@@ -40,6 +40,7 @@ Flutter                                  Cloud Run (ADK)
 | `text` | The user types in the chat box | `text` |
 | `area` | The user selects a point on the map | `lat`, `lng` |
 | `analyse` | The user taps Analyse on a "?" marker | `featureId` |
+| `answer` | The user taps an option under a question | `questionId`, `value` |
 
 `context` is sent on every turn. The app is the source of truth for what is on screen; the server does not guess. `userLocation` is present only when the user granted location access.
 
@@ -53,7 +54,8 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 | `text` | `delta` | Appends to the current answer |
 | `ui_action` | `action` (`show_layers`, `focus_map`, `draw_route`, `highlight_features`) and its arguments | The map controller applies it |
 | `card` | `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution | Renders the card widget for that type, with sources and Google Maps attribution |
-| `done` | `stop` (`end`, `budget`, `cancelled`), `usage` | Ends the turn |
+| `question` | `id`, `text`, `options`, `allowFreeText` | Shows the question with one button per option; a tap sends an `answer` input |
+| `done` | `stop` (`end`, `asked`, `budget`, `cancelled`), `usage` | Ends the turn |
 | `error` | `message`, `retryable` | Shows the error; the user may retry if `retryable` |
 
 ## Rules
@@ -63,6 +65,7 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 3. **Features by id.** Cards and UI actions reference `featureId`s. The app resolves them from the Firestore features it already listens to, which keeps events small and consistent with the map.
 4. **Server-side sessions.** Conversation history lives in the server session. The app keeps only `sessionId`.
 5. **Cancellation reaches the server.** When the user taps stop or leaves the screen, the app aborts the request. The server detects the disconnect and cancels the run, so it stops spending tokens and grounding calls.
+6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. Tapping an option sends an `answer` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
 
 ## Authentication
 
@@ -73,7 +76,7 @@ Firebase Anonymous Auth gives every user, judges included, a uid without a sign-
 | Part | Responsibility |
 | --- | --- |
 | `AgentClient` | Transport, SSE parsing, cancellation |
-| `ChatController` | Conversation state and the turn in progress |
+| `ChatController` | Conversation state, the turn in progress and any pending question |
 | `MapActions` | Applies `ui_action` events to the map |
 | Card registry | One widget per card `type`, which maps to a use case |
 

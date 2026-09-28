@@ -23,6 +23,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | [`draw_route`](#draw_route) | UI action | Haoyuan | UC-03, UC-13 |
 | [`highlight_features`](#highlight_features) | UI action | Haoyuan | UC-02, UC-03, UC-08, UC-13 |
 | [`show_card`](#show_card) | UI action | Haoyuan (validation), Wasabii (card content) | UC-02, UC-03, UC-08, UC-13 |
+| [`ask_user`](#ask_user) | Conversation | Haoyuan | UC-13 |
 
 ## Conventions
 
@@ -30,7 +31,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 - **Schemas are strict.** Enums are enums, required fields are required, and no extra fields are accepted. The server validates every call as well as the model provider.
 - **Times** are ISO 8601 with an offset, in Melbourne local time, for example `2026-10-10T19:00:00+11:00`.
 - **Lists** return at most 50 rows in compact form. The total always comes first, with `truncated: true` when rows were cut.
-- **Every call sends a `status` event** to the app with the tool's status line. This is the reasoning trace users and judges see.
+- **Data, workflow and grounding calls send a `status` event** to the app with the tool's status line. This is the reasoning trace users and judges see. UI action and conversation tools send their own event instead.
 - **Read-only calls are memoised within a turn.** An identical call returns the earlier result. A UI action does not clear the memo, because no tool writes data.
 - **Descriptions for the model** say when to use the tool, not only what it does. They are the text given to the model, and eval results decide changes to them.
 
@@ -365,6 +366,22 @@ Status line: none. Cost: none; validation runs on the server.
 | `getting_there` | string | No | For example `"8 min walk"` or `"tram 96"` |
 
 Validation: the server checks every item's `source` against the feature ids and URLs that tools returned in this turn. If any item fails, the whole call is rejected with `unverified_sources` and the failing item indexes in `details.items`, so the model can drop or fix them and call again. On success it attaches the attribution that grounding requires, sends a `card` event and returns `{ "card_id": "…" }`.
+
+## Conversation tools
+
+### `ask_user`
+
+Status line: none; the question itself is the event.
+
+**Description for the model:** Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. Calling this ends your turn.
+
+| Argument | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `question` | string | Yes | At most 200 characters |
+| `options` | string[] | Yes | 2–4 options, each at most 40 characters |
+| `allow_free_text` | boolean | No | Default `true`; the user may type an answer instead |
+
+Sends a `question` event; the server then ends the turn with `done` and stop `asked` ([agent-protocol.md](agent-protocol.md#rules)). Other tool calls in the same step run first. The server keeps the pending question in the session and puts it in the next turn's prompt, so the model can tell an answer from a change of topic. Returns `{ "question_id": "…" }` for the trace.
 
 ## Open questions
 

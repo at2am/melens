@@ -6,7 +6,7 @@ status: planned
 proposed_by: Haoyuan Tang
 trigger: query
 agents: [map_agent]
-tools: [search_features, get_feature, heritage_lookup, get_anomaly, pedestrian_pattern, nearby_context, area_brief, analyse_anomaly, maps_grounding, search_grounding, show_layers, focus_map, draw_route, highlight_features, show_card]
+tools: [search_features, get_feature, heritage_lookup, get_anomaly, pedestrian_pattern, nearby_context, area_brief, analyse_anomaly, maps_grounding, search_grounding, show_layers, focus_map, draw_route, highlight_features, show_card, ask_user]
 data_sources: [pedestrian-live, pedestrian-history, ptv-gtfs-realtime, road-disruptions, events-ticketmaster, heritage-vhd, news-rss, maps-grounding, search-grounding]
 source_rows: []
 ---
@@ -25,6 +25,7 @@ Beyond the fixed entry points, the chat box is one agent flexible enough for ran
 2. The agent picks tools from the full registry. Where a workflow covers the request, it calls that workflow instead of rebuilding it.
 3. Map requests run through UI action tools, which the app applies.
 4. Specific recommendations arrive as cards; general answers arrive as text.
+5. When the request is ambiguous in a way the context cannot resolve, the agent asks one question with options (`ask_user`). Otherwise it acts and states its assumptions.
 
 ## Example queries
 
@@ -40,6 +41,11 @@ Precise (also check the tool trace):
 - "Take me to Fitzroy Gardens." Expect `focus_map` and `draw_route`.
 - "Why is it so busy here?" Expect `analyse_anomaly`.
 
+Asking (check whether `ask_user` was called):
+
+- "Take me to the gardens." Expect `ask_user` with options such as Fitzroy Gardens, Carlton Gardens and Royal Botanic Gardens.
+- "Plan a walk near me." with a known location. Expect no `ask_user`.
+
 Multi-turn chain:
 
 - "What's around here?", then "Why is it so busy right now?", then "OK, plan me a quiet walk away from the crowds."
@@ -51,6 +57,7 @@ Multi-turn chain:
 - [ ] Requests a workflow covers call that workflow.
 - [ ] Specific facts and recommendations appear in cards with sources. General advice may be plain text but never presents live data without a tool result from the same turn.
 - [ ] "Here", "now" and "this one" resolve from the request context.
+- [ ] The agent asks only when the context cannot resolve an ambiguity or a required input has no default: at most one question per turn, with 2–4 options. It never asks for confirmation.
 - [ ] Every turn ends within the step budget; near the limit the agent wraps up and answers.
 - [ ] The eval checks the tool trace for precise requests: the right tool with the right arguments.
 

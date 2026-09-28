@@ -36,7 +36,7 @@ The chat agent can call both workflows as tools, so "why is it so busy here?" ty
 ```mermaid
 flowchart TD
   Req["App request<br/>input + context"] --> Route{"input.kind"}
-  Route -- "text" --> Prompt["Build prompt<br/>instruction, playbooks, context, session history"]
+  Route -- "text" --> Prompt["Build prompt<br/>instruction, playbooks, context,<br/>session history, pending question"]
   Route -- "area / analyse" --> WF
 
   subgraph LoopG["map_agent loop: at most 16 model calls per turn"]
@@ -60,16 +60,18 @@ flowchart TD
     UIEv(["ui_action"])
     CardEv(["card"])
     Done(["text + done"])
+    Ask(["question + done"])
   end
 
-  Exec -- "every call" --> Status
+  Exec -- "data, workflow and grounding calls" --> Status
   Exec -- "UI action tools" --> UIEv
   Check -- "yes" --> CardEv
   Drop --> CardEv
   HasTools -- "no" --> Done
+  Exec -- "ask_user ends the turn" --> Ask
 ```
 
-Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK docs for the chosen language).
+Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK docs for the chosen language).
 
 ## The chat agent (`map_agent`)
 
@@ -85,6 +87,7 @@ Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](to
 | Workflow | `area_brief`, `analyse_anomaly` | Run a known multi-step procedure in one call |
 | Grounding | `maps_grounding`, `search_grounding` | Answer open questions beyond our data |
 | UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
+| Conversation | `ask_user` | Ask one question when the context cannot resolve the request |
 
 UI action tools return to the model straight away and send a `ui_action` or `card` event to the app without waiting for a reply. The next turn's request context reports the real map state.
 
@@ -94,6 +97,15 @@ UI action tools return to the model straight away and send a `ui_action` or `car
 - **Workflows for known procedures.** A fixed multi-step job is one workflow tool call, not five tool calls assembled by the model.
 - **Tool descriptions say when to use the tool**, not only what it does.
 - **Playbooks** carry the method for multi-step jobs: one short file per use case (UC-02, UC-03, UC-04, UC-08, UC-13), with the tools, their order and the output. There are few enough to include them all in the agent's instruction. Keeping them as separate files lets the use-case owner edit prompts without touching code.
+
+### Asking the user
+
+The agent acts first and states its assumptions. It asks only when acting would probably be wrong.
+
+- **Ask** when the request is ambiguous and the request context cannot resolve it (which of several gardens, which of two anomaly markers), or when a required input has no sensible default (no location and a city-wide viewport).
+- **Do not ask** about preferences it can assume, or for confirmation. UI changes are reversible and the agent never writes data, so there is nothing to approve.
+- One question per turn, with 2–4 options. `ask_user` ends the turn, and the pending question goes into the next turn's prompt.
+- Workflows never ask, because their entry points supply every input.
 
 ### Budget and context hygiene
 
@@ -149,6 +161,7 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 - The example queries in every use-case file are the seed eval set; grow it to about 25 queries.
 - Include multi-turn chains that cross use cases, for example: "What's around here?", then "Why is it so busy right now?", then "OK, plan me a quiet walk away from the crowds."
+- Include cases where asking is right ("Take me to the gardens") and where it is wrong ("Plan a walk near me" with a known location); check them in the tool trace.
 - Checks per answer: a source for every card item, places that exist, correct times. For precise requests, also check the tool trace: the right tool with the right arguments.
 - Run the set after every prompt or tool change. Results go into the deck as evidence for the technical score.
 
