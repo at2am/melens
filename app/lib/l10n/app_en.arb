@@ -1,0 +1,19 @@
+{
+  "@@locale": "en",
+  "appTitle": "Melens",
+  "@appTitle": {
+    "description": "App name, shown in the browser tab and the task switcher."
+  },
+  "mapPlaceholder": "The map goes here (UC-01).",
+  "@mapPlaceholder": {
+    "description": "Temporary body of the map screen until the map is built."
+  },
+  "notFoundTitle": "Page not found",
+  "@notFoundTitle": {
+    "description": "Title of the screen shown for an unknown URL."
+  },
+  "notFoundBackToMap": "Back to the map",
+  "@notFoundBackToMap": {
+    "description": "Button on the not-found screen that opens the map."
+  }
+}
