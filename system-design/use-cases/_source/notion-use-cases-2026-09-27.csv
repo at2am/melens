@@ -1,0 +1,35 @@
+﻿-,Note,Person,Priority,Query examples,Trigger,Use cases
+,,,Low,,,
+Local News,,Alex Gao,,News on different area,,"User browser what happened near melbourne.
+Different Zoom level / Area display the corresponding top 3 news for browsering what happened recently.
+Open map → drag/zoom → show different news"
+Abnormal detection & analysis,,Alex Gao,,,,"地图上会显示 Pedestrian 的人流量。如果当天发现某地的 Pedestrian 人流量相较过去一周的历史数据异常突出，地图上会出现一个 Ping icon（比如问号形状的 Ping icon）。
+用户点击后，会弹出一个小的 Pop up Window，提示这里的数据比之前一周的流量额外多或少，并询问是否想要 analysis 为什么会这样。
+如果用户点击 analysis，AI 就会开始进行一些 query，根据收集的新闻数据来判断，看看是不是因为最近有什么热点事件导致流量突然增加或减少，然后给用户一些回答。"
+Personalized Discovery,一些官方举办的活动，有明确可追溯的数据源头的,Wasabii,,“What can I do after 7 PM tonight? I enjoy arts and culture and need somewhere accessible on foot or by public transport.”,Query-based," As a user, I would like to explore arts and cultural experiences available after 7 PM that are accessible without a car."
+User-published event,,Haoyuan Tang,,,,As a user I would like to publish customised events on the map directly so that other people who may interested in can discover and join.
+BYO data sources,,Haoyuan Tang,,,,"As a user I would like to add my own data sources to the map just like the old RSS, so that I can visualise something haven’t been officially supported by the map owner or something private."
+Tram/Traffic Disruption,,,,,,在地图上，用红色线条或其他 icon 标注出受影响的公共交通或高速公路交通阻塞区域。用户看到这些异常 icon 或红色线段后，点击即可弹出浮动窗口或其他提示，告知user具体发生了什么，以便user在规划行程时尽量避开。
+Personalized Discovery,更随意，可能没有官方publish的一些活动，比如散步，钓鱼，去狗狗公园看狗， 去高层看ct view， 去看日落，,Wasabii,,"“I’d like some free activities now”;
+
+“Plan a free, 45-minute walk near me, with a few interesting stops along the way.” ;",Query-based," As a user, I would like to a free, approximately 45-minute walk nearby with interesting places along the way"
+Local Deals,,Haoyuan Tang,,,,"As a user, I would like to see what latest deals the local stores provide at the moment."
+Views/layers/topics,,Haoyuan Tang,,,,"As a user, I would like to manage/catagorise infromation as views/layers/topics, and toggle the related dataset visibility on the map. For example, I can toggle on concerts/lives to focus on this kind of info on the map."
+Map Discovery,不属于提前计划，,,,,,"As a user, I’d like to understand what’s happening in my current area"
+Map Discovery,可以返还一些固定格式的标准答案，同时让用户保持持续可以去问询的对话框。,Wasabii,,"
+• “What’s interesting around here?”
+• “I’ve never been to this area. Where should I start?”
+• “What’s this neighborhood known for?”
+• “I have an hour to explore here. What should I check out?”
+• “Are there any small galleries or independent bookstores nearby?”
+• “Anything happening around here this weekend?”
+• “What’s this area like in the evening?”
+• “Where can I sit somewhere quiet and have a coffee?”
+• “I walk past here every day. What might I be missing?”
+• “Can you suggest a short walk that helps me get to know this neighborhood?”",,"As a user, I’d like to select a location on the map and discover its local character, notable places, and upcoming activities, so I can understand what makes the area distinctive and decide what to explore."
+Local history,,Haoyuan Tang,,,,"As a user, I would like to know the history of a selected region to know what have happened in the past."
+Join user-published event,,Haoyuan Tang,,,,As a user I would like to discover and join local events that can be found no where in Google Maps.
+Personalized Discovery,"A map of nearby parking options with estimated availability at the expected arrival time, parking restrictions, costs, walking distance to the destination, and alternative options. Predictions should be clearly distinguished from current availability.",Wasabii,,"“I’m heading to Melbourne Central and expect to arrive at 6 PM. Where am I likely to find parking nearby?”
+
+",Query-based,"As a driver, I’d like to know whether parking is likely to be available near my destination when I arrive, so I can plan ahead and spend less time searching for a space."
+Protest Map,,Haoyuan Tang,,,,"As a user, I would like to see the areas affected by protest."
