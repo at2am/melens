@@ -35,4 +35,4 @@ Expected output, from the Notion notes: a map of nearby parking options with est
 
 ## Open questions
 
-- Which agent owns this if it is built: discovery, or a dedicated tool?
+- If built, is it a `map_agent` tool or a workflow?

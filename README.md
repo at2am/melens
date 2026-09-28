@@ -19,6 +19,7 @@ Melens shows City of Melbourne datasets as map layers, and Gemini agents answer 
 | [use-cases/](system-design/use-cases/README.md) | What we build, in priority order |
 | [architecture.md](system-design/architecture.md) | Components, data model, data flow, deployment constraints |
 | [agent-design.md](system-design/agent-design.md) | Product agents, tools, models, answer rules |
+| [agent-protocol.md](system-design/agent-protocol.md) | How the app talks to the agent service |
 | [data-sources.md](system-design/data-sources.md) | External datasets and their limits |
 
 The team plan (timeline, owners, task order) lives in the [team plan doc](https://claude.ai/code/artifact/b20e5265-c986-413b-99f0-4c0e4075083b). `system-design/` holds what the code needs; the plan holds who does what and when.

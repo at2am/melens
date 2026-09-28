@@ -5,7 +5,7 @@ priority: P0            # P0 | P1 | P2 | out-of-scope
 status: planned         # planned | in-progress | done | dropped
 proposed_by: Name
 trigger: query          # browse | query | proactive
-agents: []              # root | discovery | insight | extraction
+agents: []              # map_agent | area_brief | analyse_anomaly | extraction
 tools: []               # see ../agent-design.md
 data_sources: []        # ids from ../data-sources.md
 source_rows: []         # Notion row titles this merges, if any

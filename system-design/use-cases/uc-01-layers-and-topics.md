@@ -5,8 +5,8 @@ priority: P0
 status: planned
 proposed_by: Haoyuan Tang
 trigger: browse
-agents: []
-tools: []
+agents: [map_agent]
+tools: [show_layers]
 data_sources: [pedestrian-live, ptv-gtfs-realtime, road-disruptions, events-ticketmaster]
 source_rows: [Views/layers/topics]
 ---
@@ -24,6 +24,7 @@ Every dataset reaches the user as a layer, and every other feature hangs off a l
 1. The map shows a layer panel. Each layer groups the MapFeatures of one topic (`MapFeature.layer`).
 2. Toggling a layer shows or hides its features at once; the app listens to Firestore.
 3. The enabled layers are sent to the agent with every question, so answers focus on what the user is looking at.
+4. In the chat, the agent can turn layers on or off with `show_layers` (UC-13).
 
 ## Acceptance criteria (Draft)
 

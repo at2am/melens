@@ -41,7 +41,7 @@ The app talks only to Firestore (display) and the agent service (questions and a
 | Component | Runs on | Responsibility |
 | --- | --- | --- |
 | Flutter app | Android, iOS, Web on Firebase Hosting | Map, layer toggles, AI chat panel, anomaly markers, disruption lines, BYO sources |
-| Agent service | Cloud Run (ADK) | Root, discovery and insight agents; tool calls; streamed answers |
+| Agent service | Cloud Run (ADK) | Chat agent, workflows and extraction; tool calls; streamed events ([agent-protocol.md](agent-protocol.md)) |
 | Ingestion jobs | Triggered by Cloud Scheduler | One connector per source; Gemini extracts places and summaries |
 | Firestore | Firebase | Current MapFeatures in one schema, nearby queries by geohash, user layers and published events |
 | BigQuery | Google Cloud | Hourly pedestrian and parking history; hourly anomaly detection; writes anomalies back to Firestore |

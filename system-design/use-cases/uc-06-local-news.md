@@ -22,7 +22,7 @@ Low marginal cost: it reuses the news pipeline that UC-04 already needs.
 ## Behaviour
 
 1. The ingestion job reads the news RSS feeds.
-2. The extraction agent (`gemini-3.5-flash-lite`, structured output) pulls out the place and a summary; Geocoding turns the place into coordinates.
+2. The extraction pipeline (`gemini-3.5-flash-lite`, structured output) pulls out the place and a summary; Geocoding turns the place into coordinates.
 3. Each item becomes a MapFeature in the `news` layer.
 4. The app shows the top 3 items for the visible area and refreshes them on pan and zoom.
 

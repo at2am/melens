@@ -19,7 +19,8 @@ Design docs, in reading order:
 1. `system-design/use-cases/README.md`: every feature with its priority and status. Start here.
 2. `system-design/architecture.md`: components, the `MapFeature` data model and the data flow.
 3. `system-design/agent-design.md`: product agents, tools, models and answer rules.
-4. `system-design/data-sources.md`: external datasets, access and limits.
+4. `system-design/agent-protocol.md`: how the app talks to the agent service.
+5. `system-design/data-sources.md`: external datasets, access and limits.
 
 ## Hard rules (competition)
 
@@ -33,7 +34,8 @@ Breaking one of these can disqualify the entry.
 
 ## Product rules
 
-- Every agent recommendation cites its source: a `MapFeature` id or a web link. No source, no output.
+- Specific facts and recommendations (places, events, times, crowds, disruptions) appear in cards, and every card item cites a `MapFeature` id or a web link returned in the same turn. General advice may be plain text but never presents live data without a tool result. Enforce this in code (see `agent-design.md`, Source rules).
+- The Flutter app never calls a language model. All agent logic runs in the agent service on Cloud Run.
 - Predictions are always labelled as predictions (`is_prediction`) and never styled as live data.
 - UI text, prompts and demo content are in English, because Maps grounding only supports English.
 - Anything shown from Google Maps grounding carries the required Google Maps attribution.

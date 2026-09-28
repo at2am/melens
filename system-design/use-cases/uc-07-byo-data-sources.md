@@ -22,7 +22,7 @@ A source of innovation points, and the second thing Google Maps cannot do: paste
 ## Behaviour
 
 1. The user signs in with Firebase Auth and pastes a URL.
-2. The extraction agent reads a sample, detects the fields and maps them to MapFeature fields (structured output).
+2. The extraction pipeline reads a sample, detects the fields and maps them to MapFeature fields (structured output).
 3. A connector for that URL writes MapFeatures into a new user layer.
 4. The layer appears in the layer panel (UC-01).
 

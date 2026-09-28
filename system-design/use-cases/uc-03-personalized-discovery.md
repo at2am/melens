@@ -5,8 +5,8 @@ priority: P0
 status: planned
 proposed_by: Wasabii
 trigger: query
-agents: [root, discovery]
-tools: [search_features, maps_grounding, search_grounding]
+agents: [map_agent]
+tools: [search_features, maps_grounding, search_grounding, draw_route, highlight_features, show_card]
 data_sources: [events-ticketmaster, maps-grounding, search-grounding]
 source_rows: [Personalized Discovery (arts after 7 PM), Personalized Discovery (free 45-minute walk)]
 ---
@@ -25,9 +25,9 @@ Shows the agent calling several tools to build a plan around the user's time, in
 ## Behaviour
 
 1. The user asks in the chat.
-2. The discovery agent finds candidates: events from the events layer for story 1, free places and activities for story 2, and Maps grounding for place details.
-3. For a walk, it builds a route with the Maps grounding route capability (up to 13 waypoints), and the app draws the polyline on the map.
-4. The answer is a plan with times, stops and a source for each item.
+2. `map_agent`, following the UC-03 playbook, finds candidates: events from the events layer for story 1, free places and activities for story 2, and Maps grounding for place details.
+3. For a walk, it builds a route with the Maps grounding route capability (up to 13 waypoints) and calls `draw_route`, so the app draws it on the map.
+4. The plan arrives as a `plan` card, with times, stops and a source for each item.
 
 ## Example queries
 

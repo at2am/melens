@@ -5,7 +5,7 @@ priority: P0
 status: planned
 proposed_by: Alex Gao
 trigger: proactive
-agents: [root, insight]
+agents: [analyse_anomaly, map_agent]
 tools: [get_anomaly, nearby_context, search_grounding]
 data_sources: [pedestrian-live, pedestrian-history, news-rss, events-ticketmaster, ptv-gtfs-realtime, road-disruptions, search-grounding]
 source_rows: [Abnormal detection & analysis]
@@ -27,7 +27,7 @@ Translated from the original Chinese in the Notion table:
 2. Anomaly detection compares each sensor with the same hour over the past 7 days (one SQL query). The upgrade is BigQuery `AI.DETECT_ANOMALIES` (TimesFM, no training).
 3. Sensors beyond the threshold become a "?" MapFeature in Firestore, and the app shows the marker in real time.
 4. Tapping the marker opens a pop-up: higher or lower than usual, by how much, and an Analyse button.
-5. Analyse: the insight agent fetches the anomaly and its baseline, then checks nearby news, events and transport disruptions, and searches the web if needed.
+5. Analyse runs the `analyse_anomaly` workflow. It fetches the anomaly and its baseline, and nearby news, events and transport disruptions, in parallel; then one generation with Search grounding writes the answer. When the question comes from the chat, `map_agent` calls the same workflow.
 6. The answer gives possible causes, a confidence level and source links. It never states a cause as fact.
 
 ## Example queries

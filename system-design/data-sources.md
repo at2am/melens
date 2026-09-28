@@ -17,6 +17,6 @@ Use cases reference sources by the `id` column.
 | `maps-grounding` | Places and routes | [Gemini: Grounding with Google Maps](https://ai.google.dev/gemini-api/docs/maps-grounding) | Gemini tool | Real time | English questions and answers only; Google Maps attribution required wherever results are shown | UC-02, UC-03 |
 | `search-grounding` | Web search | [Gemini: Grounding with Google Search](https://ai.google.dev/gemini-api/docs/google-search) | Gemini tool | Real time | Billed per call; cache results in Firestore | UC-02, UC-03, UC-04, UC-08 |
 
-**Event fallback:** if Ticketmaster has too few Melbourne events, the discovery agent uses Search grounding to find tonight's events and links the pages it used. Do not scrape What's On Melbourne.
+**Event fallback:** if Ticketmaster has too few Melbourne events, `map_agent` uses Search grounding to find tonight's events and links the pages it used. Do not scrape What's On Melbourne.
 
 **Before the transport key arrives:** build against recorded sample responses.

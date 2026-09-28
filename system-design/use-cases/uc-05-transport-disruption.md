@@ -13,7 +13,7 @@ source_rows: [Tram/Traffic Disruption]
 
 # UC-05: Tram and traffic disruption
 
-Official real-time data that is cheap to ingest and visible at a glance. It also gives the insight agent context for UC-04.
+Official real-time data that is cheap to ingest and visible at a glance. It also gives the UC-04 analysis its transport context.
 
 ## User stories
 
@@ -33,7 +33,7 @@ Translated from the original Chinese in the Notion table:
 - [ ] Tram and train disruptions appear on the affected routes or stops.
 - [ ] Tapping a disruption shows what happened, what is affected and the time window if known, with a source.
 - [ ] Polling stays within 24 calls per 60 seconds per transport mode.
-- [ ] Disruptions are available to the insight agent through `nearby_context`.
+- [ ] Disruptions are available to `map_agent` and `analyse_anomaly` through `nearby_context`.
 
 ## Notes
 

@@ -2,20 +2,21 @@
 
 What Melens does, in build order. Each file starts with YAML frontmatter that agents and scripts can parse, followed by the user stories, the behaviour, example queries and acceptance criteria.
 
-**Source:** the team's Notion use-case table (15 rows, exported 2026-09-27, kept verbatim in [`_source/`](_source/notion-use-cases-2026-09-27.csv)). The 2026-09-27 plan merged these into the 12 use cases below. Priorities are the plan's proposal and still need team confirmation.
+**Source:** the team's Notion use-case table (15 rows, exported 2026-09-27, kept verbatim in [`_source/`](_source/notion-use-cases-2026-09-27.csv)). The 2026-09-27 plan merged these into UC-01 to UC-12; UC-13 was added on 2026-09-28. Priorities are the plan's proposal and still need team confirmation.
 
 Together the P0 use cases make one demo story: open the map, see an anomaly, ask the AI why, then plan tonight.
 
 | ID | Use case | Priority | Proposed by | Agents | Status |
 | --- | --- | --- | --- | --- | --- |
-| [UC-01](uc-01-layers-and-topics.md) | Views, layers and topics | P0 | Haoyuan Tang | none (app) | planned |
-| [UC-02](uc-02-map-discovery.md) | Map discovery | P0 | Wasabii | root, discovery | planned |
-| [UC-03](uc-03-personalized-discovery.md) | Personalized discovery and planning | P0 | Wasabii | root, discovery | planned |
-| [UC-04](uc-04-pedestrian-anomaly.md) | Pedestrian anomaly detection and analysis | P0 | Alex Gao | root, insight | planned |
+| [UC-01](uc-01-layers-and-topics.md) | Views, layers and topics | P0 | Haoyuan Tang | map_agent (UI action) | planned |
+| [UC-02](uc-02-map-discovery.md) | Map discovery | P0 | Wasabii | area_brief, map_agent | planned |
+| [UC-03](uc-03-personalized-discovery.md) | Personalized discovery and planning | P0 | Wasabii | map_agent | planned |
+| [UC-04](uc-04-pedestrian-anomaly.md) | Pedestrian anomaly detection and analysis | P0 | Alex Gao | analyse_anomaly, map_agent | planned |
 | [UC-05](uc-05-transport-disruption.md) | Tram and traffic disruption | P0 | unassigned | none (connector) | planned |
+| [UC-13](uc-13-general-chat.md) | General chat assistant | P0 | Haoyuan Tang | map_agent | planned |
 | [UC-06](uc-06-local-news.md) | Local news by area | P1 | Alex Gao | extraction | planned |
 | [UC-07](uc-07-byo-data-sources.md) | Bring your own data sources | P1 | Haoyuan Tang | extraction | planned |
-| [UC-08](uc-08-local-history.md) | Local history | P1 | Haoyuan Tang | root, discovery | planned |
+| [UC-08](uc-08-local-history.md) | Local history | P1 | Haoyuan Tang | map_agent | planned |
 | [UC-09](uc-09-user-events.md) | Publish and join user events | P2 | Haoyuan Tang | none (app) | planned |
 | [UC-10](uc-10-parking-prediction.md) | Parking availability prediction | P2 | Wasabii | to be decided | planned |
 | [UC-11](uc-11-local-deals.md) | Local deals | out-of-scope | Haoyuan Tang | none | dropped |
@@ -40,7 +41,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | `status` | `planned`, `in-progress`, `done`, `dropped` |
 | `proposed_by` | Team member who proposed it in the Notion table |
 | `trigger` | `browse` (user explores the map), `query` (user asks), `proactive` (the system surfaces it) |
-| `agents` | Product agents involved; see [agent-design.md](../agent-design.md) |
+| `agents` | Chat agent, workflows or pipeline involved: `map_agent`, `area_brief`, `analyse_anomaly`, `extraction`; see [agent-design.md](../agent-design.md) |
 | `tools` | Agent tools involved; see [agent-design.md](../agent-design.md) |
 | `data_sources` | Ids from [data-sources.md](../data-sources.md) |
 | `source_rows` | Row titles in the Notion export that this use case merges |

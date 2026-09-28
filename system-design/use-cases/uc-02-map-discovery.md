@@ -5,8 +5,8 @@ priority: P0
 status: planned
 proposed_by: Wasabii
 trigger: query
-agents: [root, discovery]
-tools: [search_features, heritage_lookup, maps_grounding, search_grounding]
+agents: [area_brief, map_agent]
+tools: [search_features, heritage_lookup, maps_grounding, search_grounding, focus_map, highlight_features, show_card]
 data_sources: [heritage-vhd, events-ticketmaster, maps-grounding, search-grounding]
 source_rows: [Map Discovery (current area), Map Discovery (selected location)]
 ---
@@ -24,10 +24,10 @@ The main GenAI feature: the user points at the map and learns what makes that pl
 
 ## Behaviour
 
-1. The user selects a point on the map or asks about where they are. The app sends the coordinates, the current time and the enabled layers.
-2. The discovery agent searches layer features and heritage records within a radius, then uses Maps grounding for place details.
-3. It answers first with a fixed-format card: neighbourhood character, recommended places, upcoming activities.
-4. The chat stays open so the user can keep asking.
+1. The user selects a point on the map, or asks in the chat about where they are. The app sends the coordinates, the current time and the enabled layers.
+2. The `area_brief` workflow searches layer features and heritage records within a radius, then uses Maps grounding for place details. From the chat, `map_agent` calls the same workflow as a tool.
+3. The first answer is a fixed-format card: neighbourhood character, recommended places, upcoming activities.
+4. The chat stays open; follow-up questions go to `map_agent`.
 
 ## Example queries
 
