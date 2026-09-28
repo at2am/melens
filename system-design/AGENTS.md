@@ -12,7 +12,7 @@ Melens is a mobile and web app that shows City of Melbourne datasets as map laye
 | --- | --- |
 | `system-design/` | Design docs, use cases and agent instructions. Read the relevant ones before building a feature. |
 | `cloud/` | Google Cloud backend: ADK agent service, data connectors, infrastructure. Empty for now. |
-| `app/` | Flutter app for Android, iOS and Web. Empty for now. |
+| `app/` | Flutter app for Android, iOS and Web. Read `app/README.md` before changing it. |
 
 Design docs, in reading order:
 
@@ -49,6 +49,14 @@ Breaking one of these can disqualify the entry.
 - Do not build use cases marked `out-of-scope`.
 - Feature freeze is 2026-10-15. After that: bug fixes, UI polish and demo data only.
 - Submission target is 2026-10-17; the deadline is 2026-10-18.
+
+## Flutter app
+
+- Package choices, layout and conventions are in `app/README.md`. Follow them, and change that file when they change.
+- Use the pinned Flutter version in `app/.fvmrc` (`fvm flutter …`).
+- Import `package:material_ui/material_ui.dart`, never `package:flutter/material.dart`.
+- After changing annotated code, run `fvm dart run build_runner build` and commit the generated files with the change.
+- `fvm flutter analyze` and `fvm flutter test` pass before every commit.
 
 ## Working with use cases
 

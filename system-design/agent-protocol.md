@@ -80,7 +80,7 @@ Firebase Anonymous Auth gives every user, judges included, a uid without a sign-
 | `MapActions` | Applies `ui_action` events to the map |
 | Card registry | One widget per card `type`, which maps to a use case |
 
-**Flutter Web streaming:** `package:http`'s `BrowserClient` buffers the whole response, so SSE does not stream. Use a Fetch-based client such as `package:fetch_client`. The browser's `EventSource` supports only GET and cannot send the auth header, so it does not fit. Verify streaming on the Web build during the skeleton phase.
+**Flutter Web streaming:** `package:http`'s `BrowserClient` has used the Fetch API since http 1.3, so it streams response bodies, and http 1.5 added `AbortableRequest` for cancellation. The browser's `EventSource` supports only GET and cannot send the auth header, so the app parses the stream itself (`SseDecoder` in `app/lib/core/network/sse.dart`). Checked on 2026-09-28 in Chrome with http 1.6.0: events arrived as the server sent them, an aborted request closed the connection on the server, and the `Authorization` header passed the CORS preflight. The agent service must allow CORS from the Web origin, including that header.
 
 ## Open questions
 

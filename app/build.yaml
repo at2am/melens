@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Nested models serialise through their own toJson.
+          explicit_to_json: true
+          # Type errors name the key and model that failed to parse.
+          checked: true
