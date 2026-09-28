@@ -19,6 +19,7 @@ Melens shows City of Melbourne datasets as map layers, and Gemini agents answer 
 | [use-cases/](system-design/use-cases/README.md) | What we build, in priority order |
 | [architecture.md](system-design/architecture.md) | Components, data model, data flow, deployment constraints |
 | [agent-design.md](system-design/agent-design.md) | Product agents, tools, models, answer rules |
+| [tools.md](system-design/tools.md) | Every agent tool: arguments, returns, errors, owners |
 | [agent-protocol.md](system-design/agent-protocol.md) | How the app talks to the agent service |
 | [data-sources.md](system-design/data-sources.md) | External datasets and their limits |
 

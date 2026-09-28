@@ -19,8 +19,9 @@ Design docs, in reading order:
 1. `system-design/use-cases/README.md`: every feature with its priority and status. Start here.
 2. `system-design/architecture.md`: components, the `MapFeature` data model and the data flow.
 3. `system-design/agent-design.md`: product agents, tools, models and answer rules.
-4. `system-design/agent-protocol.md`: how the app talks to the agent service.
-5. `system-design/data-sources.md`: external datasets, access and limits.
+4. `system-design/tools.md`: every agent tool with its arguments, returns, errors and owner.
+5. `system-design/agent-protocol.md`: how the app talks to the agent service.
+6. `system-design/data-sources.md`: external datasets, access and limits.
 
 ## Hard rules (competition)
 
@@ -55,6 +56,12 @@ Breaking one of these can disqualify the entry.
 - When behaviour, priority or status changes, update the use-case frontmatter and the index table in `use-cases/README.md` in the same commit.
 - Example queries in use-case files are the seed evaluation set. Add new queries rather than rewriting old ones.
 - For a new use case, copy `use-cases/_template.md` and take the next unused id.
+
+## Working with tools
+
+- Implement tools exactly as `tools.md` defines them: names, arguments, limits, returns and error codes.
+- Changing a tool's name, arguments, returns or model-facing description updates `tools.md` in the same commit. Once a tool exists in code, its code schema is the source of truth and `tools.md` keeps the description and rationale.
+- A new tool gets an entry in `tools.md` and in the registry summary in `agent-design.md`, and is listed in the `tools` field of the use cases that need it.
 
 ## Documentation conventions
 

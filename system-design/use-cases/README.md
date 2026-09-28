@@ -42,7 +42,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | `proposed_by` | Team member who proposed it in the Notion table |
 | `trigger` | `browse` (user explores the map), `query` (user asks), `proactive` (the system surfaces it) |
 | `agents` | Chat agent, workflows or pipeline involved: `map_agent`, `area_brief`, `analyse_anomaly`, `extraction`; see [agent-design.md](../agent-design.md) |
-| `tools` | Agent tools involved; see [agent-design.md](../agent-design.md) |
+| `tools` | Agent tools involved; see [tools.md](../tools.md) |
 | `data_sources` | Ids from [data-sources.md](../data-sources.md) |
 | `source_rows` | Row titles in the Notion export that this use case merges |
 

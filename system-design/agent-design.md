@@ -77,25 +77,16 @@ One agent with the full tool registry. It answers random questions and fulfils p
 
 ### Tool registry
 
-| Group | Tool | Returns or does |
-| --- | --- | --- |
-| Data | `search_features(area, layers?, time_from?, time_to?, query?)` | Compact MapFeatures in a bounding box or radius, with the total count |
-| Data | `get_feature(id)` | One MapFeature in full |
-| Data | `heritage_lookup(point, radius)` | Victorian Heritage Database records |
-| Data | `get_anomaly(feature_id)` | Anomaly value and baseline for a pedestrian sensor |
-| Data | `pedestrian_pattern(area, day_of_week?, hour?)` | Typical pedestrian counts by hour, from BigQuery |
-| Data | `nearby_context(point, radius, time_window)` | Nearby news, events and transport disruptions |
-| Workflow | `area_brief(lat, lng)` | Runs the UC-02 workflow; its card goes to the app |
-| Workflow | `analyse_anomaly(feature_id)` | Runs the UC-04 workflow; its card goes to the app |
-| Grounding | `maps_grounding(question, location?)` | Google Maps grounding: places, opening hours, routes |
-| Grounding | `search_grounding(question)` | Google Search grounding: web results with links |
-| UI action | `show_layers(layers, exclusive?)` | Turns layers on or off in the app |
-| UI action | `focus_map(target, zoom?)` | Moves the map to a point, box or feature |
-| UI action | `draw_route(waypoints, mode)` | Draws a route; at most 13 waypoints |
-| UI action | `highlight_features(ids)` | Highlights features on the map |
-| UI action | `show_card(type, items)` | Shows a result card (`plan`, `history`, `list`; types in [agent-protocol.md](agent-protocol.md#events)); validates every item's source first |
+Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](tools.md).
 
-UI action tools return success to the model straight away and send a `ui_action` or `card` event to the app, without waiting for a reply. The next turn's request context reports the real map state.
+| Group | Tools | Purpose |
+| --- | --- | --- |
+| Data | `search_features`, `get_feature`, `heritage_lookup`, `get_anomaly`, `pedestrian_pattern`, `nearby_context` | Read our own data |
+| Workflow | `area_brief`, `analyse_anomaly` | Run a known multi-step procedure in one call |
+| Grounding | `maps_grounding`, `search_grounding` | Answer open questions beyond our data |
+| UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
+
+UI action tools return to the model straight away and send a `ui_action` or `card` event to the app without waiting for a reply. The next turn's request context reports the real map state.
 
 ### Precision
 
@@ -115,7 +106,7 @@ UI action tools return success to the model straight away and send a `ui_action`
 
 Two tiers, enforced in code rather than only in the prompt:
 
-1. **Specific facts and recommendations** about places, events, times, crowds and disruptions go in a card. Every card item must cite a MapFeature id returned by a tool in this turn, or a URL returned by grounding in this turn. `show_card` rejects items that fail this check and returns the error to the model; workflows drop them.
+1. **Specific facts and recommendations** about places, events, times, crowds and disruptions go in a card. Every card item must cite a MapFeature id or a URL that a tool, grounding included, returned in this turn. `show_card` rejects items that fail this check and returns the error to the model; workflows drop them.
 2. **General knowledge, advice and conversation** may be plain text without a source. They must not present anything as live or current data unless a tool returned it in this turn.
 
 Streamed text carries explanations and transitions only; recommendations appear in cards. When explaining causes, answers give possible causes with a confidence level and never state a cause as fact.

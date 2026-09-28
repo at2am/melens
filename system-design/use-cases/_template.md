@@ -6,7 +6,7 @@ status: planned         # planned | in-progress | done | dropped
 proposed_by: Name
 trigger: query          # browse | query | proactive
 agents: []              # map_agent | area_brief | analyse_anomaly | extraction
-tools: []               # see ../agent-design.md
+tools: []               # see ../tools.md
 data_sources: []        # ids from ../data-sources.md
 source_rows: []         # Notion row titles this merges, if any
 ---
