@@ -2,7 +2,7 @@
 
 **Status:** Checked call by call on 2026-09-27. Only the Transport Victoria data needs a key (self-service registration on the open data portal). Events are the weakest source: What's On Melbourne has no API.
 
-Use cases reference sources by the `id` column.
+Use cases reference sources by the `id` column. The chat agent (UC-13) can reach every source except parking through its tools; `pedestrian_pattern` reads `pedestrian-history`.
 
 | id | Data | Source | Access | Freshness | Notes | Use cases |
 | --- | --- | --- | --- | --- | --- | --- |

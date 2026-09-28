@@ -93,7 +93,7 @@ One agent with the full tool registry. It answers random questions and fulfils p
 | UI action | `focus_map(target, zoom?)` | Moves the map to a point, box or feature |
 | UI action | `draw_route(waypoints, mode)` | Draws a route; at most 13 waypoints |
 | UI action | `highlight_features(ids)` | Highlights features on the map |
-| UI action | `show_card(type, items)` | Shows a result card; validates every item's source first |
+| UI action | `show_card(type, items)` | Shows a result card (`plan`, `history`, `list`; types in [agent-protocol.md](agent-protocol.md#events)); validates every item's source first |
 
 UI action tools return success to the model straight away and send a `ui_action` or `card` event to the app, without waiting for a reply. The next turn's request context reports the real map state.
 
@@ -124,18 +124,19 @@ Streamed text carries explanations and transitions only; recommendations appear 
 
 ### `analyse_anomaly` (UC-04)
 
-1. A scheduled job writes the latest pedestrian counts to BigQuery every hour.
-2. Anomaly detection compares each sensor with the same hour over the past 7 days (one SQL query). The upgrade is BigQuery `AI.DETECT_ANOMALIES` (TimesFM, no training).
-3. Sensors beyond the threshold are written to Firestore as a "?" MapFeature, and the app shows the marker in real time.
-4. On Analyse, the workflow fetches in parallel: the anomaly and baseline, and nearby news, events and transport disruptions.
-5. One generation with Search grounding writes possible causes, a confidence level and sources. The card is validated and sent.
+Detection runs before the workflow and involves no model: a scheduled job writes pedestrian counts to BigQuery every hour, compares each sensor with the same hour over the past 7 days (upgrade: BigQuery `AI.DETECT_ANOMALIES`), and writes sensors beyond the threshold to Firestore as "?" MapFeatures.
+
+1. On Analyse, the workflow fetches in parallel: the anomaly and baseline, and nearby news, events and transport disruptions.
+2. One generation with Search grounding writes possible causes, a confidence level and sources.
+3. Items without a source are dropped, and the `anomaly_analysis` card is sent.
 
 ### `area_brief` (UC-02)
 
 1. The app sends the selected point, the current time and the enabled layers.
 2. The workflow fetches in parallel: layer features and heritage records within a radius, and Maps grounding for place details.
-3. One generation fills the fixed card: neighbourhood character, recommended places, upcoming activities. The card is validated and sent.
-4. Follow-up questions go to `map_agent`.
+3. One generation fills the fixed card: neighbourhood character, recommended places, upcoming activities.
+4. Items without a source are dropped, and the `area_brief` card is sent.
+5. Follow-up questions go to `map_agent`.
 
 ## Models
 

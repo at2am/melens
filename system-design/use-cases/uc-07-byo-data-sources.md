@@ -41,3 +41,4 @@ A source of innovation points, and the second thing Google Maps cannot do: paste
 
 - Are user layers private to their owner, or can they be shared?
 - How often are user sources refreshed?
+- Everyone gets an anonymous account for chat. Does adding a source need a full account (for example Google sign-in), so the layer survives a device change?

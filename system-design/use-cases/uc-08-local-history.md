@@ -6,7 +6,7 @@ status: planned
 proposed_by: Haoyuan Tang
 trigger: query
 agents: [map_agent]
-tools: [heritage_lookup, search_grounding]
+tools: [heritage_lookup, search_grounding, highlight_features, show_card]
 data_sources: [heritage-vhd, search-grounding]
 source_rows: [Local history]
 ---
@@ -23,7 +23,7 @@ Cheap to add: essentially one agent tool plus Search grounding.
 
 1. The user selects a region and asks about its history.
 2. `map_agent` calls `heritage_lookup` for heritage records nearby and uses Search grounding for more context.
-3. The answer is a short history with a source for each claim.
+3. The answer is a `history` card: a short history with a source for each claim. Heritage places it mentions are highlighted on the map.
 
 ## Example queries
 

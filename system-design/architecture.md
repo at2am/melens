@@ -25,7 +25,7 @@ flowchart TB
   Src["External sources<br/>City of Melbourne open data, Transport Victoria, events and news feeds, user URLs"]
 
   Map -- "listen to features" --> FS
-  Chat -- "ask / streamed answer" --> Agent
+  Chat -- "ask / streamed events" --> Agent
   Mine -- "add sources / publish" --> Agent
   Agent -- "search features" --> FS
   Agent -- "query history" --> BQ

@@ -35,3 +35,7 @@ Local events that cannot be found anywhere in Google Maps. P2 because it needs a
 ## Notes
 
 - Build only after P1 is done, and only the "publish + show on the map" minimum. Joining, moderation and seeding content are later.
+
+## Open questions
+
+- Can anonymous users publish, or does publishing need a full account?

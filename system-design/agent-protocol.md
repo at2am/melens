@@ -66,7 +66,7 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 
 ## Authentication
 
-Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header and Cloud Run verifies it. This ties sessions to users and allows rate limiting, which protects the per-call grounding budget.
+Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header and Cloud Run verifies it. This ties sessions to users and allows rate limiting, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.
 
 ## Flutter implementation
 
