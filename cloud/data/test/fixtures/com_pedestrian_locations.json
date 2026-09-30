@@ -1,0 +1,87 @@
+{
+  "total_count": 5,
+  "results": [
+    {
+      "location_id": 3,
+      "sensor_description": "Melbourne Central",
+      "sensor_name": "Swa295_T",
+      "installation_date": "2009-03-25",
+      "note": null,
+      "location_type": "Outdoor",
+      "status": "A",
+      "direction_1": "North",
+      "direction_2": "South",
+      "latitude": -37.81101524,
+      "longitude": 144.96429485,
+      "location": {
+        "lon": 144.96429485,
+        "lat": -37.81101524
+      }
+    },
+    {
+      "location_id": 14,
+      "sensor_description": "Sandridge Bridge",
+      "sensor_name": "SanBri_T",
+      "installation_date": "2009-03-24",
+      "note": "Sensor relocated to sensor ID 25 on 2/10/2019",
+      "location_type": "Outdoor",
+      "status": "A",
+      "direction_1": "North",
+      "direction_2": "South",
+      "latitude": -37.82011242,
+      "longitude": 144.96291897,
+      "location": {
+        "lon": 144.96291897,
+        "lat": -37.82011242
+      }
+    },
+    {
+      "location_id": 48,
+      "sensor_description": "QVM-Queen St (East)",
+      "sensor_name": "QVMQ_T",
+      "installation_date": null,
+      "note": "Funk Fish Cafe sensor upgrade 25/06/2026",
+      "location_type": "Outdoor",
+      "status": "A",
+      "direction_1": "East",
+      "direction_2": "West",
+      "latitude": -37.80631581,
+      "longitude": 144.95866697,
+      "location": {
+        "lon": 144.95866697,
+        "lat": -37.80631581
+      }
+    },
+    {
+      "location_id": 52,
+      "sensor_description": "Bourke Street Mall",
+      "sensor_name": "Bou292_T",
+      "installation_date": "2013-09-02",
+      "note": "Temporary inactive during tram track works",
+      "location_type": "Outdoor",
+      "status": "I",
+      "direction_1": "East",
+      "direction_2": "West",
+      "latitude": -37.8134,
+      "longitude": 144.9652,
+      "location": {
+        "lon": 144.9652,
+        "lat": -37.8134
+      }
+    },
+    {
+      "location_id": 90,
+      "sensor_description": "Former site",
+      "sensor_name": "Test historical",
+      "installation_date": "2019-06-01",
+      "note": "Removed",
+      "location_type": "Outdoor",
+      "status": "R",
+      "direction_1": null,
+      "direction_2": null,
+      "latitude": null,
+      "longitude": null,
+      "location": null
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "overlay": {
+    "metadata": {
+      "id": 2,
+      "objectIdField": "OBJECTID",
+      "editingInfo": {
+        "dataLastEditDate": 1711843200000
+      }
+    },
+    "ids": {
+      "objectIdFieldName": "OBJECTID",
+      "objectIds": [201]
+    },
+    "collection": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {
+            "OBJECTID": 201,
+            "ufi": 200101,
+            "scheme_code": "PO",
+            "lga_code": "343",
+            "lga": "MELBOURNE",
+            "zone_num": 1,
+            "zone_status": null,
+            "zone_code": "DDO1",
+            "zone_description": "DESIGN AND DEVELOPMENT OVERLAY - SCHEDULE 1",
+            "gaz_begin_date": 946684800000
+          },
+          "geometry": {
+            "type": "MultiPolygon",
+            "coordinates": [
+              [
+                [
+                  [144.95, -37.81],
+                  [144.96, -37.81],
+                  [144.96, -37.82],
+                  [144.95, -37.82],
+                  [144.95, -37.81]
+                ]
+              ],
+              [
+                [
+                  [144.97, -37.81],
+                  [144.98, -37.81],
+                  [144.98, -37.82],
+                  [144.97, -37.82],
+                  [144.97, -37.81]
+                ]
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "zone": {
+    "metadata": {
+      "id": 3,
+      "objectIdField": "OBJECTID",
+      "editingInfo": {
+        "dataLastEditDate": 1711843200000
+      }
+    },
+    "ids": {
+      "objectIdFieldName": "OBJECTID",
+      "objectIds": [301]
+    },
+    "collection": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {
+            "OBJECTID": 301,
+            "ufi": 300101,
+            "scheme_code": "ZN",
+            "lga_code": "343",
+            "lga": "MELBOURNE",
+            "zone_num": 1,
+            "zone_status": null,
+            "zone_code": "CCZ1",
+            "zone_description": "CAPITAL CITY ZONE - SCHEDULE 1",
+            "gaz_begin_date": 928368000000
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [144.955, -37.812],
+                [144.965, -37.812],
+                [144.965, -37.822],
+                [144.955, -37.822],
+                [144.955, -37.812]
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

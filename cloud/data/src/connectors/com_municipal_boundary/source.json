@@ -1,0 +1,31 @@
+{
+  "source_id": "melbourne.municipal_boundary",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "Municipal boundary",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/municipal-boundary/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/municipal-boundary/records",
+  "topic": "boundary",
+  "scope": "city",
+  "coverage_area_refs": ["com_municipal:1:2008-07-01"],
+  "coverage_from": "2008-07-01T00:00:00Z",
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": null,
+  "license_status": "verified_open",
+  "access_status": "active",
+  "record_granularity": "municipality_version",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/municipal-boundary/",
+    "native_record_key": "mccid_gis",
+    "completeness_rule": "total_count = 1 and name = City of Melbourne",
+    "quota_requests_per_day": 10000,
+    "secret_names": [],
+    "allowed_fields": ["mccid_gis", "name", "xdate", "geo_shape"],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/municipal-boundary",
+    "reviewed_at": "2026-09-29T23:09:59Z"
+  }
+}

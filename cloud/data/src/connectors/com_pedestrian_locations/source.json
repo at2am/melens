@@ -1,0 +1,43 @@
+{
+  "source_id": "melbourne.pedestrian.locations",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "Pedestrian Counting System - Sensor Locations",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-sensor-locations/records",
+  "topic": "pedestrian",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 86400,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "access_status": "candidate",
+  "record_granularity": "sensor_location_version",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/",
+    "native_record_key": "location_id",
+    "completeness_rule": "Fetch complete snapshot with stable location_id ordering and total_count consistency",
+    "secret_names": [],
+    "allowed_fields": [
+      "location_id",
+      "sensor_description",
+      "sensor_name",
+      "installation_date",
+      "note",
+      "location_type",
+      "status",
+      "direction_1",
+      "direction_2",
+      "latitude",
+      "longitude",
+      "location"
+    ],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/"
+  }
+}

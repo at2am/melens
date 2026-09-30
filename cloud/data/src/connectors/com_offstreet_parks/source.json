@@ -1,0 +1,53 @@
+{
+  "source_id": "melbourne.offstreet_parks",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "Off-street car parks with capacity and type",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/off-street-car-parks-with-capacity-and-type/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/off-street-car-parks-with-capacity-and-type/records",
+  "dataset_id": "off-street-car-parks-with-capacity-and-type",
+  "topic": "parking",
+  "scope": "city",
+  "coverage_area_refs": [
+    "com_municipal:1:2008-07-01"
+  ],
+  "coverage_from": "2002-01-01T00:00:00Z",
+  "coverage_to": "2025-01-01T00:00:00Z",
+  "cadence_seconds": 31536000,
+  "check_interval_seconds": null,
+  "license_status": "review_required",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "access_status": "candidate",
+  "record_granularity": "establishment_census_year",
+  "connector_owner": "melens integration",
+  "description": "Data collected as part of the City of Melbourne Census of Land Use and Employment (CLUE), tracking off-street parking capacity per property classified as Commercial, Residential, or Private. Only Commercial facilities are marked as public parking candidates; annual survey capacity is never written as real-time available bays.",
+  "invariants": {
+    "public_candidate_rule": "Only parking_type === 'Commercial' is marked as is_public_candidate: true and public_access: true. Residential and Private facilities are strictly non-public (is_public_candidate: false, public_access: false).",
+    "capacity_rule": "parking_spaces represents annual CLUE survey capacity, never real-time vacant spaces or sensor occupancy (is_realtime_occupancy: false, no parking observations emitted).",
+    "license_rule": "License status remains review_required and access status remains candidate until formal licensing review and real crawl verification are completed."
+  },
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/off-street-car-parks-with-capacity-and-type/",
+    "native_record_key": "census_year + property_id + parking_type",
+    "completeness_rule": "total_count > 0; unique (census_year, property_id, parking_type); only Commercial facilities marked as public candidates; annual capacity never written as real-time available bays",
+    "quota_requests_per_day": 50000,
+    "secret_names": [],
+    "allowed_fields": [
+      "census_year",
+      "block_id",
+      "property_id",
+      "base_property_id",
+      "building_address",
+      "clue_small_area",
+      "parking_type",
+      "parking_spaces",
+      "latitude",
+      "longitude",
+      "location"
+    ],
+    "raw_retention_days": 30,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/off-street-car-parks-with-capacity-and-type/"
+  }
+}

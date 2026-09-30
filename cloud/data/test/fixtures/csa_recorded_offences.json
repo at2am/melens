@@ -1,0 +1,19 @@
+{
+  "description": "Synthetic Table 01 values. Year ending June 2026 represents the rolling period 2025-07-01 to 2026-06-30, not crimes committed during June alone.",
+  "catalog_resource": {
+    "id": "06bb24c8-8f62-4144-a746-99ef5492e4f9",
+    "name": "Recorded offences by LGA - Year ending Jun 2026",
+    "format": "XLSX",
+    "url": "https://files.crimestatistics.vic.gov.au/2026-09/Data_Tables_LGA_Recorded_Offences_Year_Ending_June_2026.xlsx",
+    "period_end": "2026-06-30",
+    "release_date": "2026-09-24"
+  },
+  "table_01": [
+    ["Year", "Year ending", "Police Region", "Local Government Area", "Offence Count", "Rate per 100,000 population"],
+    [2026, "June", "North West Metro", "Melbourne", 100, 1200.5],
+    [2026, "June", "North West Metro", "Yarra", "*", null],
+    [2026, "June", "North West Metro", "Port Phillip", null, null]
+  ],
+  "expected_statuses": ["observed", "suppressed", "missing"],
+  "lga_code": null
+}

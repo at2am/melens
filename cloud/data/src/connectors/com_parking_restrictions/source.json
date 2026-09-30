@@ -1,0 +1,30 @@
+{
+  "source_id": "melbourne.parking.restrictions",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "On-street Car Park Bay Restrictions",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-car-park-bay-restrictions/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-car-park-bay-restrictions/records",
+  "topic": "parking",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "bay_rule_slot",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-car-park-bay-restrictions/",
+    "native_record_key": "bayid + numbered rule slot",
+    "completeness_rule": "All pages match total_count; parse slots 1 through 6 without merging non-overlapping rules",
+    "secret_names": [],
+    "allowed_fields": ["bayid", "deviceid", "description1-6", "disabilityext1-6", "fromday1-6", "today1-6", "starttime1-6", "endtime1-6", "typedesc1-6", "duration1-6", "effectiveonph1-6", "exemption1-6"],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-car-park-bay-restrictions/"
+  },
+  "join_warning": "Current API bayid has no verified complete crosswalk to current parking sensor kerbsideid. Rules have no per-row effective dates."
+}

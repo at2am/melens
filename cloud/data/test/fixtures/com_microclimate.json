@@ -1,0 +1,107 @@
+{
+  "total_count": 5,
+  "results": [
+    {
+      "device_id": "ICTMicroclimate-08",
+      "received_at": "2026-04-28T15:25:15+00:00",
+      "sensorlocation": "Swanston St - Tram Stop 13 adjacent Federation Sq & Flinders St Station",
+      "latlong": {
+        "lon": 144.9678474,
+        "lat": -37.8184515
+      },
+      "airtemperature": 16.7,
+      "relativehumidity": 79.9,
+      "atmosphericpressure": 1026.1,
+      "minimumwindspeed": 0.0,
+      "averagewindspeed": 0.5,
+      "gustwindspeed": 2.5,
+      "minimumwinddirection": 0.0,
+      "averagewinddirection": 220.0,
+      "maximumwinddirection": 314.0,
+      "pm25": 10.0,
+      "pm10": 12.0,
+      "noise": 58.7
+    },
+    {
+      "device_id": "ICTMicroclimate-03",
+      "received_at": "2026-04-28T15:24:12+00:00",
+      "sensorlocation": "CH1 rooftop",
+      "latlong": {
+        "lon": 144.96728,
+        "lat": -37.8140348
+      },
+      "airtemperature": 20.8,
+      "relativehumidity": 65.0,
+      "atmosphericpressure": 1018.1,
+      "minimumwindspeed": 0.0,
+      "averagewindspeed": 0.6,
+      "gustwindspeed": 1.4,
+      "minimumwinddirection": 0.0,
+      "averagewinddirection": 4.0,
+      "maximumwinddirection": 349.0,
+      "pm25": 12.0,
+      "pm10": 15.0,
+      "noise": 61.8
+    },
+    {
+      "device_id": "ICTMicroclimate-05",
+      "received_at": "2026-04-28T15:20:00+00:00",
+      "sensorlocation": "Enterprize Park - Pole ID: COM1667",
+      "latlong": {
+        "lon": 144.9591192,
+        "lat": -37.8204083
+      },
+      "airtemperature": null,
+      "relativehumidity": null,
+      "atmosphericpressure": null,
+      "minimumwindspeed": null,
+      "averagewindspeed": null,
+      "gustwindspeed": null,
+      "minimumwinddirection": null,
+      "averagewinddirection": null,
+      "maximumwinddirection": null,
+      "pm25": null,
+      "pm10": null,
+      "noise": null
+    },
+    {
+      "device_id": "ICTMicroclimate-10",
+      "received_at": "2026-04-28T15:19:01+00:00",
+      "sensorlocation": "1 Treasury Place",
+      "latlong": {
+        "lon": 144.9745395,
+        "lat": -37.8128595
+      },
+      "airtemperature": 18.5,
+      "relativehumidity": 74.6,
+      "atmosphericpressure": 1019.3,
+      "minimumwindspeed": null,
+      "averagewindspeed": null,
+      "gustwindspeed": null,
+      "minimumwinddirection": null,
+      "averagewinddirection": null,
+      "maximumwinddirection": null,
+      "pm25": null,
+      "pm10": null,
+      "noise": 62.6
+    },
+    {
+      "device_id": "ICTMicroclimate-02",
+      "received_at": "2026-04-28T15:18:00+00:00",
+      "sensorlocation": "101 Collins St L11 Rooftop (Maintenance Test)",
+      "latlong": null,
+      "airtemperature": 17.5,
+      "relativehumidity": 80.2,
+      "atmosphericpressure": 1018.7,
+      "minimumwindspeed": 0.0,
+      "averagewindspeed": 0.0,
+      "gustwindspeed": 0.4,
+      "minimumwinddirection": 0.0,
+      "averagewinddirection": 0.0,
+      "maximumwinddirection": 341.0,
+      "pm25": 22.0,
+      "pm10": 24.0,
+      "noise": 69.6
+    }
+  ]
+}

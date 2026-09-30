@@ -1,0 +1,211 @@
+{
+  "sources": {
+    "pedestrian_minute": {
+      "source_id": "melbourne.pedestrian.minute",
+      "legacy_ids": ["com_pedestrian_minute"],
+      "provider": "City of Melbourne",
+      "dataset_title": "Pedestrian Volume (Minute)",
+      "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-minute-counts",
+      "topic": "pedestrian",
+      "scope": "city",
+      "coverage_area_refs": ["com_municipal:1:2008-07-01"],
+      "coverage_from": "2026-09-01T00:00:00Z",
+      "coverage_to": null,
+      "cadence_seconds": 60,
+      "check_interval_seconds": 60,
+      "connector_owner": "pedestrian-team",
+      "license_status": "verified_open",
+      "access_status": "active",
+      "last_checked_at": null,
+      "last_success_at": null,
+      "last_source_update_at": null,
+      "record_granularity": "sensor_minute",
+      "admission_evidence": {
+        "dataset_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-past-hour-minute-counts",
+        "native_record_key": "sensor_id:reading_datetime",
+        "completeness_rule": "all_active_sensors_per_minute",
+        "quota_requests_per_day": 5000,
+        "secret_names": [],
+        "allowed_fields": ["sensor_id", "reading_datetime", "pedestrian_count"],
+        "raw_retention_days": 7,
+        "staging_retention_days": 1,
+        "license_evidence_url": "https://creativecommons.org/licenses/by/4.0/",
+        "reviewed_at": "2026-09-28T00:00:00Z",
+        "missing_requirements": [],
+        "declared_license_status": "verified_open"
+      }
+    },
+    "road_unplanned": {
+      "source_id": "victoria.transport.road_unplanned",
+      "legacy_ids": ["tv_road_unplanned"],
+      "provider": "Transport Victoria",
+      "dataset_title": "Unplanned Road Incidents",
+      "landing_url": "https://opendata.transport.vic.gov.au/dataset/traffic-hazards",
+      "topic": "road_disruption",
+      "scope": "victoria",
+      "coverage_area_refs": ["ASGS_STE:2:2026"],
+      "coverage_from": "2026-09-01T00:00:00Z",
+      "coverage_to": null,
+      "cadence_seconds": null,
+      "check_interval_seconds": 60,
+      "connector_owner": "transport-team",
+      "license_status": "verified_open",
+      "access_status": "active",
+      "last_checked_at": null,
+      "last_success_at": null,
+      "last_source_update_at": null,
+      "record_granularity": "incident_impact",
+      "admission_evidence": {
+        "dataset_url": "https://api.transport.vic.gov.au/v3/traffic/hazards",
+        "native_record_key": "incident_id:impact_id",
+        "completeness_rule": "all_active_incidents",
+        "quota_requests_per_day": 28800,
+        "secret_names": ["transport-vic-api-key"],
+        "allowed_fields": ["incident_id", "impact_id", "status", "geometry", "created"],
+        "raw_retention_days": 14,
+        "staging_retention_days": 1,
+        "license_evidence_url": "https://opendata.transport.vic.gov.au/terms",
+        "reviewed_at": "2026-09-28T00:00:00Z",
+        "missing_requirements": [],
+        "declared_license_status": "verified_open"
+      }
+    },
+    "police_news": {
+      "source_id": "victoria.police.news",
+      "legacy_ids": ["vic_police_news"],
+      "provider": "Victoria Police",
+      "dataset_title": "Media Releases",
+      "landing_url": "https://www.police.vic.gov.au/media-releases",
+      "topic": "crime_news",
+      "scope": "victoria",
+      "coverage_area_refs": ["ASGS_STE:2:2026"],
+      "coverage_from": "2026-09-01T00:00:00Z",
+      "coverage_to": null,
+      "cadence_seconds": null,
+      "check_interval_seconds": 900,
+      "connector_owner": "news-team",
+      "license_status": "review_required",
+      "access_status": "active",
+      "last_checked_at": null,
+      "last_success_at": null,
+      "last_source_update_at": null,
+      "record_granularity": "article",
+      "admission_evidence": {
+        "dataset_url": "https://www.police.vic.gov.au/media-releases",
+        "native_record_key": "article_id",
+        "completeness_rule": "recent_releases",
+        "quota_requests_per_day": 96,
+        "secret_names": [],
+        "allowed_fields": ["article_id", "headline", "published_date", "location"],
+        "raw_retention_days": 30,
+        "staging_retention_days": 1,
+        "license_evidence_url": "https://www.police.vic.gov.au/copyright",
+        "reviewed_at": "2026-09-28T00:00:00Z",
+        "missing_requirements": ["redistribution_license_clarification"],
+        "declared_license_status": "review_required"
+      }
+    },
+    "paused_parking": {
+      "source_id": "melbourne.parking.bays",
+      "legacy_ids": ["com_parking_bays"],
+      "provider": "City of Melbourne",
+      "dataset_title": "On-street Parking Bays",
+      "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays",
+      "topic": "parking",
+      "scope": "city",
+      "coverage_area_refs": ["com_municipal:1:2008-07-01"],
+      "coverage_from": "2026-01-01T00:00:00Z",
+      "coverage_to": null,
+      "cadence_seconds": 86400,
+      "check_interval_seconds": 86400,
+      "connector_owner": "parking-team",
+      "license_status": "verified_open",
+      "access_status": "paused",
+      "last_checked_at": null,
+      "last_success_at": null,
+      "last_source_update_at": null,
+      "record_granularity": "bay",
+      "admission_evidence": {
+        "dataset_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bays",
+        "native_record_key": "bay_id",
+        "completeness_rule": "all_bays_snapshot",
+        "quota_requests_per_day": 100,
+        "secret_names": [],
+        "allowed_fields": ["bay_id", "marker_id", "geometry"],
+        "raw_retention_days": 365,
+        "staging_retention_days": 1,
+        "license_evidence_url": "https://creativecommons.org/licenses/by/4.0/",
+        "reviewed_at": "2026-09-28T00:00:00Z",
+        "missing_requirements": [],
+        "declared_license_status": "verified_open"
+      }
+    }
+  },
+  "scenarios": {
+    "failed_check": {
+      "error_code": "upstream_unavailable",
+      "message": "Upstream service 503 Service Unavailable",
+      "consecutive_failures": 2,
+      "checked_at": "2026-09-28T01:15:00Z"
+    },
+    "recovered_replay": {
+      "initial_checkpoint": "2026-09-28T00:00:00Z",
+      "window1": {
+        "from": "2026-09-28T00:00:00Z",
+        "to": "2026-09-28T01:00:00Z",
+        "batchId": "batch_w1"
+      },
+      "window2": {
+        "from": "2026-09-28T01:00:00Z",
+        "to": "2026-09-28T02:00:00Z",
+        "batchId": "batch_w2"
+      }
+    },
+    "late_check": {
+      "now": "2026-09-28T00:03:00Z",
+      "last_success_at": "2026-09-28T00:00:30Z",
+      "last_checked_at": "2026-09-28T00:03:00Z",
+      "budget_seconds": 120
+    },
+    "stale_check": {
+      "now": "2026-09-28T00:10:00Z",
+      "last_success_at": "2026-09-28T00:00:00Z",
+      "last_checked_at": "2026-09-28T00:10:00Z",
+      "budget_seconds": 120
+    },
+    "unchanged_upstream": {
+      "now": "2026-09-28T00:01:00Z",
+      "last_checked_at": "2026-09-28T00:00:50Z",
+      "last_success_at": "2026-09-28T00:00:50Z",
+      "latest_upstream_update_at": "2026-09-21T00:00:00Z"
+    },
+    "uncovered_area": {
+      "area_ref": "ASGS_LGA:22310:2026",
+      "area_name": "City of Greater Geelong"
+    },
+    "duplicate_records": [
+      {
+        "batch_id": "batch_at_least_once_1",
+        "source_id": "melbourne.pedestrian.minute",
+        "geo_record_id": "ped:sensor_1:2026-09-28T00:01:00Z",
+        "version_id": "v1",
+        "topic": "pedestrian",
+        "title": "Pedestrian count 42",
+        "published_at": "2026-09-28T00:01:30Z",
+        "observed_at": "2026-09-28T00:01:00Z",
+        "record_status": "active"
+      },
+      {
+        "batch_id": "batch_at_least_once_retry",
+        "source_id": "melbourne.pedestrian.minute",
+        "geo_record_id": "ped:sensor_1:2026-09-28T00:01:00Z",
+        "version_id": "v1",
+        "topic": "pedestrian",
+        "title": "Pedestrian count 42",
+        "published_at": "2026-09-28T00:01:30Z",
+        "observed_at": "2026-09-28T00:01:00Z",
+        "record_status": "active"
+      }
+    ]
+  }
+}

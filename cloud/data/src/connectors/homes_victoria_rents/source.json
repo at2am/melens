@@ -1,0 +1,58 @@
+{
+  "source_id": "homes_victoria.rents",
+  "legacy_ids": [],
+  "provider": "Homes Victoria",
+  "dataset_title": "Rental Report - Quarterly: Quarterly Median Rents by LGA",
+  "landing_url": "https://discover.data.vic.gov.au/dataset/rental-report-quarterly-quarterly-median-rents-by-lga",
+  "api_endpoint": "https://discover.data.vic.gov.au/api/3/action/package_show?id=rental-report-quarterly-quarterly-median-rents-by-lga",
+  "topic": "housing",
+  "scope": "victoria",
+  "coverage_area_refs": [
+    "ASGS_STE:2:2021"
+  ],
+  "coverage_from": "2000-01-01T00:00:00Z",
+  "coverage_to": null,
+  "cadence_seconds": 7776000,
+  "check_interval_seconds": 86400,
+  "license_status": "verified_open",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "access_status": "active",
+  "record_granularity": "lga_or_suburb_quarter",
+  "connector_owner": "melens integration",
+  "description": "Quarterly median rents and bond counts across Victorian Local Government Areas (LGAs) and suburbs published by Homes Victoria (Department of Families, Fairness and Housing) based on Residential Tenancies Bond Authority (RTBA) lodgements. Preserves quarterly period, administrative/statistical geography, statistical specifications, and suppressed/missing values without zero-filling. Must never be treated as active market rental listings.",
+  "admission_evidence": {
+    "dataset_url": "https://discover.data.vic.gov.au/dataset/rental-report-quarterly-quarterly-median-rents-by-lga",
+    "native_record_key": "quarter + lga_name + (suburb) + property_type",
+    "completeness_rule": "Quarterly moving median rent records across Victorian LGAs; confidentiality suppressed (<4 bonds) and missing values preserved as null without zero-filling",
+    "quota_requests_per_day": 10,
+    "secret_names": [],
+    "allowed_fields": [
+      "quarter",
+      "quarter_code",
+      "period_start",
+      "period_end",
+      "lga_name",
+      "region_group",
+      "suburb",
+      "property_type",
+      "raw_count",
+      "raw_median",
+      "count",
+      "median_rent",
+      "measure",
+      "currency",
+      "status"
+    ],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://discover.data.vic.gov.au/dataset/rental-report-quarterly-quarterly-median-rents-by-lga/resource/458264e7-0b2f-4061-80b4-c73ad4e94aa7",
+    "reviewed_at": "2026-09-30T11:38:37Z"
+  },
+  "invariants": {
+    "not_current_listing_rule": "Rental figures represent historical quarterly moving median rents derived from lodged tenancy bonds, strictly NOT active market rental vacancy listings or current asks (is_current_listing: false, assertion_kind: 'observation').",
+    "suppressed_and_null_rule": "Confidentiality-suppressed values ('-', '<4') and missing quarters must remain null with status set to 'suppressed' or 'missing'; they must NEVER be converted to numeric zero (0). Only 'observed' status holds numeric values.",
+    "geography_rule": "Preserves LGA and suburb boundary references (location_role: 'area_only', location_confidence: 'official_join'); point coordinates and centroid lat/lon remain null, never fabricated as arbitrary street points.",
+    "status_rule": "The DataVic dataset and current XLSX resource explicitly state CC BY 4.0. Each real workbook response must carry a valid Last-Modified value to order corrections. No LGA or suburb boundary is inferred from a name alone."
+  }
+}

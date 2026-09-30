@@ -1,0 +1,45 @@
+{
+  "source_id": "melbourne.pedestrian.hourly",
+  "legacy_ids": ["pedestrian-history"],
+  "provider": "City of Melbourne",
+  "dataset_title": "Pedestrian Counting System - Monthly (counts per hour)",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-monthly-counts-per-hour/records",
+  "topic": "pedestrian",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "sensor_hour",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/",
+    "native_record_key": "id",
+    "completeness_rule": "All pages match total_count; retains sensor-hour granularity without backfilling missing minute readings",
+    "secret_names": [],
+    "allowed_fields": [
+      "id",
+      "location_id",
+      "sensing_date",
+      "hourday",
+      "direction_1",
+      "direction_2",
+      "pedestriancount",
+      "sensor_name",
+      "location"
+    ],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/"
+  },
+  "notes": "The dataset description says monthly updates while its quality metadata says daily; daily checks do not imply a guaranteed publication cadence. Ambiguous or nonexistent daylight-saving hours cannot be assigned a UTC timestamp from sensing_date and hourday alone.",
+  "invariants": {
+    "granularity_rule": "Preserves sensor-hour granularity; must not synthesize or backfill missing minute counts",
+    "no_zero_filling_rule": "Missing sensor-hour intervals are unobserved, never zero-filled",
+    "timezone_rule": "sensing_date and hourday reflect Australia/Melbourne local time and are converted to UTC timestamp"
+  }
+}

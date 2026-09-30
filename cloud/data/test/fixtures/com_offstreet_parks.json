@@ -1,0 +1,325 @@
+{
+  "total_count": 20,
+  "results": [
+    {
+      "census_year": "2024",
+      "block_id": 6,
+      "property_id": "578328",
+      "base_property_id": "573333",
+      "building_address": "Carpark Federation Square 2 Swanston Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 450,
+      "longitude": 144.969917465,
+      "latitude": -37.81784465,
+      "location": {
+        "lon": 144.969917465,
+        "lat": -37.81784465
+      }
+    },
+    {
+      "census_year": "2024",
+      "block_id": 1,
+      "property_id": "611393",
+      "base_property_id": "611393",
+      "building_address": "507-541 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 29,
+      "longitude": 144.957229886,
+      "latitude": -37.82088351,
+      "location": {
+        "lon": 144.957229886,
+        "lat": -37.82088351
+      }
+    },
+    {
+      "census_year": "2024",
+      "block_id": 11,
+      "property_id": "103957",
+      "base_property_id": "103957",
+      "building_address": "517-537 Flinders Lane MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 117,
+      "longitude": 144.956601666,
+      "latitude": -37.81988483,
+      "location": {
+        "lon": 144.956601666,
+        "lat": -37.81988483
+      }
+    },
+    {
+      "census_year": "2024",
+      "block_id": 12,
+      "property_id": "103997",
+      "base_property_id": "103997",
+      "building_address": "472-482 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 330,
+      "longitude": 144.958272108,
+      "latitude": -37.81974183,
+      "location": {
+        "lon": 144.958272108,
+        "lat": -37.81974183
+      }
+    },
+    {
+      "census_year": "2024",
+      "block_id": 12,
+      "property_id": "105398",
+      "base_property_id": "105398",
+      "building_address": "Substation 246, 34 King Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 2,
+      "longitude": 144.957419867,
+      "latitude": -37.81943036,
+      "location": {
+        "lon": 144.957419867,
+        "lat": -37.81943036
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 12,
+      "property_id": "103998",
+      "base_property_id": "103998",
+      "building_address": "452-470 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 296,
+      "longitude": 144.958601159,
+      "latitude": -37.81946849,
+      "location": {
+        "lon": 144.958601159,
+        "lat": -37.81946849
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 12,
+      "property_id": "103999",
+      "base_property_id": "103999",
+      "building_address": "The Clarion Gateway Apartments 1-13 William Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 109,
+      "longitude": 144.959510564,
+      "latitude": -37.81943285,
+      "location": {
+        "lon": 144.959510564,
+        "lat": -37.81943285
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 12,
+      "property_id": "110091",
+      "base_property_id": "110091",
+      "building_address": "15-33 William Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 300,
+      "longitude": 144.959187559,
+      "latitude": -37.8192157,
+      "location": {
+        "lon": 144.959187559,
+        "lat": -37.8192157
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 13,
+      "property_id": "104002",
+      "base_property_id": "104002",
+      "building_address": "376-388 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 315,
+      "longitude": 144.961529931,
+      "latitude": -37.81884626,
+      "location": {
+        "lon": 144.961529931,
+        "lat": -37.81884626
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 13,
+      "property_id": "108060",
+      "base_property_id": "108060",
+      "building_address": "19-35 Queen Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 172,
+      "longitude": 144.961779921,
+      "latitude": -37.81822749,
+      "location": {
+        "lon": 144.961779921,
+        "lat": -37.81822749
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 14,
+      "property_id": "108114",
+      "base_property_id": "108114",
+      "building_address": "28-38 Queen Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 22,
+      "longitude": 144.962437489,
+      "latitude": -37.81798973,
+      "location": {
+        "lon": 144.962437489,
+        "lat": -37.81798973
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 15,
+      "property_id": "103942",
+      "base_property_id": "103942",
+      "building_address": "253-265 Flinders Lane MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 15,
+      "longitude": 144.965902811,
+      "latitude": -37.81706291,
+      "location": {
+        "lon": 144.965902811,
+        "lat": -37.81706291
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 16,
+      "property_id": "104018",
+      "base_property_id": "104018",
+      "building_address": "172-192 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 895,
+      "longitude": 144.968542869,
+      "latitude": -37.81663861,
+      "location": {
+        "lon": 144.968542869,
+        "lat": -37.81663861
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 16,
+      "property_id": "111528",
+      "base_property_id": "110760",
+      "building_address": "St Pauls Carpark 198 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 27,
+      "longitude": 144.967694595,
+      "latitude": -37.81676378,
+      "location": {
+        "lon": 144.967694595,
+        "lat": -37.81676378
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 17,
+      "property_id": "103592",
+      "base_property_id": "103592",
+      "building_address": "11-37 Exhibition Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 131,
+      "longitude": 144.971726234,
+      "latitude": -37.81546152,
+      "location": {
+        "lon": 144.971726234,
+        "lat": -37.81546152
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 17,
+      "property_id": "104024",
+      "base_property_id": "104024",
+      "building_address": "130-132 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Residential",
+      "parking_spaces": 2,
+      "longitude": 144.970542958,
+      "latitude": -37.81627651,
+      "location": {
+        "lon": 144.970542958,
+        "lat": -37.81627651
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 17,
+      "property_id": "104025",
+      "base_property_id": "104025",
+      "building_address": "114-128 Flinders Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Commercial",
+      "parking_spaces": 1275,
+      "longitude": 144.970735312,
+      "latitude": -37.81595762,
+      "location": {
+        "lon": 144.970735312,
+        "lat": -37.81595762
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 17,
+      "property_id": "107002",
+      "base_property_id": "107002",
+      "building_address": "22-30 Oliver Lane MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Residential",
+      "parking_spaces": 15,
+      "longitude": 144.970202809,
+      "latitude": -37.81592613,
+      "location": {
+        "lon": 144.970202809,
+        "lat": -37.81592613
+      }
+    },
+    {
+      "census_year": "2023",
+      "block_id": 17,
+      "property_id": "108594",
+      "base_property_id": "108594",
+      "building_address": "14-22 Russell Street MELBOURNE VIC 3000",
+      "clue_small_area": "Melbourne (CBD)",
+      "parking_type": "Private",
+      "parking_spaces": 11,
+      "longitude": 144.969980827,
+      "latitude": -37.81618166,
+      "location": {
+        "lon": 144.969980827,
+        "lat": -37.81618166
+      }
+    },
+    {
+      "census_year": "2005",
+      "block_id": 778,
+      "property_id": "110556",
+      "base_property_id": "110556",
+      "building_address": "190-206 Turner Street PORT MELBOURNE 3207",
+      "clue_small_area": "Port Melbourne",
+      "parking_type": "Private",
+      "parking_spaces": 5,
+      "longitude": 144.932979707,
+      "latitude": -37.82470191,
+      "location": {
+        "lon": 144.932979707,
+        "lat": -37.82470191
+      }
+    }
+  ]
+}

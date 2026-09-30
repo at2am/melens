@@ -1,0 +1,60 @@
+{
+  "source_id": "melbourne.microclimate",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "Microclimate sensors data",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/microclimate-sensors-data/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/microclimate-sensors-data/records",
+  "dataset_id": "microclimate-sensors-data",
+  "topic": "other",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 900,
+  "check_interval_seconds": 900,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "access_status": "candidate",
+  "record_granularity": "sensor_observation",
+  "connector_owner": "melens integration",
+  "description": "Climate readings from microclimate sensors deployed across the City of Melbourne, updated approximately every 15 minutes. Measures ambient air temperature (°C), relative humidity (%), atmospheric pressure (hPa), wind speed (m/s) and direction (degrees), particulate matter (PM2.5, PM10 in µg/m³), and ambient noise (dBA). Missing or unmeasured parameters are strictly preserved as null without zero-filling. Current sensor location and device evidence are derived directly from the active telemetry stream, rejecting deprecated historical sensor location tables as active device inventory.",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/microclimate-sensors-data/",
+    "native_record_key": "device_id + received_at",
+    "completeness_rule": "All filtered OpenDataSoft pages match total_count for the requested time window",
+    "secret_names": [],
+    "allowed_fields": [
+      "device_id",
+      "received_at",
+      "sensorlocation",
+      "latlong",
+      "minimumwinddirection",
+      "averagewinddirection",
+      "maximumwinddirection",
+      "minimumwindspeed",
+      "averagewindspeed",
+      "gustwindspeed",
+      "airtemperature",
+      "relativehumidity",
+      "atmosphericpressure",
+      "pm25",
+      "pm10",
+      "noise"
+    ],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/microclimate-sensors-data/",
+    "missing_requirements": [
+      "Verified upstream license terms and production quota approval"
+    ],
+    "declared_license_status": "review_required"
+  },
+  "invariants": {
+    "no_historical_inventory_rule": "Deprecated historical microclimate-sensor-locations table is never used as current equipment inventory; current device presence and coordinates are sourced solely from active telemetry readings.",
+    "no_zero_filling_rule": "Missing measurements (null airtemperature, humidity, pressure, wind, pm25, pm10, noise) indicate unobserved or failed metrics and must strictly remain null, NEVER filled with zero (0).",
+    "unit_preservation_rule": "Preserves explicit measurement units: airtemperature in °C, relativehumidity in %, atmosphericpressure in hPa, wind speeds in m/s, wind directions in degrees, pm25 and pm10 in µg/m³, and noise in dBA.",
+    "location_evidence_rule": "Device coordinates from latlong are preserved as WGS84 point geometry; missing or invalid coordinates are quarantined with null geometry and centroid without fabricating (0,0)."
+  }
+}

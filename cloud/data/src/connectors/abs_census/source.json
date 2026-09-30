@@ -1,0 +1,47 @@
+{
+  "source_id": "abs.census",
+  "legacy_ids": [],
+  "provider": "Australian Bureau of Statistics",
+  "dataset_title": "2021 Census DataPacks for Victoria and Greater Melbourne (SA1/SA2/LGA)",
+  "landing_url": "https://www.abs.gov.au/census/find-census-data/datapacks",
+  "topic": "demographics",
+  "scope": "victoria",
+  "coverage_area_refs": [
+    "ASGS_STE:2:2021",
+    "ASGS_GCCSA:2GMEL:2021"
+  ],
+  "coverage_from": "2021-08-10T00:00:00Z",
+  "coverage_to": "2026-08-10T00:00:00Z",
+  "cadence_seconds": null,
+  "check_interval_seconds": null,
+  "license_status": "verified_open",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "access_status": "active",
+  "record_granularity": "census_datapack_metric",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://www.abs.gov.au/census/find-census-data/datapacks",
+    "native_record_key": "Census vintage + ASGS scheme + region code + metric",
+    "completeness_rule": "ABS Census DataPack table headers match metadata definitions; suppressed/missing values preserved without zero-filling",
+    "quota_requests_per_day": 100,
+    "secret_names": [],
+    "allowed_fields": [
+      "region_id",
+      "census_year",
+      "asgs_vintage",
+      "table_id",
+      "metric_name",
+      "metric_value",
+      "unit"
+    ],
+    "staging_retention_days": 1,
+    "raw_retention_days": 0,
+    "license_evidence_url": "https://www.abs.gov.au/website-privacy-copyright-and-disclaimer",
+    "reviewed_at": "2026-09-30T11:45:00Z"
+  },
+  "invariants": {
+    "suppressed_and_missing_rule": "Confidentiality-suppressed values ('..', '-', 'np', 'suppressed') and missing values maintain status = 'suppressed' | 'missing' and null values; they must NEVER be zero-filled.",
+    "vintage_rule": "2021 Census DataPacks are paired with 2021 ASGS boundary vintage (ASGS_SA1, ASGS_SA2, ASGS_LGA);跨年份边界不静默混用。",
+    "status_rule": "ABS DataPacks are CC BY 4.0; published source facts retain verified_open rights and suppressed cells remain null."
+  }
+}

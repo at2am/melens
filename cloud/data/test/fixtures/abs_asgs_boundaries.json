@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "objectid": 1, "gccsa_code_2021": "2GMEL", "gccsa_name_2021": "Greater Melbourne" },
+      "geometry": { "type": "MultiPolygon", "coordinates": [[[[144.8, -37.9], [145.0, -37.9], [145.0, -37.7], [144.8, -37.9]]]] }
+    }
+  ]
+}

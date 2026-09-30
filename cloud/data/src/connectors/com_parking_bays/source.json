@@ -1,0 +1,30 @@
+{
+  "source_id": "melbourne.parking.bays",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "On-street Parking Bays",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bays/exports/json",
+  "topic": "parking",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "roadsegment_point_export_row",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays/",
+    "native_record_key": "roadsegmentid + optional kerbsideid (string) + coordinate",
+    "completeness_rule": "Full JSON export count equals independent records total_count; conflicting duplicate native IDs fail",
+    "secret_names": [],
+    "allowed_fields": ["roadsegmentid", "kerbsideid", "roadsegmentdescription", "latitude", "longitude", "lastupdated"],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays/"
+  },
+  "join_warning": "Current export contains points rather than bay polygons. Kerbside IDs are strings; normalize to decimal text before matching numeric sensor IDs. Restrictions have no complete crosswalk, so public_access and may_park_now remain unknown."
+}

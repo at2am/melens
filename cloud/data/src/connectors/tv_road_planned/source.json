@@ -1,0 +1,32 @@
+{
+  "source_id": "victoria.transport.road_planned",
+  "legacy_ids": [],
+  "provider": "Transport Victoria",
+  "dataset_title": "Planned Disruptions - Road",
+  "landing_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road",
+  "api_endpoint": "https://api.opendata.transport.vic.gov.au/opendata/roads/disruptions/planned/v1/",
+  "topic": "road_disruption",
+  "scope": "victoria",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 1800,
+  "check_interval_seconds": 1800,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "planned_disruption_snapshot_and_geometry",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road/resource/337dcdcd-defd-427f-b3f7-e06954b853d8",
+    "native_record_key": "properties.id with geometry ordinal",
+    "completeness_rule": "All numbered pages must agree on totals, or a token chain must end with hasMoreRecords=false; event IDs must be unique",
+    "quota_requests_per_day": 14400,
+    "secret_names": ["transport_victoria_key_id"],
+    "allowed_fields": ["geometry", "properties", "meta", "nextPageDetails"],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road"
+  },
+  "notes": "Public page states CC BY 4.0, KeyID, 20 calls/minute, page/limit pagination, 30-minute refresh. The linked older OpenAPI describes NextPageToken and 10 calls/minute, so the connector accepts both documented page shapes and conservatively spaces requests by 6.1 seconds. Admission awaits live KeyID validation and operator review. Victorian local timestamps are converted to UTC; ambiguous daylight-saving times fail closed. Duration may contain recurring impact windows, retained in summary JSON; valid_from/valid_to describe the overall plan period, not continuous closure."
+}

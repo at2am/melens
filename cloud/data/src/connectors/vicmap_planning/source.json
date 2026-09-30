@@ -1,0 +1,51 @@
+{
+  "source_id": "victoria.vicmap.planning",
+  "legacy_ids": [],
+  "provider": "Department of Transport and Planning",
+  "dataset_title": "Vicmap Planning: Planning Scheme Zones and Overlays",
+  "landing_url": "https://discover.data.vic.gov.au/dataset/vicmap-planning-api",
+  "api_endpoint": "https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Planning/FeatureServer",
+  "topic": "planning",
+  "scope": "victoria",
+  "coverage_area_refs": [
+    "vicmap_lga:343"
+  ],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 604800,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "access_status": "candidate",
+  "record_granularity": "planning_control",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Planning/FeatureServer",
+    "native_record_key": "layer_kind:ufi",
+    "completeness_rule": "Every object ID in both Melbourne LGA planning layers is fetched and layer edit times remain unchanged during collection",
+    "quota_requests_per_day": 10000,
+    "secret_names": [],
+    "allowed_fields": [
+      "OBJECTID",
+      "ufi",
+      "scheme_code",
+      "lga_code",
+      "lga",
+      "zone_num",
+      "zone_status",
+      "zone_code",
+      "zone_description",
+      "gaz_begin_date"
+    ],
+    "raw_retention_days": 0,
+    "staging_retention_days": 7,
+    "license_evidence_url": "https://discover.data.vic.gov.au/dataset/vicmap-planning-api"
+  },
+  "invariants": {
+    "planning_status_rule": "Planning zones and overlays represent legal planning controls and planning status; they must NEVER be automatically marked or treated as approved development projects.",
+    "polygon_geometry_rule": "Polygons and MultiPolygons are split into individual parts so each GeoRecord has a valid single Polygon geometry; coordinates are in WGS84 and never inverted.",
+    "effective_time_rule": "gaz_begin_date is preserved as valid_from; time_missing_reason documents that layer has an edit timestamp rather than per-feature publication time.",
+    "status_rule": "license_status stays review_required and access_status candidate until real collection and formal licensing review are completed."
+  }
+}

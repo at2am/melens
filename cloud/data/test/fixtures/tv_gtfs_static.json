@@ -1,0 +1,194 @@
+{
+  "feed_info": [
+    {
+      "feed_publisher_name": "Transport Victoria",
+      "feed_publisher_url": "https://opendata.transport.vic.gov.au",
+      "feed_lang": "en",
+      "feed_version": "PTV_GTFS_20260928_v1",
+      "feed_start_date": "20260928",
+      "feed_end_date": "20261231"
+    }
+  ],
+  "routes": [
+    {
+      "route_id": "3-96",
+      "agency_id": "3",
+      "route_short_name": "96",
+      "route_long_name": "East Brunswick - St Kilda Beach",
+      "route_type": 0,
+      "route_color": "78BE20",
+      "route_text_color": "FFFFFF"
+    },
+    {
+      "route_id": "3-19",
+      "agency_id": "3",
+      "route_short_name": "19",
+      "route_long_name": "North Coburg - City (Elizabeth St)",
+      "route_type": 0,
+      "route_color": "78BE20",
+      "route_text_color": "FFFFFF"
+    },
+    {
+      "route_id": "2-FLI",
+      "agency_id": "2",
+      "route_short_name": "Craigieburn",
+      "route_long_name": "Flinders Street - Craigieburn",
+      "route_type": 2,
+      "route_color": "FFB800",
+      "route_text_color": "000000"
+    },
+    {
+      "route_id": "2-LIL",
+      "agency_id": "2",
+      "route_short_name": "Lilydale",
+      "route_long_name": "Flinders Street - Lilydale",
+      "route_type": 2,
+      "route_color": "0072CE",
+      "route_text_color": "FFFFFF"
+    },
+    {
+      "route_id": "4-200",
+      "agency_id": "4",
+      "route_short_name": "200",
+      "route_long_name": "City (Queen St) - Bulleen",
+      "route_type": 3,
+      "route_color": "FF6600",
+      "route_text_color": "FFFFFF"
+    }
+  ],
+  "stops": [
+    {
+      "stop_id": "19499",
+      "stop_name": "Flinders Street Railway Station",
+      "stop_lat": -37.8183,
+      "stop_lon": 144.9671,
+      "location_type": 1,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    },
+    {
+      "stop_id": "19854",
+      "stop_name": "Southern Cross Railway Station",
+      "stop_lat": -37.8185,
+      "stop_lon": 144.9525,
+      "location_type": 1,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    },
+    {
+      "stop_id": "18260",
+      "stop_name": "Bourke St/Swanston St #10",
+      "stop_lat": -37.8136,
+      "stop_lon": 144.9652,
+      "location_type": 0,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    },
+    {
+      "stop_id": "21500",
+      "stop_name": "St Kilda Station/Fitzroy St #132",
+      "stop_lat": -37.8598,
+      "stop_lon": 144.9782,
+      "location_type": 0,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    },
+    {
+      "stop_id": "20500",
+      "stop_name": "Melbourne Central Station/Lonsdale St",
+      "stop_lat": -37.8118,
+      "stop_lon": 144.9645,
+      "location_type": 0,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    }
+  ],
+  "trips": [
+    {
+      "route_id": "3-96",
+      "service_id": "T0",
+      "trip_id": "TRIP-96-01",
+      "trip_headsign": "St Kilda Beach",
+      "direction_id": 0
+    },
+    {
+      "route_id": "3-19",
+      "service_id": "T0",
+      "trip_id": "TRIP-19-01",
+      "trip_headsign": "City (Elizabeth St)",
+      "direction_id": 1
+    },
+    {
+      "route_id": "2-FLI",
+      "service_id": "T0",
+      "trip_id": "TRIP-FLI-01",
+      "trip_headsign": "Craigieburn",
+      "direction_id": 0
+    },
+    {
+      "route_id": "2-LIL",
+      "service_id": "T0",
+      "trip_id": "TRIP-LIL-01",
+      "trip_headsign": "Lilydale",
+      "direction_id": 0
+    },
+    {
+      "route_id": "4-200",
+      "service_id": "T0",
+      "trip_id": "TRIP-200-01",
+      "trip_headsign": "Bulleen",
+      "direction_id": 0
+    }
+  ],
+  "stop_times": [
+    {
+      "trip_id": "TRIP-96-01",
+      "arrival_time": "08:15:00",
+      "departure_time": "08:15:00",
+      "stop_id": "18260",
+      "stop_sequence": 1
+    },
+    {
+      "trip_id": "TRIP-96-01",
+      "arrival_time": "08:35:00",
+      "departure_time": "08:35:00",
+      "stop_id": "21500",
+      "stop_sequence": 2
+    },
+    {
+      "trip_id": "TRIP-19-01",
+      "arrival_time": "08:20:00",
+      "departure_time": "08:20:00",
+      "stop_id": "18260",
+      "stop_sequence": 1
+    },
+    {
+      "trip_id": "TRIP-FLI-01",
+      "arrival_time": "07:50:00",
+      "departure_time": "07:52:00",
+      "stop_id": "19499",
+      "stop_sequence": 1
+    },
+    {
+      "trip_id": "TRIP-FLI-01",
+      "arrival_time": "07:56:00",
+      "departure_time": "07:58:00",
+      "stop_id": "19854",
+      "stop_sequence": 2
+    },
+    {
+      "trip_id": "TRIP-LIL-01",
+      "arrival_time": "08:00:00",
+      "departure_time": "08:02:00",
+      "stop_id": "19499",
+      "stop_sequence": 1
+    },
+    {
+      "trip_id": "TRIP-200-01",
+      "arrival_time": "08:10:00",
+      "departure_time": "08:10:00",
+      "stop_id": "20500",
+      "stop_sequence": 1
+    }
+  ]
+}

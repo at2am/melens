@@ -1,0 +1,31 @@
+{
+  "source_id": "victoria.transport.road_unplanned",
+  "legacy_ids": [],
+  "provider": "Transport Victoria",
+  "dataset_title": "Unplanned Disruptions - Road - v3",
+  "landing_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road",
+  "api_endpoint": "https://api.opendata.transport.vic.gov.au/api/opendata/roads/disruptions/unplanned/v3",
+  "topic": "road_disruption",
+  "scope": "victoria",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 60,
+  "check_interval_seconds": 60,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "incident_and_impact_snapshot",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road/resource/1b185c7f-d4b2-404d-a65c-b5a80da7582d",
+    "native_record_key": "properties.id + properties.impactId",
+    "completeness_rule": "All v3 pages must agree on total_records and total_pages; unique incident-impact IDs required",
+    "secret_names": ["transport_victoria_key_id"],
+    "allowed_fields": ["geometry", "properties", "meta"],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road"
+  },
+  "notes": "The public page states CC BY 4.0, KeyID header, 20 calls per 60 seconds and a 60-second refresh. Account access, production quota, attribution and retention still require operator review. v3 endTime is an estimate, not evidence that an incident resolved."
+}

@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic GKG examples: Victoria mention is a candidate, Florida is excluded; mention is never an incident point.",
+  "gkg_timestamp": "20260928184500",
+  "rows": [
+    {
+      "gkg_record_id": "20260928184500-101",
+      "document_identifier": "https://example.org/melbourne-story?utm_source=feed",
+      "v2_locations": "4#Melbourne, Victoria, Australia#AS#AS07#5430#-37.8167#144.967#-1586844#120;4#Melbourne, Florida, United States#US#USFL##28.0836#-80.6081#12345#215"
+    },
+    {
+      "gkg_record_id": "20260928184500-102",
+      "document_identifier": "https://example.org/florida-story",
+      "v2_locations": "3#Melbourne, Florida, United States#US#USFL##28.0836#-80.6081#12345#45"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "total_count": 2,
+  "results": [
+    {"roadsegmentid": 23259, "kerbsideid": null, "roadsegmentdescription": "South Wharf Drive between Foundry Way and Riggers Place", "latitude": -37.8224529, "longitude": 144.9374727, "lastupdated": "2025-09-03"},
+    {"roadsegmentid": 23260, "kerbsideid": "1234", "roadsegmentdescription": "Sample road segment", "latitude": -37.8200000, "longitude": 144.9400000, "lastupdated": "2025-09-03"}
+  ]
+}

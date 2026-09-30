@@ -1,0 +1,51 @@
+{
+  "total_count": 4,
+  "results": [
+    {
+      "kerbsideid": 9344,
+      "lastupdated": "2024-12-30T00:44:37+00:00",
+      "status_timestamp": "2024-08-18T08:23:46+00:00",
+      "status_description": "Unoccupied",
+      "zone_number": 7394,
+      "location": {
+        "lon": 144.95916129121264,
+        "lat": -37.80494402936792
+      }
+    },
+    {
+      "kerbsideid": 9623,
+      "lastupdated": "2026-09-28T18:38:50+00:00",
+      "status_timestamp": "2026-09-28T13:07:50+00:00",
+      "status_description": "Present",
+      "zone_number": 7753,
+      "location": {
+        "lon": 144.94861316805952,
+        "lat": -37.80497194170077
+      }
+    },
+    {
+      "kerbsideid": 9701,
+      "lastupdated": "2026-09-28T18:40:00+00:00",
+      "status_timestamp": "2026-09-28T14:10:00+00:00",
+      "status_description": "Unknown",
+      "zone_number": 7753,
+      "location": {
+        "lon": 144.95,
+        "lat": -37.805
+      }
+    },
+    {
+      "kerbsideid": 9802,
+      "lastupdated": "2026-09-28T18:45:00+00:00",
+      "status_timestamp": "2026-09-28T15:20:00+00:00",
+      "status_description": "Present",
+      "marker_id": "marker-9802",
+      "bay_id": "bay-9802",
+      "zone_number": 7800,
+      "location": {
+        "lon": 144.955,
+        "lat": -37.806
+      }
+    }
+  ]
+}

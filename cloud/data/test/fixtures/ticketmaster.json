@@ -1,0 +1,7 @@
+{
+  "page": {"size": 100, "totalElements": 2, "totalPages": 1, "number": 0},
+  "_embedded": {"events": [
+    {"id": "EV-1", "name": "Example Melbourne Concert", "url": "https://www.ticketmaster.com.au/event/EV-1", "dates": {"start": {"dateTime": "2026-10-01T09:00:00Z", "localDate": "2026-10-01", "localTime": "19:00:00"}, "timezone": "Australia/Melbourne", "status": {"code": "onsale"}}, "_embedded": {"venues": [{"id": "VEN-1", "name": "Example Venue", "location": {"longitude": "144.96", "latitude": "-37.81"}, "country": {"countryCode": "AU"}, "state": {"stateCode": "VIC"}}]}},
+    {"id": "EV-2", "name": "Postponed Example", "url": "https://www.ticketmaster.com.au/event/EV-2", "dates": {"start": {"localDate": "2026-10-02", "dateTBD": true}, "timezone": "Australia/Melbourne", "status": {"code": "postponed"}}, "_embedded": {"venues": [{"id": "VEN-2", "name": "Other Venue", "location": {"longitude": "144.98", "latitude": "-37.83"}, "country": {"countryCode": "AU"}, "state": {"stateCode": "VIC"}}]}}
+  ]}
+}

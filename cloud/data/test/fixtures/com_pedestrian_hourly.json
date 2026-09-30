@@ -1,0 +1,33 @@
+{
+  "total_count": 2,
+  "results": [
+    {
+      "id": 1671020241030,
+      "location_id": 167,
+      "sensing_date": "2024-10-30",
+      "hourday": 10,
+      "direction_1": 17,
+      "direction_2": 77,
+      "pedestriancount": 94,
+      "sensor_name": "Lat526_T",
+      "location": {
+        "lon": 144.95155955,
+        "lat": -37.81304149
+      }
+    },
+    {
+      "id": 712020260109,
+      "location_id": 71,
+      "sensing_date": "2026-01-09",
+      "hourday": 20,
+      "direction_1": 2,
+      "direction_2": 12,
+      "pedestriancount": 14,
+      "sensor_name": "WestWP_T",
+      "location": {
+        "lon": 144.97136962,
+        "lat": -37.81235775
+      }
+    }
+  ]
+}

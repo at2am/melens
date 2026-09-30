@@ -1,0 +1,31 @@
+{
+  "source_id": "ticketmaster.events",
+  "legacy_ids": ["events-ticketmaster"],
+  "provider": "Ticketmaster",
+  "dataset_title": "Discovery API v2 Events",
+  "landing_url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
+  "api_endpoint": "https://app.ticketmaster.com/discovery/v2/events.json",
+  "topic": "event",
+  "scope": "greater_melbourne",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "ticketmaster_event_version",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
+    "native_record_key": "event.id",
+    "completeness_rule": "All zero-based pages in a bounded event-start window; reject deep paging beyond 1000 events",
+    "quota_requests_per_day": 5000,
+    "secret_names": ["ticketmaster_discovery_api_key"],
+    "allowed_fields": ["id", "url", "name", "dates", "_embedded.venues.location"],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://developer.ticketmaster.com/support/terms-of-use/"
+  },
+  "notes": "Candidate only. The query covers approximately 80 km around Melbourne CBD, not an official Greater Melbourne boundary, and only Ticketmaster-platform events. Terms limit caching to a reasonable period and require takedown within 24 hours; indefinite BigQuery event history needs a rights decision."
+}

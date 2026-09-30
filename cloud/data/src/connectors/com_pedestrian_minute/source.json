@@ -1,0 +1,29 @@
+{
+  "source_id": "melbourne.pedestrian.minute",
+  "legacy_ids": ["pedestrian-live", "com.pedestrian.live"],
+  "provider": "City of Melbourne",
+  "dataset_title": "Pedestrian Counting System - Past Hour (counts per minute)",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-past-hour-counts-per-minute/records",
+  "topic": "pedestrian",
+  "scope": "city",
+  "coverage_area_refs": [],
+  "coverage_from": null,
+  "coverage_to": null,
+  "cadence_seconds": 900,
+  "check_interval_seconds": 900,
+  "requires_monitoring": true,
+  "license_status": "review_required",
+  "access_status": "candidate",
+  "record_granularity": "sensor_minute",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/",
+    "native_record_key": "location_id + sensing_datetime",
+    "completeness_rule": "All pages match total_count; requested window plus 15-minute overlap remains inside the past-hour feed",
+    "secret_names": [],
+    "allowed_fields": ["location_id", "sensing_datetime", "direction_1", "direction_2", "total_of_directions"],
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/"
+  }
+}

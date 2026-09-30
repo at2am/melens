@@ -1,0 +1,52 @@
+{
+  "source_id": "melbourne.development_monitor",
+  "legacy_ids": [],
+  "provider": "City of Melbourne",
+  "dataset_title": "Development Activity Monitor",
+  "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/development-activity-monitor/",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/development-activity-monitor/records",
+  "topic": "planning",
+  "scope": "city",
+  "coverage_area_refs": ["com_municipal:1:2008-07-01"],
+  "coverage_from": "2026-09-30T11:30:00Z",
+  "coverage_to": null,
+  "cadence_seconds": 2592000,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "verified_open",
+  "access_status": "active",
+  "record_granularity": "development_project",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/development-activity-monitor/",
+    "native_record_key": "development_key",
+    "completeness_rule": "All OpenDataSoft records match total_count; duplicate development_keys fail",
+    "quota_requests_per_day": 100,
+    "secret_names": [],
+    "allowed_fields": [
+      "development_key",
+      "status",
+      "street_address",
+      "clue_small_area",
+      "clue_block",
+      "floors_above",
+      "resi_dwellings",
+      "town_planning_application",
+      "year_completed",
+      "latitude",
+      "longitude",
+      "title",
+      "summary"
+    ],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/development-activity-monitor",
+    "reviewed_at": "2026-09-30T11:30:00Z"
+  },
+  "description": "Monitors major new commercial and residential property development in the City of Melbourne municipality. Tracks development sites across 13 small areas that are mooted/applied, approved, under construction, or completed. Source status must be preserved without collapsing into approved.",
+  "invariants": {
+    "status_preservation_rule": "Development status must retain distinct source states: 'mooted' (from APPLIED/MOOTED/PLANNED), 'approved', 'under_construction', and 'completed'. Never collapse or merge into a single 'approved' status.",
+    "point_coordinate_rule": "Preserves WGS84 point coordinates (longitude, latitude) as GeoJSON Point and centroid (lon, lat); coordinates must never be inverted and missing coordinates must remain null, never 0,0.",
+    "monthly_update_rule": "Upstream dataset follows a monthly update cycle; connector records source publication and modified timestamps."
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "total_count": 3,
+  "results": [
+    {
+      "bayid": 2313,
+      "deviceid": 25054,
+      "description1": "1P MTR M-F 9:30-18:30",
+      "fromday1": 1,
+      "today1": 5,
+      "starttime1": "0001-01-01T09:30:00+00:00",
+      "endtime1": "0001-01-01T18:30:00+00:00",
+      "typedesc1": "1P Meter",
+      "duration1": 60,
+      "effectiveonph1": 0,
+      "exemption1": null,
+      "description2": "2P MTR M-SAT 6:30PM-8:30PM",
+      "fromday2": 1,
+      "today2": 6,
+      "starttime2": "0001-01-01T18:30:00+00:00",
+      "endtime2": "0001-01-01T20:30:00+00:00",
+      "typedesc2": "2P Meter",
+      "duration2": 120,
+      "effectiveonph2": 0,
+      "exemption2": null
+    },
+    {
+      "bayid": 8801,
+      "deviceid": null,
+      "description1": "1/2P DIS M-SUN 0:00-23:59",
+      "fromday1": 1,
+      "today1": 0,
+      "starttime1": "0001-01-01T00:00:00+00:00",
+      "endtime1": "0001-01-01T23:59:00+00:00",
+      "typedesc1": "Disabled",
+      "duration1": 30,
+      "effectiveonph1": 1,
+      "exemption1": "Disability Permit Only"
+    },
+    {
+      "bayid": 9902,
+      "deviceid": 34102,
+      "description1": "1/4P SUN 10:00-17:00",
+      "fromday1": 0,
+      "today1": 0,
+      "starttime1": "0001-01-01T10:00:00+00:00",
+      "endtime1": "0001-01-01T17:00:00+00:00",
+      "typedesc1": "1/4P",
+      "duration1": 15,
+      "effectiveonph1": 0,
+      "exemption1": null
+    }
+  ]
+}

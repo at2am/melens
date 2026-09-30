@@ -1,0 +1,12 @@
+{
+  "mccid_gis": 1,
+  "name": "City of Melbourne",
+  "xdate": "2008-07-01",
+  "geo_shape": {
+    "type": "Feature",
+    "geometry": {
+      "type": "MultiPolygon",
+      "coordinates": [[[[144.94, -37.82], [144.96, -37.82], [144.96, -37.80], [144.94, -37.82]]]]
+    }
+  }
+}

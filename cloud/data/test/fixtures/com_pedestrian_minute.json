@@ -1,0 +1,7 @@
+{
+  "total_count": 2,
+  "results": [
+    {"location_id": 3, "sensing_datetime": "2026-09-28T13:59:00+00:00", "direction_1": 4, "direction_2": 0, "total_of_directions": 4},
+    {"location_id": 3, "sensing_datetime": "2026-09-28T14:00:00+00:00", "direction_1": 0, "direction_2": 2, "total_of_directions": 2}
+  ]
+}
