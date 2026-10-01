@@ -570,5 +570,14 @@
     "input_count": 6324,
     "output_count": 6324,
     "rejected_count": 0
+  },
+  "sensor_second_natural_execution": {
+    "name": "melens-dev-melbourne-parking-sensors-mc5hm",
+    "start_time": "2026-10-01T13:06:09.253004Z",
+    "completion_time": "2026-10-01T13:06:46.576235Z",
+    "batch_id": "batch_3cc6896c12fd5e087e3f26dc4c51fd28df1304c2",
+    "input_count": 6324,
+    "output_count": 6324,
+    "rejected_count": 0
   }
 }

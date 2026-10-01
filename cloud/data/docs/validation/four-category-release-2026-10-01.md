@@ -86,3 +86,5 @@ australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b
 一次 guarded GDELT 历史窗口复核 `bpzcv` 也已成功，使用新 classifier/revision image。重复或新版本有稳定逻辑键；回补不把 checkpoint 向旧时刻回退。
 
 自然 13:04 停车 Scheduler 执行 `w28s6` 成功，13:04:03.251997–13:04:46.565735；batch `batch_cef9de61302666cbdec1b5bd43da4426892fdb5b`，6,324/6,324/0。随后只读聚合得到 6,324 located sensors，其中 5,284 的 `source_freshness=current`、3,568 reported vacant、0 legal yes；其他传感器的旧/未知上游时间如实保留，完整重新采集不意味着每设备产生新观测。最终一般报道总数为 134，核实 10/3/10/0 样本不变，crime6/6/6/0，活动419/372不变。新源六个 Scheduler 全 ENABLED；共八个 source schedules，另两个 cleanup schedules。具体聚合查询有先后时间，不是跨查询事务快照。
+
+第二次自然停车调度 13:06 也成功：`mc5hm`，13:06:09.253004–13:06:46.576235，batch `batch_3cc6896c12fd5e087e3f26dc4c51fd28df1304c2`，6,324/6,324/0。连续两次自然执行验证自动刷新，但不代替 SC-002 的24小时分母。代码提交 `d91ffaa`，仅数据服务与 spec001 发布记录；当前 app/map/spec002 并行工作未并入。
