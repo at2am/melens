@@ -1,41 +1,56 @@
 {
   "source_id": "melbourne.parking.sensors",
-  "legacy_ids": ["parking-sensors"],
+  "legacy_ids": [
+    "parking-sensors"
+  ],
   "provider": "City of Melbourne",
   "dataset_title": "On-street Parking Bay Sensors",
   "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bay-sensors/",
-  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bay-sensors/records",
+  "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bay-sensors/exports/json",
   "topic": "parking",
   "scope": "city",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": [
+    "com_municipal:1:2008-07-01"
+  ],
+  "coverage_from": "2026-10-01T11:02:24.068Z",
   "coverage_to": null,
   "cadence_seconds": 120,
   "check_interval_seconds": 120,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "verified_open",
+  "access_status": "active",
   "record_granularity": "kerbside_sensor_snapshot",
   "connector_owner": "melens integration",
   "admission_evidence": {
     "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bay-sensors/",
     "native_record_key": "kerbsideid",
-    "completeness_rule": "All pages match total_count and kerbsideid is unique within a snapshot",
+    "completeness_rule": "Complete JSON export count equals independent records total_count; all kerbsideid values unique; any mismatch or duplicate fails the entire snapshot",
     "secret_names": [],
     "allowed_fields": [
-      "kerbsideid",
       "lastupdated",
       "status_timestamp",
+      "zone_number",
       "status_description",
-      "location",
-      "marker_id",
-      "bay_id",
-      "occupied",
-      "zone_number"
+      "kerbsideid",
+      "location"
     ],
     "staging_retention_days": 1,
-    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bay-sensors/"
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bay-sensors",
+    "quota_requests_per_day": 10000,
+    "raw_retention_days": 0,
+    "reviewed_at": "2026-10-01T11:05:00Z"
   },
   "join_warning": "Current API has no marker_id or bay_id. A sample kerbsideid match does not establish an admitted general crosswalk; restrictions have no verified mapping. Never infer legal parking from occupancy alone.",
-  "notes": "Official dataset metadata checked 2026-10-01: quality.update-frequency is 2 Minutes. Sensors are not operational on public holidays and can report construction-blocked bays as vacant. Network relays can delay readings. Public availability needs independent current rule/access evidence; neither a vacant sensor nor a successful fetch proves it."
+  "notes": "Official dataset metadata checked 2026-10-01: quality.update-frequency is 2 Minutes. Sensors are not operational on public holidays and can report construction-blocked bays as vacant. Network relays can delay readings. Public availability needs independent current rule/access evidence; neither a vacant sensor nor a successful fetch proves it.",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "admission_notes": "CC BY 4.0 verified from official dataset metadata. Credit City of Melbourne, link dataset and license, and identify Melens field/geometry conversion. Observed anonymous X-RateLimit-Limit is 10000 with UTC next-day reset; shared portal/IP budget is not a dedicated allowance. Admitted for source-specific cloud publication with reviewed retention and request guards; independent occupancy does not establish legal permission.",
+  "coverage_notes": "coverage_from records the first verified present-day snapshot in this admission wave, not historic completeness or a per-row effective date. Data covers City of Melbourne survey/sensors with publisher caveats; no assertion of complete mapped bays or live rule coverage.",
+  "normalized_retention_hours": 48,
+  "operational_request_recommendation": {
+    "requests_per_execution": 2,
+    "requests_per_day": 2160,
+    "schedule": "*/2 * * * *",
+    "retry_attempts": 1
+  },
+  "timestamp_notes": "status_timestamp is the last occupancy status change, not the refresh clock. lastupdated is the individual sensor upstream update. Preserve both, and do not call an old status change stale when lastupdated and source checks are current."
 }

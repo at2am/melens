@@ -15,6 +15,7 @@ import {
   parseSensorRow,
 } from '../../src/connectors/com_parking_sensors/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
+import { HttpClient, type HttpRequest, type HttpResponse } from '../../src/core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient, type OdsQuery, type OdsRecords } from '../../src/core/opendatasoft.js';
 import { parseSourceManifest } from '../../src/core/registry.js';
 
@@ -27,16 +28,58 @@ async function loadFixtureRecords(): Promise<{ total_count: number; results: unk
   return JSON.parse(content) as { total_count: number; results: unknown[] };
 }
 
-test('Source manifest parses successfully and stays review_required and candidate', async () => {
+test('Source manifest has complete reviewed open-data admission', async () => {
   const manifestRaw = JSON.parse(await readFile(manifestPath, 'utf8'));
   const dataSource = parseSourceManifest(manifestRaw);
 
   assert.equal(dataSource.source_id, SOURCE_ID);
   assert.equal(dataSource.topic, 'parking');
   assert.equal(dataSource.scope, 'city');
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.ok(['candidate', 'active'].includes(dataSource.access_status));
+  assert.deepEqual(dataSource.admission_evidence.missing_requirements, []);
   assert.equal(connector.sourceId, SOURCE_ID);
+});
+
+test('production sensor transport uses two bounded requests and verifies the complete JSON export', async () => {
+  const fixture = await loadFixtureRecords();
+  const requests: HttpRequest[] = [];
+  class ExportClient extends HttpClient {
+    override async getJson(request: HttpRequest): Promise<HttpResponse<unknown>> {
+      requests.push(request);
+      return { body: String(request.url).endsWith('/records?limit=0')
+        ? { total_count: fixture.total_count } : fixture.results,
+      status: 200, fetchedAt: '2026-09-29T10:00:00Z', etag: null,
+      lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new ParkingSensorsConnector(new ExportClient()).collect(parseConnectorInput({
+    sourceId: SOURCE_ID, window: { kind: 'snapshot', revision: '2026-09-29' },
+    checkpoint: null, runId: 'complete-export',
+  }));
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+  assert.equal(result.parkingObservations.length, fixture.total_count);
+  assert.equal(result.completeness.method, 'export_count');
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every(request => request.maxAttempts === 1 && request.redirect === 'error'));
+});
+
+test('a drifting export count fails the whole sensor collection', async () => {
+  class DriftingExport extends HttpClient {
+    override async getJson(request: HttpRequest): Promise<HttpResponse<unknown>> {
+      return { body: String(request.url).endsWith('/records?limit=0') ? { total_count: 1 } : [],
+        status: 200, fetchedAt: '2026-09-29T10:00:00Z', etag: null,
+        lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new ParkingSensorsConnector(new DriftingExport()).collect(parseConnectorInput({
+    sourceId: SOURCE_ID, window: { kind: 'snapshot', revision: '2026-09-29' },
+    checkpoint: null, runId: 'drifting-export',
+  }));
+  assert.equal(result.kind, 'failure');
+  if (result.kind !== 'failure') return;
+  assert.equal(result.code, 'incomplete_window');
 });
 
 test('com_parking_sensors parses fixture and produces valid observations, source records, and geo records', async () => {
@@ -78,15 +121,15 @@ test('com_parking_sensors parses fixture and produces valid observations, source
   assert.equal(result.sourceLatestUpdateAt, '2026-09-28T18:45:00.000Z');
 
   for (const record of result.sourceRecords) {
-    assert.equal(record.rights_status, 'review_required');
+    assert.equal(record.rights_status, 'verified_open');
     assert.equal(record.assertion_kind, 'observation');
     assert.equal(record.record_status, 'active');
   }
 
   for (const geo of result.geoRecords) {
-    assert.equal(geo.rights_status, 'review_required');
+    assert.equal(geo.rights_status, 'verified_open');
     assert.equal(geo.assertion_kind, 'observation');
-    assert.equal(geo.public_query_allowed, false);
+    assert.equal(geo.public_query_allowed, true);
     assert.equal(geo.location_role, 'sensor_site');
     assert.equal(geo.location_confidence, 'source_coordinate');
   }
@@ -503,7 +546,7 @@ test('GM-03 Key census: official API schema with missing marker_id and bay_id re
 
   // Check rights and access status:
   for (const record of result.sourceRecords) {
-    assert.equal(record.rights_status, 'review_required');
+    assert.equal(record.rights_status, 'verified_open');
     assert.equal(record.assertion_kind, 'observation');
   }
 });

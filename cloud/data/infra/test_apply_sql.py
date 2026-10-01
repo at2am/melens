@@ -15,9 +15,9 @@ SPEC.loader.exec_module(apply_sql)
 class ApplySqlTest(unittest.TestCase):
     def test_reviewed_sql_has_expected_objects_and_raw_view_allowlist(self):
         planned = apply_sql.plan_sql()
-        self.assertEqual(sum(kind == "table" for _, kind, _, _ in planned), 12)
-        self.assertEqual(sum(kind == "view" for _, kind, _, _ in planned), 22)
-        self.assertEqual(len(apply_sql.AUTHORIZED_RAW_VIEWS), 11)
+        self.assertEqual(sum(kind == "table" for _, kind, _, _ in planned), 13)
+        self.assertEqual(sum(kind == "view" for _, kind, _, _ in planned), 25)
+        self.assertEqual(len(apply_sql.AUTHORIZED_RAW_VIEWS), 13)
 
     def test_sql_split_ignores_semicolons_inside_comments_and_literals(self):
         statements = apply_sql.split_sql(

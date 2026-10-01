@@ -145,6 +145,10 @@ class FakeBigQuery {
       }
       return [[]];
     }
+    if (sql.includes('INSERT INTO') && sql.includes('data_sources')) {
+      this.sourceRows.push(...parseRows([JSON.parse(input.params.payload ?? '{}')]));
+      return [[]];
+    }
     if (sql.includes('TO_JSON_STRING(t) AS batch')) {
       const latest = this.latest(input.params.batchId);
       return [latest ? [{ batch: JSON.stringify(latest) }] : []];
@@ -215,7 +219,15 @@ const window = { source, result, windowFrom: '2026-09-28T00:00:00Z',
 
 test('boundary publication checks source version identity and revision order', async () => {
   const { publisher, bigquery } = setup();
-  await publisher.publish(window);
+  await publisher.publish({ ...window, result: { ...result, boundaries: [{
+    batch_id: result.runId, source_id: source.source_id, schema_version: 1,
+    fetched_at: result.fetchedAt, source_record_id: record.source_record_id,
+    boundary_id: 'fixture:area:2026', version_id: record.version_id,
+    scheme: 'fixture', code: 'area', name: 'Fixture area', vintage: '2026',
+    geometry_geojson: JSON.stringify({ type: 'Polygon', coordinates: [
+      [[144.9, -37.9], [145, -37.9], [145, -37.8], [144.9, -37.8], [144.9, -37.9]],
+    ] }), valid_from: null, valid_to: null,
+  }] } });
   const sql = bigquery.validationQueries.get('boundaries');
   assert.ok(sql);
   assert.match(sql, /r\.source_record_id = t\.source_record_id AND r\.version_id = t\.version_id/);
@@ -495,6 +507,22 @@ test('revocation deletes copies; stale publication cannot reactivate the source'
   assert.ok([...store.objects.keys()].every(uri => store.deleted.has(uri)));
   await assert.rejects(publisher.publish(window), /withdrawn or narrowed/);
   assert.equal(bigquery.sourceRows.at(-1)?.access_status, 'paused');
+});
+
+test('high frequency source checks use control inserts without registry load jobs', async () => {
+  const { store, bigquery } = setup();
+  const writes: string[] = [];
+  const publisher = new BigQueryPublisher(config, bigquery as unknown as BigQuery,
+    store as unknown as GcsStore, async input => {
+      writes.push(input.table);
+      bigquery.facts.set(input.table, [...bigquery.facts.get(input.table) ?? [], ...parseRows(input.rows)]);
+      return { acknowledgedRows: input.rows.length, guarantee: 'at_least_once' };
+    });
+  await publisher.publish({ ...window, source: { ...source, cadence_seconds: 120 } });
+  assert.equal(bigquery.sourceRows.length, 2);
+  assert.equal(bigquery.sourceRows.at(-1)?.last_success_at, result.fetchedAt);
+  assert.equal(bigquery.loadedTables.includes('data_sources'), false);
+  assert.ok(writes.includes('source_records'));
 });
 
 test('default-stream retry duplicates physical rows but only publishes a complete batch', async () => {

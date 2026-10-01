@@ -34,7 +34,7 @@ async function loadFixture(): Promise<{ total_count: number; results: unknown[] 
   return JSON.parse(content) as { total_count: number; results: unknown[] };
 }
 
-test('T027: source.json manifest parses cleanly and maintains review_required candidate status', async () => {
+test('T027: source.json has complete reviewed open-data admission', async () => {
   const manifestRaw = JSON.parse(await readFile(manifestPath, 'utf8'));
   const dataSource = parseSourceManifest(manifestRaw);
 
@@ -43,8 +43,9 @@ test('T027: source.json manifest parses cleanly and maintains review_required ca
   assert.equal(dataSource.dataset_title, 'On-street Parking Bays');
   assert.equal(dataSource.topic, 'parking');
   assert.equal(dataSource.scope, 'city');
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.ok(['candidate', 'active'].includes(dataSource.access_status));
+  assert.deepEqual(dataSource.admission_evidence.missing_requirements, []);
   assert.equal(dataSource.cadence_seconds, null);
   assert.equal(dataSource.check_interval_seconds, 86400);
   assert.equal(dataSource.record_granularity, 'roadsegment_point_export_row');
@@ -53,21 +54,20 @@ test('T027: source.json manifest parses cleanly and maintains review_required ca
   assert.ok(isConnector(connector));
 });
 
-test('T027: source registry loads connector successfully and keeps candidate out of active()', async () => {
+test('T027: source registry loads the connector and respects explicit activation', async () => {
   const connectorsDir = fileURLToPath(new URL('../../src/connectors', import.meta.url));
   const registry = await loadSourceRegistry(connectorsDir);
 
   const entry = registry.get(SOURCE_ID);
   assert.ok(entry, `Source ${SOURCE_ID} must be registered`);
   assert.equal(entry.dataSource.source_id, SOURCE_ID);
-  assert.equal(entry.dataSource.license_status, 'review_required');
-  assert.equal(entry.dataSource.access_status, 'candidate');
+  assert.equal(entry.dataSource.license_status, 'verified_open');
+  assert.ok(['candidate', 'active'].includes(entry.dataSource.access_status));
 
-  // Must not be considered active
   assert.equal(
     registry.active().some(s => s.dataSource.source_id === SOURCE_ID),
-    false,
-    'Candidate review_required source must not be in active()',
+    entry.dataSource.access_status === 'active',
+    'Reviewed candidate is inactive until explicit cloud activation',
   );
 
   const loaded = await loadConnector(entry);
@@ -135,7 +135,7 @@ test('T027: fixture parsing preserves actual point geometry, missing keys, and n
     assert.equal(sr.source_id, SOURCE_ID);
     assert.equal(sr.assertion_kind, 'observation');
     assert.equal(sr.record_status, 'active');
-    assert.equal(sr.rights_status, 'review_required');
+    assert.equal(sr.rights_status, 'verified_open');
     assert.equal(sr.time_missing_reason, 'The source provides only an unzoned date, not an exact UTC update time');
     assert.equal(sr.source_updated_at, null);
     assert.equal(sr.original_url, LANDING_URL);

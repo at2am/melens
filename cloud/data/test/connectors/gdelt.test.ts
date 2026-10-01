@@ -12,6 +12,7 @@ import {
   connector,
   parseGkgArchive,
   parseLocationMentions,
+  parsePageTitle,
 } from '../../src/connectors/gdelt/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
 import { HttpClient, HttpFailure, type HttpRequest, type HttpResponse } from '../../src/core/http.js';
@@ -28,21 +29,29 @@ function createGkgLine(fields: Partial<Record<number, string>>): string {
   return row.join('\t');
 }
 
+function archiveStream(bytes: Uint8Array): ReadableStream<Uint8Array<ArrayBuffer>> {
+  return new ReadableStream({ start(controller) {
+    controller.enqueue(new Uint8Array(bytes)); controller.close();
+  } });
+}
+
 function createZipArchive(entryName: string, content: string): Uint8Array {
   return zipSync({
     [entryName]: strToU8(content),
   });
 }
 
-test('Source manifest parses successfully and stays review_required and candidate', async () => {
+test('Source manifest contains reviewed metadata rights and project request cap', async () => {
   const manifestRaw = JSON.parse(await readFile(manifestPath, 'utf8'));
   const dataSource = parseSourceManifest(manifestRaw);
 
   assert.equal(dataSource.source_id, SOURCE_ID);
   assert.equal(dataSource.topic, 'news');
   assert.equal(dataSource.scope, 'global');
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.equal(dataSource.access_status, 'active');
+  assert.equal(dataSource.admission_evidence.quota_requests_per_day, 160);
+  assert.deepEqual(dataSource.admission_evidence.missing_requirements, []);
   assert.equal(
     dataSource.admission_evidence.license_evidence_url,
     'https://www.gdeltproject.org/about.html#termsofuse'
@@ -99,6 +108,55 @@ test('parseLocationMentions parses and deduplicates repeated mentions within the
   assert.deepEqual(parseLocationMentions(';;;'), []);
 });
 
+test('GKG PAGE_TITLE decodes metadata without accepting nested elements or unbounded values', () => {
+  assert.equal(parsePageTitle('<PAGE_TITLE>Melbourne &#x2014; parks &amp; news</PAGE_TITLE>'),
+    'Melbourne — parks & news');
+  assert.equal(parsePageTitle('<PAGE_TITLE><script>body</script></PAGE_TITLE>'), null);
+  assert.equal(parsePageTitle('<PAGE_TITLE></PAGE_TITLE>'), null);
+  assert.equal(parsePageTitle(`<PAGE_TITLE>${'a'.repeat(8_001)}</PAGE_TITLE>`), null);
+});
+
+test('GKG archive preserves overseas evidence and rejects a rollover processing date', () => {
+  const timestamp = '20260930120000';
+  const fields = { 0: `${timestamp}-1`, 1: timestamp, 3: 'example.com',
+    4: 'https://example.com/story',
+    10: '4#Melbourne, Victoria, Australia#AS#AS07#5430#-37.8#144.9#vic#5;4#Melbourne, Florida, United States#US#USFL##28.1#-80.6#fl#9;',
+    26: '<PAGE_TITLE>Victoria and Florida</PAGE_TITLE>' };
+  const [candidate] = parseGkgArchive(createZipArchive(`${timestamp}.gkg.csv`, createGkgLine(fields)), timestamp);
+  assert.equal(candidate?.locationMentions.length, 2);
+  assert.equal(candidate?.title, 'Victoria and Florida');
+  assert.throws(() => parseGkgArchive(createZipArchive(`${timestamp}.gkg.csv`,
+    createGkgLine({ ...fields, 1: '20260230120000' })), timestamp), /ID, date, or article URL/);
+});
+
+test('GKG compressed stream limit cancels download and fails the whole window', async () => {
+  let cancelled = false;
+  class OversizedClient extends HttpClient {
+    override async getStream(request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
+      assert.equal(request.maxAttempts, 1);
+      assert.equal(request.redirect, 'error');
+      let sent = 0;
+      return { body: new ReadableStream({
+        pull(controller) { sent += 1; controller.enqueue(new Uint8Array(16_000_001));
+          if (sent === 3) controller.close(); },
+        cancel() { cancelled = true; },
+      }), status: 200, fetchedAt: '2026-09-30T12:30:00Z', etag: null,
+      lastModified: null, contentType: 'application/zip' };
+    }
+  }
+  const result = await new GdeltConnector(new OversizedClient()).collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'time', from: '2026-09-30T12:00:00Z', to: '2026-09-30T12:15:00Z' },
+    checkpoint: null, runId: 'oversized-stream',
+  }));
+  assert.equal(result.kind, 'failure');
+  assert.equal(cancelled, true);
+  if (result.kind === 'failure') {
+    assert.equal(result.completeness.fetched_pages, 0);
+    assert.equal(result.completeness.complete, false);
+  }
+});
+
 test('parseGkgArchive extracts Victoria candidates and excludes non-Victoria rows', () => {
   const ts = '20260930120000';
   const lineVic = createGkgLine({
@@ -137,6 +195,12 @@ test('parseGkgArchive extracts Victoria candidates and excludes non-Victoria row
   // Throws on missing expected entry
   const wrongZip = createZipArchive('other.csv', 'data');
   assert.throws(() => parseGkgArchive(wrongZip, ts), /GDELT archive lacks the expected bounded GKG CSV entry/);
+
+  const duplicateZip = zipSync({
+    [`${ts}.gkg.csv`]: strToU8(lineVic),
+    [`nested/${ts}.gkg.csv`]: strToU8(lineVic),
+  });
+  assert.throws(() => parseGkgArchive(duplicateZip, ts), /GDELT archive is invalid/);
 });
 
 test('GdeltConnector rejects invalid time window or mismatched sourceId', async () => {
@@ -217,11 +281,11 @@ test('GdeltConnector.collect successfully reads multi-interval window and dedupl
   const zip2 = createZipArchive(`${ts2}.gkg.csv`, `${art1Line2}\n`);
 
   class MockGdeltClient extends HttpClient {
-    override async getBytes(request: any): Promise<any> {
+    override async getStream(request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
       const urlStr = String(request.url);
       if (urlStr.includes(ts1)) {
         return {
-          body: Buffer.from(zip1),
+          body: archiveStream(zip1),
           status: 200,
           fetchedAt: '2026-09-30T12:30:00Z',
           etag: null,
@@ -231,7 +295,7 @@ test('GdeltConnector.collect successfully reads multi-interval window and dedupl
       }
       if (urlStr.includes(ts2)) {
         return {
-          body: Buffer.from(zip2),
+          body: archiveStream(zip2),
           status: 200,
           fetchedAt: '2026-09-30T12:30:00Z',
           etag: null,
@@ -271,7 +335,7 @@ test('GdeltConnector.collect successfully reads multi-interval window and dedupl
     r.original_url === 'https://www.abc.net.au/news/melbourne-cbd-story'
   );
   assert.ok(art1Record);
-  assert.equal(art1Record.rights_status, 'review_required');
+  assert.equal(art1Record.rights_status, 'verified_open');
   assert.equal(art1Record.source_updated_at, '2026-09-30T12:15:00Z');
   assert.equal(
     art1Record.time_missing_reason,
@@ -285,7 +349,7 @@ test('GdeltConnector.collect successfully reads multi-interval window and dedupl
   assert.equal(art1Geo.topic, 'news');
   assert.equal(art1Geo.location_role, 'mentioned_place');
   assert.equal(art1Geo.location_confidence, 'unverified');
-  assert.equal(art1Geo.public_query_allowed, false);
+  assert.equal(art1Geo.public_query_allowed, true);
 
   const summaryObj = JSON.parse(art1Geo.summary ?? '{}');
   // Locations from both intervals are merged
@@ -299,7 +363,7 @@ test('GdeltConnector.collect successfully reads multi-interval window and dedupl
 
 test('GdeltConnector handles 404 with incomplete_window code', async () => {
   class NotFoundClient extends HttpClient {
-    override async getBytes(_request: any): Promise<any> {
+    override async getStream(_request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
       throw new HttpFailure('upstream_unavailable', 404, 1);
     }
   }
@@ -363,9 +427,9 @@ test('R05 regression: deduplication and tie-break are 100% deterministic under i
     constructor(private readonly zipBytes: Uint8Array) {
       super();
     }
-    override async getBytes(_request: any): Promise<any> {
+    override async getStream(_request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
       return {
-        body: Buffer.from(this.zipBytes),
+        body: archiveStream(this.zipBytes),
         status: 200,
         fetchedAt: '2026-09-30T12:30:00Z',
         etag: null,

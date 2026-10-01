@@ -12,6 +12,10 @@ import { BigQueryPublisher } from '../core/publisher.js';
 import { withPublishedPedestrianHistory } from '../core/pedestrian-history.js';
 import { withPublishedPedestrianLocationHistory } from '../core/pedestrian-location-history.js';
 import { withPublishedGtfsLocations } from '../core/gtfs-runtime.js';
+import { withPublishedNewsLocations } from '../normalization/news-runtime.js';
+import { withPublishedParkingState } from '../normalization/parking-runtime.js';
+import { withVerifiedNewsPublicationEvidence } from '../normalization/news-publication-evidence.js';
+import { enrichVerifiedCrimeNews } from '../normalization/crime-news-evidence.js';
 import { loadConnector, loadSourceRegistry } from '../core/registry.js';
 import type { CsaSuccess } from '../connectors/csa_recorded_offences/index.js';
 import { normalizeCsaStatistics } from '../normalization/area-indicators.js';
@@ -118,7 +122,11 @@ export async function ingest(args: readonly string[],
     ...result, areaIndicators: normalized.indicators,
     outputCount: result.outputCount + normalized.indicators.length,
   };
-  const publishable = await withPublishedGtfsLocations(normalizedResult, config, bigquery);
+  const parking = await withPublishedParkingState(normalizedResult, config, bigquery);
+  const news = await withPublishedNewsLocations(parking, config, bigquery);
+  const newsPublication = withVerifiedNewsPublicationEvidence(news);
+  const crime = enrichVerifiedCrimeNews(newsPublication);
+  const publishable = await withPublishedGtfsLocations(crime, config, bigquery);
   const batch = await publisher.publish({ source, result: publishable,
     windowFrom: window.kind === 'time' ? window.from : null,
     windowTo: window.kind === 'time' ? window.to : null,

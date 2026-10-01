@@ -4,6 +4,7 @@ import type { Connector, ConnectorInput, ConnectorResult } from '../../core/conn
 import { HttpClient, HttpFailure } from '../../core/http.js';
 import type { GeoRecord, GeoRecordSource, SourceRecord } from '../../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
+import { TICKETMASTER_ATTRIBUTION, ticketmasterUpcomingWindow } from './policy.js';
 
 export const SOURCE_ID = 'ticketmaster.events';
 export const ENDPOINT = 'https://app.ticketmaster.com/discovery/v2/events.json';
@@ -11,6 +12,19 @@ export const MELBOURNE = { lat: -37.8136, lon: 144.9631 };
 export const SEARCH_RADIUS_KM = 80;
 export const PAGE_SIZE = 100;
 export const DEEP_PAGING_LIMIT = 1000;
+export const MAX_REQUEST_PAGES = DEEP_PAGING_LIMIT / PAGE_SIZE;
+export const REQUEST_GAP_MS = 350;
+
+/** Discovery search uses whole-second UTC parameters; the input remains half-open. */
+export function ticketmasterApiTimeWindow(window: { from: string; to: string }) {
+  const fromMs = Math.ceil(Date.parse(window.from) / 1000) * 1000;
+  const toMs = Math.floor((Date.parse(window.to) - 1) / 1000) * 1000;
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs > toMs) {
+    throw new Error('Ticketmaster search requires a nonempty whole-second event window');
+  }
+  return { from: new Date(fromMs).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    to: new Date(toMs).toISOString().replace(/\.\d{3}Z$/, 'Z') };
+}
 
 const venueSchema = z.object({
   id: z.string().optional(),
@@ -70,14 +84,16 @@ export function geohash(lat: number, lon: number, precision = 8): string {
 }
 
 function timestamp(value: string | undefined): string | null {
-  if (!value || !Number.isFinite(Date.parse(value))
-    || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
-  return new Date(value).toISOString();
+  const parsed = z.iso.datetime({ offset: true }).safeParse(value);
+  if (!parsed.success || !Number.isFinite(Date.parse(parsed.data))) return null;
+  return new Date(parsed.data).toISOString();
 }
 
 function pointFor(event: TicketEvent): { lon: number; lat: number } | null {
-  const location = event._embedded?.venues?.[0]?.location;
-  if (!location) return null;
+  const venues = event._embedded?.venues;
+  if (venues?.length !== 1) return null;
+  const location = venues[0]?.location;
+  if (!location || location.longitude.trim() === '' || location.latitude.trim() === '') return null;
   const lon = Number(location.longitude);
   const lat = Number(location.latitude);
   return Number.isFinite(lon) && Number.isFinite(lat) && lon >= -180 && lon <= 180
@@ -102,29 +118,31 @@ export function normalizeTicketEvents(events: readonly TicketEvent[], input: Con
     const startAt = unscheduled ? null : timestamp(event.dates.start.dateTime);
     const suppliedEnd = timestamp(event.dates.end?.dateTime);
     const endAt = startAt === null ? null
-      : suppliedEnd !== null && suppliedEnd >= startAt ? suppliedEnd : startAt;
-    const venue = event._embedded?.venues?.[0];
+      : suppliedEnd !== null && suppliedEnd >= startAt ? suppliedEnd : null;
+    const venues = event._embedded?.venues ?? [];
+    const venue = venues.length === 1 ? venues[0] : undefined;
     const point = pointFor(event);
     const id = sourceRecordId({ sourceId: SOURCE_ID, nativeId: event.id,
       originalUrl: event.url, sourceTime: startAt });
     const version = sourceVersionId(null, {
       status, start: event.dates.start, end: event.dates.end,
-      timezone: event.dates.timezone, venue: venue?.id,
-      venueLocation: venue?.location, name: event.name,
+      timezone: event.dates.timezone, venues: venues.map(entry => ({
+        id: entry.id, name: entry.name, location: entry.location,
+      })), name: event.name, url: event.url,
     });
     sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
       fetched_at: fetchedAt, source_record_id: id, version_id: version,
       original_url: event.url, raw_uri: null, published_at: null, observed_at: null,
-      first_accessible_at: null,
+      first_accessible_at: fetchedAt,
       time_missing_reason: 'Discovery API does not provide event publication time',
       valid_from: startAt, valid_to: endAt, source_updated_at: null,
       source_version_ordinal: null,
       record_status: cancelled ? 'cancelled' : 'active', assertion_kind: 'plan',
-      rights_status: 'review_required' });
+      rights_status: 'restricted' });
     geoRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
       fetched_at: fetchedAt, geo_record_id: id, version_id: version,
       topic: 'event', assertion_kind: 'plan', title: event.name,
-      summary: `Ticketmaster status: ${status}; local start: ${event.dates.start.localDate ?? 'unknown'} ${event.dates.start.localTime ?? ''} ${event.dates.timezone ?? ''}; venue: ${venue?.name ?? 'unknown'}`,
+      summary: `${TICKETMASTER_ATTRIBUTION}; Ticketmaster status: ${status}; local start: ${event.dates.start.localDate ?? 'unknown'} ${event.dates.start.localTime ?? ''} ${event.dates.timezone ?? ''}; venue: ${venue?.name ?? (venues.length > 1 ? 'multiple venues' : 'unknown')}`,
       original_url: event.url,
       geometry_geojson: point === null ? null : JSON.stringify({ type: 'Point',
         coordinates: [point.lon, point.lat] }),
@@ -135,7 +153,7 @@ export function normalizeTicketEvents(events: readonly TicketEvent[], input: Con
       valid_from: startAt, valid_to: endAt, source_updated_at: null,
       source_version_ordinal: null, freshness_state: 'unknown',
       record_status: cancelled ? 'cancelled' : 'planned',
-      rights_status: 'review_required', public_query_allowed: false });
+      rights_status: 'restricted', public_query_allowed: true });
     geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID,
       schema_version: 1, fetched_at: fetchedAt,
       geo_record_id: id, version_id: version, source_record_id: id,
@@ -161,21 +179,30 @@ export function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_
 export class TicketmasterConnector implements Connector {
   readonly sourceId = SOURCE_ID;
   constructor(private readonly client = new HttpClient(),
-    private readonly keyProvider: () => string | undefined = () => process.env.TICKETMASTER_DISCOVERY_API_KEY) {}
+    private readonly keyProvider: () => string | undefined = () => process.env.TICKETMASTER_DISCOVERY_API_KEY,
+    private readonly now: () => string = () => new Date().toISOString()) {}
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
-    if (input.sourceId !== SOURCE_ID || input.window.kind !== 'time') {
+    if (input.sourceId !== SOURCE_ID) {
       return failure(input, 'validation_failed');
     }
     const key = this.keyProvider()?.trim();
     if (!key) return failure(input, 'auth_failed');
     try {
+      const window = input.window.kind === 'time' ? input.window
+        : ticketmasterUpcomingWindow(this.now());
+      const apiWindow = ticketmasterApiTimeWindow(window);
       const events: TicketEvent[] = [];
       let fetchedAt = new Date().toISOString();
       let total: number | null = null;
       let pages: number | null = null;
+      let pageSize: number | null = null;
+      let fetchedPages = 0;
       for (let page = 0; ; page += 1) {
-        if (page * PAGE_SIZE >= DEEP_PAGING_LIMIT) return failure(input, 'incomplete_window');
+        if (page >= MAX_REQUEST_PAGES) {
+          return failure(input, 'incomplete_window');
+        }
+        if (page > 0) await new Promise(resolve => setTimeout(resolve, REQUEST_GAP_MS));
         const url = new URL(ENDPOINT);
         url.searchParams.set('apikey', key);
         url.searchParams.set('countryCode', 'AU');
@@ -183,31 +210,48 @@ export class TicketmasterConnector implements Connector {
         url.searchParams.set('geoPoint', geohash(MELBOURNE.lat, MELBOURNE.lon));
         url.searchParams.set('radius', String(SEARCH_RADIUS_KM));
         url.searchParams.set('unit', 'km');
-        url.searchParams.set('startDateTime', input.window.from);
-        url.searchParams.set('endDateTime', input.window.to);
+        url.searchParams.set('startDateTime', apiWindow.from);
+        url.searchParams.set('endDateTime', apiWindow.to);
+        url.searchParams.set('sort', 'id,asc');
+        url.searchParams.set('includeTest', 'no');
+        url.searchParams.set('includeTBA', 'no');
+        url.searchParams.set('includeTBD', 'no');
         url.searchParams.set('size', String(PAGE_SIZE));
         url.searchParams.set('page', String(page));
-        const response = await this.client.getJson({ url, timeoutMs: 20000, maxAttempts: 3 });
+        const response = await this.client.getJson({ url, timeoutMs: 20000,
+          maxAttempts: 1, redirect: 'error' });
         const body = parseTicketPage(response.body);
+        fetchedPages += 1;
         fetchedAt = response.fetchedAt;
         if (body.page.number !== page || (total !== null && body.page.totalElements !== total)
-          || (pages !== null && body.page.totalPages !== pages)) {
+          || (pages !== null && body.page.totalPages !== pages)
+          || body.page.size > PAGE_SIZE
+          || (pageSize !== null && body.page.size !== pageSize)) {
           return failure(input, 'incomplete_window');
         }
         total = body.page.totalElements;
-        pages = body.page.totalPages;
-        if (total > DEEP_PAGING_LIMIT) return failure(input, 'incomplete_window');
-        events.push(...(body._embedded?.events ?? []));
-        if (page + 1 >= Math.max(1, pages)) break;
+        pageSize = body.page.size;
+        pages = Math.max(1, body.page.totalPages);
+        const expectedPages = Math.max(1, Math.ceil(total / pageSize));
+        const expectedItems = Math.min(pageSize, Math.max(0, total - page * pageSize));
+        const items = body._embedded?.events ?? [];
+        if (total > DEEP_PAGING_LIMIT || pages > MAX_REQUEST_PAGES || pages !== expectedPages
+          || (total > 0 && body.page.totalPages === 0) || items.length !== expectedItems) {
+          return failure(input, 'incomplete_window');
+        }
+        events.push(...items);
+        if (page + 1 >= pages) break;
       }
       if (events.length !== total) return failure(input, 'incomplete_window');
       const normalized = normalizeTicketEvents(events, input, fetchedAt);
       return { kind: 'success', sourceId: SOURCE_ID, runId: input.runId,
-        fetchedAt, sourceRevision: null, sourceLatestUpdateAt: null,
-        checkpointAfter: input.window.to,
+        fetchedAt, sourceRevision: sourceVersionId(null, { fetchedAt,
+          window, events: normalized.sourceRecords.map(row => [row.source_record_id, row.version_id]) }),
+        sourceLatestUpdateAt: null,
+        checkpointAfter: input.window.kind === 'time' ? input.window.to : null,
         completeness: { complete: true, method: 'pagination', expected_records: total,
           fetched_records: events.length, expected_pages: pages,
-          fetched_pages: Math.max(1, pages ?? 1),
+          fetched_pages: fetchedPages,
           evidence: 'Every zero-based page agrees on totalElements and totalPages' },
         inputCount: events.length, outputCount: normalized.sourceRecords.length,
         rejectedCount: 0, ...normalized, boundaries: [], areaIndicators: [],

@@ -17,6 +17,8 @@ const MAX_TABLE_ROWS = 10_000;
 const catalogSchema = z.object({
   success: z.literal(true),
   result: z.object({
+    license_id: z.string().optional(),
+    license_url: z.url().optional(),
     resources: z.array(z.object({
       id: z.string().uuid(),
       name: z.string(),
@@ -109,6 +111,13 @@ function xlsxEntries(bytes: Uint8Array, names: readonly string[]): Record<string
 
 export function selectCsaResource(catalog: unknown, requestedRevision = 'latest'): CsaResource {
   const data = catalogSchema.parse(catalog);
+  if (data.result.license_id !== undefined && data.result.license_id !== 'cc-by') {
+    throw new Error('CSA catalog licence changed from the reviewed CC BY 4.0 grant');
+  }
+  if (data.result.license_url !== undefined
+    && !/^https:\/\/creativecommons\.org\/licenses\/by\/4\.0\/?$/.test(data.result.license_url)) {
+    throw new Error('CSA catalog licence URL changed from the reviewed CC BY 4.0 grant');
+  }
   const resources = data.result.resources.flatMap((candidate) => {
     if (!/recorded offences by lga/i.test(candidate.name)) return [];
     if (candidate.format.toLowerCase().replace('.', '') !== 'xlsx') return [];
@@ -281,6 +290,7 @@ export interface CsaRecordedOffencesConnectorOptions {
   readonly catalogUrl?: string | undefined;
   readonly rawWorkbookBytes?: Uint8Array | undefined;
   readonly catalogJson?: unknown;
+  readonly workbookLastModified?: string | null;
 }
 
 export class CsaRecordedOffencesConnector implements Connector {
@@ -289,6 +299,7 @@ export class CsaRecordedOffencesConnector implements Connector {
   private readonly catalogUrl: string;
   private readonly rawWorkbookBytes?: Uint8Array | undefined;
   private readonly catalogJson?: unknown;
+  private readonly workbookLastModified: string | null;
 
   constructor(
     httpOrOptions?: HttpClient | CsaRecordedOffencesConnectorOptions,
@@ -297,15 +308,18 @@ export class CsaRecordedOffencesConnector implements Connector {
     if (httpOrOptions && 'getJson' in httpOrOptions) {
       this.http = httpOrOptions;
       this.catalogUrl = catalogUrl;
+      this.workbookLastModified = null;
     } else if (httpOrOptions && typeof httpOrOptions === 'object') {
-      const opts = httpOrOptions as CsaRecordedOffencesConnectorOptions;
+      const opts = httpOrOptions;
       this.http = opts.http ?? new HttpClient();
       this.catalogUrl = opts.catalogUrl ?? catalogUrl;
       this.rawWorkbookBytes = opts.rawWorkbookBytes;
       this.catalogJson = opts.catalogJson;
+      this.workbookLastModified = opts.workbookLastModified ?? null;
     } else {
       this.http = new HttpClient();
       this.catalogUrl = catalogUrl;
+      this.workbookLastModified = null;
     }
   }
 
@@ -316,17 +330,25 @@ export class CsaRecordedOffencesConnector implements Connector {
     }
     let resource: CsaResource;
     let bytes: Uint8Array;
+    let resourceUpdatedAt: string;
     try {
       const catalog = this.catalogJson !== undefined
         ? { body: this.catalogJson }
-        : await this.http.getJson({ url: this.catalogUrl, timeoutMs: 30_000 });
+        : await this.http.getJson({ url: this.catalogUrl, timeoutMs: 30_000, maxAttempts: 1 });
       resource = selectCsaResource(catalog.body, input.window.revision);
+      let lastModified = this.workbookLastModified;
       if (this.rawWorkbookBytes) {
         bytes = this.rawWorkbookBytes;
       } else {
-        const workbook = await this.http.getBytes({ url: resource.url, timeoutMs: 120_000 });
+        const workbook = await this.http.getBytes({ url: resource.url, timeoutMs: 120_000, maxAttempts: 1 });
         bytes = workbook.body;
+        lastModified = workbook.lastModified;
       }
+      const updatedMs = lastModified === null ? Number.NaN : Date.parse(lastModified);
+      if (!Number.isFinite(updatedMs) || updatedMs > Date.parse(checkedAt)) {
+        throw new Error('CSA workbook lacks a valid, nonfuture Last-Modified revision timestamp');
+      }
+      resourceUpdatedAt = new Date(updatedMs).toISOString();
     } catch (error) {
       const code = error instanceof HttpFailure ? error.code : 'schema_changed';
       return failure(input, code, 'CSA catalog or selected LGA workbook could not be fetched', checkedAt);
@@ -342,17 +364,15 @@ export class CsaRecordedOffencesConnector implements Connector {
       fetched_at: checkedAt, source_record_id: stat.sourceRecordId,
       version_id: stat.versionId, original_url: resource.url, raw_uri: null,
       published_at: null, observed_at: null, first_accessible_at: null,
-      time_missing_reason: 'CSA provides a release date and rolling-year period, not an exact publication or incident timestamp',
+      time_missing_reason: `CSA calendar release_date=${stat.releaseDate ?? 'unknown'} and rolling-year period are available; exact publication and incident timestamps are absent`,
       valid_from: stat.periodStart, valid_to: stat.periodEndExclusive,
-      // The selected resource period orders successive quarterly releases;
-      // it is not an exact article or incident publication timestamp.
-      source_updated_at: new Date(`${resource.periodEnd}T00:00:00Z`).toISOString(),
+      source_updated_at: resourceUpdatedAt,
       source_version_ordinal: null,
-      record_status: 'active', assertion_kind: 'observation', rights_status: 'review_required',
+      record_status: 'active', assertion_kind: 'observation', rights_status: 'verified_open',
     }));
     return {
       kind: 'success', sourceId: SOURCE_ID, runId: input.runId, fetchedAt: checkedAt,
-      sourceRevision: resource.id, sourceLatestUpdateAt: null,
+      sourceRevision: resource.id, sourceLatestUpdateAt: resourceUpdatedAt,
       checkpointAfter: resource.id,
       completeness: {
         complete: true, method: 'export_count', expected_records: statistics.length,

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type {
   AreaIndicator, Boundary, GeoRecord, GeoRecordSource, ParkingBay,
-  ParkingObservation, ParkingRule, PedestrianObservation, SensorLocation,
+  ParkingObservation, ParkingRule, ParkingSensorMembership, PedestrianObservation, SensorLocation,
   SourceId, SourceRecord, UtcTimestamp,
 } from './types.js';
 
@@ -87,6 +87,7 @@ export interface ConnectorSuccess {
   parkingBays: readonly ParkingBay[];
   parkingObservations: readonly ParkingObservation[];
   parkingRules: readonly ParkingRule[];
+  parkingSensorMemberships?: readonly ParkingSensorMembership[];
   sensorLocations: readonly SensorLocation[];
   pedestrianObservations: readonly PedestrianObservation[];
   /** Raw fields already filtered to those the source license allows us to retain. */

@@ -212,6 +212,24 @@ CREATE TABLE IF NOT EXISTS `melens_ingest.parking_observations` (
 PARTITION BY DATE(fetched_at)
 CLUSTER BY source_id, bay_id, sensor_id;
 
+CREATE TABLE IF NOT EXISTS `melens_ingest.parking_sensor_memberships` (
+  sensor_id STRING NOT NULL,
+  version_id STRING NOT NULL,
+  batch_id STRING NOT NULL,
+  source_id STRING NOT NULL,
+  schema_version INT64 NOT NULL,
+  fetched_at TIMESTAMP NOT NULL,
+  business_source_record_id STRING NOT NULL,
+  business_state_hash STRING NOT NULL,
+  business_version_id STRING NOT NULL,
+  business_batch_id STRING NOT NULL,
+  source_updated_at TIMESTAMP,
+  snapshot_source_record_id STRING NOT NULL,
+  snapshot_version_id STRING NOT NULL
+)
+PARTITION BY DATE(fetched_at)
+CLUSTER BY source_id, batch_id, sensor_id, business_version_id;
+
 CREATE TABLE IF NOT EXISTS `melens_ingest.parking_rules` (
   rule_id STRING NOT NULL,
   version_id STRING NOT NULL,

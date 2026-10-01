@@ -223,6 +223,15 @@ class SourceIdentityTest(unittest.TestCase):
         self.assertTrue(any(call[1:3] == ("secrets", "get-iam-policy") for call in self.cloud.calls))
         self.assertFalse(any("versions" in call for call in self.cloud.calls))
 
+    def test_secret_inventory_accepts_project_number_resource_names(self):
+        self.plan['sources'][0]['secret_names'] = ['transport_victoria_key_id']
+        actual = source_identities.snapshot(self.cloud, self.plan)
+        actual['secrets'] = {'projects/401001961508/secrets/transport_victoria_key_id': {'bindings': []}}
+        source_identities.audit(self.plan, actual, False)
+        actual['secrets'] = {'projects/401001961508/secrets/other_key': {'bindings': []}}
+        with self.assertRaisesRegex(ValueError, 'Required secret is missing'):
+            source_identities.audit(self.plan, actual, False)
+
     def test_unconditional_bucket_access_fails_before_any_cloud_write(self):
         self.cloud.state["bucket"]["bindings"].append({"role": "roles/storage.objectAdmin", "members": [self.member]})
         with self.assertRaisesRegex(ValueError, "Unexpected bucket"):

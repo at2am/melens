@@ -20,15 +20,15 @@ test('deployment plan is inert and reports the approved budget plus remaining co
   assert.match(result.stdout, /Scheduler location: australia-southeast1/);
   assert.match(result.stdout, /Budget alerts verified: True/);
   assert.match(result.stdout, /Runtime guards verified:/);
-  assert.match(result.stdout, /gdelt\.news \| \*\/15 \* \* \* \* \| time \| candidate/);
+  assert.match(result.stdout, /gdelt\.news \| \*\/15 \* \* \* \* \| time \| enabled \| 160 \| 500000000/);
 });
 
 test('apply refuses a candidate source before cloud access', () => {
-  const result = spawnSync(script, [...baseArgs,
+  const result = spawnSync(script, [...baseArgs.slice(0, -1), 'melbourne.microclimate',
     '--image', `example.com/melens@sha256:${'a'.repeat(64)}`,
     '--apply', '--confirm-project', 'melens-510012'], { encoding: 'utf8' });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Source not enabled for deployment: gdelt\.news/);
+  assert.match(result.stderr, /Source not enabled for deployment: melbourne\.microclimate/);
   assert.doesNotMatch(result.stdout, /Plan only/);
 });
 

@@ -18,7 +18,7 @@ import {
   timeMinute,
 } from '../../src/connectors/com_parking_restrictions/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
-import { HttpFailure } from '../../src/core/http.js';
+import { HttpClient, HttpFailure, type HttpRequest, type HttpResponse } from '../../src/core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient, type OdsQuery, type OdsRecords } from '../../src/core/opendatasoft.js';
 import { parseSourceManifest } from '../../src/core/registry.js';
 import type { ParkingBay, ParkingObservation, ParkingRule } from '../../src/core/types.js';
@@ -40,18 +40,43 @@ const input = parseConnectorInput({
   runId: 'fixture-test-run',
 });
 
-test('source.json manifest validates against schema and retains review_required status', async () => {
+test('source.json has complete reviewed open-data admission', async () => {
   const content = await readFile(manifestPath, 'utf8');
   const manifest = parseSourceManifest(JSON.parse(content));
 
   assert.equal(manifest.source_id, SOURCE_ID);
-  assert.equal(manifest.license_status, 'review_required');
-  assert.equal(manifest.access_status, 'candidate');
+  assert.equal(manifest.license_status, 'verified_open');
+  assert.ok(['candidate', 'active'].includes(manifest.access_status));
+  assert.deepEqual(manifest.admission_evidence.missing_requirements, []);
   assert.equal(manifest.topic, 'parking');
   assert.equal(manifest.scope, 'city');
   assert.equal(manifest.check_interval_seconds, 86400);
   assert.equal(manifest.record_granularity, 'bay_rule_slot');
   assert.equal(manifest.provider, 'City of Melbourne');
+});
+
+test('production restrictions use the full export and official dataset revision rather than fetch time', async () => {
+  const fixture = await loadFixture();
+  const requests: HttpRequest[] = [];
+  class ExportClient extends HttpClient {
+    override async getJson(request: HttpRequest): Promise<HttpResponse<unknown>> {
+      requests.push(request);
+      const url = String(request.url);
+      const body = url.endsWith('/records?limit=0') ? { total_count: fixture.total_count }
+        : url.endsWith('/exports/json') ? fixture.results
+          : { metas: { default: { data_processed: '2022-11-13T10:30:19+00:00' } } };
+      return { body, status: 200, fetchedAt: '2026-10-01T10:00:00Z', etag: null,
+        lastModified: '2026-10-01T09:59:00Z', contentType: 'application/json' };
+    }
+  }
+  const result = await new ParkingRestrictionsConnector(new ExportClient()).collect(input);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+  assert.equal(result.sourceRevision, '2022-11-13T10:30:19.000Z');
+  assert.equal(result.completeness.method, 'export_count');
+  assert.equal(requests.length, 3);
+  assert.ok(requests.every(request => request.maxAttempts === 1 && request.redirect === 'error'));
+  assert.ok(result.parkingRules.every(rule => rule.valid_from === null && rule.valid_to === null));
 });
 
 test('com_parking_restrictions parses fixture, preserves multiple non-overlapping rule slots per bay', async () => {
@@ -142,7 +167,7 @@ test('com_parking_restrictions parses fixture, preserves multiple non-overlappin
 
   // Verify source records retain review_required and missing publication time explanation
   for (const srcRec of result.sourceRecords) {
-    assert.equal(srcRec.rights_status, 'review_required');
+    assert.equal(srcRec.rights_status, 'verified_open');
     assert.equal(srcRec.assertion_kind, 'plan');
     assert.equal(srcRec.record_status, 'active');
     assert.equal(srcRec.valid_from, null);
@@ -152,8 +177,8 @@ test('com_parking_restrictions parses fixture, preserves multiple non-overlappin
 
   // Verify geo records retain review_required and private query status
   for (const geoRec of result.geoRecords) {
-    assert.equal(geoRec.rights_status, 'review_required');
-    assert.equal(geoRec.public_query_allowed, false);
+    assert.equal(geoRec.rights_status, 'verified_open');
+    assert.equal(geoRec.public_query_allowed, true);
     assert.equal(geoRec.topic, 'parking');
     assert.equal(geoRec.assertion_kind, 'plan');
     assert.equal(geoRec.freshness_state, 'unknown');

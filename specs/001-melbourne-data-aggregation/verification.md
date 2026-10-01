@@ -2,6 +2,48 @@
 
 Last checked: 2026-10-01 (Australia/Melbourne). T077 remains open.
 
+## Current result: four-category release
+
+Twelve independent sources now have real published development BigQuery batches.
+Five of eight category sample thresholds are met: general news, local crime news
+with separate CSA statistics, activities, administrative boundaries, and regional
+statistics. Parking occupancy/location is queryable, but its legal three-table
+sample gate is open; pedestrian and traffic gates are open. Four category workers
+completed independent delivery; root owns deployment and readback.
+
+- General news: ten distinct reviewed logical events, three original publisher
+  dates, official area mentions and zero precise Points.
+- Local crime news: six reviewed reports across six publication dates, zero
+  precise Points; new conservative candidates remain marked unverified.
+- CSA: 1,620 count/rate indicators, 81 original area labels and ten statistical
+  periods; missing boundary codes/vintages stay null.
+- Activities: 421 complete provider records, 419 current noncancelled, 372 future
+  dated and 38 provider venues; 80 km search circle is not an official boundary.
+- Parking: 29,053 bay points, 6,324 sensors and 8,035 reference rules; no current
+  authoritative crosswalk/rule period, so legal permission remains unknown.
+- Actual positive GCP checks: parking views 2/2, parking retention 4/4,
+  news retention 7/7 and event publisher/lifecycle 1/1. Ordinary tests are
+  separate from these opt-in executions.
+- Eight source schedules are ENABLED, plus two cleanup schedules. New sensor
+  natural 13:04 execution and GDELT natural 12:30/12:45/13:00 succeeded.
+  Authenticated Scheduler dispatch also succeeded for bays/rules/CSA/events.
+  Sensor final run uses 512MiB, zero load jobs and 220MiB billed queries;
+  snapshot readback retains stale/unknown upstream device clocks.
+- Warehouse: 13 ingestion tables, 25 query views, 13 authorized direct-raw
+  view grants; twelve dedicated admitted source identities.
+- Local ADC was revoked after an auxiliary SDK diagnostic exposed a short-lived
+  OAuth request header in tool output. CLI and cloud runtime identities continue
+  to work. Local SDK development requires `gcloud auth application-default login`.
+
+[Four-category release evidence](../../cloud/data/docs/validation/four-category-release-2026-10-01.md)
+and [copyable SQL](../../cloud/data/docs/validation/four-category-readback.sql)
+record the actual image, batches, counts, automatic refresh and cost checks.
+The original task table is 63/77. SC-002 continuous 24-hour denominators, SC-004
+two independent human reviewers, and deployed SC-003/SC-005/SC-006 acceptance
+remain unfinished. The dated sections and tables below retain previous evidence;
+their 6-source/1-category totals and ADC status are superseded by this section.
+
+
 ## Local implementation checks
 
 | Check | Result | Evidence |

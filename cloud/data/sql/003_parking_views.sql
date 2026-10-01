@@ -225,3 +225,160 @@ WHERE o.ambiguous OR NOT EXISTS (
     AND b.occupancy_batch_id = o.batch_id
     AND b.occupancy_join_evidence = 'shared_marker_id'
 );
+
+-- Independent sensor coordinates and reported occupancy need no bay crosswalk.
+-- Membership follows the latest complete published collection, including empty
+-- snapshots. A failed collection cannot replace it or invent vacancy.
+CREATE OR REPLACE VIEW `melens_query.v_parking_sensor_current` AS
+WITH batches AS (
+  SELECT batch_id, source_id, state, published_at, started_at
+  FROM `melens_ingest.sync_batches`
+  WHERE source_id = 'melbourne.parking.sensors'
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC
+  ) = 1
+), latest_snapshot AS (
+  SELECT batch_id, source_id FROM batches
+  WHERE state = 'published' AND published_at IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY source_id ORDER BY started_at DESC, batch_id DESC
+  ) = 1
+), sources AS (
+  SELECT source_id, cadence_seconds, check_interval_seconds,
+    last_success_at, license_status, access_status
+  FROM `melens_ingest.data_sources`
+  WHERE source_id = 'melbourne.parking.sensors'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY updated_at DESC) = 1
+), candidates AS (
+  SELECT m.*, m.version_id AS membership_version_id,
+    r.source_record_id, r.observed_at, r.original_url,
+    r.fetched_at AS business_fetched_at, o.marker_id, o.bay_id, o.occupied,
+    r.record_status, r.rights_status,
+    COALESCE(s.cadence_seconds, s.check_interval_seconds) AS cadence_seconds,
+    s.last_success_at,
+    g.geometry_geojson, g.centroid_lat, g.centroid_lon, g.summary,
+    TO_JSON_STRING(STRUCT(m.business_source_record_id, m.business_state_hash, m.business_version_id,
+      m.business_batch_id, m.source_updated_at, o.occupied, g.geometry_geojson,
+      r.record_status, r.rights_status)) AS content_key
+  FROM `melens_ingest.parking_sensor_memberships` m
+  JOIN latest_snapshot b USING (batch_id, source_id)
+  JOIN sources s USING (source_id)
+  JOIN `melens_ingest.source_records` proof
+    ON proof.batch_id = m.batch_id AND proof.source_id = m.source_id
+   AND proof.source_record_id = m.snapshot_source_record_id AND proof.version_id = m.snapshot_version_id
+   AND proof.record_status = 'active' AND proof.rights_status IN ('verified_open', 'restricted')
+  JOIN batches business_batch
+    ON business_batch.batch_id = m.business_batch_id AND business_batch.source_id = m.source_id
+   AND business_batch.state = 'published' AND business_batch.published_at IS NOT NULL
+  JOIN `melens_ingest.source_records` r
+    ON r.batch_id = m.business_batch_id AND r.source_id = m.source_id
+   AND r.source_record_id = m.business_source_record_id AND r.version_id = m.business_version_id
+  LEFT JOIN `melens_ingest.parking_observations` o
+    ON o.batch_id = m.business_batch_id AND o.source_id = m.source_id
+   AND o.source_record_id = m.business_source_record_id AND o.version_id = m.business_version_id
+  LEFT JOIN `melens_ingest.geo_records` g
+    ON g.batch_id = m.business_batch_id AND g.source_id = m.source_id
+   AND g.geo_record_id = m.business_source_record_id AND g.version_id = m.business_version_id
+   AND g.location_role = 'sensor_site' AND g.location_confidence = 'source_coordinate'
+   AND g.record_status = 'active' AND g.rights_status IN ('verified_open', 'restricted')
+   AND g.public_query_allowed
+  WHERE s.license_status IN ('verified_open', 'restricted') AND s.access_status = 'active'
+), versions AS (
+  SELECT *, COUNT(DISTINCT content_key) OVER (
+    PARTITION BY source_id, sensor_id) > 1 AS ambiguous
+  FROM candidates
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY source_id, sensor_id
+    ORDER BY source_updated_at DESC NULLS LAST, fetched_at DESC, version_id DESC) = 1
+), clock AS (
+  SELECT CURRENT_DATE('Australia/Melbourne') AS local_date
+), operating_day AS (
+  SELECT local_date,
+    CASE WHEN EXTRACT(YEAR FROM local_date) = 2026 THEN local_date IN (
+      DATE '2026-01-01', DATE '2026-01-26', DATE '2026-03-09', DATE '2026-04-03',
+      DATE '2026-04-04', DATE '2026-04-05', DATE '2026-04-06', DATE '2026-04-25',
+      DATE '2026-06-08', DATE '2026-09-25', DATE '2026-11-03', DATE '2026-12-25',
+      DATE '2026-12-26', DATE '2026-12-28'
+    ) ELSE CAST(NULL AS BOOL) END AS is_public_holiday
+  FROM clock
+), evaluated AS (
+  SELECT v.*, d.local_date, d.is_public_holiday,
+    CASE
+      WHEN ambiguous OR source_updated_at IS NULL OR cadence_seconds IS NULL
+        OR cadence_seconds <= 0 OR last_success_at IS NULL
+        OR source_updated_at > CURRENT_TIMESTAMP() OR last_success_at > CURRENT_TIMESTAMP()
+        OR observed_at > source_updated_at THEN 'unknown'
+      WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), source_updated_at, SECOND) <= 2 * cadence_seconds
+        AND TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), last_success_at, SECOND) <= 2 * cadence_seconds
+        THEN 'current'
+      WHEN TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), source_updated_at, SECOND) <= 4 * cadence_seconds
+        AND TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), last_success_at, SECOND) <= 4 * cadence_seconds
+        THEN 'late'
+      ELSE 'stale'
+    END AS source_freshness
+  FROM versions v CROSS JOIN operating_day d
+  WHERE record_status IN ('active', 'corrected') AND rights_status IN ('verified_open', 'restricted')
+)
+SELECT source_id, batch_id, sensor_id, source_record_id, business_version_id AS version_id,
+  business_source_record_id, business_state_hash, business_version_id, business_batch_id,
+  membership_version_id, snapshot_source_record_id, snapshot_version_id, business_fetched_at,
+  marker_id, bay_id,
+  IF(ambiguous, NULL, occupied) AS occupied,
+  IF(ambiguous, NULL, JSON_VALUE(summary, '$.status_description')) AS reported_status,
+  IF(ambiguous, NULL, SAFE_CAST(JSON_VALUE(summary, '$.zone_number') AS INT64)) AS zone_number,
+  observed_at AS status_changed_at, source_updated_at, fetched_at, last_success_at,
+  IF(ambiguous, NULL, geometry_geojson) AS geometry_geojson,
+  IF(ambiguous, NULL, SAFE.ST_GEOGFROMGEOJSON(geometry_geojson)) AS geometry,
+  IF(ambiguous, NULL, centroid_lat) AS latitude,
+  IF(ambiguous, NULL, centroid_lon) AS longitude,
+  original_url, 'City of Melbourne' AS attribution,
+  'https://creativecommons.org/licenses/by/4.0/' AS license_url,
+  source_freshness,
+  IF(is_public_holiday IS FALSE AND observed_at IS NOT NULL, source_freshness, 'unknown') AS occupancy_freshness,
+  local_date, is_public_holiday,
+  'https://business.vic.gov.au/business-information/public-holidays/victorian-public-holidays-2026' AS holiday_evidence_url,
+  '2026 calendar reviewed 2026-10-01, other years unknown' AS holiday_evidence_scope,
+  CASE WHEN ambiguous THEN 'conflicting_sensor_records'
+    WHEN is_public_holiday IS TRUE THEN 'sensor_not_operational_public_holiday'
+    WHEN is_public_holiday IS NULL THEN 'sensor_holiday_status_unknown'
+    ELSE 'vacancy_does_not_prove_access_or_legal_permission' END AS availability_note,
+  TRUE AS construction_obstruction_possible,
+  'unknown' AS may_park_now
+FROM evaluated;
+
+-- These are source rule references. The publisher calls this dataset static and
+-- not updated, and provides no current effective dates or current sensor join.
+CREATE OR REPLACE VIEW `melens_query.v_parking_rule_reference` AS
+WITH batches AS (
+  SELECT batch_id, source_id, state, published_at, started_at
+  FROM `melens_ingest.sync_batches`
+  WHERE source_id = 'melbourne.parking.restrictions'
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC
+  ) = 1
+), latest_snapshot AS (
+  SELECT batch_id, source_id FROM batches
+  WHERE state = 'published' AND published_at IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY started_at DESC, batch_id DESC) = 1
+), sources AS (
+  SELECT source_id, license_status, access_status
+  FROM `melens_ingest.data_sources`
+  WHERE source_id = 'melbourne.parking.restrictions'
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY updated_at DESC) = 1
+)
+SELECT q.*, r.version_id AS source_version_id, r.original_url,
+  'unverified_current_applicability' AS rule_status,
+  'unverified' AS sensor_join_evidence, 'unknown' AS may_park_now,
+  'City of Melbourne' AS attribution,
+  'https://creativecommons.org/licenses/by/4.0/' AS license_url
+FROM `melens_ingest.parking_rules` q
+JOIN latest_snapshot b USING (batch_id, source_id)
+JOIN sources s USING (source_id)
+JOIN `melens_ingest.geo_record_sources` l
+  ON l.batch_id = q.batch_id AND l.source_id = q.source_id
+ AND l.geo_record_id = q.rule_id AND l.version_id = q.version_id
+ AND l.source_record_id = q.source_record_id AND l.evidence_role = 'official_bay_restriction'
+JOIN `melens_ingest.source_records` r
+  ON r.batch_id = l.batch_id AND r.source_id = l.source_id
+ AND r.source_record_id = l.source_record_id AND r.version_id = l.source_version_id
+WHERE s.license_status IN ('verified_open', 'restricted') AND s.access_status = 'active'
+  AND r.rights_status IN ('verified_open', 'restricted') AND r.record_status IN ('active', 'corrected');

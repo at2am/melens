@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { unzipSync } from 'fflate';
+import { XMLParser } from 'fast-xml-parser';
+import { z } from 'zod';
 
 import type { Connector, ConnectorFailure, ConnectorInput, ConnectorSuccess } from '../../core/connector.js';
 import { HttpClient, HttpFailure } from '../../core/http.js';
@@ -25,7 +27,9 @@ export interface GdeltArticleCandidate {
   articleUrl: string;
   gkgProcessedAt: string;
   sourceName: string;
+  title: string | null;
   rawLocationNames: readonly string[];
+  locationMentions: readonly GdeltLocationMention[];
   victoriaMentions: readonly GdeltLocationMention[];
   themes: readonly string[];
 }
@@ -42,7 +46,44 @@ function digest(value: string): string {
 function toUtcTimestamp(gdeltDate: string): string | null {
   if (!/^\d{14}$/.test(gdeltDate)) return null;
   const iso = `${gdeltDate.slice(0, 4)}-${gdeltDate.slice(4, 6)}-${gdeltDate.slice(6, 8)}T${gdeltDate.slice(8, 10)}:${gdeltDate.slice(10, 12)}:${gdeltDate.slice(12, 14)}Z`;
-  return Number.isNaN(Date.parse(iso)) ? null : iso;
+  const time = Date.parse(iso);
+  return !Number.isFinite(time) || new Date(time).toISOString().slice(0, 19) !== iso.slice(0, 19)
+    ? null : iso;
+}
+
+/** The GKG Extras PAGE_TITLE is metadata supplied by GDELT, not scraped article text. */
+export function parsePageTitle(extras: string): string | null {
+  const value = /<PAGE_TITLE>([^]*?)<\/PAGE_TITLE>/.exec(extras)?.[1];
+  if (!value || value.length > 8_000) return null;
+  try {
+    const parsed: unknown = new XMLParser({ parseTagValue: false, trimValues: true,
+      htmlEntities: true })
+      .parse(`<title>${value}</title>`);
+    const result = z.object({ title: z.string().trim().min(1).max(2_000) }).safeParse(parsed);
+    return result.success ? result.data.title : null;
+  } catch { return null; }
+}
+
+async function boundedArchive(stream: ReadableStream<Uint8Array<ArrayBuffer>>): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      length += next.value.byteLength;
+      if (length > MAX_ZIP_BYTES) throw new Error('GDELT archive exceeds compressed size limit');
+      chunks.push(next.value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return bytes;
 }
 
 export function articleUrl(rawUrl: string): string | null {
@@ -88,13 +129,17 @@ export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): G
   if (bytes.byteLength > MAX_ZIP_BYTES) throw new Error('GDELT archive exceeds compressed size limit');
   const entryName = `${expectedTimestamp}.gkg.csv`;
   let entries: Record<string, Uint8Array>;
+  let selectedEntries = 0;
   try {
     entries = unzipSync(bytes, {
-      filter: (entry) => (
-        entry.name === entryName ||
-        entry.name.endsWith(`/${entryName}`) ||
-        entry.name.toLowerCase() === entryName.toLowerCase()
-      ) && entry.originalSize <= MAX_CSV_BYTES,
+      filter: (entry) => {
+        const selected = entry.name === entryName || entry.name.endsWith(`/${entryName}`)
+          || entry.name.toLowerCase() === entryName.toLowerCase();
+        if (!selected) return false;
+        selectedEntries += 1;
+        if (selectedEntries > 1) throw new Error('Duplicate GKG CSV entries');
+        return entry.originalSize <= MAX_CSV_BYTES;
+      },
     });
   } catch {
     throw new Error('GDELT archive is invalid');
@@ -104,6 +149,7 @@ export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): G
   );
   const csv = entryKey ? entries[entryKey] : undefined;
   if (!csv) throw new Error('GDELT archive lacks the expected bounded GKG CSV entry');
+  if (csv.byteLength > MAX_CSV_BYTES) throw new Error('GDELT archive exceeds expanded size limit');
   const lines = new TextDecoder('utf-8', { fatal: true }).decode(csv).split('\n');
   if (lines.length > MAX_ROWS_PER_FILE + 1) throw new Error('GDELT archive exceeds row limit');
   const candidates: GdeltArticleCandidate[] = [];
@@ -124,7 +170,9 @@ export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): G
       articleUrl: url,
       gkgProcessedAt: processedAt,
       sourceName: field(3),
+      title: parsePageTitle(field(26)),
       rawLocationNames: Array.from(new Set(mentions.map((mention) => mention.name))),
+      locationMentions: mentions,
       victoriaMentions,
       themes: Array.from(new Set(field(7).split(';').filter(Boolean))),
     });
@@ -174,8 +222,9 @@ export class GdeltConnector implements Connector {
       const name = timestampName(timestamp);
       const fileUrl = new URL(`${name}.gkg.csv.zip`, this.baseUrl);
       try {
-        const response = await this.http.getBytes({ url: fileUrl, timeoutMs: 120_000 });
-        const candidates = parseGkgArchive(response.body, name);
+        const response = await this.http.getStream({ url: fileUrl, timeoutMs: 120_000,
+          maxAttempts: 1, redirect: 'error' });
+        const candidates = parseGkgArchive(await boundedArchive(response.body), name);
         articles.push(...candidates);
         fetchedFiles += 1;
         lastModified = response.lastModified ?? lastModified;
@@ -200,7 +249,9 @@ export class GdeltConnector implements Connector {
           articleUrl: article.articleUrl,
           gkgProcessedAt: article.gkgProcessedAt,
           sourceName: article.sourceName,
+          title: article.title,
           rawLocationNames: [...article.rawLocationNames],
+          locationMentions: [...article.locationMentions],
           victoriaMentions: [...article.victoriaMentions],
           themes: [...article.themes],
         });
@@ -212,6 +263,7 @@ export class GdeltConnector implements Connector {
         const gkgRecordId = isPreferred ? article.gkgRecordId : existing.gkgRecordId;
         const gkgProcessedAt = isPreferred ? article.gkgProcessedAt : existing.gkgProcessedAt;
         const sourceName = (isPreferred ? article.sourceName : existing.sourceName) || existing.sourceName || article.sourceName;
+        const title = isPreferred ? article.title : existing.title;
 
         // Merge locations and themes deterministically
         const rawLocationNames = Array.from(new Set([...existing.rawLocationNames, ...article.rawLocationNames])).sort();
@@ -219,22 +271,25 @@ export class GdeltConnector implements Connector {
 
         // Merge victoriaMentions by unique key and sort deterministically
         const mentionMap = new Map<string, GdeltLocationMention>();
-        for (const m of [...existing.victoriaMentions, ...article.victoriaMentions]) {
+        for (const m of [...existing.locationMentions, ...article.locationMentions]) {
           const key = `${m.countryCode}#${m.adm1Code}#${m.name}#${m.featureId ?? ''}`;
           if (!mentionMap.has(key)) mentionMap.set(key, m);
         }
-        const victoriaMentions = Array.from(mentionMap.values()).sort((a, b) =>
+        const locationMentions = Array.from(mentionMap.values()).sort((a, b) =>
           `${a.countryCode}#${a.adm1Code}#${a.name}#${a.featureId ?? ''}`.localeCompare(
             `${b.countryCode}#${b.adm1Code}#${b.name}#${b.featureId ?? ''}`
           )
         );
+        const victoriaMentions = locationMentions.filter(m => m.countryCode === 'AS' && m.adm1Code === 'AS07');
 
         mergedArticles.set(logicalId, {
           gkgRecordId,
           articleUrl: existing.articleUrl,
           gkgProcessedAt,
           sourceName,
+          title,
           rawLocationNames,
+          locationMentions,
           victoriaMentions,
           themes,
         });
@@ -249,7 +304,9 @@ export class GdeltConnector implements Connector {
     const sortedEntries = Array.from(mergedArticles.entries()).sort(([idA], [idB]) => idA.localeCompare(idB));
 
     for (const [logicalId, article] of sortedEntries) {
-      const versionId = digest(`${article.gkgRecordId}\0${article.gkgProcessedAt}\0${article.rawLocationNames.join(';')}\0${article.themes.join(';')}`);
+      const versionId = digest(JSON.stringify({ gkgRecordId: article.gkgRecordId,
+        gkgProcessedAt: article.gkgProcessedAt, title: article.title,
+        locationMentions: article.locationMentions, themes: article.themes }));
       const provenance = {
         batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
         fetched_at: checkedAt,
@@ -261,11 +318,11 @@ export class GdeltConnector implements Connector {
         time_missing_reason: 'GKG DATE is processing time, not the original article publication or incident time',
         valid_from: null, valid_to: null, source_updated_at: article.gkgProcessedAt,
         source_version_ordinal: null, record_status: 'active', assertion_kind: 'report',
-        rights_status: 'review_required',
+        rights_status: 'verified_open',
       });
       geoRecords.push({
         ...provenance, geo_record_id: logicalId, version_id: versionId,
-        topic: 'news', assertion_kind: 'report', title: null,
+        topic: 'news', assertion_kind: 'report', title: article.title,
         summary: JSON.stringify({ gdelt_location_mentions: article.rawLocationNames, themes: article.themes }),
         original_url: article.articleUrl, geometry_geojson: null,
         centroid_lat: null, centroid_lon: null, location_role: 'mentioned_place',
@@ -273,7 +330,7 @@ export class GdeltConnector implements Connector {
         observed_at: null, valid_from: null, valid_to: null,
         source_updated_at: article.gkgProcessedAt, source_version_ordinal: null,
         freshness_state: 'unknown', record_status: 'active',
-        rights_status: 'review_required', public_query_allowed: false,
+        rights_status: 'verified_open', public_query_allowed: true,
       });
       geoRecordSources.push({
         ...provenance, geo_record_id: logicalId, version_id: versionId,

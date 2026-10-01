@@ -15,7 +15,7 @@ import { parseSourceRecord } from '../validation/record.js';
 type FactTable =
   | 'source_records' | 'geo_records' | 'geo_record_sources' | 'boundaries'
   | 'area_indicators' | 'parking_bays' | 'parking_observations'
-  | 'parking_rules' | 'sensor_locations' | 'pedestrian_observations';
+  | 'parking_rules' | 'parking_sensor_memberships' | 'sensor_locations' | 'pedestrian_observations';
 
 function digest(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -40,6 +40,7 @@ const TABLE_KEYS: Record<FactTable, readonly string[]> = {
   parking_bays: ['bay_id', 'version_id'],
   parking_observations: ['sensor_id', 'observed_at', 'version_id'],
   parking_rules: ['rule_id', 'version_id'],
+  parking_sensor_memberships: ['sensor_id', 'version_id'],
   sensor_locations: ['sensor_id', 'version_id'],
   pedestrian_observations: ['sensor_id', 'observed_at', 'version_id'],
 };
@@ -74,8 +75,9 @@ function validationChunks(table: PlannedTable): readonly (readonly Record<string
   let chunk = chunks[0];
   let bytes = 0;
   for (const row of unique.values()) {
-    const size = Buffer.byteLength(JSON.stringify(row));
-    if (!chunk || (chunk.length > 0 && bytes + size > 500_000)) {
+    // Account for the JSON parameter's outer escaping as well as row bytes.
+    const size = Buffer.byteLength(JSON.stringify(JSON.stringify(row)));
+    if (!chunk || (chunk.length > 0 && bytes + size > 7_000_000)) {
       chunk = [];
       chunks.push(chunk);
       bytes = 0;
@@ -143,16 +145,23 @@ function planRows(result: ConnectorSuccess, source: DataSource, batchId: string)
     ['parking_bays', result.parkingBays],
     ['parking_observations', result.parkingObservations],
     ['parking_rules', result.parkingRules],
+    ['parking_sensor_memberships', result.parkingSensorMemberships ?? []],
     ['sensor_locations', result.sensorLocations],
     ['pedestrian_observations', result.pedestrianObservations],
   ];
   const tables = rawTables.map(([name, records]) => {
-    const rows: Record<string, unknown>[] = records.map(row => ({ ...row, batch_id: batchId }));
+    const rows: Record<string, unknown>[] = records.map(row => ({ ...row, batch_id: batchId,
+      ...(name === 'parking_sensor_memberships' && 'business_batch_id' in row
+        && row.business_batch_id === result.runId ? { business_batch_id: batchId } : {}),
+    }));
     const seen = new Map<string, string>();
     for (const row of rows) {
       if (row.batch_id !== batchId || row.source_id !== source.source_id
         || row.schema_version !== 1 || !utc.safeParse(row.fetched_at).success) {
         throw new Error(`Invalid provenance in ${name}`);
+      }
+      if (name === 'parking_sensor_memberships' && source.source_id !== 'melbourne.parking.sensors') {
+        throw new Error('Parking snapshot membership has the wrong source');
       }
       const key = rowKey(name, row);
       for (const [field, value] of Object.entries(row)) {
@@ -267,6 +276,30 @@ export class BigQueryPublisher {
       last_source_update_at: mostRecent(previous.lastSourceUpdateAt, sourceUpdateAt),
       updated_at: previous.updatedAt === null ? new Date().toISOString() : after(previous.updatedAt),
     };
+    if ((source.cadence_seconds ?? Number.POSITIVE_INFINITY) <= 300) {
+      // Two registry load jobs per 120-second snapshot exceed BigQuery's daily
+      // per-table load quota when the other sources also publish. Small control
+      // rows use INSERT, just like batch state; source/updated_at deduplicate retries.
+      const fields: readonly [string, string][] = [
+        ...['source_id', 'provider', 'dataset_title', 'landing_url', 'topic', 'scope',
+          'record_granularity', 'connector_owner', 'license_status', 'access_status']
+          .map(name => [name, `JSON_VALUE(j, '$.${name}')`] as [string, string]),
+        ...['legacy_ids', 'coverage_area_refs'].map(name => [name,
+          `ARRAY(SELECT JSON_VALUE(v) FROM UNNEST(JSON_QUERY_ARRAY(j, '$.${name}')) v)`] as [string, string]),
+        ...['coverage_from', 'coverage_to', 'last_checked_at', 'last_success_at',
+          'last_source_update_at', 'updated_at'].map(name => [name,
+          `CAST(JSON_VALUE(j, '$.${name}') AS TIMESTAMP)`] as [string, string]),
+        ...['cadence_seconds', 'check_interval_seconds'].map(name => [name,
+          `CAST(JSON_VALUE(j, '$.${name}') AS INT64)`] as [string, string]),
+        ['admission_evidence', "JSON_QUERY(j, '$.admission_evidence')"],
+      ];
+      await this.query(`INSERT INTO \`${this.config.projectId}.${this.config.ingestDataset}.data_sources\`
+        (${fields.map(([name]) => name).join(', ')})
+        WITH payload AS (SELECT PARSE_JSON(@payload) AS j)
+        SELECT ${fields.map(([, expression]) => expression).join(', ')} FROM payload`,
+        { payload: JSON.stringify(row) });
+      return;
+    }
     const staged = await this.gcs.saveNdjson({ kind: 'staging', sourceId: source.source_id,
       batchId: `${batchId}.source.${successAt === null ? 'checked' : 'success'}`,
       rows: [row], allowedFields: null,
@@ -326,6 +359,8 @@ export class BigQueryPublisher {
         .map(name => `${expected ? expectedValue(name) : `t.${name}`} AS ${name}`).join(', ')}))`;
       const contentFields = fields.map(field => field.name).filter(name => !auditFields.has(name));
       const logicalKeys = keys.filter(key => key !== 'version_id');
+      const snapshotScope = table.name === 'parking_sensor_memberships'
+        || source.source_id === 'ticketmaster.events' ? 'AND t.batch_id = @batchId' : '';
       const invalid = [
         't.source_id IS DISTINCT FROM @sourceId', 't.schema_version IS DISTINCT FROM 1', 't.fetched_at IS NULL',
         ...keys.map(key => `t.${key} IS NULL${key === 'observed_at' ? '' : ` OR TRIM(t.${key}) = ''`}`),
@@ -362,24 +397,43 @@ export class BigQueryPublisher {
         .map(name => `t.${name} < 0`));
       const visible = (alias: string) => `(${alias}.batch_id = @batchId OR ${alias}.batch_id IN (SELECT batch_id FROM batch_states WHERE state = 'published'))`;
       if (table.name === 'geo_record_sources') {
-        invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('geo_records')} g WHERE g.geo_record_id = t.geo_record_id
-          AND g.version_id = t.version_id AND ${visible('g')})`);
+        invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('geo_records')} g WHERE g.source_id = @sourceId AND g.geo_record_id = t.geo_record_id
+          AND g.source_id = t.source_id AND g.version_id = t.version_id AND ${visible('g')})`);
       }
       if (table.name !== 'source_records' && names.has('source_record_id')) {
         const sourceMatch = table.name === 'geo_record_sources'
-          ? 'AND r.version_id = t.source_version_id'
+          ? 'AND r.source_id = t.source_id AND r.version_id = t.source_version_id'
           : table.name === 'boundaries'
             ? "AND r.source_id = t.source_id AND r.batch_id = t.batch_id AND r.version_id = t.version_id AND r.rights_status IN ('verified_open', 'restricted')"
             : table.name === 'pedestrian_observations'
               ? 'AND r.source_id = t.source_id AND r.batch_id = t.batch_id AND r.version_id = t.version_id'
             : 'AND r.source_id = t.source_id';
-        invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('source_records')} r WHERE r.source_record_id = t.source_record_id
+        invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('source_records')} r WHERE r.source_id = @sourceId AND r.source_record_id = t.source_record_id
           ${sourceMatch}
           AND ${visible('r')})`);
       }
       if (table.name === 'geo_records') invalid.push(`NOT EXISTS (
-        SELECT 1 FROM ${path('geo_record_sources')} r WHERE r.geo_record_id = t.geo_record_id
-          AND r.version_id = t.version_id AND ${visible('r')})`);
+        SELECT 1 FROM ${path('geo_record_sources')} r WHERE r.source_id = @sourceId AND r.geo_record_id = t.geo_record_id
+          AND r.source_id = t.source_id AND r.version_id = t.version_id AND ${visible('r')})`);
+      if (table.name === 'parking_sensor_memberships') invalid.push(
+        "t.source_id != 'melbourne.parking.sensors'",
+        `NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
+          WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.batch_id
+            AND r.source_record_id = t.snapshot_source_record_id
+            AND r.version_id = t.snapshot_version_id AND ${visible('r')})`,
+        `NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
+          WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.business_batch_id
+            AND r.source_record_id = t.business_source_record_id
+            AND r.version_id = t.business_version_id AND ${visible('r')})`,
+        `(NOT EXISTS (SELECT 1 FROM ${path('parking_observations')} o
+          WHERE o.source_id = @sourceId AND o.source_id = t.source_id AND o.batch_id = t.business_batch_id
+            AND o.source_record_id = t.business_source_record_id AND o.sensor_id = t.sensor_id
+            AND o.version_id = t.business_version_id AND ${visible('o')})
+          AND NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
+            WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.business_batch_id
+              AND r.source_record_id = t.business_source_record_id AND r.version_id = t.business_version_id
+              AND r.observed_at IS NULL AND ${visible('r')}))`,
+      );
       const ordering = table.name === 'pedestrian_observations' ? `(SELECT COUNT(*) FROM (
         SELECT sensor_id, observed_at, COUNT(*) AS versions,
           COUNTIF(source_updated_at IS NULL) AS missing_time,
@@ -393,7 +447,7 @@ export class BigQueryPublisher {
           JOIN ${path('source_records')} r ON r.batch_id = t.batch_id
             AND r.source_id = t.source_id AND r.source_record_id = t.source_record_id
             AND r.version_id = t.version_id
-          WHERE ${visible('r')}
+          WHERE r.source_id = @sourceId AND ${visible('r')}
           QUALIFY ROW_NUMBER() OVER (PARTITION BY t.source_id, t.sensor_id, t.observed_at, t.version_id
             ORDER BY t.fetched_at DESC, t.batch_id DESC) = 1
         ) GROUP BY sensor_id, observed_at
@@ -411,7 +465,7 @@ export class BigQueryPublisher {
           JOIN ${path('source_records')} AS r
             ON r.batch_id = t.batch_id AND r.source_id = t.source_id
             AND r.source_record_id = t.source_record_id AND r.version_id = t.version_id
-          WHERE ${visible('r')}
+          WHERE r.source_id = @sourceId AND ${visible('r')}
           QUALIFY ROW_NUMBER() OVER (
             PARTITION BY t.boundary_id, t.version_id
             ORDER BY t.fetched_at DESC, t.batch_id DESC
@@ -420,7 +474,7 @@ export class BigQueryPublisher {
         GROUP BY boundary_id
         HAVING versions > 1 AND ((missing_time > 0 AND (has_time > 0 OR missing_ordinal > 0))
           OR positions < versions)
-      ))` : names.has('source_updated_at') ? `(SELECT COUNT(*) FROM (
+      ))` : names.has('source_updated_at') && table.name !== 'parking_sensor_memberships' ? `(SELECT COUNT(*) FROM (
         SELECT ${logicalKeys.join(', ')}, COUNT(DISTINCT version_id) AS versions,
           COUNTIF(source_updated_at IS NULL) AS missing_time,
           COUNTIF(source_updated_at IS NOT NULL) AS has_time,
@@ -429,21 +483,38 @@ export class BigQueryPublisher {
         FROM eligible GROUP BY ${logicalKeys.join(', ')}
         HAVING versions > 1 AND ((missing_time > 0 AND (has_time > 0 OR missing_ordinal > 0)) OR positions < versions)
       ))` : '0';
+      if (table.rows.length === 0) {
+        // Any physical row in a declared empty batch fails publication, even
+        // when its business key is null. No cross-table joins are needed to
+        // prove absence, and their minimum billing dominates frequent snapshots.
+        const rows = await this.query(`/* validate:${table.name} */
+          SELECT COUNT(*) AS distinct_count, 0 AS unexpected, 0 AS invalid,
+            0 AS conflicts, 0 AS ambiguous
+          FROM ${path(table.name)} WHERE source_id = @sourceId AND batch_id = @batchId`, {
+          batchId, sourceId: source.source_id, expectedRows: '[]',
+        });
+        const report = rows[0];
+        if (['distinct_count', 'unexpected', 'invalid', 'conflicts', 'ambiguous']
+          .some(key => count.parse(Number(report?.[key] ?? NaN)) !== 0)) {
+          throw new Error(`BigQuery validation failed for ${table.name}`);
+        }
+        continue;
+      }
       for (const expectedRows of validationChunks(table)) {
         const rows = await this.query(`/* validate:${table.name} */
         WITH batch_states AS (
-          SELECT batch_id, state FROM ${path('sync_batches')}
+          SELECT batch_id, state FROM ${path('sync_batches')} WHERE source_id = @sourceId
           QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC) = 1
         ), expected AS (
           SELECT ${tuple(keys, true)} AS row_key, ${tuple(contentFields, true)} AS content
           FROM UNNEST(JSON_QUERY_ARRAY(@expectedRows)) e
         ), batch_rows AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
-          FROM ${path(table.name)} t WHERE batch_id = @batchId
+          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId
         ), eligible AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
           FROM ${path(table.name)} t
-          WHERE t.source_id = @sourceId AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
+          WHERE t.source_id = @sourceId ${snapshotScope} AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
             SELECT ${tuple(logicalKeys)} FROM batch_rows t
           )
         )
@@ -516,7 +587,10 @@ export class BigQueryPublisher {
     }))));
     const batchId = stableBatchId(source.source_id, input.windowFrom, input.windowTo, effectiveRevision);
     const plan = { ...planned, tables: planned.tables.map(table => ({ ...table,
-      rows: table.rows.map(row => ({ ...row, batch_id: batchId })),
+      rows: table.rows.map(row => ({ ...row, batch_id: batchId,
+        ...(table.name === 'parking_sensor_memberships' && row.business_batch_id === 'pending'
+          ? { business_batch_id: batchId } : {}),
+      })),
     })) };
     // Different batches can contain the same version; lock the source through validation and publication.
     return this.gcs.withBatchLease(sourceLease(source), async () => {
@@ -550,7 +624,8 @@ export class BigQueryPublisher {
       const base: SyncBatch = {
         batch_id: batchId, source_id: source.source_id, schema_version: 1,
         window_from: input.windowFrom, window_to: input.windowTo, source_revision: effectiveRevision,
-        started_at: now, finished_at: null, state: 'running', state_updated_at: now,
+        started_at: ['ticketmaster.events', 'melbourne.parking.sensors'].includes(source.source_id)
+          ? result.fetchedAt : now, finished_at: null, state: 'running', state_updated_at: now,
         raw_uri: previous?.raw_uri ?? null, staging_uris: previous?.staging_uris ?? [], published_at: null,
         input_count: result.inputCount, output_count: result.outputCount,
         rejected_count: result.rejectedCount + plan.rejectedGeography,
@@ -561,18 +636,20 @@ export class BigQueryPublisher {
       let published = false;
       let lastTransitionAt = base.state_updated_at;
       try {
-        if (result.retainableRawRecords && source.admission_evidence.raw_retention_days !== null) {
+        const rawRetentionDays = source.admission_evidence.raw_retention_days ?? 0;
+        if (result.retainableRawRecords && rawRetentionDays > 0) {
           const raw = await this.gcs.saveNdjson({ kind: 'raw', sourceId: source.source_id,
             batchId, rows: result.retainableRawRecords,
             allowedFields: source.admission_evidence.allowed_fields,
-            retentionDays: source.admission_evidence.raw_retention_days });
+            retentionDays: rawRetentionDays });
           base.raw_uri = raw.uri;
         }
         await this.appendSourceCheck(source, batchId, result.fetchedAt, null, result.sourceLatestUpdateAt);
         for (const table of plan.tables) {
           if (table.rows.length === 0) continue;
           const highFrequency = (source.cadence_seconds ?? Number.POSITIVE_INFINITY) <= 300
-            && ['parking_observations', 'pedestrian_observations', 'source_records', 'geo_records'].includes(table.name);
+            && ['parking_observations', 'parking_sensor_memberships', 'geo_record_sources',
+              'pedestrian_observations', 'source_records', 'geo_records'].includes(table.name);
           if (highFrequency) {
             await this.writeRows({ projectId: this.config.projectId,
               dataset: this.config.ingestDataset, table: table.name, batchId, rows: table.rows });

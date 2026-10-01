@@ -17,7 +17,12 @@ import {
   SEARCH_RADIUS_KM,
   PAGE_SIZE,
   DEEP_PAGING_LIMIT,
+  ticketmasterApiTimeWindow,
 } from '../../src/connectors/ticketmaster/index.js';
+import { ticketmasterCacheExpiresAt, ticketmasterCacheIsVisible,
+  ticketmasterContentRecordId } from '../../src/connectors/ticketmaster/policy.js';
+import { TicketmasterProbeHttpClient, ticketmasterProbeConfig, ticketmasterProbeSummary }
+  from '../../src/jobs/ticketmaster-probe.js';
 
 const input = parseConnectorInput({
   sourceId: 'ticketmaster.events',
@@ -45,10 +50,10 @@ test('event versions keep venue evidence and postpone without inventing a start 
   assert.equal(result.geoRecords.length, 2);
   assert.equal(result.geoRecords[0]?.location_confidence, 'source_coordinate');
   assert.equal(result.geoRecords[0]?.valid_from, '2026-10-01T09:00:00.000Z');
-  assert.equal(result.geoRecords[0]?.valid_to, '2026-10-01T09:00:00.000Z');
+  assert.equal(result.geoRecords[0]?.valid_to, null);
   assert.equal(result.geoRecords[1]?.valid_from, null);
   assert.equal(result.geoRecords[1]?.summary?.includes('postponed'), true);
-  assert.equal(result.geoRecords[0]?.public_query_allowed, false);
+  assert.equal(result.geoRecords[0]?.public_query_allowed, true);
 
   result.sourceRecords.forEach((row) => assert.deepEqual(parseSourceRecord(row), row));
   result.geoRecords.forEach((row) => assert.equal(validateGeoRecordGeography(row).valid, true));
@@ -93,7 +98,7 @@ test('Discovery search uses Melbourne geohash, Australian filter and bounded eve
   );
   assert.equal(
     requested[0]?.searchParams.get('endDateTime'),
-    input.window.kind === 'time' ? input.window.to : null,
+    '2026-10-02T23:59:59Z',
   );
   assert.equal(requested[0]?.searchParams.get('size'), String(PAGE_SIZE));
   assert.equal(requested[0]?.searchParams.get('page'), '0');
@@ -223,11 +228,10 @@ test('strict field protection: only allowed metadata and coordinates are retaine
   assert.equal(JSON.stringify(geo).includes('promotional description'), false);
 });
 
-test('compliance contract: review_required status, public query blocked, and staging retention enforced', async () => {
+test('restricted metadata declares the source-specific cache and removal controls', async () => {
   const manifest = await loadManifest();
   assert.equal(manifest.source_id, SOURCE_ID);
-  assert.equal(manifest.license_status, 'review_required');
-  assert.equal(manifest.access_status, 'candidate');
+  assert.equal(manifest.license_status, 'restricted');
   assert.equal(manifest.admission_evidence.staging_retention_days, 1);
   assert.equal(manifest.admission_evidence.secret_names.includes('ticketmaster_discovery_api_key'), true);
   assert.equal(manifest.admission_evidence.license_evidence_url, 'https://developer.ticketmaster.com/support/terms-of-use/');
@@ -235,19 +239,29 @@ test('compliance contract: review_required status, public query blocked, and sta
     'id',
     'url',
     'name',
-    'dates',
+    'dates.start',
+    'dates.end.dateTime',
+    'dates.timezone',
+    'dates.status.code',
+    '_embedded.venues.id',
+    '_embedded.venues.name',
     '_embedded.venues.location',
+    'title',
+    'summary',
   ]);
+  assert.equal(manifest.admission_evidence.raw_retention_days, 0);
+  assert.equal(manifest.retention_policy.content_cache_seconds, 86400);
+  assert.equal(manifest.retention_policy.cleanup_interval_seconds, 21600);
 
   const page = await fixture();
   const res = normalizeTicketEvents(page._embedded?.events ?? [], input, fetchedAt);
   res.sourceRecords.forEach((sr) => {
-    assert.equal(sr.rights_status, 'review_required');
+    assert.equal(sr.rights_status, 'restricted');
     assert.equal(sr.raw_uri, null);
   });
   res.geoRecords.forEach((gr) => {
-    assert.equal(gr.rights_status, 'review_required');
-    assert.equal(gr.public_query_allowed, false);
+    assert.equal(gr.rights_status, 'restricted');
+    assert.equal(gr.public_query_allowed, true);
   });
 });
 
@@ -386,7 +400,7 @@ test('duplicate event IDs within single response fail with validation_failed', a
   );
 });
 
-test('mismatched sourceId or non-time window fails with validation_failed', async () => {
+test('mismatched sourceId fails with validation_failed', async () => {
   class DummyClient extends HttpClient {}
   const connector = new TicketmasterConnector(new DummyClient(), () => 'key');
 
@@ -400,15 +414,6 @@ test('mismatched sourceId or non-time window fails with validation_failed', asyn
   assert.equal(resBadSource.kind, 'failure');
   if (resBadSource.kind === 'failure') assert.equal(resBadSource.code, 'validation_failed');
 
-  const snapshotInput = parseConnectorInput({
-    sourceId: 'ticketmaster.events',
-    window: { kind: 'snapshot', revision: 'rev-1' },
-    checkpoint: null,
-    runId: 'snapshot-window',
-  });
-  const resBadWindow = await connector.collect(snapshotInput);
-  assert.equal(resBadWindow.kind, 'failure');
-  if (resBadWindow.kind === 'failure') assert.equal(resBadWindow.code, 'validation_failed');
 });
 
 test('multi-page collection chains zero-based pages, concatenates events and sets retainableRawRecords=null', async () => {
@@ -462,4 +467,218 @@ test('multi-page collection chains zero-based pages, concatenates events and set
     assert.equal(result.retainableRawRecords, null, 'Cache eviction contract: raw records must not be retained');
   }
   assert.deepEqual(requestedPages, ['0', '1']);
+});
+
+test('snapshot refresh searches the next 30 days and does not advance a time checkpoint', async () => {
+  const page = await fixture();
+  const requested: URL[] = [];
+  class SnapshotClient extends HttpClient {
+    override async getJson(request: { url: URL; redirect?: RequestRedirect; maxAttempts?: number }) {
+      requested.push(request.url);
+      assert.equal(request.redirect, 'error');
+      assert.equal(request.maxAttempts, 1);
+      return { body: page, status: 200, fetchedAt, etag: null,
+        lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const snapshotInput = parseConnectorInput({ sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null,
+    runId: 'snapshot-window' });
+  const result = await new TicketmasterConnector(new SnapshotClient(), () => 'fixture-key',
+    () => '2026-10-01T12:00:00Z').collect(snapshotInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind === 'success') {
+    assert.equal(result.checkpointAfter, null);
+    assert.ok(result.sourceRevision);
+  }
+  assert.equal(requested[0]?.searchParams.get('startDateTime'), '2026-10-01T12:00:00Z');
+  assert.equal(requested[0]?.searchParams.get('endDateTime'), '2026-10-31T11:59:59Z');
+  assert.equal(requested[0]?.searchParams.get('sort'), 'id,asc');
+  assert.equal(requested[0]?.searchParams.get('includeTest'), 'no');
+});
+
+test('empty snapshots agree on one fetched response and publisher page counts', async () => {
+  class EmptyClient extends HttpClient {
+    override async getJson() {
+      return { body: { page: { size: 100, totalElements: 0, totalPages: 0, number: 0 } },
+        status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new TicketmasterConnector(new EmptyClient(), () => 'fixture-key').collect(input);
+  assert.equal(result.kind, 'success');
+  if (result.kind === 'success') {
+    assert.equal(result.inputCount, 0);
+    assert.equal(result.completeness.expected_pages, 1);
+    assert.equal(result.completeness.fetched_pages, 1);
+  }
+});
+
+test('incorrect page count or incomplete page fails even when overall total could agree', async () => {
+  const page = await fixture();
+  for (const metadata of [
+    { size: 100, totalElements: 2, totalPages: 2, number: 0 },
+    { size: 100, totalElements: 101, totalPages: 2, number: 0 },
+    { size: 100, totalElements: 2, totalPages: 0, number: 0 },
+  ]) {
+    class BadPagingClient extends HttpClient {
+      override async getJson() {
+        return { body: { ...page, page: metadata }, status: 200, fetchedAt,
+          etag: null, lastModified: null, contentType: 'application/json' };
+      }
+    }
+    const result = await new TicketmasterConnector(new BadPagingClient(), () => 'fixture-key').collect(input);
+    assert.equal(result.kind, 'failure');
+    if (result.kind === 'failure') assert.equal(result.code, 'incomplete_window');
+  }
+});
+
+test('blank coordinates and several venues keep location unknown while venue changes create versions', async () => {
+  const original = (await fixture())._embedded?.events?.[0];
+  assert.ok(original);
+  const venues = original._embedded?.venues;
+  const venue = venues?.[0];
+  assert.ok(venue);
+  const blank = normalizeTicketEvents([{ ...original, _embedded: {
+    venues: [{ ...venue, location: { longitude: ' ', latitude: '' } }],
+  } }], input, fetchedAt);
+  assert.equal(blank.geoRecords[0]?.geometry_geojson, null);
+  const multiple = normalizeTicketEvents([{ ...original, _embedded: {
+    venues: [venue, { ...venue, id: 'OTHER-VENUE' }],
+  } }], input, fetchedAt);
+  assert.equal(multiple.geoRecords[0]?.location_role, 'unknown');
+  const baseline = normalizeTicketEvents([original], input, fetchedAt);
+  const renamed = normalizeTicketEvents([{ ...original, _embedded: {
+    venues: [{ ...venue, name: 'Renamed venue' }],
+  } }], input, fetchedAt);
+  assert.notEqual(renamed.sourceRecords[0]?.version_id, baseline.sourceRecords[0]?.version_id);
+});
+
+test('cache visibility expires at 24 hours, rejects future fetches and honors immediate suppression', () => {
+  assert.equal(ticketmasterCacheExpiresAt('2026-10-01T00:00:00Z'), '2026-10-02T00:00:00.000Z');
+  assert.equal(ticketmasterContentRecordId(' EV-1 '), 'ticketmaster.events:EV-1');
+  const row = { fetchedAt: '2026-10-01T00:00:00Z', suppressed: false };
+  assert.equal(ticketmasterCacheIsVisible({ ...row, now: '2026-10-01T23:59:59Z' }), true);
+  assert.equal(ticketmasterCacheIsVisible({ ...row, now: '2026-10-02T00:00:00Z' }), false);
+  assert.equal(ticketmasterCacheIsVisible({ ...row, now: '2026-09-30T23:59:59Z' }), false);
+  assert.equal(ticketmasterCacheIsVisible({ ...row, now: '2026-10-01T01:00:00Z', suppressed: true }), false);
+  assert.equal(ticketmasterCacheIsVisible({ ...row, now: 'invalid' }), false);
+});
+
+test('private Ticketmaster probe config requires its dedicated job and injected nonempty key', () => {
+  const env = { GOOGLE_CLOUD_PROJECT: 'melens-510012', GCS_BUCKET: 'melens-510012-dev-ingest',
+    MELENS_SOURCE_ID: SOURCE_ID, CLOUD_RUN_JOB: 'melens-dev-ticketmaster-probe',
+    TICKETMASTER_DISCOVERY_API_KEY: 'fixture-key' };
+  assert.equal(ticketmasterProbeConfig(env).sourceId, SOURCE_ID);
+  assert.equal(JSON.stringify(ticketmasterProbeConfig(env)).includes('fixture-key'), false);
+  for (const changed of [
+    { CLOUD_RUN_JOB: 'other-job' }, { GOOGLE_CLOUD_PROJECT: 'other-project' },
+    { GCS_BUCKET: 'other-bucket' }, { MELENS_SOURCE_ID: 'other.events' },
+    { TICKETMASTER_DISCOVERY_API_KEY: '' }, { TICKETMASTER_DISCOVERY_API_KEY: '   ' },
+  ]) assert.throws(() => ticketmasterProbeConfig({ ...env, ...changed }), /dedicated Cloud Run job/);
+});
+
+test('private probe summary outputs counts and fixed labels without event or diagnostic values', async () => {
+  const original = (await fixture())._embedded?.events?.[0];
+  assert.ok(original);
+  const sensitive = 'content-sentinel-must-not-reach-logs';
+  const event = { ...original, id: sensitive, name: sensitive,
+    url: `https://www.ticketmaster.com.au/event/${sensitive}`,
+    dates: { ...original.dates, status: { code: sensitive } } };
+  class FixtureClient extends HttpClient {
+    override async getJson() {
+      return { body: { page: { size: 100, totalElements: 1, totalPages: 1, number: 0 },
+        _embedded: { events: [event] } }, status: 200, fetchedAt,
+        etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new TicketmasterConnector(new FixtureClient(), () => 'fixture-key').collect(input);
+  assert.equal(result.kind, 'success');
+  const summary = ticketmasterProbeSummary(result);
+  const serialized = JSON.stringify(summary);
+  assert.equal(serialized.includes(sensitive), false);
+  assert.equal(serialized.includes('fixture-key'), false);
+  assert.equal(serialized.includes('https://'), false);
+  assert.equal(serialized.includes('original_url'), false);
+  assert.equal(serialized.includes('evidence'), false);
+  assert.equal(summary.kind, 'success');
+  if (summary.kind === 'success') {
+    assert.equal(summary.events_with_date_count, 1);
+    assert.equal(summary.events_with_source_url_count, 1);
+  }
+});
+
+test('private probe counts eligible provider venues without logging identities or postponed events', async () => {
+  const page = await fixture();
+  const original = page._embedded?.events?.[0];
+  const postponed = page._embedded?.events?.[1];
+  assert.ok(original && postponed);
+  const renamedVenue = { id: 'venue-content-sentinel', name: 'venue-name-sentinel',
+    location: { latitude: '-37.83', longitude: '144.98' } };
+  const second = { ...original, id: 'second-event-content-sentinel',
+    dates: { ...original.dates, start: { dateTime: '2026-10-02T09:00:00Z' },
+      status: { code: 'rescheduled' } }, _embedded: { venues: [renamedVenue] } };
+  const events = [original, second, postponed];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, init) => {
+    assert.equal(init?.redirect, 'error');
+    return new Response(JSON.stringify({ page: { size: 100, totalElements: 3,
+      totalPages: 1, number: 0 }, _embedded: { events } }),
+    { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const client = new TicketmasterProbeHttpClient({ from: '2026-10-01T00:00:00Z',
+      to: '2026-10-31T00:00:00Z' });
+    await client.getJson({ url: `${ENDPOINT}?apikey=fixture-key`, maxAttempts: 3,
+      redirect: 'follow' });
+    const summary = client.summary();
+    assert.equal(summary.eligible_future_event_count, 2);
+    assert.equal(summary.eligible_future_distinct_provider_venue_count, 2);
+    assert.equal(summary.provider_status_counts['postponed'], 1);
+    assert.equal(summary.provider_status_counts['rescheduled'], 1);
+    assert.equal(summary.request_attempts, 1);
+    const serialized = JSON.stringify(summary);
+    assert.equal(serialized.includes('sentinel'), false);
+    assert.equal(serialized.includes('fixture-key'), false);
+    assert.equal(serialized.includes('https://'), false);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Discovery query timestamp parameters use whole UTC seconds and half-open end', () => {
+  assert.deepEqual(ticketmasterApiTimeWindow({ from: '2026-10-01T11:40:50.238Z',
+    to: '2026-10-31T11:40:50.238Z' }), {
+    from: '2026-10-01T11:40:51Z', to: '2026-10-31T11:40:50Z',
+  });
+  assert.deepEqual(ticketmasterApiTimeWindow({ from: '2026-10-01T00:00:00Z',
+    to: '2026-10-02T00:00:00Z' }), {
+    from: '2026-10-01T00:00:00Z', to: '2026-10-01T23:59:59Z',
+  });
+});
+
+test('private probe HTTP failure reports a status count without its error body', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('request-secret-sentinel', { status: 400 });
+  try {
+    const client = new TicketmasterProbeHttpClient({ from: '2026-10-01T00:00:00Z',
+      to: '2026-10-31T00:00:00Z' });
+    await assert.rejects(client.getJson({ url: `${ENDPOINT}?apikey=fixture-key` }), HttpFailure);
+    assert.deepEqual(client.summary().http_status_counts, { 400: 1 });
+    assert.equal(JSON.stringify(client.summary()).includes('request-secret-sentinel'), false);
+    assert.equal(JSON.stringify(client.summary()).includes('fixture-key'), false);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('private probe schema failure only reports fixed paths and fixed issue codes', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    page: { size: 'schema-secret-sentinel', totalElements: 0, totalPages: 0, number: 0 },
+  }), { status: 200 });
+  try {
+    const client = new TicketmasterProbeHttpClient({ from: '2026-10-01T00:00:00Z',
+      to: '2026-10-31T00:00:00Z' });
+    await assert.rejects(client.getJson({ url: `${ENDPOINT}?apikey=fixture-key` }));
+    assert.deepEqual(client.summary().http_status_counts, { 200: 1 });
+    assert.deepEqual(client.summary().schema_issue_counts, { 'page.size:invalid_type': 1 });
+    assert.equal(JSON.stringify(client.summary()).includes('schema-secret-sentinel'), false);
+    assert.equal(JSON.stringify(client.summary()).includes('fixture-key'), false);
+  } finally { globalThis.fetch = originalFetch; }
 });

@@ -96,14 +96,19 @@ WHERE g.public_query_allowed = TRUE
   AND s.license_status IN ('verified_open', 'restricted')
   AND s.access_status = 'active'
   AND current_source.license_status IN ('verified_open', 'restricted')
-  AND current_source.access_status = 'active';
+  AND current_source.access_status = 'active'
+  AND (g.source_id != 'ticketmaster.events' OR
+    (g.fetched_at <= CURRENT_TIMESTAMP()
+     AND g.fetched_at > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR)))
+  AND (g.source_id != 'gdelt.news' OR
+    g.fetched_at > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY));
 
 -- Filter lifecycle only after selecting the latest visible version. This
 -- prevents a cancelled/resolved/withdrawn event from reverting to an older
 -- active state. A future planned event may remain visible with status planned.
 CREATE OR REPLACE VIEW `melens_query.v_geo_records_current` AS
 WITH batch_states AS (
-  SELECT batch_id, source_id, source_revision, state, published_at
+  SELECT batch_id, source_id, source_revision, state, published_at, started_at
   FROM `melens_ingest.sync_batches`
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC
@@ -178,6 +183,22 @@ current_road_members AS (
     AND l.source_record_id = snapshot.source_record_id
     AND l.source_version_id = snapshot.version_id
   WHERE l.evidence_role = 'road_snapshot_membership'
+),
+current_ticketmaster_snapshot AS (
+  SELECT batch_id FROM batch_states
+  WHERE source_id = 'ticketmaster.events' AND state = 'published' AND published_at IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (ORDER BY started_at DESC, published_at DESC, batch_id DESC) = 1
+),
+current_parking_sensor_snapshot AS (
+  SELECT batch_id FROM batch_states
+  WHERE source_id = 'melbourne.parking.sensors' AND state = 'published' AND published_at IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (ORDER BY started_at DESC, published_at DESC, batch_id DESC) = 1
+),
+current_parking_sensor_members AS (
+  SELECT DISTINCT m.business_source_record_id, m.business_version_id
+  FROM `melens_ingest.parking_sensor_memberships` m
+  JOIN current_parking_sensor_snapshot b USING (batch_id)
+  WHERE m.source_id = 'melbourne.parking.sensors'
 )
 SELECT g.*
 FROM `melens_query.v_geo_records_history` AS g
@@ -203,6 +224,15 @@ WHERE (g.source_id != 'melbourne.development_monitor'
     OR EXISTS (SELECT 1 FROM current_road_members member
       WHERE member.source_id = g.source_id AND member.geo_record_id = g.geo_record_id
         AND member.version_id = g.version_id))
+  AND (g.source_id != 'ticketmaster.events' OR EXISTS (
+    SELECT 1 FROM `melens_ingest.geo_records` member
+    JOIN current_ticketmaster_snapshot snapshot USING (batch_id)
+    WHERE member.source_id = g.source_id AND member.geo_record_id = g.geo_record_id
+      AND member.version_id = g.version_id))
+  AND (g.source_id != 'melbourne.parking.sensors' OR EXISTS (
+    SELECT 1 FROM current_parking_sensor_members member
+    WHERE member.business_source_record_id = g.geo_record_id
+      AND member.business_version_id = g.version_id))
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY geo_record_id
   ORDER BY source_updated_at DESC NULLS LAST,

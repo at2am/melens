@@ -90,7 +90,7 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 
 - [X] T040 [P] [US2] 接入来源 #1 GDELT 15 分钟新闻/GKG 元数据与 URL，按发布窗口和稳定文章/事件 ID 增量获取，保留原始地名与报道时间，不下载未经许可正文；独占 `cloud/data/src/connectors/gdelt/index.ts`、`cloud/data/src/connectors/gdelt/source.json`、`cloud/data/test/fixtures/gdelt.json`。
 - [X] T041 [P] [US2] 接入来源 #3 Crime Statistics Agency 季度犯罪统计，保留 LGA/统计期/地域代码和 `observed`、`suppressed`、`missing`，不输出逐街警情；独占 `cloud/data/src/connectors/csa_recorded_offences/index.ts`、`cloud/data/src/connectors/csa_recorded_offences/source.json`、`cloud/data/test/fixtures/csa_recorded_offences.json`。
-- [ ] T042 [P] [US2] 接入来源 #12 Ticketmaster Discovery API，按澳洲/墨尔本/时间分页，key 仅经 Secret Manager 注入；活动原生 ID 的改期/取消生成新版本，保存场馆坐标与来源链接，先复核使用条款；不可用或未达 [活动覆盖门槛](quality-rules.md#2-八类信息的首期覆盖) 时记录未达标并调查合规替代来源，未补足前 SC-001 不通过；独占 `cloud/data/src/connectors/ticketmaster/index.ts`、`cloud/data/src/connectors/ticketmaster/source.json`、`cloud/data/test/fixtures/ticketmaster.json`，结论记于 `cloud/data/docs/source-policies/events-alternative.md`。
+- [X] T042 [P] [US2] 接入来源 #12 Ticketmaster Discovery API，按澳洲/墨尔本/时间分页，key 仅经 Secret Manager 注入；活动原生 ID 的改期/取消生成新版本，保存场馆坐标与来源链接，先复核使用条款；不可用或未达 [活动覆盖门槛](quality-rules.md#2-八类信息的首期覆盖) 时记录未达标并调查合规替代来源，未补足前 SC-001 不通过；独占 `cloud/data/src/connectors/ticketmaster/index.ts`、`cloud/data/src/connectors/ticketmaster/source.json`、`cloud/data/test/fixtures/ticketmaster.json`，结论记于 `cloud/data/docs/source-policies/events-alternative.md`。
 - [X] T043 [P] [US2] 核查来源 #2 Victoria Police 新闻的自动访问、再利用、保存字段与刷新限制，记录官方证据和允许/不允许结论；未通过时记录 `review_required` 且不抓取正文，记者专用邮件订阅不作为接口，于 `cloud/data/docs/source-policies/victoria-police.md`。
 - [ ] T044 [US2] 仅在 T043 允许后接入来源 #2 Victoria Police 公开新闻，保留许可允许的元数据/原文链接、报道日期和宽泛位置；不把该条件性来源计入首期保底数；独占 `cloud/data/src/connectors/victoria_police/index.ts`、`cloud/data/src/connectors/victoria_police/source.json`、`cloud/data/test/fixtures/victoria_police.json`。
 - [X] T045 [US2] 用官方边界和来源位置证据识别 City of Melbourne、Greater Melbourne、Victoria 与海外同名地；按 [quality-rules.md](quality-rules.md#3-空间归属与新闻合并) 将仅提及地点保留 `mentioned_place`，区域级结果不伪造精确点，无效坐标隔离地理映射，于 `cloud/data/src/normalization/news-location.ts`。
@@ -213,3 +213,7 @@ flowchart LR
 
 
 **2026-10-01 本轮部署完成**：T070 对六个选定已准入来源已完成，当前任务总数 77、已完成 62、剩余 15。首次租金自然调度、P0 候选来源部署、分钟级来源成本和联合发布验收仍单独记录，不计为首期产品已发布。
+
+## 2026-10-01 四类别真实发布
+
+四个类别分别由四个 subagent 交付，root 集成并实际发布。新准入来源为停车三表、GDELT、CSA、Ticketmaster，已发布独立数据集总数从 6 增至 12；GDELT 一般/犯罪新闻仍只计一个来源。T042 已完成真实分页、Secret 注入、受限留存/删除和覆盖验证，因此本表为 63/77。停车位置及占用可独立查询，缺当前权威规则/三表键，T035/T037/T039 继续未完成；SC-002 的连续 24 小时分母与 SC-004 双人审阅仍缺，T048/T071/T077 不因这次发布勾选。实际批次、SQL、定时执行和保留检查见 [四类别发布记录](../../cloud/data/docs/validation/four-category-release-2026-10-01.md)。以上为当前状态，正文此前日期段落保留为历史证据。

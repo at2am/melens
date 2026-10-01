@@ -1,0 +1,574 @@
+{
+  "project_id": "melens-510012",
+  "region": "australia-southeast2",
+  "captured_at": "2026-10-01T13:05:33.546057+00:00",
+  "query_order_file": "four-category-readback.sql",
+  "view_aggregates": [
+    {
+      "query_index": 0,
+      "rows": [
+        {
+          "bay_count": "29053",
+          "legal_yes": "0",
+          "located_bays": "29053"
+        }
+      ]
+    },
+    {
+      "query_index": 1,
+      "rows": [
+        {
+          "fresh_sensors": "5284",
+          "legal_yes": "0",
+          "located_sensors": "6324",
+          "reported_vacant": "3568",
+          "sensor_count": "6324"
+        }
+      ]
+    },
+    {
+      "query_index": 2,
+      "rows": [
+        {
+          "rule_count": "8035",
+          "unverified_current_rules": "8035"
+        }
+      ]
+    },
+    {
+      "query_index": 3,
+      "rows": [
+        {
+          "available_publication_dates": "3",
+          "distinct_logical_event_keys": "10",
+          "exact_points": "0",
+          "reports": "134"
+        }
+      ]
+    },
+    {
+      "query_index": 4,
+      "rows": [
+        {
+          "catalogue_entries": "10",
+          "distinct_verified_catalogue_events": "10",
+          "evidence_method": "bounded_publisher_head_metadata_review",
+          "publication_evidence_status": "matched_catalogue_publication_metadata",
+          "publication_time_status": "source_provided",
+          "verified_exact_points": "0",
+          "verified_publisher_dates": "3",
+          "verified_reports_with_official_area_refs": "10"
+        }
+      ]
+    },
+    {
+      "query_index": 5,
+      "rows": [
+        {
+          "available_publication_dates": "6",
+          "evidence_status": "verified_sample_metadata",
+          "exact_points": "0",
+          "reports": "6"
+        }
+      ]
+    },
+    {
+      "query_index": 6,
+      "rows": [
+        {
+          "verified_exact_points": "0",
+          "verified_publisher_dates": "6",
+          "verified_reports_with_official_area_refs": "6",
+          "verified_sample_reports": "6"
+        }
+      ]
+    },
+    {
+      "query_index": 7,
+      "rows": [
+        {
+          "areas": "81",
+          "indicators": "1620",
+          "periods": "10"
+        }
+      ]
+    },
+    {
+      "query_index": 8,
+      "rows": [
+        {
+          "current_events": "419",
+          "future_dated_events": "372",
+          "linked_events": "419",
+          "located_events": "419"
+        }
+      ]
+    },
+    {
+      "query_index": 9,
+      "rows": [
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:49:56",
+          "license_status": "verified_open",
+          "source_id": "abs.asgs.boundaries"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:44",
+          "license_status": "verified_open",
+          "source_id": "abs.census"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 13:02:10",
+          "license_status": "verified_open",
+          "source_id": "gdelt.news"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 05:47:19",
+          "license_status": "verified_open",
+          "source_id": "homes_victoria.rents"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.clue.blocks"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 05:11:55",
+          "license_status": "verified_open",
+          "source_id": "melbourne.development_monitor"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:40",
+          "license_status": "verified_open",
+          "source_id": "melbourne.municipal_boundary"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.bays"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.restrictions"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 13:04:08",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.sensors"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:49:44",
+          "license_status": "restricted",
+          "source_id": "ticketmaster.events"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:39",
+          "license_status": "verified_open",
+          "source_id": "victoria.csa.recorded_offences"
+        }
+      ]
+    }
+  ],
+  "sensor_billed_byte_samples": [
+    443547648,
+    509607936,
+    320864256,
+    230686720
+  ],
+  "source_count": 12,
+  "category_coverage_count": 5,
+  "task_checklist": {
+    "complete": 63,
+    "total": 77
+  },
+  "actual_gcp_positive_checks": {
+    "parking_sql": 2,
+    "parking_retention": 4,
+    "news_retention": 7,
+    "events_publisher_lifecycle": 1
+  },
+  "final_job_configurations": [
+    {
+      "job": "melens-dev-melbourne-parking-sensors",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-melbourn-c8ad80e321@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "512Mi"
+      },
+      "timeout_seconds": "120",
+      "max_retries": 0,
+      "secret_refs": []
+    },
+    {
+      "job": "melens-dev-melbourne-parking-bays",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-melbourn-dd665b90df@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "1024Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": []
+    },
+    {
+      "job": "melens-dev-melbourne-parking-restrictions",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-melbourn-cadf8bfcc8@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "1024Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": []
+    },
+    {
+      "job": "melens-dev-gdelt-news",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-gdelt-ne-71166e1fed@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "1024Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": []
+    },
+    {
+      "job": "melens-dev-victoria-csa-recorded-offences",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-victoria-26e4ff116c@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "1024Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": []
+    },
+    {
+      "job": "melens-dev-ticketmaster-events",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-ticketma-98836cbbbf@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1000m",
+        "memory": "1024Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": [
+        {
+          "name": "TICKETMASTER_DISCOVERY_API_KEY",
+          "reference": {
+            "key": "1",
+            "name": "ticketmaster_discovery_api_key"
+          }
+        }
+      ]
+    },
+    {
+      "job": "melens-dev-source-retention",
+      "image": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/data@sha256:119c7b7e8117afdac13e6da349e3449f17527070ec99958d5f2ea85f4b6fc83e",
+      "service_account": "melens-dev-source-retention@melens-510012.iam.gserviceaccount.com",
+      "limits": {
+        "cpu": "1",
+        "memory": "512Mi"
+      },
+      "timeout_seconds": "600",
+      "max_retries": 0,
+      "secret_refs": []
+    }
+  ],
+  "scheduler_configurations": [
+    {
+      "lastAttemptTime": "2026-10-01T12:49:28.597756Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-ticketmaster-events-schedule",
+      "schedule": "40 */12 * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T12:50:30.904354Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-melbourne-parking-bays-schedule",
+      "schedule": "25 1 * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T12:50:32.696194Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-victoria-csa-recorded-offences-schedule",
+      "schedule": "35 1 * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T13:00:02.291006Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-gdelt-news-schedule",
+      "schedule": "*/15 * * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T05:11:41.954676Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-melbourne-development-monitor-schedule",
+      "schedule": "20 1 * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T12:11:00.748734Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-source-retention-schedule",
+      "schedule": "11 */6 * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T12:17:03.654704Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-staging-cleanup-schedule",
+      "schedule": "17 * * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "lastAttemptTime": "2026-10-01T13:04:00.208368Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-melbourne-parking-sensors-schedule",
+      "schedule": "*/2 * * * *",
+      "state": "ENABLED",
+      "status": {}
+    },
+    {
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-homes-victoria-rents-schedule",
+      "schedule": "20 1 * * *",
+      "state": "ENABLED",
+      "status": {
+        "code": -1
+      }
+    },
+    {
+      "lastAttemptTime": "2026-10-01T12:50:30.879311Z",
+      "name": "projects/melens-510012/locations/australia-southeast1/jobs/melens-dev-melbourne-parking-restrictions-schedule",
+      "schedule": "30 1 * * *",
+      "state": "ENABLED",
+      "status": {}
+    }
+  ],
+  "sensor_final_query_cost": [
+    {
+      "billed_bytes": "230686720",
+      "jobs": "23",
+      "load_jobs": "0",
+      "processed_bytes": "51711892",
+      "slot_ms": "192908"
+    }
+  ],
+  "local_tests": {
+    "total": 727,
+    "pass": 712,
+    "fail": 0,
+    "opt_in_skipped": 15,
+    "python_pass": 21
+  },
+  "previous_view_aggregates": [
+    {
+      "query_index": 0,
+      "rows": [
+        {
+          "bay_count": "29053",
+          "legal_yes": "0",
+          "located_bays": "29053"
+        }
+      ]
+    },
+    {
+      "query_index": 1,
+      "rows": [
+        {
+          "fresh_sensors": "0",
+          "legal_yes": "0",
+          "located_sensors": "6324",
+          "reported_vacant": "3643",
+          "sensor_count": "6324"
+        }
+      ]
+    },
+    {
+      "query_index": 2,
+      "rows": [
+        {
+          "rule_count": "8035",
+          "unverified_current_rules": "8035"
+        }
+      ]
+    },
+    {
+      "query_index": 3,
+      "rows": [
+        {
+          "available_publication_dates": "3",
+          "distinct_logical_event_keys": "10",
+          "exact_points": "0",
+          "reports": "131"
+        }
+      ]
+    },
+    {
+      "query_index": 4,
+      "rows": [
+        {
+          "catalogue_entries": "10",
+          "distinct_verified_catalogue_events": "10",
+          "evidence_method": "bounded_publisher_head_metadata_review",
+          "publication_evidence_status": "matched_catalogue_publication_metadata",
+          "publication_time_status": "source_provided",
+          "verified_exact_points": "0",
+          "verified_publisher_dates": "3",
+          "verified_reports_with_official_area_refs": "10"
+        }
+      ]
+    },
+    {
+      "query_index": 5,
+      "rows": [
+        {
+          "available_publication_dates": "6",
+          "evidence_status": "verified_sample_metadata",
+          "exact_points": "0",
+          "reports": "6"
+        }
+      ]
+    },
+    {
+      "query_index": 6,
+      "rows": [
+        {
+          "verified_exact_points": "0",
+          "verified_publisher_dates": "6",
+          "verified_reports_with_official_area_refs": "6",
+          "verified_sample_reports": "6"
+        }
+      ]
+    },
+    {
+      "query_index": 7,
+      "rows": [
+        {
+          "areas": "81",
+          "indicators": "1620",
+          "periods": "10"
+        }
+      ]
+    },
+    {
+      "query_index": 8,
+      "rows": [
+        {
+          "current_events": "419",
+          "future_dated_events": "372",
+          "linked_events": "419",
+          "located_events": "419"
+        }
+      ]
+    },
+    {
+      "query_index": 9,
+      "rows": [
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:49:56",
+          "license_status": "verified_open",
+          "source_id": "abs.asgs.boundaries"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:44",
+          "license_status": "verified_open",
+          "source_id": "abs.census"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:45:09",
+          "license_status": "verified_open",
+          "source_id": "gdelt.news"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 05:47:19",
+          "license_status": "verified_open",
+          "source_id": "homes_victoria.rents"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.clue.blocks"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 05:11:55",
+          "license_status": "verified_open",
+          "source_id": "melbourne.development_monitor"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 04:39:40",
+          "license_status": "verified_open",
+          "source_id": "melbourne.municipal_boundary"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.bays"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:41",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.restrictions"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:29:49",
+          "license_status": "verified_open",
+          "source_id": "melbourne.parking.sensors"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:49:44",
+          "license_status": "restricted",
+          "source_id": "ticketmaster.events"
+        },
+        {
+          "access_status": "active",
+          "last_success_at": "2026-10-01 12:50:39",
+          "license_status": "verified_open",
+          "source_id": "victoria.csa.recorded_offences"
+        }
+      ]
+    }
+  ],
+  "sensor_natural_execution": {
+    "name": "melens-dev-melbourne-parking-sensors-w28s6",
+    "start_time": "2026-10-01T13:04:03.251997Z",
+    "completion_time": "2026-10-01T13:04:46.565735Z",
+    "batch_id": "batch_cef9de61302666cbdec1b5bd43da4426892fdb5b",
+    "input_count": 6324,
+    "output_count": 6324,
+    "rejected_count": 0
+  }
+}

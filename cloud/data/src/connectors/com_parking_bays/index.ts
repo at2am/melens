@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
 import { HttpClient, HttpFailure } from '../../core/http.js';
+import { parseSourceManifest } from '../../core/registry.js';
 import type { ParkingBay, SourceRecord } from '../../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
@@ -108,9 +110,11 @@ export class ParkingBaysConnector implements Connector {
     }
 
     try {
-      const countResponse = await this.http.getJson({ url: `${API_BASE}/records?limit=0` });
+      const declaration = parseSourceManifest(JSON.parse(await readFile(new URL('./source.json', import.meta.url), 'utf8')));
+      const countResponse = await this.http.getJson({ url: `${API_BASE}/records?limit=0`, maxAttempts: 1, redirect: 'error' });
       const expectedCount = countSchema.parse(countResponse.body).total_count;
-      const exportResponse = await this.http.getJson({ url: `${API_BASE}/exports/json`, timeoutMs: 120_000 });
+      const exportResponse = await this.http.getJson({ url: `${API_BASE}/exports/json`, timeoutMs: 120_000,
+        maxAttempts: 1, redirect: 'error' });
       const rows = z.array(rowSchema).parse(exportResponse.body);
       if (rows.length !== expectedCount) {
         return failure(input, 'incomplete_window', `Export row count (${rows.length}) did not match total_count (${expectedCount})`);
@@ -123,9 +127,8 @@ export class ParkingBaysConnector implements Connector {
       for (const row of rows) {
         const kerbsideId = extractKerbsideId(row.kerbsideid);
         const markerId = extractMarkerId(row);
-        const locObj = row.location && typeof row.location === 'object' ? (row.location as { lat?: unknown; lon?: unknown }) : null;
-        const effectiveLat = row.latitude ?? (locObj?.lat !== undefined && locObj.lat !== null ? Number(locObj.lat) : null);
-        const effectiveLon = row.longitude ?? (locObj?.lon !== undefined && locObj.lon !== null ? Number(locObj.lon) : null);
+        const effectiveLat = row.latitude ?? row.location?.lat ?? null;
+        const effectiveLon = row.longitude ?? row.location?.lon ?? null;
         const hasCoords = hasValidCoordinates(effectiveLat, effectiveLon);
 
         const nativeId = [
@@ -171,7 +174,7 @@ export class ParkingBaysConnector implements Connector {
           source_version_ordinal: null,
           record_status: 'active',
           assertion_kind: 'observation',
-          rights_status: 'review_required',
+          rights_status: declaration.license_status,
         });
 
         // Requirement 1, 2, 3:

@@ -1,31 +1,67 @@
 {
   "source_id": "ticketmaster.events",
-  "legacy_ids": ["events-ticketmaster"],
+  "legacy_ids": [
+    "events-ticketmaster"
+  ],
   "provider": "Ticketmaster",
   "dataset_title": "Discovery API v2 Events",
   "landing_url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
   "api_endpoint": "https://app.ticketmaster.com/discovery/v2/events.json",
   "topic": "event",
   "scope": "greater_melbourne",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": [
+    "search_circle:melbourne_cbd:80km"
+  ],
+  "coverage_from": "2026-10-01T11:48:53.540Z",
   "coverage_to": null,
   "cadence_seconds": null,
-  "check_interval_seconds": 86400,
+  "check_interval_seconds": 43200,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "restricted",
+  "access_status": "active",
   "record_granularity": "ticketmaster_event_version",
   "connector_owner": "melens integration",
   "admission_evidence": {
     "dataset_url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
     "native_record_key": "event.id",
     "completeness_rule": "All zero-based pages in a bounded event-start window; reject deep paging beyond 1000 events",
-    "quota_requests_per_day": 5000,
-    "secret_names": ["ticketmaster_discovery_api_key"],
-    "allowed_fields": ["id", "url", "name", "dates", "_embedded.venues.location"],
+    "quota_requests_per_day": 40,
+    "secret_names": [
+      "ticketmaster_discovery_api_key"
+    ],
+    "allowed_fields": [
+      "id",
+      "url",
+      "name",
+      "dates.start",
+      "dates.end.dateTime",
+      "dates.timezone",
+      "dates.status.code",
+      "_embedded.venues.id",
+      "_embedded.venues.name",
+      "_embedded.venues.location",
+      "title",
+      "summary"
+    ],
+    "raw_retention_days": 0,
     "staging_retention_days": 1,
-    "license_evidence_url": "https://developer.ticketmaster.com/support/terms-of-use/"
+    "license_evidence_url": "https://developer.ticketmaster.com/support/terms-of-use/",
+    "reviewed_at": "2026-10-01T00:00:00Z"
   },
-  "notes": "Candidate only. The query covers approximately 80 km around Melbourne CBD, not an official Greater Melbourne boundary, and only Ticketmaster-platform events. Terms limit caching to a reasonable period and require takedown within 24 hours; indefinite BigQuery event history needs a rights decision."
+  "retention_policy": {
+    "content_cache_seconds": 86400,
+    "cleanup_interval_seconds": 21600,
+    "cleanup_age_seconds": 64800,
+    "takedown_max_seconds": 86400,
+    "raw_response_retained": false,
+    "attribution": "Event information provided by Ticketmaster",
+    "direct_event_link_required": true,
+    "publication_requires": [
+      "content cache visibility gate",
+      "scheduled source content cleanup",
+      "source withdrawal and content deletion",
+      "real complete upcoming snapshot"
+    ]
+  },
+  "notes": "Restricted minimal event metadata for a Melbourne map context, with direct source links and Ticketmaster attribution. Application policy hides content after 24 hours; every 6 hours cleanup purges content older than 18 hours, keeping normal storage within the 24-hour target. Rights requests withdraw and delete the entire source, and stored paused permission prevents re-publication. These are conservative application choices rather than the API terms' general cache duration. Requires runtime cache, cleanup and withdrawal controls before activation. Approximate 80 km Melbourne CBD circle, not an official Greater Melbourne boundary. Snapshot mode refreshes the next 30 days every 12 hours; platform participation limits coverage."
 }

@@ -5,6 +5,23 @@
 > **基准日期**: 2026-10-01
 > **准入总则**: 依据 [`quality-rules.md`](../../../specs/001-melbourne-data-aggregation/quality-rules.md) §1 与运行时注册器规则，各来源分别核实官方许可、适用的凭据、调用配额、留存期和真实采集后才能激活并发布；首期八类样本门槛另行验收。公开样例（fixtures）仅证明本地解析行为，绝不代表准入通过。`active` 表示来源清单和开发集查询可用，不表示已部署定时作业。
 
+## 当前发布状态：2026-10-01 四类别发布
+
+12 个独立数据集已经在开发项目 `melens-510012` 实际发布；其中 11 个为 `verified_open`，Ticketmaster 为 `restricted`。本次新增停车三表、GDELT、CSA 和 Ticketmaster。一般新闻和犯罪新闻共用 GDELT，按一个来源计数。24 个连接器中的其他 12 个仍候选；警方/应急条件性来源不计入。
+
+| 新来源 | 真实采集/发布 | 查询限制 |
+| --- | --- | --- |
+| `melbourne.parking.bays` | 29,053 车位点 | 点为官方位置，不推断面或合法可停 |
+| `melbourne.parking.sensors` | 6,324 传感器，完整快照及业务变化版本 | 占用和新鲜度独立；节假日/施工误报限制保留 |
+| `melbourne.parking.restrictions` | 4,263 输入，8,035 规则参考 | 2022 年处理资料；当前适用性未核实 |
+| `gdelt.news` | 10 个核实一般新闻逻辑事件/3 发布日；6 个犯罪报道/6 发布日 | 地区提及不是精确事发点；新犯罪候选待复核 |
+| `victoria.csa.recorded_offences` | 810 输入，1,620 指标；81 原始地区标签/10 统计期 | 保留原地域，未知代码/边界版本为 null |
+| `ticketmaster.events` | 421 完整活动；419 未取消，372 未来有日期 | 80 km 搜索圈，非全部社区活动；24h 可见上限 |
+
+类别样本门槛现为 5/8（一般新闻、本地犯罪、活动、行政边界、区域统计）；停车规则闭环、行人、交通中断仍待验收。63/77 原任务已勾选，完整产品 T077 仍未通过。全部实际证据及最新定时状态见 [四类别发布记录](validation/four-category-release-2026-10-01.md)。下文为此前审计快照，出现 6 来源/1 类、未发布或旧 GDELT 许可结论时以本节和当前 `source.json` 为准。
+
+## 历史审计快照
+
 2026-10-01 并行实现与开发部署：位置历史恢复、不可变闭合版本及 GTFS 静态引用／每模式完整快照成员已接入运行入口；无官方版本证明时仍不定位。六个已准入来源已部署 Cloud Run Jobs、读回专用 IAM 并全部通过真实执行；租金完整历史已发布 58,618 条记录。两个每日快照调度已启用，预算暂停机制已接入；T070 已完成，当前任务为 62/77。实际运行结果及调度状态以[来源部署记录](validation/source-deployment-2026-10-01.md)为准。首期仍只有六个独立来源、1/8 类通过；以下历史文字中的“未接线／来源调度全部关闭”以本次记录为准。
 
 2026-09-30 发布补充：市界、CLUE 2025 街区、ABS ASGS 2021／2026 快照、开发项目及 Homes Victoria 租金及 ABS Census 已作为 `verified_open` / `active` 在 GCP 开发集发布，共六个独立来源。可查询边界共 1,527 个；开发项目 1,450 条（现行 326 条、完成历史 1,124 条）；租金两季度 1,106 条且均未匹配边界；2021 Census 有 144,792 个指标，其中 3,969 个匹配同版 LGA/SA2 边界。2026 ABS 快照中的 LGA 实际为 2025 版。证据见[市界](source-policies/municipal-boundary.md)、[CLUE](source-policies/clue-blocks-admission.md)、[ABS](source-policies/asgs-boundaries.md)、[开发项目](source-policies/development-monitor-admission.md)、[租金](source-policies/homes-victoria-rents-admission.md)和[Census](source-policies/abs-census-admission.md)专项记录。下文 2026-09-29 的旧审计快照若写“全部候选”或“0 active”，以本次发布结果为准。孤立 staging 清理已独立部署且连续七次定时成功；来源定时部署仍未完成。

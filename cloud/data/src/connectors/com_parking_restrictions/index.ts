@@ -1,14 +1,21 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
-import { HttpFailure } from '../../core/http.js';
-import { OdsIncompleteWindow, OpenDataSoftClient } from '../../core/opendatasoft.js';
+import { HttpClient, HttpFailure } from '../../core/http.js';
+import { OdsIncompleteWindow, OpenDataSoftClient, type OdsRecords } from '../../core/opendatasoft.js';
+import { parseSourceManifest } from '../../core/registry.js';
 import type { GeoRecord, GeoRecordSource, GeoRecordStatus, ParkingRule, SourceRecord, SourceRecordStatus } from '../../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
 export const SOURCE_ID = 'melbourne.parking.restrictions';
 export const DATASET_ID = 'on-street-car-park-bay-restrictions';
 export const LANDING_URL = `https://data.melbourne.vic.gov.au/explore/dataset/${DATASET_ID}/`;
+export const API_BASE = `https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/${DATASET_ID}`;
+const countSchema = z.object({ total_count: z.number().int().nonnegative() });
+const metadataSchema = z.object({ metas: z.object({ default: z.object({
+  data_processed: z.iso.datetime({ offset: true }),
+}) }) });
 
 const daySchema = z.union([
   z.number().int().min(0).max(6),
@@ -243,40 +250,62 @@ function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavail
 }
 
 export interface ParkingRestrictionsConnectorOptions {
-  client?: OpenDataSoftClient;
+  client?: HttpClient | OpenDataSoftClient;
   fetchMetadataRevision?: boolean;
 }
 
 export class ParkingRestrictionsConnector implements Connector {
   readonly sourceId = SOURCE_ID;
-  private readonly client: OpenDataSoftClient;
+  private readonly client: HttpClient | OpenDataSoftClient;
   private readonly autoFetchMetadata: boolean;
 
-  constructor(options?: ParkingRestrictionsConnectorOptions | OpenDataSoftClient) {
-    if (options instanceof OpenDataSoftClient) {
+  constructor(options?: ParkingRestrictionsConnectorOptions | OpenDataSoftClient | HttpClient) {
+    if (options instanceof OpenDataSoftClient || options instanceof HttpClient) {
       this.client = options;
-      this.autoFetchMetadata = false;
+      this.autoFetchMetadata = options instanceof HttpClient;
     } else {
-      this.client = options?.client ?? new OpenDataSoftClient();
-      this.autoFetchMetadata = options?.fetchMetadataRevision ?? false;
+      this.client = options?.client ?? new HttpClient();
+      this.autoFetchMetadata = options?.fetchMetadataRevision ?? this.client instanceof HttpClient;
     }
   }
 
   async fetchMetadataRevision(): Promise<string> {
-    return this.client.fetchDatasetDataProcessed({
-      portalUrl: 'https://data.melbourne.vic.gov.au',
-      datasetId: DATASET_ID,
+    if (this.client instanceof OpenDataSoftClient) {
+      return this.client.fetchDatasetDataProcessed({
+        portalUrl: 'https://data.melbourne.vic.gov.au', datasetId: DATASET_ID,
+      });
+    }
+    const response = await this.client.getJson({ url: API_BASE, maxAttempts: 1, redirect: 'error' });
+    return new Date(metadataSchema.parse(response.body).metas.default.data_processed).toISOString();
+  }
+
+  private async snapshot(): Promise<OdsRecords> {
+    if (this.client instanceof OpenDataSoftClient) {
+      return this.client.fetchRecords({
+        portalUrl: 'https://data.melbourne.vic.gov.au', datasetId: DATASET_ID,
+        orderBy: 'bayid ASC',
+      });
+    }
+    const counted = await this.client.getJson({
+      url: `${API_BASE}/records?limit=0`, maxAttempts: 1, redirect: 'error',
     });
+    const totalCount = countSchema.parse(counted.body).total_count;
+    const exported = await this.client.getJson({
+      url: `${API_BASE}/exports/json`, maxAttempts: 1, redirect: 'error', timeoutMs: 120_000,
+    });
+    const records = z.array(z.unknown()).parse(exported.body);
+    if (records.length !== totalCount) {
+      throw new OdsIncompleteWindow('complete JSON export differs from independent total_count', totalCount);
+    }
+    return { records, totalCount, pageCount: 1,
+      fetchedAt: exported.fetchedAt, lastModified: null };
   }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
     if (input.sourceId !== SOURCE_ID) return failure(input, 'validation_failed');
     try {
-      const response = await this.client.fetchRecords({
-        portalUrl: 'https://data.melbourne.vic.gov.au',
-        datasetId: DATASET_ID,
-        orderBy: 'bayid ASC',
-      });
+      const declaration = parseSourceManifest(JSON.parse(await readFile(new URL('./source.json', import.meta.url), 'utf8')));
+      const response = await this.snapshot();
       let sourceUpdatedAt = response.lastModified === null ? null
         : new Date(response.lastModified).toISOString();
       if (sourceUpdatedAt === null && this.autoFetchMetadata) {
@@ -334,7 +363,7 @@ export class ParkingRestrictionsConnector implements Connector {
           source_version_ordinal: null,
           record_status: rowStatusInfo.sourceRecordStatus,
           assertion_kind: 'plan',
-          rights_status: 'review_required',
+          rights_status: declaration.license_status,
         });
 
         for (let slotNumber = 1; slotNumber <= 6; slotNumber += 1) {
@@ -403,8 +432,8 @@ export class ParkingRestrictionsConnector implements Connector {
             source_version_ordinal: null,
             freshness_state: 'unknown',
             record_status: slotStatusInfo.geoRecordStatus,
-            rights_status: 'review_required',
-            public_query_allowed: false,
+            rights_status: declaration.license_status,
+            public_query_allowed: declaration.license_status !== 'review_required',
           });
 
           geoRecordSources.push({
@@ -432,12 +461,14 @@ export class ParkingRestrictionsConnector implements Connector {
         checkpointAfter: input.window.kind === 'time' ? input.window.to : input.window.revision,
         completeness: {
           complete: true,
-          method: 'pagination',
+          method: this.client instanceof HttpClient ? 'export_count' : 'pagination',
           expected_records: response.totalCount,
           fetched_records: response.records.length,
           expected_pages: response.pageCount,
           fetched_pages: response.pageCount,
-          evidence: 'All source rows and numbered rule slots parsed',
+          evidence: this.client instanceof HttpClient
+            ? 'Complete JSON export matched independent total_count; all numbered rule slots parsed'
+            : 'All source rows and numbered rule slots parsed',
         },
         inputCount: response.records.length,
         outputCount: parkingRules.length,

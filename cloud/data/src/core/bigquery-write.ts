@@ -4,7 +4,8 @@ import { z } from 'zod';
 type JsonObject = Parameters<managedwriter.JSONWriter['appendRows']>[0][number];
 
 const HIGH_FREQUENCY_TABLES = new Set([
-  'parking_observations', 'pedestrian_observations', 'source_records', 'geo_records',
+  'parking_observations', 'parking_sensor_memberships', 'geo_record_sources',
+  'pedestrian_observations', 'source_records', 'geo_records',
 ]);
 
 function jsonObject(value: unknown): JsonObject {
@@ -27,7 +28,10 @@ export async function writeHighFrequencyRows(input: {
   const rows = input.rows.map(value => {
     const row = jsonObject(value);
     const keys = input.table === 'source_records' ? ['source_record_id']
-      : input.table === 'geo_records' ? ['geo_record_id'] : ['sensor_id', 'observed_at'];
+      : input.table === 'geo_records' ? ['geo_record_id']
+        : input.table === 'geo_record_sources' ? ['geo_record_id', 'source_record_id', 'source_version_id']
+          : input.table === 'parking_sensor_memberships' ? ['sensor_id', 'snapshot_source_record_id']
+            : ['sensor_id', 'observed_at'];
     if (!input.batchId || row.batch_id !== input.batchId
       || ['source_id', 'version_id', ...keys].some(key => typeof row[key] !== 'string' || !row[key])) {
       throw new Error('Write API row lacks stable batch, source or version key');

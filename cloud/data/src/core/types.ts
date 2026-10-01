@@ -109,6 +109,19 @@ export interface SourceRecord extends FactProvenance {
   rights_status: LicenseStatus;
 }
 
+/** Full sensor membership and refresh clocks, separate from business changes. */
+export interface ParkingSensorMembership extends FactProvenance {
+  sensor_id: string;
+  version_id: string;
+  business_source_record_id: string;
+  business_state_hash: string;
+  business_version_id: string;
+  business_batch_id: string;
+  source_updated_at: UtcTimestamp | null;
+  snapshot_source_record_id: string;
+  snapshot_version_id: string;
+}
+
 export type LocationRole = 'event_site' | 'mentioned_place' | 'sensor_site' | 'area_only' | 'unknown';
 export type LocationConfidence = 'source_coordinate' | 'official_join' | 'resolved_area' | 'unverified';
 

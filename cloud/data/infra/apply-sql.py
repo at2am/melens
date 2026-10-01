@@ -43,6 +43,8 @@ AUTHORIZED_RAW_VIEWS = frozenset({
     "v_geo_records_current",
     "v_parking_current",
     "v_parking_unmatched_observations",
+    "v_parking_sensor_current",
+    "v_parking_rule_reference",
     "v_pedestrian_observations",
     "v_news_sources",
     "v_crime_area_statistics",

@@ -60,6 +60,7 @@ import {
 } from '../../src/validation/record.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
 import { BigQueryPublisher } from '../../src/core/publisher.js';
+import { parseSourceManifest } from '../../src/core/registry.js';
 import {
   GcsStore,
   addCompletedWindow,
@@ -68,6 +69,7 @@ import {
 } from '../../src/core/gcs.js';
 import type { DataConfig } from '../../src/core/config.js';
 import type { ConnectorSuccess } from '../../src/core/connector.js';
+import { ticketmasterCacheIsVisible } from '../../src/connectors/ticketmaster/policy.js';
 import type {
   AssertionKind,
   DataSource,
@@ -90,7 +92,7 @@ import type {
  * 1. Comprehensive integration test suite according to User Story 4 (US4).
  * 2. Event rescheduling and cancellation handling:
  *    - Cancelled and rescheduled events reflect new status; cancelled events are
- *      excluded from current active views while retaining version history.
+ *      excluded from current active views; restricted cached history expires.
  * 3. Future roadworks / planned road disruptions (tv_road_planned):
  *    - Future disruptions have geoRecordStatus: 'planned', assertion_kind: 'plan'.
  *    - Valid time bounds (valid_from > now) properly recognized so they are not
@@ -309,6 +311,7 @@ export interface QueryViewHistoryOptions {
   enforceRightsFilter?: boolean;
   publishedBatchIds?: ReadonlySet<string> | readonly string[];
   activeSourceIds?: ReadonlySet<string> | readonly string[];
+  currentTimestamp?: UtcTimestamp;
 }
 
 /**
@@ -336,6 +339,12 @@ export function queryViewHistory(
         ? options.activeSourceIds
         : new Set(options.activeSourceIds);
     filtered = filtered.filter((r) => activeSet.has(r.source_id));
+  }
+
+  const currentTimestamp = options.currentTimestamp;
+  if (currentTimestamp) {
+    filtered = filtered.filter((r) => r.source_id !== 'ticketmaster.events'
+      || ticketmasterCacheIsVisible({ fetchedAt: r.fetched_at, now: currentTimestamp, suppressed: false }));
   }
 
   const deduped = new Map<string, GeoRecord>();
@@ -447,9 +456,31 @@ export function selectLatestGeoRecord(
  */
 export function queryViewCurrent(
   history: readonly ViewHistoryRow[],
+  options?: { ticketmasterSnapshots: readonly SyncBatch[]; ticketmasterMembers: readonly GeoRecord[] },
 ): ViewHistoryRow[] {
+  let eligible = history;
+  if (options) {
+    const batches = new Map<string, SyncBatch>();
+    for (const batch of options.ticketmasterSnapshots) {
+      const previous = batches.get(batch.batch_id);
+      if (!previous || Date.parse(batch.state_updated_at) >= Date.parse(previous.state_updated_at)) {
+        batches.set(batch.batch_id, batch);
+      }
+    }
+    const snapshot = [...batches.values()]
+      .filter(batch => batch.source_id === 'ticketmaster.events'
+        && batch.state === 'published' && batch.published_at !== null)
+      .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)
+        || Date.parse(b.published_at!) - Date.parse(a.published_at!)
+        || b.batch_id.localeCompare(a.batch_id))[0];
+    const members = new Set(options.ticketmasterMembers
+      .filter(row => row.batch_id === snapshot?.batch_id && row.source_id === 'ticketmaster.events')
+      .map(row => `${row.geo_record_id}\u0000${row.version_id}`));
+    eligible = history.filter(row => row.source_id !== 'ticketmaster.events'
+      || members.has(`${row.geo_record_id}\u0000${row.version_id}`));
+  }
   const groups = new Map<string, ViewHistoryRow[]>();
-  for (const row of history) {
+  for (const row of eligible) {
     const list = groups.get(row.geo_record_id) ?? [];
     list.push(row);
     groups.set(row.geo_record_id, list);
@@ -855,6 +886,7 @@ class FakeBigQuery {
         const eligible = (this.facts.get(table) ?? []).filter(
           (r) =>
             (r.batch_id === params.batchId || publishedBatches.has(String(r.batch_id ?? ''))) &&
+            (!sql.includes('t.source_id = @sourceId AND t.batch_id = @batchId') || r.batch_id === params.batchId) &&
             batchLogicalKeys.has(String(r.geo_record_id ?? '')),
         );
 
@@ -961,15 +993,14 @@ async function getAdmittedTicketmasterSource(): Promise<DataSource> {
     new URL('../../src/connectors/ticketmaster/source.json', import.meta.url),
     'utf8',
   );
-  const rawSource = JSON.parse(content) as DataSource;
+  const rawSource = parseSourceManifest(JSON.parse(content));
   return {
     ...rawSource,
     access_status: 'active',
-    license_status: 'verified_open',
+    license_status: 'restricted',
     admission_evidence: {
       ...rawSource.admission_evidence,
       missing_requirements: [],
-      allowed_fields: ['id', 'url', 'name', 'dates', '_embedded.venues.location', 'title', 'summary'],
     },
     last_checked_at: null,
     last_success_at: null,
@@ -993,8 +1024,8 @@ function toSuccess(
     runId,
     fetchedAt,
     sourceRevision: `rev-${runId}`,
-    sourceLatestUpdateAt: fetchedAt,
-    checkpointAfter: fetchedAt,
+    sourceLatestUpdateAt: null,
+    checkpointAfter: null,
     completeness: {
       complete: true,
       method: 'feed_snapshot',
@@ -1025,412 +1056,150 @@ function toSuccess(
 // Suite 1: Event Rescheduling & Cancellation Handling (Ticketmaster)
 // ============================================================================
 
-test('US4 Suite 1: Event lifecycle, rescheduling and cancellation preserve version history while updating current views independently of hash ordering', async () => {
-  const inputRun1 = parseConnectorInput({
-    sourceId: 'ticketmaster.events',
-    window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
-    checkpoint: null,
-    runId: 'ticketmaster-run-1',
-  });
-  const fetchedAtRun1 = '2026-09-28T00:00:00Z' as UtcTimestamp;
-
+test('US4 Suite 1: complete Ticketmaster snapshots update cancellation, rescheduling and disappearance without fabricated provider timestamps', async () => {
   const fixture = await loadTicketmasterFixture();
   const events = fixture._embedded?.events ?? [];
-  assert.ok(events.length >= 2, 'Fixture must contain at least 2 events');
+  const rawEvent = events[0];
+  assert.ok(rawEvent);
+  assert.equal(events.length, 2);
+  const { publisher, bigquery } = await setupLocalPublisher();
+  const source = await getAdmittedTicketmasterSource();
+  assert.equal(source.license_status, 'restricted');
+  const members: GeoRecord[] = [];
 
-  // 1. Initial normalization: Event 1 is active (onsale), Event 2 is postponed (dateTBD)
-  const normRun1 = normalizeTicketEvents(events, inputRun1, fetchedAtRun1);
-  assert.equal(normRun1.geoRecords.length, 2);
-
-  const ev1V1 = normRun1.geoRecords[0]!;
-  assert.ok(ev1V1);
-  assert.equal(ev1V1.topic, 'event');
-  assert.equal(ev1V1.assertion_kind, 'plan');
-  assert.equal(ev1V1.record_status, 'planned');
-  assert.equal(ev1V1.valid_from, '2026-10-01T09:00:00.000Z');
-  assert.equal(ev1V1.valid_to, '2026-10-01T09:00:00.000Z');
-  assert.equal(ev1V1.location_role, 'event_site');
-  assert.equal(ev1V1.location_confidence, 'source_coordinate');
-  assert.equal(ev1V1.centroid_lon, 144.96);
-  assert.equal(ev1V1.centroid_lat, -37.81);
-  assert.equal(validateGeoRecordGeography(ev1V1).valid, true);
-
-  // Contract verification: raw connector output leaves source_updated_at and source_version_ordinal null
-  assert.equal(ev1V1.source_updated_at, null, 'Ticketmaster raw normalization has no source_updated_at');
-  assert.equal(ev1V1.source_version_ordinal, null, 'Ticketmaster raw normalization has no source_version_ordinal');
-  assert.ok(ev1V1.version_id.startsWith('a31d9abc'), 'Event 1 V1 hash matches G22 reference hash');
-
-  const ev2V1 = normRun1.geoRecords[1]!;
-  assert.ok(ev2V1);
-  assert.equal(ev2V1.topic, 'event');
-  assert.equal(ev2V1.assertion_kind, 'plan');
-  assert.equal(ev2V1.record_status, 'planned');
-  assert.equal(ev2V1.valid_from, null, 'Postponed event with dateTBD must have null valid_from');
-  assert.equal(ev2V1.valid_to, null);
-
-  // View query at current time 2026-09-29T12:00:00Z
-  const currentTime = '2026-09-29T12:00:00Z' as UtcTimestamp;
-  const historyRun1 = queryViewHistory(normRun1.geoRecords);
-  const currentRun1 = queryViewCurrent(historyRun1);
-  const eventsCurrentRun1 = queryViewEventsCurrent(currentRun1, currentTime);
-
-  assert.equal(eventsCurrentRun1.length, 2);
-  const ev1CurrentRun1 = eventsCurrentRun1.find((r) => r.geo_record_id === ev1V1.geo_record_id);
-  assert.ok(ev1CurrentRun1);
-  assert.equal(ev1CurrentRun1.time_state, 'future');
-
-  const ev2CurrentRun1 = eventsCurrentRun1.find((r) => r.geo_record_id === ev2V1.geo_record_id);
-  assert.ok(ev2CurrentRun1);
-  assert.equal(ev2CurrentRun1.time_state, 'unscheduled');
-
-  // --------------------------------------------------------------------------
-  // 2. Scenario 1: Event Cancellation with Lexicographically Smaller Hash (G22)
-  // --------------------------------------------------------------------------
-  // Upstream reports that Event 1 is cancelled, with updated title
-  const inputRun2 = parseConnectorInput({
-    sourceId: 'ticketmaster.events',
-    window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
-    checkpoint: null,
-    runId: 'ticketmaster-run-2',
-  });
-  const fetchedAtRun2 = '2026-09-29T00:00:00Z' as UtcTimestamp;
-
-  const rawEv1 = events[0]!;
-  const cancelledEv1 = {
-    ...rawEv1,
-    name: 'Example Melbourne Concert cancelled notice 2',
-    dates: {
-      ...rawEv1.dates,
-      status: { code: 'canceled' },
-    },
+  const publishSnapshot = async (runId: string, fetchedAt: UtcTimestamp, snapshotEvents: typeof events) => {
+    const input = parseConnectorInput({
+      sourceId: source.source_id, window: { kind: 'snapshot', revision: 'latest' },
+      checkpoint: null, runId,
+    });
+    const normalized = normalizeTicketEvents(snapshotEvents, input, fetchedAt);
+    for (const row of [...normalized.sourceRecords, ...normalized.geoRecords]) {
+      assert.equal(row.source_updated_at, null);
+      assert.equal(row.source_version_ordinal, null);
+      assert.equal(row.published_at, null);
+      assert.equal(row.rights_status, 'restricted');
+    }
+    const result = toSuccess(source.source_id, runId, fetchedAt, normalized);
+    const batch = await publisher.publish({
+      source, result, windowFrom: null, windowTo: null, initialCheckpoint: null,
+    });
+    assert.equal(batch.state, 'published');
+    assert.equal(batch.started_at, fetchedAt, 'Snapshot ordering uses collection time even for empty snapshots');
+    assert.equal(batch.checkpoint_after, null);
+    assert.equal(batch.raw_uri, null);
+    members.push(...normalized.geoRecords.map(row => ({ ...row, batch_id: batch.batch_id })));
+    return { normalized, result, batch };
+  };
+  const currentAt = (now: UtcTimestamp) => {
+    const publishedIds = bigquery.states.filter(batch => batch.state === 'published').map(batch => batch.batch_id);
+    const history = queryViewHistory(members, {
+      enforceRightsFilter: true, activeSourceIds: [source.source_id],
+      publishedBatchIds: publishedIds, currentTimestamp: now,
+    });
+    return {
+      history,
+      current: queryViewCurrent(history, { ticketmasterSnapshots: bigquery.states, ticketmasterMembers: members }),
+    };
   };
 
-  const normRun2 = normalizeTicketEvents([cancelledEv1], inputRun2, fetchedAtRun2);
-  const ev1V2 = normRun2.geoRecords[0]!;
-  assert.ok(ev1V2);
-  assert.equal(ev1V2.geo_record_id, ev1V1.geo_record_id, 'Stable entity ID across lifecycle');
-  assert.equal(ev1V2.record_status, 'cancelled');
+  const run1 = await publishSnapshot('ticketmaster-run-1', '2026-10-01T08:00:00Z', events);
+  const original = run1.normalized.geoRecords[0];
+  const postponed = run1.normalized.geoRecords[1];
+  assert.ok(original && postponed);
+  assert.equal(original.record_status, 'planned');
+  assert.equal(original.valid_from, '2026-10-01T09:00:00.000Z');
+  assert.equal(original.valid_to, null, 'An absent provider end does not become the start time');
+  assert.equal(original.centroid_lon, 144.96);
+  assert.equal(original.centroid_lat, -37.81);
+  assert.equal(validateGeoRecordGeography(original).valid, true);
+  assert.equal(postponed.valid_from, null);
+  assert.equal(postponed.valid_to, null);
+  const initialEvents = queryViewEventsCurrent(currentAt('2026-10-01T08:15:00Z').current, '2026-10-01T08:15:00Z');
+  assert.equal(initialEvents.length, 2);
+  assert.equal(initialEvents.find(row => row.geo_record_id === original.geo_record_id)?.time_state, 'future');
+  assert.equal(initialEvents.find(row => row.geo_record_id === postponed.geo_record_id)?.time_state, 'unscheduled');
 
-  // Exact hash check per G22: cancelled version hash (3fff5dc8...) is STRICTLY SMALLER than original hash (a31d9abc...)
-  assert.ok(ev1V2.version_id.startsWith('3fff5dc8'), 'Cancelled version hash matches G22 reproduction hash');
-  assert.ok(
-    ev1V2.version_id.localeCompare(ev1V1.version_id) < 0,
-    'G22: Cancelled version hash MUST be lexicographically smaller than original version',
-  );
+  // Find a normal content hash below the original; hash order cannot serve as update evidence.
+  let canceled = { ...rawEvent, name: 'Cancelled notice 0',
+    dates: { ...rawEvent.dates, status: { code: 'canceled' } } };
+  for (let index = 0; index < 100; index += 1) {
+    canceled = { ...canceled, name: `Cancelled notice ${index}` };
+    const row = normalizeTicketEvents([canceled], parseConnectorInput({
+      sourceId: source.source_id, window: { kind: 'snapshot', revision: 'latest' },
+      checkpoint: null, runId: 'hash-control',
+    }), '2026-10-01T09:00:00Z').geoRecords[0];
+    if (row && row.version_id.localeCompare(original.version_id) < 0) break;
+  }
+  const run2 = await publishSnapshot('ticketmaster-run-2', '2026-10-01T09:00:00Z', [canceled]);
+  const cancellation = run2.normalized.geoRecords[0];
+  assert.ok(cancellation);
+  assert.equal(cancellation.geo_record_id, original.geo_record_id);
+  assert.equal(cancellation.record_status, 'cancelled');
+  assert.ok(cancellation.version_id.localeCompare(original.version_id) < 0);
+  const afterCancel = currentAt('2026-10-01T09:15:00Z');
+  assert.equal(afterCancel.history.length, 3, 'Unexpired versions remain available in restricted history');
+  assert.equal(afterCancel.current.length, 0, 'Cancellation and omitted postponed event both exit current membership');
+  const timeline = queryViewChangeTimeline(afterCancel.history, '2026-10-01T09:15:00Z');
+  assert.equal(timeline.find(row => row.version_id === cancellation.version_id)?.time_state, 'cancelled');
+  assert.equal(queryViewCurrent(afterCancel.history).length, 2,
+    'Fixture detects the incorrect hash-only selection that omits snapshot membership');
 
-  // 2a. Real Publisher Rejection of Ambiguous Multi-Version Updates (G22 Requirement):
-  // When version ordering evidence is missing (both source_updated_at and source_version_ordinal are null),
-  // the real BigQuery publisher rejects ambiguous multiple versions at the publication gate.
-  const { publisher: unversionedPublisher } = await setupLocalPublisher();
-  const admittedSource = await getAdmittedTicketmasterSource();
+  const rescheduled = { ...rawEvent, name: 'Rescheduled Concert', dates: {
+    ...rawEvent.dates,
+    start: { dateTime: '2026-10-20T09:00:00Z', localDate: '2026-10-20', localTime: '20:00:00' },
+    status: { code: 'rescheduled' },
+  } };
+  const run3 = await publishSnapshot('ticketmaster-run-3', '2026-10-01T10:00:00Z', [rescheduled]);
+  const changed = run3.normalized.geoRecords[0];
+  assert.ok(changed);
+  assert.equal(changed.geo_record_id, original.geo_record_id);
+  assert.notEqual(changed.version_id, original.version_id);
+  const afterReschedule = currentAt('2026-10-01T10:15:00Z');
+  assert.equal(afterReschedule.current.length, 1);
+  assert.equal(afterReschedule.current[0]?.version_id, changed.version_id);
+  assert.equal(afterReschedule.current[0]?.valid_from, '2026-10-20T09:00:00.000Z');
 
-  // Run 1 succeeds as the initial single-version entity
-  const run1Success = toSuccess(admittedSource.source_id, 'ticketmaster-run-1', fetchedAtRun1, {
-    sourceRecords: normRun1.sourceRecords,
-    geoRecords: normRun1.geoRecords.map((r) => ({
-      ...r,
-      rights_status: 'verified_open',
-      public_query_allowed: true,
-    })),
-    geoRecordSources: normRun1.geoRecordSources,
-  });
-  const publishedBatch1 = await unversionedPublisher.publish({
-    source: admittedSource,
-    result: run1Success,
-    windowFrom: '2026-10-01T00:00:00Z',
-    windowTo: '2026-10-05T00:00:00Z',
-    initialCheckpoint: '2026-10-01T00:00:00Z',
-  });
-  assert.equal(publishedBatch1.state, 'published');
+  await assert.rejects(publisher.publish({ source,
+    result: { ...run3.result, runId: 'incomplete-refresh', sourceRevision: 'incomplete-refresh',
+      completeness: { ...run3.result.completeness, expected_records: 2 } },
+    windowFrom: null, windowTo: null, initialCheckpoint: null,
+  }), /Connector window is incomplete/);
+  await publisher.recordConnectorFailure(source, {
+    kind: 'failure', sourceId: source.source_id, runId: 'failed-refresh',
+    checkedAt: '2026-10-01T10:30:00Z', code: 'incomplete_window', message: 'Fixed failure fixture',
+    retryAfterSeconds: null, sourceLatestUpdateAt: null,
+    completeness: { complete: false, expected_records: null, fetched_records: 0,
+      expected_pages: null, fetched_pages: 0, evidence: 'Fixed failure fixture' },
+  }, null, null);
+  assert.equal(currentAt('2026-10-01T10:45:00Z').current[0]?.version_id, changed.version_id,
+    'An incomplete or failed refresh preserves the last complete snapshot');
 
-  // Attempting to publish an unversioned multiple version (ev1V2 has null source_updated_at & ordinal)
-  // MUST fail closed in BigQuery publication validation gate!
-  const run2UnversionedSuccess = toSuccess(admittedSource.source_id, 'ticketmaster-run-2-ambiguous', fetchedAtRun2, {
-    sourceRecords: normRun2.sourceRecords,
-    geoRecords: normRun2.geoRecords.map((r) => ({
-      ...r,
-      rights_status: 'verified_open',
-      public_query_allowed: true,
-    })),
-    geoRecordSources: normRun2.geoRecordSources,
-  });
-  await assert.rejects(
-    unversionedPublisher.publish({
-      source: admittedSource,
-      result: run2UnversionedSuccess,
-      windowFrom: '2026-10-01T00:00:00Z',
-      windowTo: '2026-10-05T00:00:00Z',
-      initialCheckpoint: '2026-10-05T00:00:00Z',
-    }),
-    /BigQuery validation failed for geo_records/,
-    'Unversioned multiple versions MUST be rejected by the BigQuery publisher validation gate',
-  );
+  await publishSnapshot('ticketmaster-empty', '2026-10-01T11:00:00Z', []);
+  assert.equal(currentAt('2026-10-01T11:15:00Z').current.length, 0,
+    'An empty complete snapshot removes all previous current membership');
+  await publishSnapshot('ticketmaster-late-older', '2026-10-01T09:30:00Z', [rawEvent]);
+  assert.equal(currentAt('2026-10-01T11:20:00Z').current.length, 0,
+    'Older collected data published later cannot supersede the newer empty snapshot');
+  await publishSnapshot('ticketmaster-newest', '2026-10-01T11:30:00Z', [rescheduled]);
+  assert.equal(currentAt('2026-10-01T11:45:00Z').current[0]?.version_id, changed.version_id);
+  assert.equal(currentAt('2026-10-02T11:30:00Z').history.length, 0,
+    'All Ticketmaster query content expires at 24 hours');
 
-  // 2b. Versioned Cancellation Check (G22 Requirement):
-  // When proper version ordering evidence is present (source_updated_at and source_version_ordinal),
-  // the publisher validates and publishes the batch, and the cancellation takes effect even
-  // when hash order is reversed (ev1V2: 3fff5dc8... < ev1V1: a31d9abc...)!
-  const { publisher: versionedPublisher } = await setupLocalPublisher();
-
-  const ev1V1_versioned: GeoRecord = {
-    ...ev1V1,
-    source_updated_at: '2026-09-28T00:00:00Z',
-    source_version_ordinal: 1,
-  };
-  const ev1V2_versioned: GeoRecord = {
-    ...ev1V2,
-    source_updated_at: '2026-09-29T00:00:00Z',
-    source_version_ordinal: 2,
-  };
-
-  const run1VersionedSuccess = toSuccess(admittedSource.source_id, 'ticketmaster-run-1-versioned', fetchedAtRun1, {
-    sourceRecords: normRun1.sourceRecords.map((r) => ({
-      ...r,
-      source_updated_at: '2026-09-28T00:00:00Z',
-      source_version_ordinal: 1,
-    })),
-    geoRecords: [
-      {
-        ...ev1V1_versioned,
-        rights_status: 'verified_open',
-        public_query_allowed: true,
-      },
-    ],
-    geoRecordSources: normRun1.geoRecordSources,
-  });
-  await versionedPublisher.publish({
-    source: admittedSource,
-    result: run1VersionedSuccess,
-    windowFrom: '2026-10-01T00:00:00Z',
-    windowTo: '2026-10-05T00:00:00Z',
-    initialCheckpoint: '2026-10-01T00:00:00Z',
-  });
-
-  const run2VersionedSuccess = toSuccess(admittedSource.source_id, 'ticketmaster-run-2-versioned', fetchedAtRun2, {
-    sourceRecords: normRun2.sourceRecords.map((r) => ({
-      ...r,
-      source_updated_at: '2026-09-29T00:00:00Z',
-      source_version_ordinal: 2,
-    })),
-    geoRecords: [
-      {
-        ...ev1V2_versioned,
-        rights_status: 'verified_open',
-        public_query_allowed: true,
-      },
-    ],
-    geoRecordSources: normRun2.geoRecordSources,
-  });
-  const publishedBatch2 = await versionedPublisher.publish({
-    source: admittedSource,
-    result: run2VersionedSuccess,
-    windowFrom: '2026-10-01T00:00:00Z',
-    windowTo: '2026-10-05T00:00:00Z',
-    initialCheckpoint: '2026-10-05T00:00:00Z',
-  });
-  assert.equal(publishedBatch2.state, 'published', 'Versioned updates pass real publisher validation');
-
-  const combinedHistory = queryViewHistory([ev1V1_versioned, ev1V2_versioned]);
-  assert.equal(combinedHistory.length, 2, 'Version history strictly retained in audit view');
-
-  const currentAfterCancel = queryViewCurrent(combinedHistory);
-  assert.equal(
-    currentAfterCancel.some((r) => r.geo_record_id === ev1V1.geo_record_id),
-    false,
-    'Cancelled event MUST NOT be returned in current active views even with smaller hash',
-  );
-
-  const eventsCurrentAfterCancel = queryViewEventsCurrent(currentAfterCancel, currentTime);
-  assert.equal(
-    eventsCurrentAfterCancel.some((r) => r.geo_record_id === ev1V1.geo_record_id),
-    false,
-  );
-
-  const timeline = queryViewChangeTimeline(combinedHistory, currentTime);
-  const ev1TimelineCancelled = timeline.find(
-    (r) => r.geo_record_id === ev1V1.geo_record_id && r.version_id === ev1V2.version_id,
-  );
-  assert.ok(ev1TimelineCancelled);
-  assert.equal(ev1TimelineCancelled.time_state, 'cancelled');
-  assert.equal(ev1TimelineCancelled.record_status, 'cancelled');
-
-  // Local comparator controls for the event cancellation fixture:
-  // Proves that production sorting contract is strictly enforced and that mutating the ordering logic
-  // causes sensitive test failure.
-  const cancelRecords = [ev1V1_versioned, ev1V2_versioned];
-  const canonicalCancel = selectLatestGeoRecord(cancelRecords);
-  assert.equal(
-    canonicalCancel,
-    null,
-    'Local contract sorting must select cancelled ev1V2 and exit it from current view',
-  );
-
-  // Mutation 1: Naive hash sorting (ev1V1 hash 'a31d...' > ev1V2 hash '3fff...')
-  const mutatedCancelByHash = selectLatestGeoRecord(cancelRecords, {
-    comparator: (a, b) => b.version_id.localeCompare(a.version_id),
-  });
-  assert.ok(mutatedCancelByHash, 'Mutation sensitivity: broken hash sorting incorrectly yields an active record');
-  assert.equal(
-    mutatedCancelByHash?.version_id,
-    ev1V1.version_id,
-    'Mutation sensitivity: naive hash sorting selects ev1V1 (planned) instead of ev1V2 (cancelled)',
-  );
-  assert.equal(mutatedCancelByHash?.record_status, 'planned');
-  assert.notEqual(canonicalCancel, mutatedCancelByHash);
-
-  // Mutation 2: Pre-filtering lifecycle before ranking
-  const mutatedCancelByPreFilter = selectLatestGeoRecord(cancelRecords, {
-    filterLifecycleBeforeSort: true,
-  });
-  assert.equal(
-    mutatedCancelByPreFilter?.record_status,
-    'planned',
-    'Mutation sensitivity: filtering lifecycle before ranking resurrects planned event',
-  );
-  assert.notEqual(canonicalCancel, mutatedCancelByPreFilter);
-
-  // --------------------------------------------------------------------------
-  // 3. Scenario 2: Event Rescheduling with Lexicographically Smaller Hash (G22)
-  // --------------------------------------------------------------------------
-  // In run 3, Event 1 was not cancelled, but rescheduled to 2026-11-20
-  const inputRun3 = parseConnectorInput({
-    sourceId: 'ticketmaster.events',
-    window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-11-30T00:00:00Z' },
-    checkpoint: null,
-    runId: 'ticketmaster-run-3',
-  });
-  const fetchedAtRun3 = '2026-09-29T06:00:00Z' as UtcTimestamp;
-
-  const rescheduledEv1 = {
-    ...rawEv1,
-    name: 'Rescheduled Concert 1',
-    dates: {
-      ...rawEv1.dates,
-      start: {
-        dateTime: '2026-11-20T09:00:00Z',
-        localDate: '2026-11-20',
-        localTime: '19:00:00',
-      },
-      status: { code: 'rescheduled' },
-    },
-  };
-  const normRun3 = normalizeTicketEvents([rescheduledEv1], inputRun3, fetchedAtRun3);
-  const ev1V3 = normRun3.geoRecords[0]!;
-  assert.ok(ev1V3);
-  assert.equal(ev1V3.valid_from, '2026-11-20T09:00:00.000Z');
-  assert.ok(ev1V3.version_id.startsWith('1652443d'), 'Rescheduled version has smaller hash');
-  assert.ok(
-    ev1V3.version_id.localeCompare(ev1V1.version_id) < 0,
-    'Rescheduled version hash MUST be lexicographically smaller than original planned version',
-  );
-
-  // When version ordering evidence is present, rescheduled version supersedes planned version
-  const ev1V3_versioned: GeoRecord = {
-    ...ev1V3,
-    source_updated_at: '2026-09-29T06:00:00Z',
-    source_version_ordinal: 3,
-  };
-
-  const historyRescheduled = queryViewHistory([ev1V1_versioned, ev1V3_versioned]);
-  assert.equal(historyRescheduled.length, 2);
-
-  const currentRescheduled = queryViewCurrent(historyRescheduled);
-  assert.equal(currentRescheduled.length, 1);
-  assert.equal(currentRescheduled[0]?.version_id, ev1V3.version_id);
-  assert.equal(currentRescheduled[0]?.valid_from, '2026-11-20T09:00:00.000Z');
-
-  const eventsCurrentRescheduled = queryViewEventsCurrent(currentRescheduled, currentTime);
-  assert.equal(eventsCurrentRescheduled.length, 1);
-  assert.equal(eventsCurrentRescheduled[0]?.valid_from, '2026-11-20T09:00:00.000Z');
-  assert.equal(eventsCurrentRescheduled[0]?.time_state, 'future');
-
-  // Local comparator controls for the event rescheduling fixture:
-  const reschedRecords = [ev1V1_versioned, ev1V3_versioned];
-  const canonicalResched = selectLatestGeoRecord(reschedRecords);
-  assert.equal(canonicalResched?.version_id, ev1V3.version_id);
-  assert.equal(canonicalResched?.valid_from, '2026-11-20T09:00:00.000Z');
-
-  // Mutation: Naive hash sorting (ev1V1 hash 'a31d...' > ev1V3 hash '1652...')
-  const mutatedReschedByHash = selectLatestGeoRecord(reschedRecords, {
-    comparator: (a, b) => b.version_id.localeCompare(a.version_id),
-  });
-  assert.equal(
-    mutatedReschedByHash?.valid_from,
-    '2026-10-01T09:00:00.000Z',
-    'Mutation sensitivity: naive hash sorting fails to update to rescheduled date',
-  );
-  assert.notEqual(canonicalResched?.valid_from, mutatedReschedByHash?.valid_from);
-
-  // --------------------------------------------------------------------------
-  // 4. Scenario 3: Delayed / Late-Arriving Older Versions (G22 Requirement)
-  // --------------------------------------------------------------------------
-  // Verify that delayed/late-arriving older versions cannot overwrite newer versions
-  // Even though ev1V1 has a larger hash ('a31d9abc' > '3fff5dc8'), replaying ev1V1
-  // after ev1V2 or ev1V3 cannot overwrite the newer version!
-  const delayedHistoryCancelled = queryViewHistory([ev1V2_versioned, ev1V1_versioned]);
-  const currentAfterDelayedReplay = queryViewCurrent(delayedHistoryCancelled);
-  assert.equal(
-    currentAfterDelayedReplay.some((r) => r.geo_record_id === ev1V1.geo_record_id),
-    false,
-    'Delayed older planned version MUST NOT overwrite newer cancellation version',
-  );
-
-  const delayedHistoryRescheduled = queryViewHistory([ev1V3_versioned, ev1V1_versioned]);
-  const currentAfterDelayedResched = queryViewCurrent(delayedHistoryRescheduled);
-  assert.equal(currentAfterDelayedResched.length, 1);
-  assert.equal(
-    currentAfterDelayedResched[0]?.version_id,
-    ev1V3.version_id,
-    'Delayed older version MUST NOT revert rescheduled event date',
-  );
-  assert.equal(currentAfterDelayedResched[0]?.valid_from, '2026-11-20T09:00:00.000Z');
-
-  // --------------------------------------------------------------------------
-  // 5. Rights & Publication Batch Gating on Public Query (G22 Requirement)
-  // --------------------------------------------------------------------------
-  // Raw Ticketmaster connector sets rights_status = 'review_required', public_query_allowed = false
-  const unadmittedHistory = queryViewHistory([ev1V1], { enforceRightsFilter: true });
-  assert.equal(
-    unadmittedHistory.length,
-    0,
-    'Candidate review_required Ticketmaster records must be excluded from public query history',
-  );
-
-  // When admitted and in published batches, records are accessible
-  const admittedEv1: GeoRecord = {
-    ...ev1V1_versioned,
-    rights_status: 'verified_open',
-    public_query_allowed: true,
-  };
-  const admittedHistory = queryViewHistory([admittedEv1], {
-    enforceRightsFilter: true,
-    publishedBatchIds: ['ticketmaster-run-1'],
-  });
-  assert.equal(admittedHistory.length, 1);
-
-  // --------------------------------------------------------------------------
-  // 6. Missing Venue Coordinates / Unlocated Event
-  // --------------------------------------------------------------------------
-  const unlocatedEv = {
-    ...rawEv1,
-    id: 'EV-UNLOCATED',
+  assert.equal(queryViewHistory([original], { enforceRightsFilter: true, activeSourceIds: [] }).length, 0);
+  assert.equal(queryViewHistory([original], { enforceRightsFilter: true, publishedBatchIds: [] }).length, 0);
+  assert.equal(queryViewHistory([{ ...original, public_query_allowed: false }], { enforceRightsFilter: true }).length, 0);
+  const unlocated = normalizeTicketEvents([{ ...rawEvent, id: 'EV-UNLOCATED',
     _embedded: { venues: [{ id: 'V-NO-COORDS', name: 'Unknown Tent' }] },
-  };
-  const normUnlocated = normalizeTicketEvents([unlocatedEv], inputRun1, fetchedAtRun1);
-  const unlocatedGeo = normUnlocated.geoRecords[0];
-  assert.ok(unlocatedGeo);
-  assert.equal(unlocatedGeo.geometry_geojson, null);
-  assert.equal(unlocatedGeo.centroid_lat, null);
-  assert.equal(unlocatedGeo.centroid_lon, null);
-  assert.equal(unlocatedGeo.location_role, 'unknown');
-  assert.equal(unlocatedGeo.location_confidence, 'unverified');
-  assert.equal(validateGeoRecordGeography(unlocatedGeo).valid, true);
-
-  // 7. Invariant: Duplicate Event IDs upstream fail fast
-  assert.throws(
-    () => normalizeTicketEvents([rawEv1, rawEv1], inputRun1, fetchedAtRun1),
-    /Duplicate Ticketmaster event ID/,
-  );
+  }], parseConnectorInput({ sourceId: source.source_id,
+    window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null, runId: 'unlocated-run',
+  }), '2026-10-01T11:30:00Z').geoRecords[0];
+  assert.ok(unlocated);
+  assert.equal(unlocated.geometry_geojson, null);
+  assert.equal(unlocated.location_confidence, 'unverified');
+  assert.throws(() => normalizeTicketEvents([rawEvent, rawEvent], parseConnectorInput({
+    sourceId: source.source_id, window: { kind: 'snapshot', revision: 'latest' },
+    checkpoint: null, runId: 'duplicate-run',
+  }), '2026-10-01T11:30:00Z'), /Duplicate Ticketmaster event ID/);
 });
 
 // ============================================================================
@@ -2663,179 +2432,115 @@ test('US4 Suite 7: GCP acceptance - real GoogleSQL view execution on BigQuery', 
     await query(qualify(await readSql('002_core_views.sql')));
     await query(qualify(await readSql('007_changes_views.sql')));
 
-    // Admitted Ticketmaster source definition
     const admittedSource = await getAdmittedTicketmasterSource();
-
-    // 1. Initial event publication (Version 1)
     const fixture = await loadTicketmasterFixture();
-    const rawEv1 = fixture._embedded?.events?.[0];
-    assert.ok(rawEv1, 'Fixture must contain event');
-
-    const input1 = parseConnectorInput({
-      sourceId: admittedSource.source_id,
-      window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
-      checkpoint: null,
-      runId: `gcp-run-1-${id}`,
-    });
-    const fetchedAt1 = '2026-09-28T00:00:00Z' as UtcTimestamp;
-    const norm1 = normalizeTicketEvents([rawEv1], input1, fetchedAt1);
-    const ev1V1 = norm1.geoRecords[0]!;
-    const ev1V1_versioned: GeoRecord = {
-      ...ev1V1,
-      rights_status: 'verified_open',
-      public_query_allowed: true,
-      source_updated_at: '2026-09-28T00:00:00Z',
-      source_version_ordinal: 1,
+    const rawEvent = fixture._embedded?.events?.[0];
+    assert.ok(rawEvent, 'Fixture must contain an event');
+    const referenceMs = Date.now();
+    const collectedAt = (minutesAgo: number) => new Date(referenceMs - minutesAgo * 60_000).toISOString();
+    const originalDate = new Date(referenceMs + 3 * 86_400_000).toISOString();
+    const rescheduledDate = new Date(referenceMs + 4 * 86_400_000).toISOString();
+    const originalEvent = { ...rawEvent, id: `EV-LIVE-FIXTURE-${id}`, dates: {
+      ...rawEvent.dates, start: { dateTime: originalDate, localDate: originalDate.slice(0, 10) },
+    } };
+    const publishSnapshot = async (suffix: string, fetchedAt: UtcTimestamp, events: typeof originalEvent[]) => {
+      const runId = `gcp-${suffix}-${id}`;
+      const input = parseConnectorInput({ sourceId: admittedSource.source_id,
+        window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null, runId,
+      });
+      const normalized = normalizeTicketEvents(events, input, fetchedAt);
+      const result = toSuccess(admittedSource.source_id, runId, fetchedAt, normalized);
+      const batch = await publisher.publish({ source: admittedSource, result,
+        windowFrom: null, windowTo: null, initialCheckpoint: null,
+      });
+      assert.equal(batch.state, 'published');
+      assert.equal(batch.started_at, fetchedAt);
+      assert.equal(batch.raw_uri, null);
+      assert.equal(batch.checkpoint_after, null);
+      for (const row of [...normalized.sourceRecords, ...normalized.geoRecords]) {
+        assert.equal(row.source_updated_at, null);
+        assert.equal(row.source_version_ordinal, null);
+        assert.equal(row.rights_status, 'restricted');
+      }
+      return { normalized, result, batch };
     };
-    const batch1Success = toSuccess(admittedSource.source_id, `gcp-run-1-${id}`, fetchedAt1, {
-      sourceRecords: norm1.sourceRecords.map((r) => ({
-        ...r,
-        source_updated_at: '2026-09-28T00:00:00Z',
-        source_version_ordinal: 1,
-      })),
-      geoRecords: [ev1V1_versioned],
-      geoRecordSources: norm1.geoRecordSources,
-    });
-
-    const publishedBatch1 = await publisher.publish({
-      source: admittedSource,
-      result: batch1Success,
-      windowFrom: '2026-10-01T00:00:00Z',
-      windowTo: '2026-10-05T00:00:00Z',
-      initialCheckpoint: '2026-10-01T00:00:00Z',
-    });
-    assert.equal(publishedBatch1.state, 'published');
-
-    // Verify v_geo_records_current returns Version 1
-    const currentRowsV1 = await query(
-      `SELECT geo_record_id, version_id, record_status FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_current\` WHERE geo_record_id = @id`,
-      { id: ev1V1.geo_record_id },
+    const currentRows = (entityId: string) => query(
+      `SELECT geo_record_id, version_id, record_status, valid_from, source_updated_at, source_version_ordinal
+       FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_current\` WHERE geo_record_id = @id`,
+      { id: entityId },
     );
-    assert.equal(currentRowsV1.length, 1);
-    assert.equal(currentRowsV1[0]?.version_id, ev1V1.version_id);
-    assert.equal(currentRowsV1[0]?.record_status, 'planned');
 
-    // 2. Ambiguity check: Attempting to publish unversioned multiple versions MUST fail closed in BigQuery validation gate
-    const input2Ambiguous = parseConnectorInput({
-      sourceId: admittedSource.source_id,
-      window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
-      checkpoint: '2026-10-05T00:00:00Z',
-      runId: `gcp-run-2-ambiguous-${id}`,
-    });
-    const fetchedAt2 = '2026-09-29T00:00:00Z' as UtcTimestamp;
-    const cancelledEv1 = {
-      ...rawEv1,
-      name: 'Example Melbourne Concert cancelled notice 2',
-      dates: { ...rawEv1.dates, status: { code: 'canceled' } },
+    const first = await publishSnapshot('initial', collectedAt(10), [originalEvent]);
+    const firstRow = first.normalized.geoRecords[0];
+    assert.ok(firstRow);
+    const initialCurrent = await currentRows(firstRow.geo_record_id);
+    assert.equal(initialCurrent.length, 1);
+    assert.equal(initialCurrent[0]?.version_id, firstRow.version_id);
+    assert.equal(initialCurrent[0]?.source_updated_at, null);
+    assert.equal(initialCurrent[0]?.source_version_ordinal, null);
+
+    const canceledEvent = { ...originalEvent, name: 'Fixture cancellation',
+      dates: { ...originalEvent.dates, status: { code: 'canceled' } },
     };
-    const norm2 = normalizeTicketEvents([cancelledEv1], input2Ambiguous, fetchedAt2);
-    const ev1V2 = norm2.geoRecords[0]!;
-
-    // ev1V2 is unversioned (both source_updated_at and ordinal null)
-    const batch2AmbiguousSuccess = toSuccess(admittedSource.source_id, `gcp-run-2-ambiguous-${id}`, fetchedAt2, {
-      sourceRecords: norm2.sourceRecords,
-      geoRecords: norm2.geoRecords.map((r) => ({
-        ...r,
-        rights_status: 'verified_open',
-        public_query_allowed: true,
-      })),
-      geoRecordSources: norm2.geoRecordSources,
-    });
-    await assert.rejects(
-      publisher.publish({
-        source: admittedSource,
-        result: batch2AmbiguousSuccess,
-        windowFrom: '2026-10-01T00:00:00Z',
-        windowTo: '2026-10-05T00:00:00Z',
-        initialCheckpoint: '2026-10-05T00:00:00Z',
-      }),
-      /validation failed/i,
-      'Ambiguous unversioned updates must be rejected by BigQuery publisher gate',
-    );
-
-    // Verify ambiguous version was not published and v1 remains visible
-    const currentRowsAfterAmbiguous = await query(
-      `SELECT geo_record_id, version_id FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_current\` WHERE geo_record_id = @id`,
-      { id: ev1V1.geo_record_id },
-    );
-    assert.equal(currentRowsAfterAmbiguous.length, 1);
-    assert.equal(currentRowsAfterAmbiguous[0]?.version_id, ev1V1.version_id);
-
-    // 3. Publishing cancellation with version ordering evidence (lexicographically smaller hash)
-    assert.ok(ev1V2.version_id.localeCompare(ev1V1.version_id) < 0, 'Cancelled version has smaller hash');
-    const ev1V2_versioned: GeoRecord = {
-      ...ev1V2,
-      rights_status: 'verified_open',
-      public_query_allowed: true,
-      source_updated_at: '2026-09-29T00:00:00Z',
-      source_version_ordinal: 2,
-    };
-    const batch2VersionedSuccess = toSuccess(admittedSource.source_id, `gcp-run-2-versioned-${id}`, fetchedAt2, {
-      sourceRecords: norm2.sourceRecords.map((r) => ({
-        ...r,
-        source_updated_at: '2026-09-29T00:00:00Z',
-        source_version_ordinal: 2,
-      })),
-      geoRecords: [ev1V2_versioned],
-      geoRecordSources: norm2.geoRecordSources,
-    });
-    const publishedBatch2 = await publisher.publish({
-      source: admittedSource,
-      result: batch2VersionedSuccess,
-      windowFrom: '2026-10-01T00:00:00Z',
-      windowTo: '2026-10-05T00:00:00Z',
-      initialCheckpoint: '2026-10-05T00:00:00Z',
-    });
-    assert.equal(publishedBatch2.state, 'published');
-
-    // 4. In BigQuery GoogleSQL views:
-    // v_geo_records_current must exclude cancelled record (even with smaller hash!)
-    const currentRowsCancelled = await query(
-      `SELECT geo_record_id FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_current\` WHERE geo_record_id = @id`,
-      { id: ev1V1.geo_record_id },
-    );
-    assert.equal(currentRowsCancelled.length, 0, 'Cancelled event must exit v_geo_records_current despite smaller hash');
-
-    // v_geo_records_history strictly retains both versions
+    const canceled = await publishSnapshot('canceled', collectedAt(9), [canceledEvent]);
+    const canceledRow = canceled.normalized.geoRecords[0];
+    assert.ok(canceledRow);
+    assert.equal((await currentRows(firstRow.geo_record_id)).length, 0);
     const historyRows = await query(
-      `SELECT version_id, record_status FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_history\` WHERE geo_record_id = @id ORDER BY version_id`,
-      { id: ev1V1.geo_record_id },
+      `SELECT version_id, record_status, source_updated_at, source_version_ordinal
+       FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_history\` WHERE geo_record_id = @id`,
+      { id: firstRow.geo_record_id },
     );
-    assert.equal(historyRows.length, 2, 'History retains all versions');
-
-    // v_change_timeline reflects cancelled time_state
-    const timelineRows = await query(
-      `SELECT version_id, time_state, record_status FROM \`${devProject}.${cloudConfig.queryDataset}.v_change_timeline\` WHERE geo_record_id = @id AND version_id = @v2`,
-      { id: ev1V1.geo_record_id, v2: ev1V2.version_id },
+    assert.equal(historyRows.length, 2, 'Unexpired restricted versions remain in history');
+    assert.ok(historyRows.every(row => row.source_updated_at === null && row.source_version_ordinal === null));
+    const timeline = await query(
+      `SELECT time_state FROM \`${devProject}.${cloudConfig.queryDataset}.v_change_timeline\`
+       WHERE geo_record_id = @id AND version_id = @version`,
+      { id: firstRow.geo_record_id, version: canceledRow.version_id },
     );
-    assert.equal(timelineRows.length, 1);
-    assert.equal(timelineRows[0]?.time_state, 'cancelled');
+    assert.equal(timeline[0]?.time_state, 'cancelled');
 
-    // 5. Late-arriving older version replayed in subsequent batch must NOT revive the record
-    const lateOlderSuccess = toSuccess(admittedSource.source_id, `gcp-run-late-replay-${id}`, '2026-09-30T00:00:00Z' as UtcTimestamp, {
-      sourceRecords: norm1.sourceRecords.map((r) => ({
-        ...r,
-        source_updated_at: '2026-09-28T00:00:00Z',
-        source_version_ordinal: 1,
-      })),
-      geoRecords: [ev1V1_versioned],
-      geoRecordSources: norm1.geoRecordSources,
-    });
-    await publisher.publish({
-      source: admittedSource,
-      result: lateOlderSuccess,
-      windowFrom: '2026-10-01T00:00:00Z',
-      windowTo: '2026-10-05T00:00:00Z',
-      initialCheckpoint: '2026-10-05T00:00:00Z',
-    });
+    const rescheduledEvent = { ...originalEvent, name: 'Fixture rescheduling', dates: {
+      ...originalEvent.dates, start: { dateTime: rescheduledDate, localDate: rescheduledDate.slice(0, 10) },
+      status: { code: 'rescheduled' },
+    } };
+    const rescheduled = await publishSnapshot('rescheduled', collectedAt(8), [rescheduledEvent]);
+    const rescheduledRow = rescheduled.normalized.geoRecords[0];
+    assert.ok(rescheduledRow);
+    assert.equal((await currentRows(firstRow.geo_record_id))[0]?.version_id, rescheduledRow.version_id);
 
-    const currentRowsAfterLate = await query(
-      `SELECT geo_record_id FROM \`${devProject}.${cloudConfig.queryDataset}.v_geo_records_current\` WHERE geo_record_id = @id`,
-      { id: ev1V1.geo_record_id },
-    );
-    assert.equal(currentRowsAfterLate.length, 0, 'Late arriving older version must NOT revive cancelled record');
+    await assert.rejects(publisher.publish({ source: admittedSource,
+      result: { ...rescheduled.result, runId: `gcp-incomplete-${id}`, sourceRevision: `incomplete-${id}`,
+        completeness: { ...rescheduled.result.completeness, expected_records: 2 } },
+      windowFrom: null, windowTo: null, initialCheckpoint: null,
+    }), /Connector window is incomplete/);
+    await publisher.recordConnectorFailure(admittedSource, {
+      kind: 'failure', sourceId: admittedSource.source_id, runId: `gcp-failed-${id}`,
+      checkedAt: collectedAt(7.5), code: 'incomplete_window', message: 'Fixed failure fixture',
+      retryAfterSeconds: null, sourceLatestUpdateAt: null,
+      completeness: { complete: false, expected_records: null, fetched_records: 0,
+        expected_pages: null, fetched_pages: 0, evidence: 'Fixed failure fixture' },
+    }, null, null);
+    assert.equal((await currentRows(firstRow.geo_record_id))[0]?.version_id, rescheduledRow.version_id,
+      'Failed and incomplete refreshes do not replace complete membership');
+
+    await publishSnapshot('empty', collectedAt(7), []);
+    assert.equal((await currentRows(firstRow.geo_record_id)).length, 0,
+      'An empty complete batch removes all current membership');
+    await publishSnapshot('late-older', collectedAt(9.5), [originalEvent]);
+    assert.equal((await currentRows(firstRow.geo_record_id)).length, 0,
+      'Older collected data published later cannot replace the newer empty snapshot');
+    await publishSnapshot('newest', collectedAt(6), [rescheduledEvent]);
+    assert.equal((await currentRows(firstRow.geo_record_id))[0]?.version_id, rescheduledRow.version_id);
+  } catch (error) {
+    // SDK response objects can contain authentication headers. Keep them out of test output.
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      const code = 'code' in error && typeof error.code === 'number' ? error.code : null;
+      throw new Error(`US4 GCP operation failed (${code ?? 'unknown'})`);
+    }
+    throw error;
   } finally {
-    await Promise.allSettled([
+    const cleanupResults = await Promise.allSettled([
       ...createdDatasets.map((name) => bq.dataset(name).delete({ force: true })),
       ...(createdBucket
         ? [
@@ -2847,5 +2552,7 @@ test('US4 Suite 7: GCP acceptance - real GoogleSQL view execution on BigQuery', 
           ]
         : []),
     ]);
+    assert.equal(cleanupResults.filter(result => result.status === 'rejected').length, 0,
+      `Isolated US4 resource cleanup failed for ${id}`);
   }
 });

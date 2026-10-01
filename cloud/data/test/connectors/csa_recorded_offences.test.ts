@@ -112,7 +112,7 @@ const defaultHeaders = [
   'Rate per 100,000 population',
 ] as const;
 
-test('SourceRegistry admission: registers victoria.csa.recorded_offences with review_required and candidate status', async () => {
+test('SourceRegistry admission: registers reviewed CSA statistics with a complete admission record', async () => {
   const connectorsDir = join(__dirname, '../../src/connectors');
   const registry = await loadSourceRegistry(connectorsDir);
 
@@ -124,12 +124,13 @@ test('SourceRegistry admission: registers victoria.csa.recorded_offences with re
   assert.equal(entry.dataSource.topic, 'crime_statistics');
   assert.equal(entry.dataSource.scope, 'victoria');
 
-  // Governance invariants: candidate and review_required until full human review & LGA code join
-  assert.equal(entry.dataSource.license_status, 'review_required');
-  assert.equal(entry.dataSource.access_status, 'candidate');
+  assert.equal(entry.dataSource.license_status, 'verified_open');
+  assert.equal(entry.dataSource.access_status, 'active');
   assert.equal(entry.dataSource.landing_url, LANDING_URL);
-  assert.ok(entry.dataSource.admission_evidence.missing_requirements.includes('quota_requests_per_day'));
-  assert.ok(entry.dataSource.admission_evidence.missing_requirements.includes('connector_owner'));
+  assert.deepEqual(entry.dataSource.admission_evidence.missing_requirements, []);
+  assert.equal(entry.dataSource.admission_evidence.quota_requests_per_day, 6);
+  assert.equal(entry.dataSource.admission_evidence.raw_retention_days, 0);
+  assert.equal(entry.dataSource.admission_evidence.staging_retention_days, 1);
 
   const loaded = await loadConnector(entry);
   assert.ok(isConnector(loaded), 'Loaded entry must conform to Connector interface');
@@ -207,6 +208,64 @@ test('selectCsaResource: correctly filters, sorts by period_end, and validates t
     () => selectCsaResource({ success: false }, 'latest'),
     (err: any) => err?.name === 'ZodError'
   );
+});
+
+test('CSA rejects a changed catalogue reuse grant before selecting a workbook', () => {
+  const resource = {
+    id: sampleResource.id, name: sampleResource.name, format: 'XLSX',
+    url: sampleResource.url, period_end: sampleResource.periodEnd,
+  };
+  assert.throws(() => selectCsaResource({
+    success: true, result: { license_id: 'closed', resources: [resource] },
+  }), /licence changed/);
+  assert.throws(() => selectCsaResource({
+    success: true,
+    result: { license_id: 'cc-by', license_url: 'https://example.org/changed', resources: [resource] },
+  }), /licence URL changed/);
+});
+
+test('CSA corrections use workbook revision time and never the statistical period as update time', async () => {
+  const catalog = { success: true, result: { resources: [{
+    id: sampleResource.id, name: sampleResource.name, format: 'XLSX',
+    url: sampleResource.url, period_end: sampleResource.periodEnd,
+  }] } };
+  const input = parseConnectorInput({
+    sourceId: SOURCE_ID, window: { kind: 'snapshot', revision: 'latest' },
+    checkpoint: null, runId: 'csa-correction-test',
+  });
+  const first = await new CsaRecordedOffencesConnector({
+    catalogJson: catalog,
+    rawWorkbookBytes: buildSyntheticCsaXlsx([defaultHeaders,
+      [2026, 'June', 'North West Metro', 'Melbourne', 100, 10]]),
+    workbookLastModified: 'Thu, 10 Sep 2026 09:05:22 GMT',
+  }).collect(input);
+  const corrected = await new CsaRecordedOffencesConnector({
+    catalogJson: catalog,
+    rawWorkbookBytes: buildSyntheticCsaXlsx([defaultHeaders,
+      [2026, 'June', 'North West Metro', 'Melbourne', 105, 10.5]]),
+    workbookLastModified: 'Fri, 11 Sep 2026 09:05:22 GMT',
+  }).collect(input);
+  assert.ok(first.kind === 'success' && corrected.kind === 'success');
+  const before = first.sourceRecords[0];
+  const after = corrected.sourceRecords[0];
+  assert.ok(before && after);
+  assert.equal(before.source_record_id, after.source_record_id);
+  assert.notEqual(before.version_id, after.version_id);
+  assert.equal(before.source_updated_at, '2026-09-10T09:05:22.000Z');
+  assert.equal(after.source_updated_at, '2026-09-11T09:05:22.000Z');
+  assert.equal(after.valid_to, '2026-07-01T00:00:00.000Z');
+  assert.equal(after.published_at, null);
+
+  for (const lastModified of [null, 'not a date', 'Fri, 01 Jan 2100 00:00:00 GMT']) {
+    const result = await new CsaRecordedOffencesConnector({
+      catalogJson: catalog,
+      rawWorkbookBytes: buildSyntheticCsaXlsx([defaultHeaders,
+        [2026, 'June', 'North West Metro', 'Melbourne', 100, 10]]),
+      workbookLastModified: lastModified,
+    }).collect(input);
+    assert.ok(result.kind === 'failure');
+    assert.equal(result.code, 'schema_changed');
+  }
 });
 
 test('Unit parsing invariants: monthEnding, numericValue, and parseRate', () => {
@@ -428,6 +487,7 @@ test('CsaRecordedOffencesConnector.collect: graceful failure when upstream catal
         ],
       },
     },
+    workbookLastModified: 'Thu, 10 Sep 2026 09:05:22 GMT',
     rawWorkbookBytes: new Uint8Array([0x00, 0x01, 0x02, 0x03]), // corrupted non-zip
   });
   const failResult2 = await connCorruptXlsx.collect(input);
@@ -461,6 +521,7 @@ test('CsaRecordedOffencesConnector.collect: successfully parses snapshot, genera
       },
     },
     rawWorkbookBytes: workbookBytes,
+    workbookLastModified: 'Thu, 10 Sep 2026 09:05:22 GMT',
   });
 
   const input = parseConnectorInput({
@@ -489,11 +550,13 @@ test('CsaRecordedOffencesConnector.collect: successfully parses snapshot, genera
     assert.equal(sr.batch_id, 'csa-success-test-run');
     assert.equal(sr.record_status, 'active');
     assert.equal(sr.assertion_kind, 'observation');
-    assert.equal(sr.rights_status, 'review_required');
+    assert.equal(sr.rights_status, 'verified_open');
     assert.equal(sr.valid_from, '2025-07-01T00:00:00.000Z');
     assert.equal(sr.valid_to, '2026-07-01T00:00:00.000Z');
-    assert.equal(sr.source_updated_at, '2026-06-30T00:00:00.000Z');
+    assert.equal(sr.source_updated_at, '2026-09-10T09:05:22.000Z');
+    assert.equal(sr.published_at, null);
     assert.ok(sr.time_missing_reason?.includes('rolling-year period'));
+    assert.ok(sr.time_missing_reason?.includes('release_date=2026-09-24'));
   }
 
   // Statistics payload invariants
@@ -540,6 +603,7 @@ test('GM-02 Delivery Standard: Unversioned LGA names retain boundary_mapping_sta
       },
     },
     rawWorkbookBytes: workbookBytes,
+    workbookLastModified: 'Thu, 10 Sep 2026 09:05:22 GMT',
   });
 
   const input = parseConnectorInput({

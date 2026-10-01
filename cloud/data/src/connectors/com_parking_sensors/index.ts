@@ -1,14 +1,18 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
-import { HttpFailure } from '../../core/http.js';
-import { OdsIncompleteWindow, OpenDataSoftClient } from '../../core/opendatasoft.js';
+import { HttpClient, HttpFailure } from '../../core/http.js';
+import { OdsIncompleteWindow, OpenDataSoftClient, type OdsRecords } from '../../core/opendatasoft.js';
+import { parseSourceManifest } from '../../core/registry.js';
 import type { GeoRecord, GeoRecordSource, ParkingObservation, SourceRecord } from '../../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
 export const SOURCE_ID = 'melbourne.parking.sensors';
 export const DATASET_ID = 'on-street-parking-bay-sensors';
 export const LANDING_URL = `https://data.melbourne.vic.gov.au/explore/dataset/${DATASET_ID}/`;
+export const API_BASE = `https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/${DATASET_ID}`;
+const countSchema = z.object({ total_count: z.number().int().nonnegative() });
 
 export const rowSchema = z.object({
   kerbsideid: z.union([
@@ -148,7 +152,31 @@ function failure(
 export class ParkingSensorsConnector implements Connector {
   readonly sourceId = SOURCE_ID;
 
-  constructor(private readonly client: OpenDataSoftClient = new OpenDataSoftClient()) {}
+  constructor(private readonly client: HttpClient | OpenDataSoftClient = new HttpClient()) {}
+
+  private async snapshot(): Promise<OdsRecords> {
+    if (this.client instanceof OpenDataSoftClient) {
+      return this.client.fetchRecords({
+        portalUrl: 'https://data.melbourne.vic.gov.au',
+        datasetId: DATASET_ID,
+        orderBy: 'kerbsideid ASC',
+      });
+    }
+    const count = await this.client.getJson({
+      url: `${API_BASE}/records?limit=0`, maxAttempts: 1, redirect: 'error',
+    });
+    const expectedCount = countSchema.parse(count.body).total_count;
+    const exported = await this.client.getJson({
+      url: `${API_BASE}/exports/json`, timeoutMs: 120_000,
+      maxAttempts: 1, redirect: 'error',
+    });
+    const records = z.array(z.unknown()).parse(exported.body);
+    if (records.length !== expectedCount) {
+      throw new OdsIncompleteWindow('complete JSON export differs from independent total_count', expectedCount);
+    }
+    return { records, totalCount: expectedCount, pageCount: 1,
+      fetchedAt: exported.fetchedAt, lastModified: exported.lastModified };
+  }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
     if (input.sourceId !== SOURCE_ID) {
@@ -156,11 +184,8 @@ export class ParkingSensorsConnector implements Connector {
     }
 
     try {
-      const response = await this.client.fetchRecords({
-        portalUrl: 'https://data.melbourne.vic.gov.au',
-        datasetId: DATASET_ID,
-        orderBy: 'kerbsideid ASC',
-      });
+      const declaration = parseSourceManifest(JSON.parse(await readFile(new URL('./source.json', import.meta.url), 'utf8')));
+      const response = await this.snapshot();
 
       const sourceRecords: SourceRecord[] = [];
       const parkingObservations: ParkingObservation[] = [];
@@ -193,11 +218,16 @@ export class ParkingSensorsConnector implements Connector {
           sourceId: SOURCE_ID,
           nativeId: sensorKey,
           originalUrl: LANDING_URL,
-          sourceTime: observedAt,
+          sourceTime: null,
         });
-        const versionId = sourceVersionId(updatedAt, row);
 
         const point = row.location ?? null;
+        const versionId = sourceVersionId(null, {
+          policy: 'parking-sensor-business-v1', sensor_id: sensorKey,
+          occupied, status_description: row.status_description ?? null,
+          observed_at: observedAt, marker_id: markerId, bay_id: bayId,
+          zone_number: row.zone_number ?? null, location: point,
+        });
         const geometry = point === null ? null : JSON.stringify({
           type: 'Point',
           coordinates: [point.lon, point.lat],
@@ -222,7 +252,7 @@ export class ParkingSensorsConnector implements Connector {
           source_version_ordinal: null,
           record_status: 'active',
           assertion_kind: 'observation',
-          rights_status: 'review_required',
+          rights_status: declaration.license_status,
         });
 
         if (observedAt !== null) {
@@ -251,7 +281,8 @@ export class ParkingSensorsConnector implements Connector {
           topic: 'parking',
           assertion_kind: 'observation',
           title: null,
-          summary: null,
+          summary: JSON.stringify({ status_description: row.status_description ?? null,
+            zone_number: row.zone_number ?? null }),
           original_url: LANDING_URL,
           geometry_geojson: geometry,
           centroid_lat: point?.lat ?? null,
@@ -267,8 +298,8 @@ export class ParkingSensorsConnector implements Connector {
           source_version_ordinal: null,
           freshness_state: 'unknown',
           record_status: 'active',
-          rights_status: 'review_required',
-          public_query_allowed: false,
+          rights_status: declaration.license_status,
+          public_query_allowed: declaration.license_status !== 'review_required',
         });
 
         geoRecordSources.push({
@@ -295,12 +326,14 @@ export class ParkingSensorsConnector implements Connector {
         checkpointAfter: input.window.kind === 'time' ? input.window.to : input.window.revision,
         completeness: {
           complete: true,
-          method: 'pagination',
+          method: this.client instanceof HttpClient ? 'export_count' : 'pagination',
           expected_records: response.totalCount,
           fetched_records: response.records.length,
           expected_pages: response.pageCount,
           fetched_pages: response.pageCount,
-          evidence: 'Every page matched the stable kerbsideid-ordered total_count',
+          evidence: this.client instanceof HttpClient
+            ? 'Complete JSON export matched independent total_count; unique kerbsideid validated'
+            : 'Every page matched the stable kerbsideid-ordered total_count',
         },
         inputCount: response.records.length,
         outputCount: sourceRecords.length,

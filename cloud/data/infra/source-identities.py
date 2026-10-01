@@ -24,11 +24,18 @@ REGION = "australia-southeast2"
 INGEST = "melens_ingest"
 PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]\Z")
 BUCKET = re.compile(r"[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]\Z")
-SOURCES = frozenset({
+DEFAULT_SOURCES = frozenset({
     "melbourne.municipal_boundary", "melbourne.clue.blocks",
     "abs.asgs.boundaries", "melbourne.development_monitor",
     "homes_victoria.rents", "abs.census",
 })
+SOURCES = DEFAULT_SOURCES | frozenset({
+    "melbourne.parking.bays", "melbourne.parking.sensors",
+    "melbourne.parking.restrictions", "gdelt.news",
+    "victoria.csa.recorded_offences", "ticketmaster.events",
+})
+SOURCE_SECRETS = {"ticketmaster.events": ["ticketmaster_discovery_api_key"]}
+QUERY_READ_SOURCES = frozenset({"gdelt.news", "melbourne.parking.sensors"})
 OBJECT_ROLE = "melensSourceObjects"
 BUCKET_ROLE = "melensSourceBucketMetadata"
 PERMISSIONS = {
@@ -89,13 +96,13 @@ def plan(project: str, environment: str, bucket: str,
             raise ValueError(f"Duplicate source manifest: {source}")
         manifests[source] = manifest
     sources = []
-    for source in sorted(selected or SOURCES):
+    for source in sorted(selected or DEFAULT_SOURCES):
         manifest = manifests.get(source, {})
         evidence = manifest.get("admission_evidence") or {}
         if (manifest.get("access_status") != "active"
-                or manifest.get("license_status") != "verified_open"
-                or evidence.get("secret_names", []) != []):
-            raise ValueError(f"Source admission or empty secret allowlist drift: {source}")
+                or manifest.get("license_status") != ("restricted" if source == "ticketmaster.events" else "verified_open")
+                or evidence.get("secret_names", []) != SOURCE_SECRETS.get(source, [])):
+            raise ValueError(f"Source admission or secret allowlist drift: {source}")
         identity = account_id(source, environment)
         sources.append({
             "source_id": source,
@@ -103,7 +110,7 @@ def plan(project: str, environment: str, bucket: str,
             "service_account_email": f"{identity}@{project}.iam.gserviceaccount.com",
             "object_condition": object_condition(source, bucket),
             "condition_title": identity + "-objects",
-            "secret_names": [],
+            "secret_names": SOURCE_SECRETS.get(source, []),
             "job_name": f"melens-{environment}-{source.replace('.', '-').replace('_', '-')}",
             "dedicated_identity_permissions_verified": False,
         })
@@ -231,14 +238,30 @@ def audit(planned: dict, actual: dict, require_complete: bool) -> None:
         for name, dataset in actual["datasets"].items():
             entries = [entry for entry in dataset.get("access", [])
                        if entry.get("userByEmail") == email or entry.get("iamMember") == member]
-            if entries and (name != INGEST or len(entries) != 1
-                            or entries[0].get("role") not in {"WRITER", "roles/bigquery.dataEditor"}
+            allowed_roles = ({"WRITER", "roles/bigquery.dataEditor"} if name == INGEST
+                             else {"READER", "roles/bigquery.dataViewer"}
+                             if name == "melens_query" and source["source_id"] in QUERY_READ_SOURCES else set())
+            if entries and (not allowed_roles or len(entries) != 1
+                            or entries[0].get("role") not in allowed_roles
                             or entries[0].get("condition")):
                 raise ValueError(f"Unexpected dataset grant: {source['source_id']}/{name}")
             if require_complete and name == INGEST and len(entries) != 1:
                 raise ValueError(f"Ingestion dataset writer grant missing: {source['source_id']}")
-        if any(member_bindings(policy, member) for policy in actual["secrets"].values()):
-            raise ValueError(f"Unexpected Secret Manager grant: {source['source_id']}")
+            if require_complete and name == "melens_query" and source["source_id"] in QUERY_READ_SOURCES and len(entries) != 1:
+                raise ValueError(f"Query dataset reader grant missing: {source['source_id']}")
+        expected_secrets = set(source["secret_names"])
+        actual_secret_names = {name.rsplit("/", 1)[-1] for name in actual["secrets"]}
+        for name, policy in actual["secrets"].items():
+            grants = member_bindings(policy, member)
+            secret_id = name.rsplit("/", 1)[-1]
+            if grants and (secret_id not in expected_secrets or len(grants) != 1
+                           or grants[0].get("role") != "roles/secretmanager.secretAccessor"
+                           or grants[0].get("condition")):
+                raise ValueError(f"Unexpected Secret Manager grant: {source['source_id']}")
+            if require_complete and secret_id in expected_secrets and len(grants) != 1:
+                raise ValueError(f"Secret accessor grant missing: {source['source_id']}")
+        if expected_secrets - actual_secret_names:
+            raise ValueError(f"Required secret is missing: {source['source_id']}")
 
 
 def verify_roles(run: Runner, project: str, require_complete: bool) -> None:
@@ -257,14 +280,14 @@ def verify_roles(run: Runner, project: str, require_complete: bool) -> None:
             raise ValueError(f"Custom role permission drift: {name}")
 
 
-def authorize_dataset(dataset: dict, sources: list[dict]) -> dict:
+def authorize_dataset(dataset: dict, sources: list[dict], role: str = "WRITER") -> dict:
     access = dataset.get("access")
     if not isinstance(access, list):
         raise ValueError("Dataset access list is unavailable")
     selected = {source["service_account_email"] for source in sources}
     retained = [entry for entry in access if entry.get("userByEmail") not in selected
                 and entry.get("iamMember") not in {f"serviceAccount:{email}" for email in selected}]
-    retained.extend({"role": "WRITER", "userByEmail": email} for email in sorted(selected))
+    retained.extend({"role": role, "userByEmail": email} for email in sorted(selected))
     return {**dataset, "access": retained}
 
 
@@ -288,6 +311,9 @@ def provision(run: Runner, planned: dict) -> dict:
                   f"--project={project}", f"--display-name=Melens {source['source_id']}")
         cloud(run, "projects", "add-iam-policy-binding", project,
               f"--member={member}", "--role=roles/bigquery.jobUser", "--condition=None")
+        for secret in source["secret_names"]:
+            cloud(run, "secrets", "add-iam-policy-binding", secret, f"--project={project}",
+                  f"--member={member}", "--role=roles/secretmanager.secretAccessor", "--condition=None")
         for role, title, expression in (
                 (OBJECT_ROLE, source["condition_title"], source["object_condition"]),
                 (BUCKET_ROLE, "melens-source-bucket-metadata", planned["bucket_condition"])):
@@ -300,6 +326,13 @@ def provision(run: Runner, planned: dict) -> dict:
         json.dump(updated, source)
         source.flush()
         run("bq", f"--project_id={project}", "--format=prettyjson", "update", f"--source={source.name}", f"{project}:{INGEST}")
+    readers = [source for source in planned["sources"] if source["source_id"] in QUERY_READ_SOURCES]
+    if readers:
+        updated_query = authorize_dataset(read_dataset(run, project, "melens_query"), readers, "READER")
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as config_file:
+            json.dump(updated_query, config_file)
+            config_file.flush()
+            run("bq", f"--project_id={project}", "--format=prettyjson", "update", f"--source={config_file.name}", f"{project}:melens_query")
     return verify(run, planned)
 
 

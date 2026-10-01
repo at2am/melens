@@ -59,8 +59,9 @@ The script explicitly enables Cloud Run, Cloud Scheduler, Cloud Storage, BigQuer
 
 Use `source-identities.py` to provision and read back a dedicated identity before
 setting that source's `service_account_email`, verified flag and `enabled` flag.
-The current identity installer accepts the six admitted public sources; secret
-sources need their own reviewed per-secret provisioning extension. The shared
+The identity installer accepts twelve admitted datasets, including the three parking
+datasets, GDELT, CSA and Ticketmaster. Ticketmaster receives access only to its
+reviewed Secret Manager secret; deployments pin enabled version 1. The shared
 warehouse grants ingestion writers access to all ingestion rows, while bucket
 objects are restricted to each source's paths. See [identity verification](../docs/validation/source-runtime-identities.md).
 
@@ -183,3 +184,15 @@ python3 cloud/data/infra/budget-action.py --project melens-510012 \
 ```
 
 The setup includes only non-P0 Scheduler jobs that already exist. Run it again after each source deployment and compare the printed allowlist count with the deployed non-P0 schedules. Keep `budget_action_verified=false` until the authenticated push, actual pause, duplicate delivery, cleanup and ordinary Billing notification checks pass. Budget notifications can arrive hours late and do not cap project spending. [Google documents the notification format and delivery limits](https://docs.cloud.google.com/billing/docs/how-to/budgets-programmatic-notifications).
+
+## Four-category development release (2026-10-01)
+
+Parking, general news, local crime news with separate CSA statistics, and
+Ticketmaster events have real published BigQuery batches. The warehouse contains
+13 ingestion tables and 25 authorized query views, with 13 direct-raw view grants.
+Use the [release evidence](../docs/validation/four-category-release-2026-10-01.md)
+and [readback SQL](../docs/validation/four-category-readback.sql) for current
+counts, job images, scheduling, retention and limitations. GDELT crime and
+general news count as one independent source. The total admitted source count
+is twelve. The original feature's full parking, P0 and continuous-observation
+acceptance remains open.

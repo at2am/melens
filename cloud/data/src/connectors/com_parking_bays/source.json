@@ -7,14 +7,16 @@
   "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bays/exports/json",
   "topic": "parking",
   "scope": "city",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": [
+    "com_municipal:1:2008-07-01"
+  ],
+  "coverage_from": "2026-10-01T11:02:18.698Z",
   "coverage_to": null,
   "cadence_seconds": null,
   "check_interval_seconds": 86400,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "verified_open",
+  "access_status": "active",
   "record_granularity": "roadsegment_point_export_row",
   "connector_owner": "melens integration",
   "admission_evidence": {
@@ -22,9 +24,30 @@
     "native_record_key": "roadsegmentid + optional kerbsideid (string) + coordinate",
     "completeness_rule": "Full JSON export count equals independent records total_count; conflicting duplicate native IDs fail",
     "secret_names": [],
-    "allowed_fields": ["roadsegmentid", "kerbsideid", "roadsegmentdescription", "latitude", "longitude", "lastupdated", "location"],
+    "allowed_fields": [
+      "roadsegmentid",
+      "kerbsideid",
+      "roadsegmentdescription",
+      "latitude",
+      "longitude",
+      "lastupdated",
+      "location"
+    ],
     "staging_retention_days": 1,
-    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays/"
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/on-street-parking-bays",
+    "quota_requests_per_day": 10000,
+    "raw_retention_days": 0,
+    "reviewed_at": "2026-10-01T11:05:00Z"
   },
-  "join_warning": "Current export contains points rather than bay polygons. Kerbside IDs are strings; normalize to decimal text before matching numeric sensor IDs. Restrictions have no complete crosswalk, so public_access and may_park_now remain unknown."
+  "join_warning": "Current official export contains surveyed point geometry, not bay polygons. Missing marker_id stays null. A kerbsideid match alone is not a reviewed crosswalk. Unknown public_access and rule validity keep may_park_now unknown.",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "admission_notes": "CC BY 4.0 verified from official dataset metadata. Credit City of Melbourne, link dataset and license, and identify Melens field/geometry conversion. Observed anonymous X-RateLimit-Limit is 10000 with UTC next-day reset; shared portal/IP budget is not a dedicated allowance. Admitted for source-specific cloud publication with reviewed retention and request guards; independent occupancy does not establish legal permission.",
+  "coverage_notes": "coverage_from records the first verified present-day snapshot in this admission wave, not historic completeness or a per-row effective date. Data covers City of Melbourne survey/sensors with publisher caveats; no assertion of complete mapped bays or live rule coverage.",
+  "operational_request_recommendation": {
+    "requests_per_execution": 2,
+    "requests_per_day": 20,
+    "schedule": "10 2 * * *",
+    "retry_attempts": 1
+  },
+  "source_quality_notes": "Static survey with unmapped bays and potentially removed bays still listed; location does not establish current accessibility."
 }

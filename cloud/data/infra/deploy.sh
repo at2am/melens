@@ -293,9 +293,11 @@ while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes
     IFS=',' read -r -a names <<<"$secrets"
     for name in "${names[@]}"; do
       gcloud secrets describe "$name" --project="$project" >/dev/null
+      secret_state="$(gcloud secrets versions describe 1 --secret="$name" --project="$project" --format='value(state)')"
+      [[ "$secret_state" == ENABLED ]] || { echo 'Pinned secret version 1 is not enabled' >&2; exit 2; }
       case "$name" in
-        transport_victoria_key_id) refs+=("TRANSPORT_VICTORIA_KEY_ID=${name}:latest") ;;
-        ticketmaster_discovery_api_key) refs+=("TICKETMASTER_DISCOVERY_API_KEY=${name}:latest") ;;
+        transport_victoria_key_id) refs+=("TRANSPORT_VICTORIA_KEY_ID=${name}:1") ;;
+        ticketmaster_discovery_api_key) refs+=("TICKETMASTER_DISCOVERY_API_KEY=${name}:1") ;;
         *) echo 'Secret lacks an approved environment mapping' >&2; exit 2 ;;
       esac
     done

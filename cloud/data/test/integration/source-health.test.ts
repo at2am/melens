@@ -567,6 +567,10 @@ class FakeBigQuery {
     }
 
     if (sql.includes('INSERT INTO') && sql.includes('data_sources')) {
+      if (typeof params.payload === 'string') {
+        this.sourceRows.push(z.record(z.string(), z.unknown()).parse(JSON.parse(params.payload)));
+        return [[]];
+      }
       const sourceId = params.sourceId ?? params.source_id;
       if (sourceId) {
         this.sourceRows.push({

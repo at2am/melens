@@ -220,6 +220,35 @@ export class GcsStore {
   }
 
   /** Remove retained copies after a source's reuse permission is withdrawn. */
+  async cleanupSourceExpired(id: string, now: Date, maxObjects: number,
+    maximumAgeSeconds: number): Promise<number> {
+    const canonicalId = sourceId.parse(id);
+    if (!Number.isFinite(now.getTime()) || !Number.isInteger(maxObjects)
+      || maxObjects < 1 || maxObjects > 10_000 || maximumAgeSeconds <= 0) {
+      throw new Error('Invalid source cleanup bounds');
+    }
+    let deleted = 0;
+    for (const kind of ['raw', 'staging'] as const) {
+      const [files] = await this.bucket.getFiles({ prefix: `${kind}/${canonicalId}/`,
+        maxResults: maxObjects + 1 });
+      for (const file of files.slice(0, maxObjects)) {
+        const [metadata] = await file.getMetadata();
+        const created = Date.parse(String(metadata.timeCreated ?? ''));
+        const expiry = Date.parse(String(metadata.metadata?.expiresAt ?? ''));
+        const ageLimit = Number.isFinite(created) ? created + maximumAgeSeconds * 1000 : NaN;
+        const deadline = Number.isFinite(expiry)
+          ? Number.isFinite(ageLimit) ? Math.min(expiry, ageLimit) : expiry : ageLimit;
+        if (!Number.isFinite(deadline) || deadline > now.getTime() || !metadata.generation) continue;
+        await this.bucket.file(file.name, { generation: String(metadata.generation) })
+          .delete({ ignoreNotFound: true });
+        deleted += 1;
+      }
+      if (files.length > maxObjects) throw new Error('Source retention scan is incomplete');
+    }
+    return deleted;
+  }
+
+  /** Remove retained copies after a source's reuse permission is withdrawn. */
   async purgeSourceCopies(id: string): Promise<number> {
     const canonicalId = sourceId.parse(id);
     let deleted = 0;
