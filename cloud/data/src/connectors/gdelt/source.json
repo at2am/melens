@@ -20,14 +20,15 @@
   "allowed_fields": null,
   "raw_retention_days": null,
   "staging_retention_days": null,
-  "license_evidence_url": null,
-  "reviewed_at": null,
+  "license_evidence_url": "https://www.gdeltproject.org/about.html#termsofuse",
+  "license_url": "https://www.gdeltproject.org/about.html#termsofuse",
   "license_status": "review_required",
   "access_status": "candidate",
   "admission_evidence": {
     "dataset_url": "https://data.gdeltproject.org/gdeltv2/lastupdate.txt",
     "native_record_key": "GKGRECORDID",
     "completeness_rule": "One GKG ZIP per aligned 15-minute interval; all requested files required",
+    "license_evidence_url": "https://www.gdeltproject.org/about.html#termsofuse",
     "secret_names": [],
     "missing_requirements": ["reuse and raw-retention rights", "request quota", "connector owner", "license review date"]
   },

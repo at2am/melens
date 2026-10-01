@@ -90,6 +90,17 @@ function coordsDiffer(lon1: number, lat1: number, lon2: number, lat2: number): b
   return Math.abs(lon1 - lon2) > 1e-5 || Math.abs(lat1 - lat2) > 1e-5;
 }
 
+export function isRelocationIndicated(note?: string | null, description?: string | null): boolean {
+  const text = `${note ?? ''} ${description ?? ''}`.toLowerCase();
+  if (!text.trim()) return false;
+  // If the note only indicates that traffic was handed off to another sensor ID (e.g. "relocated to sensor ID 25"),
+  // and does not describe physical relocation of this sensor to a new site/address or returning, do not treat as relocation.
+  if (/\brelocated\s+to\s+sensor\s*(id)?\s*\d+/i.test(text) && !/\b(move(d)?\s+(to|from)|relocat(ed|ion)?\s+(to\s+(?!sensor\b)|from|due|on)|returned\s+to)\b/i.test(text)) {
+    return false;
+  }
+  return /\b(relocat(ed|ion)?|move(d)?\s+(to|from)|move\s+(to|from)|former\s+sensor|returned\s+to|re-install(ed)?)\b/i.test(text);
+}
+
 export const CANONICAL_INSTALLATION_COORDINATES: Readonly<Record<string, readonly [number, number]>> = {
   '3': [144.96429485, -37.81101524],
   '14': [144.96291897, -37.82011242],
@@ -97,6 +108,9 @@ export const CANONICAL_INSTALLATION_COORDINATES: Readonly<Record<string, readonl
   '10': [144.9600, -37.8100],
   '25': [144.9660, -37.8190],
   '42': [144.9620, -37.8050],
+  '37': [144.96650, -37.80480], // 174 Lygon St (original site)
+  '47': [144.96282, -37.81216], // 266 Elizabeth St / St Francis Church (original site)
+  '181': [144.9610, -37.8085], // 380 Elizabeth St (original site)
 };
 
 export interface PedestrianLocationsConnectorOptions {
@@ -271,10 +285,17 @@ export class PedestrianLocationsConnector implements Connector {
 
         // Check if coordinates differ from known initial installation coordinates on cold start
         const canonicalCoords = this.baselineCoordinates.get(sensorId) ?? CANONICAL_INSTALLATION_COORDINATES[sensorId];
-        const isColdStartRelocated = previousLocation === undefined
-          && canonicalCoords !== undefined
-          && hasPoint
+        const hasBaselineEvidence = canonicalCoords !== undefined && hasPoint;
+        const canonicalDiffers = hasBaselineEvidence
           && coordsDiffer(canonicalCoords[0], canonicalCoords[1], lon, lat);
+        const relocationDeclared = isRelocationIndicated(row.note, row.sensor_description);
+
+        // A sensor has relocated coordinates on cold start if:
+        // 1. Its coordinates differ from known initial installation coordinates (canonicalDiffers), OR
+        // 2. Its note/description explicitly indicates it was moved/relocated
+        //    (even if current coordinates match original baseline, e.g. returning to original site after moving).
+        const isColdStartRelocated = previousLocation === undefined
+          && (relocationDeclared || canonicalDiffers);
 
         // Effective dates:
         // Distinguish device installation date from coordinate valid interval.
@@ -302,14 +323,9 @@ export class PedestrianLocationsConnector implements Connector {
           timeMissingReason = 'Relocation detected on cold start without official migration date; valid_from reflects earliest observed snapshot timestamp, not official relocation time or device installation date';
         } else if (previousLocation) {
           validFrom = previousLocation.valid_from;
-        } else if (row.installation_date) {
-          const t = Date.parse(`${row.installation_date}T00:00:00.000Z`);
-          if (!Number.isFinite(t)) {
-            return failure(input, 'validation_failed', `Sensor ${row.location_id} has invalid installation_date: ${row.installation_date}`);
-          }
-          validFrom = new Date(t).toISOString();
         } else {
           validFrom = response.fetchedAt;
+          timeMissingReason = 'Current coordinates first observed in this snapshot; installation date and matching baseline coordinates do not establish the historical coordinate interval';
         }
 
         let validTo: string | null = null;

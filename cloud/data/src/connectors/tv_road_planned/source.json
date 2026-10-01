@@ -22,11 +22,18 @@
     "native_record_key": "properties.id with geometry ordinal",
     "completeness_rule": "All numbered pages must agree on totals, or a token chain must end with hasMoreRecords=false; event IDs must be unique",
     "quota_requests_per_day": 14400,
-    "secret_names": ["transport_victoria_key_id"],
-    "allowed_fields": ["geometry", "properties", "meta", "nextPageDetails"],
+    "secret_names": [
+      "transport_victoria_key_id"
+    ],
+    "allowed_fields": [
+      "geometry",
+      "properties",
+      "meta",
+      "nextPageDetails"
+    ],
     "raw_retention_days": 0,
     "staging_retention_days": 1,
     "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road"
   },
-  "notes": "Public page states CC BY 4.0, KeyID, 20 calls/minute, page/limit pagination, 30-minute refresh. The linked older OpenAPI describes NextPageToken and 10 calls/minute, so the connector accepts both documented page shapes and conservatively spaces requests by 6.1 seconds. Admission awaits live KeyID validation and operator review. Victorian local timestamps are converted to UTC; ambiguous daylight-saving times fail closed. Duration may contain recurring impact windows, retained in summary JSON; valid_from/valid_to describe the overall plan period, not continuous closure."
+  "notes": "Public page states CC BY 4.0, KeyID, 20 calls/minute, page/limit pagination, 30-minute refresh. The linked older OpenAPI describes NextPageToken and 10 calls/minute, so the connector accepts both documented page shapes and conservatively spaces requests by 6.1 seconds. Cloud private probe on 2026-10-01 read 19 token pages with 9,452 events and 0 rejects, but observed 100% offsetless lastUpdated strings. Official OpenAPI declares lastUpdated as generic string without timezone rule and technical PDF returned HTTP 409. The connector converts only explicitly offset timestamps to UTC; offsetless clocks remain null; absence of future timestamps does not prove this convention versus UTC, remaining an operational risk and admission barrier. Admission strictly awaits live KeyID approval, timezone rule confirmation from Transport Victoria, and operator review. Duration may contain recurring impact windows, retained in summary JSON; valid_from/valid_to describe the overall plan period, not continuous closure. Integration review 2026-10-01: offsetless timestamps remain unverified; absolute valid times/source_updated_at are null until Transport Victoria confirms the timezone rule. Original wall clocks remain in summary content. Snapshot revisions hash complete canonical content and do not prove ordering or freshness."
 }

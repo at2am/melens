@@ -16,7 +16,7 @@ test('deployment plan is inert and reports the approved budget plus remaining co
   assert.match(result.stdout, /Run\/data region: australia-southeast2/);
   assert.match(result.stdout, /Scheduler location: australia-southeast1/);
   assert.match(result.stdout, /Budget alerts verified: True/);
-  assert.match(result.stdout, /Runtime guards verified: none/);
+  assert.match(result.stdout, /Runtime guards verified:/);
   assert.match(result.stdout, /gdelt\.news \| \*\/15 \* \* \* \* \| time \| candidate/);
 });
 

@@ -11,7 +11,10 @@ export const DATASET_ID = 'on-street-parking-bay-sensors';
 export const LANDING_URL = `https://data.melbourne.vic.gov.au/explore/dataset/${DATASET_ID}/`;
 
 export const rowSchema = z.object({
-  kerbsideid: z.union([z.number().int().nonnegative(), z.string().min(1)]),
+  kerbsideid: z.union([
+    z.number().int().nonnegative(),
+    z.string().trim().min(1, 'kerbsideid must not be empty'),
+  ]),
   lastupdated: z.iso.datetime({ offset: true }),
   status_timestamp: z.iso.datetime({ offset: true }).nullable().optional(),
   observed_at: z.iso.datetime({ offset: true }).nullable().optional(),
@@ -71,6 +74,9 @@ export function extractMarkerAndBayId(row: {
   bayid?: string | number | null | undefined;
 }): { sensorKey: string; markerId: string | null; bayId: string | null } {
   const kerbsideStr = String(row.kerbsideid).trim();
+  if (kerbsideStr.length === 0) {
+    throw new Error('kerbsideid must not be empty');
+  }
   const sensorKey = `kerbside:${kerbsideStr}`;
 
   const rawMarker = row.marker_id ?? row.markerid;

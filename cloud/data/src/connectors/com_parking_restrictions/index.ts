@@ -208,6 +208,18 @@ export function rulesOverlap(a: ParkingRule, b: ParkingRule): boolean {
   return a.start_minute_of_day < b.end_minute_of_day && b.start_minute_of_day < a.end_minute_of_day;
 }
 
+export function findRuleConflicts(rules: readonly ParkingRule[]): Array<[ParkingRule, ParkingRule]> {
+  const conflicts: Array<[ParkingRule, ParkingRule]> = [];
+  for (let i = 0; i < rules.length; i += 1) {
+    for (let j = i + 1; j < rules.length; j += 1) {
+      if (rulesOverlap(rules[i]!, rules[j]!)) {
+        conflicts.push([rules[i]!, rules[j]!]);
+      }
+    }
+  }
+  return conflicts;
+}
+
 function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavailable' | 'schema_changed'
   | 'auth_failed' | 'incomplete_window' | 'validation_failed'): ConnectorResult {
   return {
@@ -232,18 +244,29 @@ function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavail
 
 export interface ParkingRestrictionsConnectorOptions {
   client?: OpenDataSoftClient;
+  fetchMetadataRevision?: boolean;
 }
 
 export class ParkingRestrictionsConnector implements Connector {
   readonly sourceId = SOURCE_ID;
   private readonly client: OpenDataSoftClient;
+  private readonly autoFetchMetadata: boolean;
 
   constructor(options?: ParkingRestrictionsConnectorOptions | OpenDataSoftClient) {
     if (options instanceof OpenDataSoftClient) {
       this.client = options;
+      this.autoFetchMetadata = false;
     } else {
       this.client = options?.client ?? new OpenDataSoftClient();
+      this.autoFetchMetadata = options?.fetchMetadataRevision ?? false;
     }
+  }
+
+  async fetchMetadataRevision(): Promise<string> {
+    return this.client.fetchDatasetDataProcessed({
+      portalUrl: 'https://data.melbourne.vic.gov.au',
+      datasetId: DATASET_ID,
+    });
   }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
@@ -254,8 +277,15 @@ export class ParkingRestrictionsConnector implements Connector {
         datasetId: DATASET_ID,
         orderBy: 'bayid ASC',
       });
-      const sourceUpdatedAt = response.lastModified === null ? null
+      let sourceUpdatedAt = response.lastModified === null ? null
         : new Date(response.lastModified).toISOString();
+      if (sourceUpdatedAt === null && this.autoFetchMetadata) {
+        try {
+          sourceUpdatedAt = await this.fetchMetadataRevision();
+        } catch {
+          // If metadata endpoint is unavailable, retain null
+        }
+      }
       const sourceRecords: SourceRecord[] = [];
       const parkingRules: ParkingRule[] = [];
       const geoRecords: GeoRecord[] = [];

@@ -567,3 +567,214 @@ test('T027: Helper functions unit tests', () => {
   assert.throws(() => parseBayRow({ roadsegmentid: -1 }));
   assert.throws(() => parseBayRow({ roadsegmentid: 'abc', latitude: 100 }));
 });
+
+test('T035: GM-04 official duplicate kerbsideid across segments does not collide and preserves distinct bays', async () => {
+  // Replicates real upstream evidence: kerbsideid "17212" appearing at two distinct locations:
+  // 1) roadsegment 20472 (Berkeley St, Carlton), lat: -37.8038058, lon: 144.9594192
+  // 2) roadsegment 22630 (Wellington Parade South, East Melbourne), lat: -37.8160071, lon: 144.9753201
+  const rows = [
+    {
+      roadsegmentid: 20472,
+      kerbsideid: '17212',
+      roadsegmentdescription: 'Berkeley Street between Queensberry Street and Pelham Street',
+      latitude: -37.8038058,
+      longitude: 144.9594192,
+      lastupdated: '2025-09-03',
+      location: { lon: 144.9594192, lat: -37.8038058 },
+    },
+    {
+      roadsegmentid: 22630,
+      kerbsideid: '17212',
+      roadsegmentdescription: 'Wellington Parade South between Wellington Crescent and Flinders Street',
+      latitude: -37.8160071,
+      longitude: 144.9753201,
+      lastupdated: '2025-06-03',
+      location: { lon: 144.9753201, lat: -37.8160071 },
+    },
+  ];
+
+  class DuplicateKerbsideClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = String(request.url);
+      if (url.includes('/records?limit=0')) {
+        return {
+          body: { total_count: 2 } as T,
+          status: 200,
+          fetchedAt: '2026-09-30T12:00:00.000Z',
+          etag: null,
+          lastModified: null,
+          contentType: 'application/json',
+        };
+      }
+      return {
+        body: rows as T,
+        status: 200,
+        fetchedAt: '2026-09-30T12:00:00.000Z',
+        etag: null,
+        lastModified: null,
+        contentType: 'application/json',
+      };
+    }
+  }
+
+  const conn = new ParkingBaysConnector(new DuplicateKerbsideClient());
+  const res = await conn.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: '2026-09-30' },
+    checkpoint: null,
+    runId: 'duplicate_kerbside_test',
+  }));
+
+  assert.equal(res.kind, 'success');
+  if (res.kind !== 'success') return;
+
+  assert.equal(res.inputCount, 2);
+  assert.equal(res.outputCount, 2);
+  assert.equal(res.sourceRecords.length, 2);
+  assert.equal(res.parkingBays.length, 2);
+
+  const bay1 = res.parkingBays.find(b => b.bay_id.includes(':20472:17212:'));
+  const bay2 = res.parkingBays.find(b => b.bay_id.includes(':22630:17212:'));
+  assert.ok(bay1, 'Bay on roadsegment 20472 must exist');
+  assert.ok(bay2, 'Bay on roadsegment 22630 must exist');
+  assert.notEqual(bay1.bay_id, bay2.bay_id);
+  assert.equal(bay1.marker_id, null);
+  assert.equal(bay2.marker_id, null);
+
+  const geom1 = parseGeometryGeojson(bay1.geometry_geojson!);
+  const geom2 = parseGeometryGeojson(bay2.geometry_geojson!);
+  assert.equal(geom1.type, 'Point');
+  assert.equal(geom2.type, 'Point');
+  assert.deepEqual(geom1.coordinates, [144.9594192, -37.8038058]);
+  assert.deepEqual(geom2.coordinates, [144.9753201, -37.8160071]);
+});
+
+test('T035: GM-04 dominant null kerbsideid on same roadsegment preserves distinct bays with Point geometry and no polygons', async () => {
+  // Replicates real upstream evidence: roadsegment 20928 (O'Connell St) has multiple bays with kerbsideid: null
+  const rows = [
+    {
+      roadsegmentid: 20928,
+      kerbsideid: null,
+      roadsegmentdescription: "O'Connell Street between Victoria Street and Queensberry Street",
+      latitude: -37.8051304,
+      longitude: 144.958068,
+      lastupdated: '2025-06-03',
+      location: { lon: 144.958068, lat: -37.8051304 },
+    },
+    {
+      roadsegmentid: 20928,
+      kerbsideid: null,
+      roadsegmentdescription: "O'Connell Street between Victoria Street and Queensberry Street",
+      latitude: -37.805151,
+      longitude: 144.9580778,
+      lastupdated: '2025-06-03',
+      location: { lon: 144.9580778, lat: -37.805151 },
+    },
+  ];
+
+  class NullKerbsideClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = String(request.url);
+      if (url.includes('/records?limit=0')) {
+        return {
+          body: { total_count: 2 } as T,
+          status: 200,
+          fetchedAt: '2026-09-30T12:00:00.000Z',
+          etag: null,
+          lastModified: null,
+          contentType: 'application/json',
+        };
+      }
+      return {
+        body: rows as T,
+        status: 200,
+        fetchedAt: '2026-09-30T12:00:00.000Z',
+        etag: null,
+        lastModified: null,
+        contentType: 'application/json',
+      };
+    }
+  }
+
+  const conn = new ParkingBaysConnector(new NullKerbsideClient());
+  const res = await conn.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: '2026-09-30' },
+    checkpoint: null,
+    runId: 'null_kerbside_test',
+  }));
+
+  assert.equal(res.kind, 'success');
+  if (res.kind !== 'success') return;
+
+  assert.equal(res.parkingBays.length, 2);
+  const [bayA, bayB] = res.parkingBays;
+  assert.ok(bayA);
+  assert.ok(bayB);
+  assert.notEqual(bayA.bay_id, bayB.bay_id);
+
+  // Both must be Point geometry, never Polygon
+  const geomA = parseGeometryGeojson(bayA.geometry_geojson!);
+  const geomB = parseGeometryGeojson(bayB.geometry_geojson!);
+  assert.equal(geomA.type, 'Point');
+  assert.equal(geomB.type, 'Point');
+  assert.notEqual(geomA.type, 'Polygon');
+  assert.notEqual(geomB.type, 'Polygon');
+  assert.deepEqual(geomA.coordinates, [144.958068, -37.8051304]);
+  assert.deepEqual(geomB.coordinates, [144.9580778, -37.805151]);
+});
+
+test('T035: GM-04 coordinates extracted from location object fallback when top-level latitude/longitude omitted', async () => {
+  const rows = [
+    {
+      roadsegmentid: 30001,
+      kerbsideid: '99999',
+      roadsegmentdescription: 'Test Location Object Fallback',
+      latitude: null,
+      longitude: null,
+      location: { lat: -37.815, lon: 144.965 },
+      lastupdated: '2025-06-03',
+    },
+  ];
+
+  class LocationFallbackClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = String(request.url);
+      if (url.includes('/records?limit=0')) {
+        return {
+          body: { total_count: 1 } as T,
+          status: 200,
+          fetchedAt: '2026-09-30T12:00:00.000Z',
+          etag: null,
+          lastModified: null,
+          contentType: 'application/json',
+        };
+      }
+      return {
+        body: rows as T,
+        status: 200,
+        fetchedAt: '2026-09-30T12:00:00.000Z',
+        etag: null,
+        lastModified: null,
+        contentType: 'application/json',
+      };
+    }
+  }
+
+  const conn = new ParkingBaysConnector(new LocationFallbackClient());
+  const res = await conn.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: '2026-09-30' },
+    checkpoint: null,
+    runId: 'fallback_test',
+  }));
+
+  assert.equal(res.kind, 'success');
+  if (res.kind !== 'success') return;
+
+  assert.equal(res.parkingBays.length, 1);
+  const bay = res.parkingBays[0]!;
+  const geom = parseGeometryGeojson(bay.geometry_geojson!);
+  assert.equal(geom.type, 'Point');
+  assert.deepEqual(geom.coordinates, [144.965, -37.815]);
+});

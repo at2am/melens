@@ -20,7 +20,7 @@
   "access_status": "candidate",
   "record_granularity": "sensor_observation",
   "connector_owner": "melens integration",
-  "description": "Climate readings from microclimate sensors deployed across the City of Melbourne, updated approximately every 15 minutes. Measures ambient air temperature (°C), relative humidity (%), atmospheric pressure (hPa), wind speed (m/s) and direction (degrees), particulate matter (PM2.5, PM10 in µg/m³), and ambient noise (dBA). Missing or unmeasured parameters are strictly preserved as null without zero-filling. Current sensor location and device evidence are derived directly from the active telemetry stream, rejecting deprecated historical sensor location tables as active device inventory.",
+  "description": "Climate readings from microclimate sensors deployed across the City of Melbourne, updated approximately every 15 minutes. Measures ambient air temperature (°C), relative humidity (%), atmospheric pressure (hPa), wind speed (m/s) and direction (degrees), particulate matter (PM2.5, PM10 in µg/m³), and ambient noise (dBA). Missing or unmeasured parameters are strictly preserved as null without zero-filling. Telemetry coordinates prove location only at the observation instant. Official device lifecycle status is absent, so device_status remains null; current device recency is derived separately by queries.",
   "admission_evidence": {
     "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/microclimate-sensors-data/",
     "native_record_key": "device_id + received_at",
@@ -52,7 +52,7 @@
     "declared_license_status": "review_required"
   },
   "invariants": {
-    "no_historical_inventory_rule": "Deprecated historical microclimate-sensor-locations table is never used as current equipment inventory; current device presence and coordinates are sourced solely from active telemetry readings.",
+    "no_historical_inventory_rule": "Telemetry proves a point observation, not an official asset lifecycle. All sensor locations use valid_from=valid_to=observed_at and device_status=null; current recency belongs to the query layer. Deprecated historical location tables are never a current inventory.",
     "no_zero_filling_rule": "Missing measurements (null airtemperature, humidity, pressure, wind, pm25, pm10, noise) indicate unobserved or failed metrics and must strictly remain null, NEVER filled with zero (0).",
     "unit_preservation_rule": "Preserves explicit measurement units: airtemperature in °C, relativehumidity in %, atmosphericpressure in hPa, wind speeds in m/s, wind directions in degrees, pm25 and pm10 in µg/m³, and noise in dBA.",
     "location_evidence_rule": "Device coordinates from latlong are preserved as WGS84 point geometry; missing or invalid coordinates are quarantined with null geometry and centroid without fabricating (0,0)."

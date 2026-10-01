@@ -4,17 +4,17 @@ import { z } from 'zod';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
 import { HttpClient, HttpFailure } from '../../core/http.js';
-import type { GeoRecord, GeoRecordSource, SourceRecord } from '../../core/types.js';
+import type { GeoRecord, GeoRecordSource, GeoRecordStatus, SourceRecord, SourceRecordStatus } from '../../core/types.js';
 import { parseGeometryGeojson, type ValidGeometry } from '../../validation/geography.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
-const SOURCE_ID = 'victoria.transport.road_planned';
-const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road';
-const API_URL = 'https://api.opendata.transport.vic.gov.au/opendata/roads/disruptions/planned/v1/';
-const PAGE_SIZE = 1000;
-const MAX_PAGES = 1000;
+export const SOURCE_ID = 'victoria.transport.road_planned';
+export const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road';
+export const API_URL = 'https://api.opendata.transport.vic.gov.au/opendata/roads/disruptions/planned/v1/';
+export const PAGE_SIZE = 1000;
+export const MAX_PAGES = 1000;
 // The linked OpenAPI still says 10/minute while the landing page says 20/minute.
-const PAGE_DELAY_MS = 6100;
+export const PAGE_DELAY_MS = 6100;
 
 const optionalText = z.string().nullish();
 const recurrenceSchema = z.object({
@@ -33,6 +33,8 @@ const propertiesSchema = z.object({
   endIntersectionRoadName: optionalText,
   endIntersectionLocality: optionalText,
   localGovernmentArea: optionalText,
+  rmaClass: optionalText,
+  source: z.object({ sourceName: optionalText, sourceId: optionalText }).passthrough().nullish(),
   eventType: optionalText,
   eventSubType: optionalText,
   eventSubtype: optionalText,
@@ -74,33 +76,52 @@ export function parsePlannedRoadPage(value: unknown): RoadPage {
   return { kind: 'token', body: tokenPageSchema.parse(value) };
 }
 
-/** The documented timestamps have Victorian local time but may lack an offset. */
+/** Only explicitly offset timestamps prove an absolute instant. */
 export function parseVictorianTimestamp(value: string | null | undefined): string | null {
   if (value == null || value.trim() === '') return null;
   const text = value.trim();
-  if (/Z$|[+-]\d{2}:\d{2}$/.test(text)) {
-    const parsed = Date.parse(text);
-    if (!Number.isFinite(parsed)) throw new Error('Invalid offset timestamp');
-    return new Date(parsed).toISOString();
+  const local = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?$/.exec(text);
+  if (local) {
+    const instant = new Date(`${text}Z`);
+    if (!Number.isFinite(instant.valueOf()) || instant.toISOString().slice(0, 19) !== local[1]) {
+      throw new Error('Invalid offsetless timestamp');
+    }
+    // The provider has not documented whether this wall clock is UTC or Melbourne.
+    // Retain the original string in source content; never infer an absolute time.
+    return null;
   }
-  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/.exec(text);
-  if (!parts) throw new Error('Invalid Victorian local timestamp');
-  const [, year, month, day, hour, minute, second, fraction] = parts;
-  const local = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour),
-    Number(minute), Number(second), Number((fraction ?? '').padEnd(3, '0')));
-  const formatter = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Melbourne',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
-    minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-  const target = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-  const matches = [10, 11].map(offset => new Date(local - offset * 3600000))
-    .filter(candidate => {
-      const formatted = Object.fromEntries(formatter.formatToParts(candidate)
-        .map(part => [part.type, part.value]));
-      return `${formatted.year}-${formatted.month}-${formatted.day}T${formatted.hour}:` +
-        `${formatted.minute}:${formatted.second}` === target;
-    });
-  if (matches.length !== 1) throw new Error('Ambiguous or invalid Victorian local timestamp');
-  return matches[0]?.toISOString() ?? null;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(text)
+    || !z.iso.datetime({ offset: true }).safeParse(text).success) {
+    throw new Error('Invalid offset timestamp');
+  }
+  return new Date(text).toISOString();
+}
+
+function hasUnverifiedTimezone(value: string | null | undefined): boolean {
+  return value != null && value.trim() !== '' && parseVictorianTimestamp(value) === null;
+}
+
+export function classifyPlannedStatus(status: string, start: string | null, fetchedAt: string): {
+  sourceRecordStatus: SourceRecordStatus;
+  geoRecordStatus: GeoRecordStatus;
+} {
+  const norm = status.trim().toLowerCase();
+  if (norm === 'cancelled' || norm === 'canceled') {
+    return { sourceRecordStatus: 'cancelled', geoRecordStatus: 'cancelled' };
+  }
+  if (norm === 'completed' || norm === 'resolved' || norm === 'inactive' || norm === 'closed') {
+    return { sourceRecordStatus: 'active', geoRecordStatus: 'resolved' };
+  }
+  if (norm === 'pending') {
+    return { sourceRecordStatus: 'active', geoRecordStatus: 'planned' };
+  }
+  if (norm === 'active') {
+    return {
+      sourceRecordStatus: 'active',
+      geoRecordStatus: 'active',
+    };
+  }
+  throw new Error(`Undocumented planned disruption status: ${status}`);
 }
 
 function geometriesFor(feature: RoadFeature): Array<ValidGeometry | null> {
@@ -130,7 +151,7 @@ function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavail
 export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
   input: ConnectorInput, fetchedAt: string): {
     sourceRecords: SourceRecord[]; geoRecords: GeoRecord[];
-    geoRecordSources: GeoRecordSource[]; latestUpdate: string | null;
+    geoRecordSources: GeoRecordSource[]; latestUpdate: string | null; sourceRevision: string;
   } {
   const sourceRecords: SourceRecord[] = [];
   const geoRecords: GeoRecord[] = [];
@@ -141,30 +162,35 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
     const p = feature.properties;
     if (seen.has(p.id)) throw new Error('Duplicate planned disruption ID');
     seen.add(p.id);
-    if (p.status !== 'Pending' && p.status !== 'Active') {
-      throw new Error('Undocumented planned disruption status');
-    }
     const updatedAt = parseVictorianTimestamp(p.lastUpdated);
     const start = parseVictorianTimestamp(p.duration?.start);
     const end = parseVictorianTimestamp(p.duration?.end);
+    const timezoneUnverified = [p.lastUpdated, p.duration?.start, p.duration?.end]
+      .some(hasUnverifiedTimezone);
     if (start !== null && end !== null && end < start) {
       throw new Error('Planned disruption ends before it starts');
     }
+    const { sourceRecordStatus, geoRecordStatus } = classifyPlannedStatus(p.status, start, fetchedAt);
     if (updatedAt !== null && (latestUpdate === null || updatedAt > latestUpdate)) {
       latestUpdate = updatedAt;
     }
     const sourceId = sourceRecordId({ sourceId: SOURCE_ID, nativeId: p.id,
       originalUrl: LANDING_URL, sourceTime: null });
-    const sourceVersion = sourceVersionId(updatedAt, feature);
+    const sourceVersion = sourceVersionId(updatedAt, {
+      normalizationPolicy: 'explicit-offset-provider-status-v1', feature,
+    });
     const detail = JSON.stringify({ source_status: p.status, road: p.closedRoadName,
       start_intersection: p.startIntersectionRoadName,
       start_locality: p.startIntersectionLocality,
       end_intersection: p.endIntersectionRoadName,
       end_locality: p.endIntersectionLocality,
       local_government_area: p.localGovernmentArea,
+      rma_class: p.rmaClass ?? null,
       event_type: p.eventType, event_subtype: p.eventSubType ?? p.eventSubtype,
       event_due_to: p.eventDueTo, description: p.description,
       impact: p.impact, duration: p.duration,
+      source_last_updated: p.lastUpdated ?? null,
+      timezone_status: timezoneUnverified ? 'unverified' : 'explicit_offset_or_absent',
       validity_note: p.duration?.recurrences?.length
         ? 'Overall plan period; recurrence schedule determines impact times'
         : 'Overall plan period; traffic impact depends on source status' });
@@ -172,9 +198,11 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
       fetched_at: fetchedAt, source_record_id: sourceId, version_id: sourceVersion,
       original_url: LANDING_URL, raw_uri: null, published_at: null,
       observed_at: null, first_accessible_at: fetchedAt,
-      time_missing_reason: 'Source does not provide an event creation time',
+      time_missing_reason: timezoneUnverified
+        ? 'Source creation time absent; source timestamp timezone unverified; wall clocks retained'
+        : 'Source does not provide an event creation time',
       valid_from: start, valid_to: end, source_updated_at: updatedAt,
-      source_version_ordinal: null, record_status: 'active', assertion_kind: 'plan',
+      source_version_ordinal: null, record_status: sourceRecordStatus, assertion_kind: 'plan',
       rights_status: 'review_required' });
     const geoms = geometriesFor(feature);
     for (const [index, geometry] of geoms.entries()) {
@@ -183,12 +211,11 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         sourceTime: null });
       const geoVersion = sourceVersionId(updatedAt, { sourceVersion, index, geometry });
       const point = geometry?.type === 'Point' ? geometry.coordinates : null;
-      const recordStatus = p.status === 'Pending' || (start !== null && start > fetchedAt)
-        ? 'planned' : 'active';
       geoRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
         fetched_at: fetchedAt, geo_record_id: geoId, version_id: geoVersion,
         topic: 'road_disruption', assertion_kind: 'plan',
         title: p.closedRoadName ? `Planned disruption: ${p.closedRoadName}`
+          : p.eventType ? `Planned disruption: ${p.eventType}`
           : 'Planned road disruption', summary: detail, original_url: LANDING_URL,
         geometry_geojson: geometry === null ? null : JSON.stringify(geometry),
         centroid_lon: point?.[0] ?? null, centroid_lat: point?.[1] ?? null,
@@ -197,7 +224,7 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         area_refs: [], published_at: null, observed_at: null,
         valid_from: start, valid_to: end, source_updated_at: updatedAt,
         source_version_ordinal: null, freshness_state: 'unknown',
-        record_status: recordStatus, rights_status: 'review_required',
+        record_status: geoRecordStatus, rights_status: 'review_required',
         public_query_allowed: false });
       geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID,
         schema_version: 1, fetched_at: fetchedAt, geo_record_id: geoId,
@@ -206,7 +233,9 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         original_url: LANDING_URL });
     }
   }
-  return { sourceRecords, geoRecords, geoRecordSources, latestUpdate };
+  return { sourceRecords, geoRecords, geoRecordSources, latestUpdate,
+    sourceRevision: sourceVersionId(null, { normalizationPolicy: 'explicit-offset-provider-status-v1',
+      features: [...features].sort((a, b) => a.properties.id.localeCompare(b.properties.id)) }) };
 }
 
 export class PlannedRoadConnector implements Connector {
@@ -217,7 +246,7 @@ export class PlannedRoadConnector implements Connector {
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
     if (input.sourceId !== SOURCE_ID) return failure(input, 'validation_failed');
-    const key = this.keyProvider();
+    const key = this.keyProvider()?.trim();
     if (!key) return failure(input, 'auth_failed');
     try {
       const features: RoadFeature[] = [];
@@ -270,7 +299,7 @@ export class PlannedRoadConnector implements Connector {
       }
       const normalized = normalizePlannedRoadSnapshot(features, input, fetchedAt);
       return { kind: 'success', sourceId: SOURCE_ID, runId: input.runId,
-        fetchedAt, sourceRevision: normalized.latestUpdate,
+        fetchedAt, sourceRevision: normalized.sourceRevision,
         sourceLatestUpdateAt: normalized.latestUpdate,
         checkpointAfter: input.window.kind === 'time' ? input.window.to : input.window.revision,
         completeness: { complete: true, method: 'pagination',

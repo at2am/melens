@@ -931,9 +931,44 @@ test('US3 Section 1: Querying two regions returns comparable indicators and prov
     boundaryEvidence2025,
   );
   const melbRents = rentsResult.indicators.filter((ind) => ind.boundary_id === 'ASGS_LGA:24600:2025');
+  const yarraRents = rentsResult.indicators.filter((ind) => ind.boundary_id === 'ASGS_LGA:27350:2025');
+
   assert.ok(melbRents.length > 0, 'Melbourne LGA must have rental indicators');
+  assert.ok(yarraRents.length > 0, 'Yarra LGA must have rental indicators');
   assert.equal(melbRents[0]?.unit, 'AUD/week');
+  assert.equal(yarraRents[0]?.unit, 'AUD/week');
   assert.ok(normRents.sourceRecords.some((sr) => sr.source_record_id === melbRents[0]?.source_record_id));
+  assert.ok(normRents.sourceRecords.some((sr) => sr.source_record_id === yarraRents[0]?.source_record_id));
+
+  // Verify two regions have comparable indicator structures for the same property type and period
+  const melbAllProp = melbRents.find((i) => i.definition.includes('All Properties') && i.period_start === '2025-07-01T00:00:00Z');
+  const yarraAllProp = yarraRents.find((i) => i.definition.includes('All Properties') && i.period_start === '2025-07-01T00:00:00Z');
+  assert.ok(melbAllProp && yarraAllProp, 'Both Melbourne and Yarra must have All Properties rent indicator for 2025-Q3');
+  assert.equal(melbAllProp.value, 670);
+  assert.equal(yarraAllProp.value, 650);
+  assert.equal(melbAllProp.unit, 'AUD/week');
+  assert.equal(yarraAllProp.unit, 'AUD/week');
+  assert.equal(melbAllProp.source_area_vintage, '2025');
+  assert.equal(yarraAllProp.source_area_vintage, '2025');
+
+  // Verify unmatched rents from fixture do not silently join and fail closed in comparability
+  const unmatchedRents = rentsResult.indicators.filter((ind) => ind.boundary_id.includes(':unresolved'));
+  assert.ok(unmatchedRents.length > 0, 'Unmatched rent records must be marked as unresolved');
+  assert.throws(
+    () => assertComparableIndicators(melbAllProp, unmatchedRents[0]!),
+    /Cross-vintage or unresolved boundary comparison.*requires an explicit boundary mapping/,
+    'Unmatched rent cannot be compared with a matched boundary without crosswalk',
+  );
+
+  // Verify suppressed and missing rents strictly have value: null, never 0
+  const suppressedRents = rentsResult.indicators.filter((ind) => ind.status === 'suppressed');
+  const missingRents = rentsResult.indicators.filter((ind) => ind.status === 'missing');
+  assert.ok(suppressedRents.length > 0, 'Must have suppressed rent indicators in fixture');
+  assert.ok(missingRents.length > 0, 'Must have missing rent indicators in fixture');
+  for (const ind of [...suppressedRents, ...missingRents]) {
+    assert.equal(ind.value, null, 'Suppressed and missing rent indicators must have value null, never 0');
+    assert.doesNotThrow(() => enforceAreaIndicatorInvariants(ind));
+  }
 
   // 4. Employment from CLUE (City of Melbourne only) via actual normalizer
   const clueBatchId = 'batch-clue-2024';
@@ -1001,8 +1036,22 @@ test('US3 Section 1: Querying two regions returns comparable indicators and prov
   assert.ok(viewRows.length > 0, 'Eligible indicators must pass the consumption gate');
   const viewMelbPop = viewRows.find((r) => r.indicator_id === melbPop.indicator_id);
   const viewYarraCrime = viewRows.find((r) => r.indicator_id === yarraOffences?.indicator_id);
+  const viewMelbRent = viewRows.find((r) => r.indicator_id === melbAllProp.indicator_id);
+  const viewYarraRent = viewRows.find((r) => r.indicator_id === yarraAllProp.indicator_id);
+  const viewUnmatchedRent = viewRows.find((r) => r.indicator_id === unmatchedRents[0]!.indicator_id);
+  const viewSuppressedRent = viewRows.find((r) => r.indicator_id === suppressedRents[0]!.indicator_id);
+
   assert.ok(viewMelbPop && viewMelbPop.value === 22639);
   assert.ok(viewYarraCrime && viewYarraCrime.value === 11200);
+  assert.ok(viewMelbRent && viewMelbRent.boundary_mapping_status === 'matched');
+  assert.equal(viewMelbRent?.boundary_name, 'Melbourne');
+  assert.ok(viewYarraRent && viewYarraRent.boundary_mapping_status === 'matched');
+  assert.equal(viewYarraRent?.boundary_name, 'Yarra');
+
+  assert.ok(viewUnmatchedRent && viewUnmatchedRent.boundary_mapping_status === 'missing');
+  assert.equal(viewUnmatchedRent?.boundary_name, null);
+  assert.ok(viewSuppressedRent && viewSuppressedRent.status === 'suppressed');
+  assert.equal(viewSuppressedRent?.value, null);
 });
 
 // ============================================================================
@@ -1070,7 +1119,7 @@ test('US3 Section 2: Temporal intervals are strictly bound, and cross-vintage co
     'Comparing with explicit correspondence crosswalk succeeds',
   );
 
-  // Scenario 2: Two different quarters of the same boundary vintage through normalizeHomesVictoriaRents
+  // Scenario 2: Two different quarters of the same boundary vintage across two regions through normalizeHomesVictoriaRents
   const rentPayloadQ4: HomesVictoriaPayload = {
     results: [
       {
@@ -1082,6 +1131,17 @@ test('US3 Section 2: Temporal intervals are strictly bound, and cross-vintage co
         property_type: 'All properties',
         median_rent: 615,
         count: 1500,
+        status: 'observed',
+      },
+      {
+        quarter: 'Dec 2024',
+        quarter_code: '2024-Q4',
+        period_start: '2024-10-01T00:00:00Z',
+        period_end: '2025-01-01T00:00:00Z',
+        lga_name: 'Yarra',
+        property_type: 'All properties',
+        median_rent: 675,
+        count: 1592,
         status: 'observed',
       },
     ],
@@ -1099,6 +1159,17 @@ test('US3 Section 2: Temporal intervals are strictly bound, and cross-vintage co
         count: 1420,
         status: 'observed',
       },
+      {
+        quarter: 'Mar 2025',
+        quarter_code: '2025-Q1',
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-04-01T00:00:00Z',
+        lga_name: 'Yarra',
+        property_type: 'All properties',
+        median_rent: 700,
+        count: 1628,
+        status: 'observed',
+      },
     ],
   };
 
@@ -1112,20 +1183,31 @@ test('US3 Section 2: Temporal intervals are strictly bound, and cross-vintage co
     { areaIndicators: normRentQ1.areaIndicators, sourceRecords: normRentQ1.sourceRecords },
     boundaryEvidence2025,
   );
-  const rentQ4 = rentResultQ4.indicators[0]!;
-  const rentQ1 = rentResultQ1.indicators[0]!;
-  assert.ok(rentQ4 && rentQ1);
-  assert.equal(rentQ4.value, 615);
-  assert.equal(rentQ1.value, 680);
-  assert.equal(rentQ4.boundary_id, 'ASGS_LGA:24600:2025');
-  assert.equal(rentQ1.boundary_id, 'ASGS_LGA:24600:2025');
+  const melbRentQ4 = rentResultQ4.indicators.find((i) => i.boundary_id === 'ASGS_LGA:24600:2025')!;
+  const melbRentQ1 = rentResultQ1.indicators.find((i) => i.boundary_id === 'ASGS_LGA:24600:2025')!;
+  const yarraRentQ4 = rentResultQ4.indicators.find((i) => i.boundary_id === 'ASGS_LGA:27350:2025')!;
+  const yarraRentQ1 = rentResultQ1.indicators.find((i) => i.boundary_id === 'ASGS_LGA:27350:2025')!;
+
+  assert.ok(melbRentQ4 && melbRentQ1 && yarraRentQ4 && yarraRentQ1);
+  assert.equal(melbRentQ4.value, 615);
+  assert.equal(melbRentQ1.value, 680);
+  assert.equal(yarraRentQ4.value, 675);
+  assert.equal(yarraRentQ1.value, 700);
+  assert.equal(melbRentQ4.boundary_id, 'ASGS_LGA:24600:2025');
+  assert.equal(melbRentQ1.boundary_id, 'ASGS_LGA:24600:2025');
+  assert.equal(yarraRentQ4.boundary_id, 'ASGS_LGA:27350:2025');
+  assert.equal(yarraRentQ1.boundary_id, 'ASGS_LGA:27350:2025');
 
   assert.doesNotThrow(
-    () => assertComparableIndicators(rentQ4, rentQ1),
-    'Sequential quarters of same LGA boundary vintage are directly comparable',
+    () => assertComparableIndicators(melbRentQ4, melbRentQ1),
+    'Sequential quarters of same Melbourne LGA boundary vintage are directly comparable',
   );
-  assert.notEqual(rentQ4.period_start, rentQ1.period_start);
-  assert.notEqual(rentQ4.period_end, rentQ1.period_end);
+  assert.doesNotThrow(
+    () => assertComparableIndicators(yarraRentQ4, yarraRentQ1),
+    'Sequential quarters of same Yarra LGA boundary vintage are directly comparable',
+  );
+  assert.notEqual(melbRentQ4.period_start, melbRentQ1.period_start);
+  assert.notEqual(melbRentQ4.period_end, melbRentQ1.period_end);
 
   // Scenario 3: Cross-year CLUE employment comparison through normalizeClueEmploymentStatistics
   const clue2023Row: ClueEmploymentRawRow = {
@@ -1735,7 +1817,7 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
   insertSourceSqlite(db, rentsSource);
   insertSourceSqlite(db, csaSource);
 
-  // 2. Prepare real normalizer output across two statistical periods
+  // 2. Prepare real normalizer output across two statistical periods and two regions, plus suppressed/unmatched records
   // Period 1: Homes Victoria rents Q4 2024
   const rentPayloadQ4: HomesVictoriaPayload = {
     results: [
@@ -1750,9 +1832,32 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
         count: 1500,
         status: 'observed',
       },
+      {
+        quarter: 'Dec 2024',
+        quarter_code: '2024-Q4',
+        period_start: '2024-10-01T00:00:00Z',
+        period_end: '2025-01-01T00:00:00Z',
+        lga_name: 'Yarra',
+        property_type: 'All properties',
+        median_rent: 675,
+        count: 1592,
+        status: 'observed',
+      },
+      {
+        quarter: 'Dec 2024',
+        quarter_code: '2024-Q4',
+        period_start: '2024-10-01T00:00:00Z',
+        period_end: '2025-01-01T00:00:00Z',
+        lga_name: 'Buloke',
+        property_type: 'All properties',
+        median_rent: 310,
+        count: 7,
+        status: 'observed',
+      },
     ],
   };
-  // Period 2: Homes Victoria rents Q1 2025
+
+  // Period 2: Homes Victoria rents Q1 2025 (includes two regions, suppressed, missing, and unmatched records)
   const rentPayloadQ1: HomesVictoriaPayload = {
     results: [
       {
@@ -1764,6 +1869,54 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
         property_type: 'All properties',
         median_rent: 680,
         count: 1420,
+        status: 'observed',
+      },
+      {
+        quarter: 'Mar 2025',
+        quarter_code: '2025-Q1',
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-04-01T00:00:00Z',
+        lga_name: 'Yarra',
+        property_type: 'All properties',
+        median_rent: 700,
+        count: 1628,
+        status: 'observed',
+      },
+      {
+        quarter: 'Mar 2025',
+        quarter_code: '2025-Q1',
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-04-01T00:00:00Z',
+        lga_name: 'Buloke',
+        property_type: 'All properties',
+        raw_count: '<4',
+        raw_median: '-',
+        count: null,
+        median_rent: null,
+        status: 'suppressed',
+      },
+      {
+        quarter: 'Mar 2025',
+        quarter_code: '2025-Q1',
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-04-01T00:00:00Z',
+        lga_name: 'French Island',
+        property_type: 'All properties',
+        raw_count: null,
+        raw_median: null,
+        count: null,
+        median_rent: null,
+        status: 'missing',
+      },
+      {
+        quarter: 'Mar 2025',
+        quarter_code: '2025-Q1',
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-04-01T00:00:00Z',
+        lga_name: 'Unknown Region',
+        property_type: 'All properties',
+        median_rent: 550,
+        count: 30,
         status: 'observed',
       },
     ],
@@ -1791,61 +1944,129 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
     insertSourceRecordSqlite(db, { ...sr, rights_status: 'verified_open' });
   }
 
-  // Boundary (Melbourne LGA)
-  const boundaryLga = boundaryEvidence2025.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:24600:2025')!;
-  const boundaryRecord: Boundary = {
-    boundary_id: boundaryLga.boundary_id,
-    version_id: normRentQ4.sourceRecords[0]!.version_id,
-    scheme: boundaryLga.scheme ?? 'ASGS_LGA',
-    code: boundaryLga.code ?? '24600',
-    name: boundaryLga.name ?? 'Melbourne',
-    vintage: boundaryLga.vintage ?? '2025',
-    geometry_geojson: '{"type":"Polygon","coordinates":[[[144.9,-37.8],[145.0,-37.8],[145.0,-37.7],[144.9,-37.7],[144.9,-37.8]]]}',
-    valid_from: '2025-01-01T00:00:00Z',
-    valid_to: null,
-    source_record_id: normRentQ4.sourceRecords[0]!.source_record_id,
-    batch_id: 'batch-rent-q4',
-    source_id: 'homes_victoria.rents',
-    schema_version: 1,
-    fetched_at: '2026-09-28T00:00:00Z',
-  };
-  insertBoundarySqlite(db, boundaryRecord);
+  // Boundaries: Melbourne LGA 2025, Yarra LGA 2025, and historical vintage 2021 boundary
+  const boundaryMelb2025 = boundaryEvidence2025.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:24600:2025')!;
+  const boundaryYarra2025 = boundaryEvidence2025.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:27350:2025')!;
+  const boundaryEvidenceHist2021 = boundaryEvidence2021.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:24600:2021')!;
 
-  // Indicators
-  const indQ4 = rentResultQ4.indicators[0]!;
-  const indQ1 = rentResultQ1.indicators[0]!;
-  insertIndicatorSqlite(db, indQ4);
-  insertIndicatorSqlite(db, indQ1);
+  const boundaryRecords: Boundary[] = [
+    {
+      boundary_id: boundaryMelb2025.boundary_id,
+      version_id: normRentQ4.sourceRecords[0]!.version_id,
+      scheme: boundaryMelb2025.scheme ?? 'ASGS_LGA',
+      code: boundaryMelb2025.code ?? '24600',
+      name: boundaryMelb2025.name ?? 'Melbourne',
+      vintage: boundaryMelb2025.vintage ?? '2025',
+      geometry_geojson: '{"type":"Polygon","coordinates":[[[144.9,-37.8],[145.0,-37.8],[145.0,-37.7],[144.9,-37.7],[144.9,-37.8]]]}',
+      valid_from: '2025-01-01T00:00:00Z',
+      valid_to: null,
+      source_record_id: normRentQ4.sourceRecords[0]!.source_record_id,
+      batch_id: 'batch-rent-q4',
+      source_id: 'homes_victoria.rents',
+      schema_version: 1,
+      fetched_at: '2026-09-28T00:00:00Z',
+    },
+    {
+      boundary_id: boundaryYarra2025.boundary_id,
+      version_id: normRentQ4.sourceRecords[1]!.version_id,
+      scheme: boundaryYarra2025.scheme ?? 'ASGS_LGA',
+      code: boundaryYarra2025.code ?? '27350',
+      name: boundaryYarra2025.name ?? 'Yarra',
+      vintage: boundaryYarra2025.vintage ?? '2025',
+      geometry_geojson: '{"type":"Polygon","coordinates":[[[144.98,-37.8],[145.02,-37.8],[145.02,-37.78],[144.98,-37.78],[144.98,-37.8]]]}',
+      valid_from: '2025-01-01T00:00:00Z',
+      valid_to: null,
+      source_record_id: normRentQ4.sourceRecords[1]!.source_record_id,
+      batch_id: 'batch-rent-q4',
+      source_id: 'homes_victoria.rents',
+      schema_version: 1,
+      fetched_at: '2026-09-28T00:00:00Z',
+    },
+    {
+      boundary_id: boundaryEvidenceHist2021.boundary_id,
+      version_id: 'b-v2021',
+      scheme: boundaryEvidenceHist2021.scheme ?? 'ASGS_LGA',
+      code: boundaryEvidenceHist2021.code ?? '24600',
+      name: boundaryEvidenceHist2021.name ?? 'Melbourne',
+      vintage: boundaryEvidenceHist2021.vintage ?? '2021',
+      geometry_geojson: '{"type":"Polygon","coordinates":[[[144.9,-37.8],[145.0,-37.8],[145.0,-37.7],[144.9,-37.7],[144.9,-37.8]]]}',
+      valid_from: '2021-01-01T00:00:00Z',
+      valid_to: null,
+      source_record_id: normRentQ4.sourceRecords[0]!.source_record_id,
+      batch_id: 'batch-rent-q4',
+      source_id: 'homes_victoria.rents',
+      schema_version: 1,
+      fetched_at: '2026-09-28T00:00:00Z',
+    },
+  ];
+
+  for (const b of boundaryRecords) {
+    insertBoundarySqlite(db, b);
+  }
+
+  // Insert all normalized rent indicators
+  for (const ind of [...rentResultQ4.indicators, ...rentResultQ1.indicators]) {
+    insertIndicatorSqlite(db, ind);
+  }
+
+  // Define indQ4 and indQ1 for subsequent negative gate tests
+  const indQ4 = rentResultQ4.indicators.find((i) => i.boundary_id === 'ASGS_LGA:24600:2025')!;
+  const indQ1 = rentResultQ1.indicators.find((i) => i.boundary_id === 'ASGS_LGA:24600:2025')!;
 
   // --------------------------------------------------------------------------
-  // Assertion 1: Valid indicators across two statistical periods from real normalizer
-  // output are correctly joined and traceable to their SourceRecord and batch
+  // Assertion 1: Real SQL queries for two regions across two statistical periods
   // --------------------------------------------------------------------------
-  const twoPeriodRows = db.prepare(`
+  // Region 1: Melbourne LGA across Q4 2024 and Q1 2025
+  const melbRentRows = db.prepare(`
     SELECT * FROM v_area_indicators
     WHERE source_id = 'homes_victoria.rents' AND boundary_id = 'ASGS_LGA:24600:2025'
     ORDER BY period_start
   `).all() as Record<string, unknown>[];
 
-  assert.equal(twoPeriodRows.length, 2, 'Must return both statistical periods from real normalizer output');
-  assert.equal(twoPeriodRows[0]?.period_start, '2024-10-01T00:00:00Z');
-  assert.equal(twoPeriodRows[0]?.value, 615);
-  assert.equal(twoPeriodRows[0]?.boundary_mapping_status, 'matched');
-  assert.equal(twoPeriodRows[0]?.boundary_name, 'Melbourne');
-  assert.equal(twoPeriodRows[0]?.boundary_code, '24600');
-  assert.equal(twoPeriodRows[0]?.unit, 'AUD/week');
-  assert.equal(twoPeriodRows[0]?.source_record_id, indQ4.source_record_id);
-  assert.equal(twoPeriodRows[0]?.batch_id, 'batch-rent-q4');
+  assert.equal(melbRentRows.length, 2, 'Melbourne must return both statistical periods from real normalizer output');
+  assert.equal(melbRentRows[0]?.period_start, '2024-10-01T00:00:00Z');
+  assert.equal(melbRentRows[0]?.value, 615);
+  assert.equal(melbRentRows[0]?.boundary_mapping_status, 'matched');
+  assert.equal(melbRentRows[0]?.boundary_name, 'Melbourne');
+  assert.equal(melbRentRows[0]?.boundary_code, '24600');
+  assert.equal(melbRentRows[0]?.unit, 'AUD/week');
+  assert.ok(melbRentRows[0]?.source_record_id);
+  assert.equal(melbRentRows[0]?.batch_id, 'batch-rent-q4');
 
-  assert.equal(twoPeriodRows[1]?.period_start, '2025-01-01T00:00:00Z');
-  assert.equal(twoPeriodRows[1]?.value, 680);
-  assert.equal(twoPeriodRows[1]?.boundary_mapping_status, 'matched');
-  assert.equal(twoPeriodRows[1]?.boundary_name, 'Melbourne');
-  assert.equal(twoPeriodRows[1]?.boundary_code, '24600');
-  assert.equal(twoPeriodRows[1]?.source_record_id, indQ1.source_record_id);
-  assert.equal(twoPeriodRows[1]?.batch_id, 'batch-rent-q1');
+  assert.equal(melbRentRows[1]?.period_start, '2025-01-01T00:00:00Z');
+  assert.equal(melbRentRows[1]?.value, 680);
+  assert.equal(melbRentRows[1]?.boundary_mapping_status, 'matched');
+  assert.equal(melbRentRows[1]?.boundary_name, 'Melbourne');
+  assert.equal(melbRentRows[1]?.boundary_code, '24600');
+  assert.ok(melbRentRows[1]?.source_record_id);
+  assert.equal(melbRentRows[1]?.batch_id, 'batch-rent-q1');
 
-  // Verify second source: Crime Statistics from CSA across two annual periods
+  // Region 2: Yarra LGA across Q4 2024 and Q1 2025
+  const yarraRentRows = db.prepare(`
+    SELECT * FROM v_area_indicators
+    WHERE source_id = 'homes_victoria.rents' AND boundary_id = 'ASGS_LGA:27350:2025'
+    ORDER BY period_start
+  `).all() as Record<string, unknown>[];
+
+  assert.equal(yarraRentRows.length, 2, 'Yarra must return both statistical periods from real normalizer output');
+  assert.equal(yarraRentRows[0]?.period_start, '2024-10-01T00:00:00Z');
+  assert.equal(yarraRentRows[0]?.value, 675);
+  assert.equal(yarraRentRows[0]?.boundary_mapping_status, 'matched');
+  assert.equal(yarraRentRows[0]?.boundary_name, 'Yarra');
+  assert.equal(yarraRentRows[0]?.boundary_code, '27350');
+  assert.equal(yarraRentRows[0]?.unit, 'AUD/week');
+  assert.ok(yarraRentRows[0]?.source_record_id);
+  assert.equal(yarraRentRows[0]?.batch_id, 'batch-rent-q4');
+
+  assert.equal(yarraRentRows[1]?.period_start, '2025-01-01T00:00:00Z');
+  assert.equal(yarraRentRows[1]?.value, 700);
+  assert.equal(yarraRentRows[1]?.boundary_mapping_status, 'matched');
+  assert.equal(yarraRentRows[1]?.boundary_name, 'Yarra');
+  assert.equal(yarraRentRows[1]?.boundary_code, '27350');
+  assert.ok(yarraRentRows[1]?.source_record_id);
+  assert.equal(yarraRentRows[1]?.batch_id, 'batch-rent-q1');
+
+  // Second source: CSA Crime Statistics across two regions and two annual periods
   const csaMultiYear = makeCsaFixture([
     {
       lgaName: 'Melbourne',
@@ -1867,6 +2088,36 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
       periodEnd: '2026-07-01T00:00:00Z',
       yearEnding: 2026,
     },
+    {
+      lgaName: 'Yarra',
+      lgaCode: '27350',
+      count: 10500,
+      ratePer100k: 10400,
+      status: 'observed',
+      periodStart: '2024-07-01T00:00:00Z',
+      periodEnd: '2025-07-01T00:00:00Z',
+      yearEnding: 2025,
+    },
+    {
+      lgaName: 'Yarra',
+      lgaCode: '27350',
+      count: 11200,
+      ratePer100k: 11150.2,
+      status: 'observed',
+      periodStart: '2025-07-01T00:00:00Z',
+      periodEnd: '2026-07-01T00:00:00Z',
+      yearEnding: 2026,
+    },
+    {
+      lgaName: 'Queenscliffe',
+      lgaCode: '25810',
+      count: null,
+      ratePer100k: null,
+      status: 'suppressed',
+      periodStart: '2025-07-01T00:00:00Z',
+      periodEnd: '2026-07-01T00:00:00Z',
+      yearEnding: 2026,
+    },
   ]);
   const csaMultiResult = normalizeCsaStatistics(csaMultiYear, boundaryEvidence2025);
   const csaBatch = makePublishedBatch('csa-test-run', 'victoria.csa.recorded_offences');
@@ -1878,17 +2129,104 @@ test('US3 Section 6b: Real SQL consumption gate (SQLite in-memory) enforces batc
     insertIndicatorSqlite(db, ind);
   }
 
-  const csaSqlRows = db.prepare(`
-    SELECT period_start, period_end, value, unit, boundary_mapping_status, source_record_id, batch_id
+  const melbCsaSqlRows = db.prepare(`
+    SELECT period_start, period_end, value, unit, boundary_mapping_status, boundary_name, source_record_id, batch_id
     FROM v_area_indicators
-    WHERE source_id = 'victoria.csa.recorded_offences' AND unit = 'recorded_offences'
+    WHERE source_id = 'victoria.csa.recorded_offences' AND boundary_id = 'ASGS_LGA:24600:2025' AND unit = 'recorded_offences'
     ORDER BY period_start
   `).all() as Record<string, unknown>[];
-  assert.equal(csaSqlRows.length, 2, 'CSA offences across two periods must be queryable in real SQL view');
-  assert.equal(csaSqlRows[0]?.value, 26000);
-  assert.equal(csaSqlRows[1]?.value, 28450);
-  assert.equal(csaSqlRows[0]?.boundary_mapping_status, 'matched');
-  assert.equal(csaSqlRows[1]?.boundary_mapping_status, 'matched');
+  assert.equal(melbCsaSqlRows.length, 2);
+  assert.equal(melbCsaSqlRows[0]?.value, 26000);
+  assert.equal(melbCsaSqlRows[1]?.value, 28450);
+  assert.equal(melbCsaSqlRows[0]?.boundary_mapping_status, 'matched');
+  assert.equal(melbCsaSqlRows[0]?.boundary_name, 'Melbourne');
+
+  const yarraCsaSqlRows = db.prepare(`
+    SELECT period_start, period_end, value, unit, boundary_mapping_status, boundary_name, source_record_id, batch_id
+    FROM v_area_indicators
+    WHERE source_id = 'victoria.csa.recorded_offences' AND boundary_id = 'ASGS_LGA:27350:2025' AND unit = 'recorded_offences'
+    ORDER BY period_start
+  `).all() as Record<string, unknown>[];
+  assert.equal(yarraCsaSqlRows.length, 2);
+  assert.equal(yarraCsaSqlRows[0]?.value, 10500);
+  assert.equal(yarraCsaSqlRows[1]?.value, 11200);
+  assert.equal(yarraCsaSqlRows[0]?.boundary_mapping_status, 'matched');
+  assert.equal(yarraCsaSqlRows[0]?.boundary_name, 'Yarra');
+
+  // --------------------------------------------------------------------------
+  // Assertion 2: Suppressed and missing observations strictly remain NULL and never zero-fill in real SQL view
+  // --------------------------------------------------------------------------
+  const suppressedRentRows = db.prepare(`
+    SELECT indicator_id, boundary_id, status, value, source_area_name
+    FROM v_area_indicators
+    WHERE source_id = 'homes_victoria.rents' AND status IN ('suppressed', 'missing')
+  `).all() as Record<string, unknown>[];
+
+  assert.equal(suppressedRentRows.length, 2, 'Must have suppressed and missing rent rows in SQL view');
+  for (const row of suppressedRentRows) {
+    assert.equal(row.value, null, 'Suppressed or missing rent value MUST be NULL in view, never zero-filled');
+    assert.notEqual(row.value, 0, 'Zero-fill is strictly prohibited for suppressed/missing observations');
+  }
+
+  const suppressedCsaRows = db.prepare(`
+    SELECT indicator_id, boundary_id, status, value, source_area_name
+    FROM v_area_indicators
+    WHERE source_id = 'victoria.csa.recorded_offences' AND status = 'suppressed'
+  `).all() as Record<string, unknown>[];
+  assert.ok(suppressedCsaRows.length > 0, 'Must have suppressed CSA rows in SQL view');
+  for (const row of suppressedCsaRows) {
+    assert.equal(row.value, null, 'Suppressed CSA count/rate MUST be NULL in view, never zero-filled');
+    assert.notEqual(row.value, 0);
+  }
+
+  // --------------------------------------------------------------------------
+  // Assertion 3: Unmatched rents cannot silently join in real SQL consumption view
+  // --------------------------------------------------------------------------
+  const unmatchedSqlRows = db.prepare(`
+    SELECT indicator_id, boundary_id, boundary_scheme, boundary_code, boundary_name, boundary_vintage,
+           boundary_mapping_status, source_area_name
+    FROM v_area_indicators
+    WHERE source_id = 'homes_victoria.rents' AND boundary_mapping_status = 'missing'
+  `).all() as Record<string, unknown>[];
+
+  assert.ok(unmatchedSqlRows.length >= 3, 'Buloke, French Island, and Unknown Region must be present with mapping status missing');
+  for (const row of unmatchedSqlRows) {
+    assert.equal(row.boundary_mapping_status, 'missing');
+    assert.equal(row.boundary_scheme, null, 'Unmatched boundary must not have joined boundary_scheme');
+    assert.equal(row.boundary_code, null, 'Unmatched boundary must not have joined boundary_code');
+    assert.equal(row.boundary_name, null, 'Unmatched boundary must not have joined boundary_name');
+    assert.equal(row.boundary_vintage, null, 'Unmatched boundary must not have joined boundary_vintage');
+    assert.match(String(row.boundary_id), /:unresolved$/, 'Unmatched boundary ID must preserve unresolved tag');
+  }
+
+  // Boundary Vintage Isolation Barrier:
+  // An indicator targeting 2026 cannot join to an existing 2021 or 2025 boundary even with identical area code/name
+  const vintageMismatchIndicator: AreaIndicator = {
+    ...indQ1,
+    indicator_id: 'ind-cross-vintage-barrier-test',
+    boundary_id: 'ASGS_LGA:24600:2026', // vintage 2026 does not exist in v_boundaries
+    source_area_vintage: '2026',
+    source_record_id: normRentQ1.sourceRecords[0]!.source_record_id,
+  };
+  insertIndicatorSqlite(db, vintageMismatchIndicator);
+
+  const crossVintageRow = db.prepare(`
+    SELECT boundary_id, boundary_mapping_status, boundary_name
+    FROM v_area_indicators
+    WHERE indicator_id = 'ind-cross-vintage-barrier-test'
+  `).get() as Record<string, unknown>;
+
+  assert.equal(crossVintageRow.boundary_mapping_status, 'missing', 'Cross-vintage boundary must not silently join');
+  assert.equal(crossVintageRow.boundary_name, null);
+
+  // Domain comparability fail-closed gate:
+  const unmatchedBulokeInd = rentResultQ1.indicators.find((i) => i.source_area_name === 'Buloke')!;
+  const matchedMelbInd = rentResultQ1.indicators.find((i) => i.source_area_name === 'Melbourne')!;
+  assert.throws(
+    () => assertComparableIndicators(matchedMelbInd, unmatchedBulokeInd),
+    /Cross-vintage or unresolved boundary comparison.*requires an explicit boundary mapping/,
+    'Unmatched rent indicator must fail closed when asserted comparable with a matched region',
+  );
 
   // --------------------------------------------------------------------------
   // Assertion 2: Missing or invalid source records cannot be queried through consumption view
@@ -2165,6 +2503,17 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
           count: 1500,
           status: 'observed',
         },
+        {
+          quarter: 'Dec 2024',
+          quarter_code: '2024-Q4',
+          period_start: '2024-10-01T00:00:00Z',
+          period_end: '2025-01-01T00:00:00Z',
+          lga_name: 'Yarra',
+          property_type: 'All properties',
+          median_rent: 675,
+          count: 1592,
+          status: 'observed',
+        },
       ],
     };
     const rentPayloadQ1: HomesVictoriaPayload = {
@@ -2179,6 +2528,30 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
           median_rent: 680,
           count: 1420,
           status: 'observed',
+        },
+        {
+          quarter: 'Mar 2025',
+          quarter_code: '2025-Q1',
+          period_start: '2025-01-01T00:00:00Z',
+          period_end: '2025-04-01T00:00:00Z',
+          lga_name: 'Yarra',
+          property_type: 'All properties',
+          median_rent: 700,
+          count: 1628,
+          status: 'observed',
+        },
+        {
+          quarter: 'Mar 2025',
+          quarter_code: '2025-Q1',
+          period_start: '2025-01-01T00:00:00Z',
+          period_end: '2025-04-01T00:00:00Z',
+          lga_name: 'Buloke',
+          property_type: 'All properties',
+          raw_count: '<4',
+          raw_median: '-',
+          count: null,
+          median_rent: null,
+          status: 'suppressed',
         },
       ],
     };
@@ -2195,6 +2568,8 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
     );
 
     const boundaryLga = boundaryEvidence2025.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:24600:2025')!;
+    const boundaryYarraLga = boundaryEvidence2025.boundaries.find((b) => b.boundary_id === 'ASGS_LGA:27350:2025')!;
+
     const boundaryQ4: Boundary = {
       boundary_id: boundaryLga.boundary_id,
       version_id: normRentQ4.sourceRecords[0]!.version_id,
@@ -2206,6 +2581,23 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
       valid_from: '2025-01-01T00:00:00Z',
       valid_to: null,
       source_record_id: normRentQ4.sourceRecords[0]!.source_record_id,
+      batch_id: 'gcp-rent-q4',
+      source_id: 'homes_victoria.rents',
+      schema_version: 1,
+      fetched_at: '2026-09-28T00:00:00Z',
+    };
+
+    const boundaryYarraQ4: Boundary = {
+      boundary_id: boundaryYarraLga.boundary_id,
+      version_id: normRentQ4.sourceRecords[1]!.version_id,
+      scheme: boundaryYarraLga.scheme ?? 'ASGS_LGA',
+      code: boundaryYarraLga.code ?? '27350',
+      name: boundaryYarraLga.name ?? 'Yarra',
+      vintage: boundaryYarraLga.vintage ?? '2025',
+      geometry_geojson: '{"type":"Polygon","coordinates":[[[144.98,-37.8],[145.02,-37.8],[145.02,-37.78],[144.98,-37.78],[144.98,-37.8]]]}',
+      valid_from: '2025-01-01T00:00:00Z',
+      valid_to: null,
+      source_record_id: normRentQ4.sourceRecords[1]!.source_record_id,
       batch_id: 'gcp-rent-q4',
       source_id: 'homes_victoria.rents',
       schema_version: 1,
@@ -2224,21 +2616,21 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
       completeness: {
         complete: true,
         method: 'feed_snapshot',
-        expected_records: 1,
-        fetched_records: 1,
+        expected_records: 2,
+        fetched_records: 2,
         expected_pages: 1,
         fetched_pages: 1,
         evidence: 'fixture',
       },
-      inputCount: 1,
-      outputCount: 1,
+      inputCount: 2,
+      outputCount: 2,
       rejectedCount: 0,
       sourceRecords: normRentQ4.sourceRecords.map(sr => ({
         ...sr, source_updated_at: '2025-01-01T00:00:00Z',
       })),
       geoRecords: [],
       geoRecordSources: [],
-      boundaries: [boundaryQ4],
+      boundaries: [boundaryQ4, boundaryYarraQ4],
       areaIndicators: rentResultQ4.indicators,
       parkingBays: [],
       parkingObservations: [],
@@ -2262,6 +2654,11 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
       version_id: normRentQ1.sourceRecords[0]!.version_id,
       source_record_id: normRentQ1.sourceRecords[0]!.source_record_id,
     };
+    const boundaryYarraQ1: Boundary = {
+      ...boundaryYarraQ4,
+      version_id: normRentQ1.sourceRecords[1]!.version_id,
+      source_record_id: normRentQ1.sourceRecords[1]!.source_record_id,
+    };
     const successQ1: ConnectorSuccess = {
       kind: 'success',
       sourceId: 'homes_victoria.rents',
@@ -2273,21 +2670,21 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
       completeness: {
         complete: true,
         method: 'feed_snapshot',
-        expected_records: 1,
-        fetched_records: 1,
+        expected_records: 3,
+        fetched_records: 3,
         expected_pages: 1,
         fetched_pages: 1,
         evidence: 'fixture',
       },
-      inputCount: 1,
-      outputCount: 1,
+      inputCount: 3,
+      outputCount: 3,
       rejectedCount: 0,
       sourceRecords: normRentQ1.sourceRecords.map(sr => ({
         ...sr, source_updated_at: '2025-04-01T00:00:00Z',
       })),
       geoRecords: [],
       geoRecordSources: [],
-      boundaries: [boundaryQ1],
+      boundaries: [boundaryQ1, boundaryYarraQ1],
       areaIndicators: rentResultQ1.indicators,
       parkingBays: [],
       parkingObservations: [],
@@ -2309,33 +2706,41 @@ test('US3 Section 7: GCP acceptance: real GoogleSQL v_area_indicators and v_boun
     const boundaryRows = await query(`
       SELECT boundary_id, scheme, code, name, vintage
       FROM \`${devProject}.${cloudConfig.queryDataset}.v_boundaries\`
-      WHERE boundary_id = 'ASGS_LGA:24600:2025'
+      WHERE boundary_id IN ('ASGS_LGA:24600:2025', 'ASGS_LGA:27350:2025')
+      ORDER BY code
     `);
-    assert.equal(boundaryRows.length, 1);
+    assert.equal(boundaryRows.length, 2);
     assert.equal(boundaryRows[0]?.boundary_id, 'ASGS_LGA:24600:2025');
     assert.equal(boundaryRows[0]?.name, 'Melbourne');
+    assert.equal(boundaryRows[1]?.boundary_id, 'ASGS_LGA:27350:2025');
+    assert.equal(boundaryRows[1]?.name, 'Yarra');
 
-    // 3. Real GoogleSQL Query & Assertions on v_area_indicators across 2 periods
+    // 3. Real GoogleSQL Query & Assertions on v_area_indicators across 2 periods and 2 regions
     const indicatorRows = await query(`
       SELECT indicator_id, boundary_id, boundary_mapping_status, boundary_name,
              period_start, period_end, value, unit, status, assertion_kind,
              source_record_id, source_id, batch_id
       FROM \`${devProject}.${cloudConfig.queryDataset}.v_area_indicators\`
       WHERE source_id = 'homes_victoria.rents'
-      ORDER BY period_start
+      ORDER BY boundary_name, period_start
     `);
-    assert.equal(indicatorRows.length, 2, 'Two distinct statistical periods must be queryable in real GoogleSQL');
-    assert.equal(indicatorRows[0]?.value, 615);
-    assert.equal(indicatorRows[0]?.boundary_mapping_status, 'matched');
-    assert.equal(indicatorRows[0]?.boundary_name, 'Melbourne');
-    assert.ok(indicatorRows[0]?.batch_id);
-    assert.ok(indicatorRows[0]?.source_record_id);
+    const melbRows = indicatorRows.filter((r) => r.boundary_name === 'Melbourne');
+    const yarraRows = indicatorRows.filter((r) => r.boundary_name === 'Yarra');
+    const suppressedGcpRows = indicatorRows.filter((r) => r.status === 'suppressed');
+    const unmatchedGcpRows = indicatorRows.filter((r) => r.boundary_mapping_status === 'missing');
 
-    assert.equal(indicatorRows[1]?.value, 680);
-    assert.equal(indicatorRows[1]?.boundary_mapping_status, 'matched');
-    assert.equal(indicatorRows[1]?.boundary_name, 'Melbourne');
-    assert.ok(indicatorRows[1]?.batch_id);
-    assert.ok(indicatorRows[1]?.source_record_id);
+    assert.equal(melbRows.length, 2, 'Melbourne must return two periods');
+    assert.equal(melbRows[0]?.value, 615);
+    assert.equal(melbRows[1]?.value, 680);
+    assert.equal(yarraRows.length, 2, 'Yarra must return two periods');
+    assert.equal(yarraRows[0]?.value, 675);
+    assert.equal(yarraRows[1]?.value, 700);
+
+    assert.ok(suppressedGcpRows.length > 0, 'Must have suppressed rent row');
+    assert.equal(suppressedGcpRows[0]?.value, null, 'Suppressed rent must have NULL value in GoogleSQL');
+    assert.ok(unmatchedGcpRows.length > 0, 'Must have unmatched rent row');
+    assert.equal(unmatchedGcpRows[0]?.boundary_mapping_status, 'missing');
+    assert.equal(unmatchedGcpRows[0]?.boundary_name, null, 'Unmatched rent cannot silently join in GoogleSQL');
 
     // 4. Gate: Missing or invalid source record cannot be queried
     await query(`

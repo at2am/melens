@@ -8,6 +8,7 @@ import {
   ParkingRestrictionsConnector,
   SOURCE_ID,
   daysInInclusiveRange,
+  findRuleConflicts,
   inferVehicleClass,
   parseExemption,
   parseHolidayApplicability,
@@ -20,7 +21,8 @@ import { parseConnectorInput } from '../../src/core/connector.js';
 import { HttpFailure } from '../../src/core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient, type OdsQuery, type OdsRecords } from '../../src/core/opendatasoft.js';
 import { parseSourceManifest } from '../../src/core/registry.js';
-import type { ParkingRule } from '../../src/core/types.js';
+import type { ParkingBay, ParkingObservation, ParkingRule } from '../../src/core/types.js';
+import { evaluateParkingBay } from '../../src/normalization/parking.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturePath = join(__dirname, '../fixtures/com_parking_restrictions.json');
@@ -721,5 +723,251 @@ test('sourceId mismatch fails closed with validation_failed', async () => {
   assert.equal(result.kind, 'failure');
   if (result.kind === 'failure') {
     assert.equal(result.code, 'validation_failed');
+  }
+});
+
+test('findRuleConflicts accurately detects conflicting rules on the same bay', () => {
+  const provenance = {
+    batch_id: 'batch',
+    source_id: SOURCE_ID,
+    schema_version: 1,
+    fetched_at: '2026-09-29T12:00:00Z',
+    source_record_id: 'src:1',
+    source_updated_at: '2022-11-13T10:30:19.000Z',
+    source_version_ordinal: null,
+    valid_from: null,
+    valid_to: null,
+    version_id: 'v1',
+  };
+
+  const ruleA: ParkingRule = {
+    ...provenance,
+    rule_id: 'r:1',
+    bay_id: 'restriction_bay:100',
+    days_of_week: [1, 2, 3, 4, 5],
+    start_minute_of_day: 570,
+    end_minute_of_day: 1110,
+    holiday_applicability: null,
+    vehicle_class: 'all',
+    restriction_type: '1P Meter',
+    max_stay_minutes: 60,
+    exemption: null,
+  };
+
+  const ruleB: ParkingRule = {
+    ...provenance,
+    rule_id: 'r:2',
+    bay_id: 'restriction_bay:100',
+    days_of_week: [1, 2, 3, 4, 5],
+    start_minute_of_day: 1110,
+    end_minute_of_day: 1230,
+    holiday_applicability: null,
+    vehicle_class: 'all',
+    restriction_type: '2P Meter',
+    max_stay_minutes: 120,
+    exemption: null,
+  };
+
+  // No conflict between non-overlapping contiguous rules A and B
+  assert.equal(findRuleConflicts([ruleA, ruleB]).length, 0);
+
+  const conflictingRule: ParkingRule = {
+    ...provenance,
+    rule_id: 'r:3',
+    bay_id: 'restriction_bay:100',
+    days_of_week: [1, 2, 3],
+    start_minute_of_day: 600,
+    end_minute_of_day: 900,
+    holiday_applicability: null,
+    vehicle_class: 'all',
+    restriction_type: 'No Stopping',
+    max_stay_minutes: 0,
+    exemption: null,
+  };
+
+  const conflicts = findRuleConflicts([ruleA, ruleB, conflictingRule]);
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0]![0].rule_id, 'r:1');
+  assert.equal(conflicts[0]![1].rule_id, 'r:3');
+});
+
+test('rules from com_parking_restrictions ensure undated, expired, unknown-holiday, and conflicting rules never produce may_park_now = yes', () => {
+  const provenance = {
+    batch_id: 'batch',
+    source_id: SOURCE_ID,
+    schema_version: 1,
+    fetched_at: '2026-09-30T12:00:00Z',
+    source_record_id: 'src:2313',
+    source_updated_at: '2022-11-13T10:30:19.000Z',
+    source_version_ordinal: null,
+    version_id: 'v1',
+  };
+
+  const bay: ParkingBay = {
+    ...provenance,
+    bay_id: 'bay:2313',
+    marker_id: 'marker:2313',
+    geometry_geojson: null,
+    public_access: true,
+    valid_from: null,
+    valid_to: null,
+  };
+
+  const observation: ParkingObservation = {
+    ...provenance,
+    sensor_id: 'sensor:2313',
+    bay_id: 'sensor-bay:2313',
+    marker_id: 'marker:2313',
+    observed_at: '2026-09-30T00:58:00Z',
+    occupied: false,
+  };
+
+  // Official upstream rule: undated sign from 2022 dataset with valid_from = null
+  const undatedRule: ParkingRule = {
+    ...provenance,
+    rule_id: 'rule:2313:slot1',
+    bay_id: 'restriction_bay:2313',
+    days_of_week: [1, 2, 3, 4, 5],
+    start_minute_of_day: 570,
+    end_minute_of_day: 1110,
+    holiday_applicability: 'does_not_apply',
+    vehicle_class: 'all',
+    restriction_type: '1P Meter',
+    max_stay_minutes: 60,
+    exemption: null,
+    valid_from: null, // Upstream restrictions have no row effective dates
+    valid_to: null,
+  };
+
+  const baseInput = {
+    bay,
+    allBays: [bay],
+    observations: [observation],
+    rules: [undatedRule],
+    ruleCrosswalk: {
+      bayId: bay.bay_id,
+      sensorBayId: observation.bay_id!,
+      ruleBayId: undatedRule.bay_id,
+      evidenceUrl: 'https://data.melbourne.vic.gov.au/explore/dataset/on-street-car-park-bay-restrictions/',
+      verified: true as const,
+    },
+    now: new Date('2026-09-30T01:00:00Z'), // 11:00 AM Melbourne time (day 3 / Wednesday)
+    melbournePublicHoliday: false,
+    vehicleClass: 'car',
+    cadenceSeconds: 300,
+    lastSuccessfulCheckAt: '2026-09-30T00:59:00Z',
+  };
+
+  // 1. Undated historical rule: cannot prove permission today -> unknown (no_current_rule)
+  const undatedDecision = evaluateParkingBay(baseInput);
+  assert.equal(undatedDecision.mayParkNow, 'unknown');
+  assert.ok(undatedDecision.reasons.includes('no_current_rule'));
+
+  // 2. Expired rule: valid_to in the past -> unknown (no_current_rule)
+  const expiredRule: ParkingRule = {
+    ...undatedRule,
+    valid_from: '2022-01-01T00:00:00Z',
+    valid_to: '2022-12-31T23:59:59Z',
+  };
+  const expiredDecision = evaluateParkingBay({ ...baseInput, rules: [expiredRule] });
+  assert.equal(expiredDecision.mayParkNow, 'unknown');
+  assert.ok(expiredDecision.reasons.includes('no_current_rule'));
+
+  // 3. Known valid date but unknown holiday state -> unknown (rule_ambiguous)
+  const datedRule: ParkingRule = {
+    ...undatedRule,
+    restriction_type: 'allowed',
+    valid_from: '2026-01-01T00:00:00Z',
+    valid_to: '2026-12-31T23:59:59Z',
+  };
+  const unknownHolidayDecision = evaluateParkingBay({
+    ...baseInput,
+    rules: [datedRule],
+    melbournePublicHoliday: null,
+  });
+  assert.equal(unknownHolidayDecision.mayParkNow, 'unknown');
+  assert.ok(unknownHolidayDecision.reasons.includes('rule_ambiguous'));
+
+  // 4. Rule with does_not_apply holiday applicability on a public holiday -> unknown (rule_ambiguous)
+  const doesNotApplyRule: ParkingRule = {
+    ...datedRule,
+    holiday_applicability: 'does_not_apply',
+  };
+  const holidayDecision = evaluateParkingBay({
+    ...baseInput,
+    rules: [doesNotApplyRule],
+    melbournePublicHoliday: true,
+  });
+  assert.equal(holidayDecision.mayParkNow, 'unknown');
+  assert.ok(holidayDecision.reasons.includes('rule_ambiguous'));
+
+  // 5. Rule with exemption -> unknown (rule_ambiguous)
+  const exemptionRule: ParkingRule = {
+    ...datedRule,
+    exemption: 'Disability Permit Only',
+  };
+  const exemptionDecision = evaluateParkingBay({ ...baseInput, rules: [exemptionRule] });
+  assert.equal(exemptionDecision.mayParkNow, 'unknown');
+  assert.ok(exemptionDecision.reasons.includes('rule_ambiguous'));
+
+  // 6. Conflicting overlapping rules on same bay -> unknown (rule_ambiguous)
+  const conflictingRule: ParkingRule = {
+    ...datedRule,
+    rule_id: 'rule:2313:slot2',
+    restriction_type: 'no_parking',
+  };
+  const conflictDecision = evaluateParkingBay({
+    ...baseInput,
+    rules: [datedRule, conflictingRule],
+  });
+  assert.equal(conflictDecision.mayParkNow, 'unknown');
+  assert.ok(conflictDecision.reasons.includes('rule_ambiguous'));
+
+  // 7. No verified crosswalk (the real situation today between restrictions bayid and sensor kerbsideid)
+  const noCrosswalkDecision = evaluateParkingBay({ ...baseInput, rules: [datedRule], ruleCrosswalk: null });
+  assert.equal(noCrosswalkDecision.mayParkNow, 'unknown');
+  assert.ok(noCrosswalkDecision.reasons.includes('rule_crosswalk_unverified'));
+});
+
+test('fetchMetadataRevision retrieves official data_processed timestamp and autoFetchMetadata populates sourceUpdatedAt', async () => {
+  class MetadataClient extends OpenDataSoftClient {
+    override async fetchDatasetDataProcessed(query: Pick<OdsQuery, 'portalUrl' | 'datasetId'>): Promise<string> {
+      assert.equal(query.datasetId, 'on-street-car-park-bay-restrictions');
+      return '2022-11-13T10:30:19.000Z';
+    }
+    override async fetchRecords(_query: OdsQuery): Promise<OdsRecords> {
+      return {
+        records: [{
+          bayid: 1001,
+          fromday1: 1,
+          today1: 5,
+          starttime1: '0001-01-01T09:00:00+00:00',
+          endtime1: '0001-01-01T17:00:00+00:00',
+          typedesc1: '2P Meter',
+        }],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-30T12:00:00Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  const connector = new ParkingRestrictionsConnector({
+    client: new MetadataClient(),
+    fetchMetadataRevision: true,
+  });
+
+  const metadataRevision = await connector.fetchMetadataRevision();
+  assert.equal(metadataRevision, '2022-11-13T10:30:19.000Z');
+
+  const result = await connector.collect(input);
+  assert.equal(result.kind, 'success');
+  if (result.kind === 'success') {
+    assert.equal(result.sourceRevision, '2022-11-13T10:30:19.000Z');
+    assert.equal(result.sourceLatestUpdateAt, '2022-11-13T10:30:19.000Z');
+    assert.equal(result.sourceRecords[0]!.source_updated_at, '2022-11-13T10:30:19.000Z');
+    assert.equal(result.parkingRules[0]!.source_updated_at, '2022-11-13T10:30:19.000Z');
+    assert.equal(result.geoRecords[0]!.source_updated_at, '2022-11-13T10:30:19.000Z');
   }
 });

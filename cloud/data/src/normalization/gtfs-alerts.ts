@@ -13,6 +13,10 @@ import {
 import type { GeoRecord, GeoRecordSource, SourceRecord } from '../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../validation/record.js';
 
+const tripStartDateSchema = z.string().regex(/^\d{8}$/).refine(value =>
+  z.iso.date().safeParse(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`).success);
+const tripStartTimeSchema = z.string().regex(/^\d{2,}:[0-5]\d:[0-5]\d$/);
+
 const selectorSchema = z.object({
   agencyId: z.string().nullable(),
   routeId: z.string().nullable(),
@@ -21,8 +25,8 @@ const selectorSchema = z.object({
   directionId: z.number().int().nullable(),
   tripId: z.string().nullable(),
   tripRouteId: z.string().nullable(),
-  tripStartDate: z.string().nullable(),
-  tripStartTime: z.string().nullable(),
+  tripStartDate: tripStartDateSchema.nullable(),
+  tripStartTime: tripStartTimeSchema.nullable(),
 });
 const summarySchema = z.object({
   mode: z.enum(['metro_train', 'yarra_tram']),
@@ -42,7 +46,7 @@ export interface StaticGtfsVersion {
 
 export type GtfsMappingStatus =
   | 'located' | 'route_only' | 'unmapped' | 'ambiguous'
-  | 'version_unverified' | 'invalid_alert';
+  | 'version_unverified' | 'trip_instance_unverified' | 'invalid_alert';
 
 export interface GtfsAlertMapping {
   geoRecordId: string;
@@ -116,23 +120,33 @@ interface ResolvedSelector {
   exactRouteIds: string[];
 }
 
+type SelectorResolution =
+  | { kind: 'matched'; selector: ResolvedSelector }
+  | { kind: 'unmapped' }
+  | { kind: 'trip_instance_unverified' };
+
 function resolveSelector(
   selector: AlertSelector,
   mode: AlertMode,
   staticFeed: PreparedStatic,
-): ResolvedSelector | null {
+): SelectorResolution {
+  // A trip instance needs calendar/frequency evidence that the current static
+  // snapshot does not preserve. Do not silently drop these AND constraints.
+  if (selector.tripStartDate !== null || selector.tripStartTime !== null) {
+    return { kind: 'trip_instance_unverified' };
+  }
   const { snapshot } = staticFeed.version;
   const trip = selector.tripId === null ? null : staticFeed.trips.get(selector.tripId);
-  if (selector.tripId !== null && trip === undefined) return null;
+  if (selector.tripId !== null && trip === undefined) return { kind: 'unmapped' };
   if (selector.routeId !== null && selector.tripRouteId !== null
-    && selector.routeId !== selector.tripRouteId) return null;
+    && selector.routeId !== selector.tripRouteId) return { kind: 'unmapped' };
   if (trip && ((selector.routeId !== null && selector.routeId !== trip.route_id)
-    || (selector.tripRouteId !== null && selector.tripRouteId !== trip.route_id))) return null;
+    || (selector.tripRouteId !== null && selector.tripRouteId !== trip.route_id))) return { kind: 'unmapped' };
 
   const stop = selector.stopId === null ? null : staticFeed.stops.get(selector.stopId);
-  if (selector.stopId !== null && stop === undefined) return null;
+  if (selector.stopId !== null && stop === undefined) return { kind: 'unmapped' };
   if (trip && stop && (!staticFeed.version.normalized.tripStopMembershipComplete
-    || !staticFeed.tripStops.has(`${trip.trip_id}\u0000${stop.stop_id}`))) return null;
+    || !staticFeed.tripStops.has(`${trip.trip_id}\u0000${stop.stop_id}`))) return { kind: 'unmapped' };
 
   const explicitRouteId = selector.routeId ?? selector.tripRouteId ?? trip?.route_id ?? null;
   const routeIds = (explicitRouteId === null
@@ -152,12 +166,11 @@ function resolveSelector(
     }
     return true;
   });
-  if (routeIds.length === 0) return null;
-  return {
-    routeIds,
-    stopId: stop?.stop_id ?? null,
+  if (routeIds.length === 0) return { kind: 'unmapped' };
+  return { kind: 'matched', selector: {
+    routeIds, stopId: stop?.stop_id ?? null,
     exactRouteIds: explicitRouteId === null ? [] : routeIds,
-  };
+  } };
 }
 
 function staticRecord(staticFeed: PreparedStatic, kind: 'stop' | 'route', id: string): SourceRecord | null {
@@ -213,10 +226,13 @@ export function joinGtfsAlertLocations(input: {
         if (staticFeed) {
           const resolved = summary.selectors.map(selector =>
             resolveSelector(selector, summary.mode, staticFeed!));
-          const matched = resolved.filter((item): item is ResolvedSelector => item !== null);
+          const matched = resolved.flatMap(item => item.kind === 'matched' ? [item.selector] : []);
           routeIds = [...new Set(matched.flatMap(item => item.exactRouteIds))].sort();
           stopIds = [...new Set(matched.flatMap(item => item.stopId === null ? [] : [item.stopId]))].sort();
-          if (matched.length === 0) status = 'unmapped';
+          if (resolved.some(item => item.kind === 'trip_instance_unverified')) {
+            status = 'trip_instance_unverified';
+          }
+          else if (matched.length === 0) status = 'unmapped';
           else if (matched.length !== resolved.length || stopIds.length > 1
             || (stopIds.length === 1 && matched.some(item => item.stopId === null))) {
             // A stop selector alongside a route or agency selector describes

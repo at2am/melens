@@ -102,8 +102,37 @@ WHERE g.public_query_allowed = TRUE
 -- prevents a cancelled/resolved/withdrawn event from reverting to an older
 -- active state. A future planned event may remain visible with status planned.
 CREATE OR REPLACE VIEW `melens_query.v_geo_records_current` AS
-SELECT *
-FROM `melens_query.v_geo_records_history`
+WITH batch_states AS (
+  SELECT batch_id, source_id, source_revision, state, published_at
+  FROM `melens_ingest.sync_batches`
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC
+  ) = 1
+),
+development_snapshots AS (
+  SELECT batch_id, SAFE_CAST(source_revision AS TIMESTAMP) AS snapshot_at
+  FROM batch_states
+  WHERE source_id = 'melbourne.development_monitor'
+    AND state = 'published' AND published_at IS NOT NULL
+    AND SAFE_CAST(source_revision AS TIMESTAMP) IS NOT NULL
+),
+current_development_snapshot AS (
+  SELECT batch_id
+  FROM development_snapshots
+  WHERE snapshot_at = (SELECT MAX(snapshot_at) FROM development_snapshots)
+)
+SELECT g.*
+FROM `melens_query.v_geo_records_history` AS g
+-- Development is a complete, versioned snapshot. A project removed from its
+-- latest published snapshot remains in history but is no longer current.
+-- Snapshot disappearance does not assert that the project was cancelled.
+WHERE g.source_id != 'melbourne.development_monitor'
+   OR EXISTS (
+     SELECT 1 FROM `melens_ingest.geo_records` AS member
+     JOIN current_development_snapshot AS snapshot USING (batch_id)
+     WHERE member.source_id = g.source_id
+       AND member.geo_record_id = g.geo_record_id
+   )
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY geo_record_id
   ORDER BY source_updated_at DESC NULLS LAST,

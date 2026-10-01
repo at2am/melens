@@ -170,7 +170,10 @@ test('T069 offline UC-04: minute and hour observations retain source time and lo
     observations: hourly.pedestrianObservations, locations, granularity: 'hour',
   });
   assert.equal(hourlyJoined[0]?.observation.observed_at, '2026-09-28T13:00:00.000Z');
-  assert.equal(hourlyJoined[0]?.location?.version_id, locations[0]?.version_id);
+  // The hour predates the first location snapshot; installation date does not
+  // establish where this sensor was during that earlier hour.
+  assert.equal(hourlyJoined[0]?.locationStatus, 'unlocated');
+  assert.equal(hourlyJoined[0]?.location, null);
   assert.equal(hourlyJoined[0]?.granularity, 'hour');
   assert.equal(hourlyJoined[0]?.observation.total_count, 94);
   assert.equal(hourly.sourceRecords[0]?.observed_at, hourlyJoined[0]?.observation.observed_at);
@@ -228,7 +231,7 @@ test('T069 offline UC-05: a static stop locates a matching alert, while absent e
       impactPeriods: [{ start: '2026-09-28T00:05:00.000Z', end: '2026-09-28T01:30:00.000Z' }],
       selectors: [{ agencyId: '2', routeId: '2-FLI', routeType: 2,
         stopId: '19499', directionId: 0, tripId: 'TRIP-FLI-01',
-        tripRouteId: '2-FLI', tripStartDate: '20260928', tripStartTime: '07:50:00' }],
+        tripRouteId: '2-FLI', tripStartDate: null, tripStartTime: null }],
       cause: null, effect: 1, header: 'Synthetic rail alert',
       description: null, url: null,
     }],

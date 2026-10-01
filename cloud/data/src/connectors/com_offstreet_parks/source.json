@@ -25,7 +25,8 @@
   "invariants": {
     "public_candidate_rule": "Only parking_type === 'Commercial' is marked as is_public_candidate: true and public_access: true. Residential and Private facilities are strictly non-public (is_public_candidate: false, public_access: false).",
     "capacity_rule": "parking_spaces represents annual CLUE survey capacity, never real-time vacant spaces or sensor occupancy (is_realtime_occupancy: false, no parking observations emitted).",
-    "license_rule": "License status remains review_required and access status remains candidate until formal licensing review and real crawl verification are completed."
+    "license_rule": "License status remains review_required and access status remains candidate until formal licensing review and real crawl verification are completed.",
+    "multi_row_aggregation_rule": "Upstream row granularity is establishment level without official establishment sub-keys. Multiple establishment rows sharing (census_year, property_id, parking_type) are deterministically deduplicated, sorted, and aggregated by summing parking_spaces into property-level annual capacity."
   },
   "admission_evidence": {
     "dataset_url": "https://data.melbourne.vic.gov.au/explore/dataset/off-street-car-parks-with-capacity-and-type/",

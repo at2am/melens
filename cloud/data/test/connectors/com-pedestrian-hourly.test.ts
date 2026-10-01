@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import {
   DATASET_ID,
   LANDING_URL,
+  MAX_HOURLY_SUMMARIES,
   PedestrianHourlyConnector,
   SOURCE_ID,
   createConnector,
   melbourneHourToUtc,
+  parseHourlyCheckpoint,
   parsePedestrianHourlyRow,
 } from '../../src/connectors/com_pedestrian_hourly/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
@@ -237,7 +239,7 @@ test('snapshot revision by sensing date queries only that date', async () => {
   if (result.kind !== 'success') return;
   assert.equal(capturedWhere, "sensing_date = date'2024-10-30'");
   assert.match(result.sourceRevision ?? '', /^2024-10-30@[0-9a-f]{64}$/);
-  assert.equal(result.checkpointAfter, '2024-10-30');
+  assert.equal(parseHourlyCheckpoint(result.checkpointAfter)?.cursor, '2024-10-30');
   assert.equal(result.sourceLatestUpdateAt, '2024-10-30T12:00:00.000Z');
   assert.equal(result.sourceRecords[0]?.source_updated_at, '2024-10-30T12:00:00.000Z');
   assert.equal(result.sourceRecords[0]?.observed_at, '2024-10-29T23:00:00.000Z');
@@ -567,6 +569,7 @@ test('corrected hourly reading produces updated revision and does not reuse iden
 
   class MutableOdsClient extends OpenDataSoftClient {
     currentRow = initialRow;
+    currentLastModified: string | null = '2024-10-30T10:00:00.000Z';
 
     override async fetchRecords(): Promise<OdsRecords> {
       return {
@@ -574,7 +577,7 @@ test('corrected hourly reading produces updated revision and does not reuse iden
         totalCount: 1,
         pageCount: 1,
         fetchedAt: '2026-09-29T00:00:00.000Z',
-        lastModified: null,
+        lastModified: this.currentLastModified,
       };
     }
   }
@@ -601,13 +604,13 @@ test('corrected hourly reading produces updated revision and does not reuse iden
   assert.ok(version1, 'Version ID must be generated');
   assert.ok(revision1, 'Source revision must be generated');
   assert.equal(result1.pedestrianObservations[0]?.total_count, 3);
-  // observed_at is the hour of observation; source_updated_at is null (not conflated with observed_at)
   assert.equal(result1.sourceRecords[0]?.observed_at, '2024-10-29T23:00:00.000Z');
-  assert.equal(result1.sourceRecords[0]?.source_updated_at, null);
-  assert.equal(result1.sourceLatestUpdateAt, null);
+  assert.equal(result1.sourceRecords[0]?.source_updated_at, '2024-10-30T10:00:00.000Z');
+  assert.equal(result1.sourceLatestUpdateAt, '2024-10-30T10:00:00.000Z');
 
-  // 2. City of Melbourne corrects the count from 3 to 4
+  // 2. City of Melbourne corrects the count from 3 to 4 with an advancing Last-Modified revision timestamp
   client.currentRow = correctedRow;
+  client.currentLastModified = '2024-10-30T12:00:00.000Z';
   const input2 = parseConnectorInput({
     sourceId,
     window: { kind: 'snapshot', revision: '2024-10-30' },
@@ -628,7 +631,7 @@ test('corrected hourly reading produces updated revision and does not reuse iden
 
   // The observation hour remains unchanged and update time is separated
   assert.equal(result2.sourceRecords[0]?.observed_at, '2024-10-29T23:00:00.000Z');
-  assert.equal(result2.sourceRecords[0]?.source_updated_at, null);
+  assert.equal(result2.sourceRecords[0]?.source_updated_at, '2024-10-30T12:00:00.000Z');
 
   // Version ID, source revision, and stableBatchId MUST all update!
   assert.notEqual(version1, version2, 'Corrected count must produce a distinct version_id');
@@ -663,13 +666,14 @@ test('corrected hourly reading in time window produces updated revision and batc
 
   class TimeClient extends OpenDataSoftClient {
     currentRow = initialRow;
+    currentLastModified: string | null = '2024-10-30T10:00:00.000Z';
     override async fetchRecords(): Promise<OdsRecords> {
       return {
         records: [this.currentRow],
         totalCount: 1,
         pageCount: 1,
         fetchedAt: '2026-09-29T00:00:00.000Z',
-        lastModified: null,
+        lastModified: this.currentLastModified,
       };
     }
   }
@@ -692,6 +696,7 @@ test('corrected hourly reading in time window produces updated revision and batc
   if (res1.kind !== 'success') return;
 
   client.currentRow = correctedRow;
+  client.currentLastModified = '2024-10-30T12:00:00.000Z';
   const res2 = await connector.collect(parseConnectorInput({
     sourceId,
     window,
@@ -708,3 +713,762 @@ test('corrected hourly reading in time window produces updated revision and batc
   assert.notEqual(b1, b2);
 });
 
+test('detects conflicting duplicate readings for same sensor-hour even when native id differs', async () => {
+  class DifferingNativeIdConflictClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [
+          {
+            id: 1001,
+            location_id: 167,
+            sensing_date: '2024-10-30',
+            hourday: 10,
+            direction_1: 20,
+            direction_2: 30,
+            pedestriancount: 50,
+            sensor_name: 'Lat526_T',
+          },
+          {
+            id: 1002,
+            location_id: 167,
+            sensing_date: '2024-10-30',
+            hourday: 10,
+            direction_1: 30,
+            direction_2: 50,
+            pedestriancount: 80,
+            sensor_name: 'Lat526_T',
+          },
+        ],
+        totalCount: 2,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  const connector = createConnector({ client: new DifferingNativeIdConflictClient() });
+  const result = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'differing-native-id-conflict-run',
+  }));
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind !== 'failure') return;
+  assert.equal(result.code, 'validation_failed');
+  assert.match(result.message, /Conflicting duplicate sensor-hour readings/);
+});
+
+test('detects conflicting duplicate readings for same sensor-hour when one record has null id', async () => {
+  class NullIdConflictClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [
+          {
+            id: 1671020241030,
+            location_id: 167,
+            sensing_date: '2024-10-30',
+            hourday: 10,
+            direction_1: 20,
+            direction_2: 30,
+            pedestriancount: 50,
+            sensor_name: 'Lat526_T',
+          },
+          {
+            id: null,
+            location_id: 167,
+            sensing_date: '2024-10-30',
+            hourday: 10,
+            direction_1: 40,
+            direction_2: 50,
+            pedestriancount: 90,
+            sensor_name: 'Lat526_T',
+          },
+        ],
+        totalCount: 2,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  const connector = createConnector({ client: new NullIdConflictClient() });
+  const result = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'null-id-conflict-run',
+  }));
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind !== 'failure') return;
+  assert.equal(result.code, 'validation_failed');
+  assert.match(result.message, /Conflicting duplicate sensor-hour readings/);
+});
+
+test('fails closed when previousObservations contains conflicting version of same sensor-hour without revision ordering evidence', async () => {
+  const row = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 20,
+    direction_2: 40,
+    pedestriancount: 60,
+    sensor_name: 'Lat526_T',
+  };
+
+  class SimpleClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  // Previous observation had count = 50, resulting in a different version_id
+  const connector = createConnector({
+    client: new SimpleClient(),
+    previousObservations: [
+      {
+        batch_id: 'prev-batch',
+        source_id: sourceId,
+        schema_version: 1,
+        fetched_at: '2026-09-28T00:00:00.000Z',
+        sensor_id: '167',
+        observed_at: '2024-10-29T23:00:00.000Z',
+        version_id: 'old-version-digest-xyz',
+        total_count: 50,
+        direction_a_count: 20,
+        direction_b_count: 30,
+        source_record_id: `${sourceId}:1671020241030`,
+      },
+    ],
+  });
+
+  const result = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'prior-version-conflict-run',
+  }));
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind !== 'failure') return;
+  assert.equal(result.code, 'validation_failed');
+  assert.match(result.message, /Conflicting duplicate sensor-hour readings across versions without revision order/);
+});
+
+test('fails closed when JSON checkpoint contains conflicting version of same sensor-hour without revision ordering evidence', async () => {
+  const row = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 20,
+    direction_2: 40,
+    pedestriancount: 60,
+    sensor_name: 'Lat526_T',
+  };
+
+  class SimpleClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  const connector = createConnector({ client: new SimpleClient() });
+  const checkpoint = JSON.stringify({
+    cursor: '2024-10-30',
+    previousObservations: [
+      {
+        source_record_id: 'hourly:167:2024-10-29T23:00:00.000Z',
+        sensor_id: '167',
+        observed_at: '2024-10-29T23:00:00.000Z',
+        version_id: 'old-version-digest-abc',
+        total_count: 3,
+      },
+    ],
+  });
+
+  const result = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint,
+    runId: 'checkpoint-conflict-run',
+  }));
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind !== 'failure') return;
+  assert.equal(result.code, 'validation_failed');
+  assert.match(result.message, /Conflicting duplicate sensor-hour readings across versions without revision order/);
+});
+
+test('succeeds idempotently when previousObservations contains identical version of same sensor-hour', async () => {
+  const row = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+    location: { lon: 144.95155955, lat: -37.81304149 },
+  };
+
+  class SimpleClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: null,
+      };
+    }
+  }
+
+  // First run to get exact version_id
+  const c1 = createConnector({ client: new SimpleClient() });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'idempotent-first-run',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+
+  // Second run with previousObservations populated with the identical observation
+  const c2 = createConnector({
+    client: new SimpleClient(),
+    previousObservations: r1.pedestrianObservations,
+  });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'idempotent-second-run',
+  }));
+  assert.equal(r2.kind, 'success');
+  if (r2.kind !== 'success') return;
+  assert.equal(r2.pedestrianObservations.length, 1);
+  assert.equal(r2.pedestrianObservations[0]?.version_id, r1.pedestrianObservations[0]?.version_id);
+});
+
+test('Melbourne DST transition edge cases verify valid hours before and after transition while rejecting ambiguous and nonexistent hours', () => {
+  // 1. Fallback day (2026-04-05, AEDT -> AEST)
+  // Hour 1: 01:00 AEDT (UTC+11) -> 14:00 UTC previous day
+  assert.equal(melbourneHourToUtc('2026-04-05', 1), '2026-04-04T14:00:00.000Z');
+  // Hour 2: ambiguous (repeated) -> must throw
+  assert.throws(() => melbourneHourToUtc('2026-04-05', 2), /ambiguous/);
+  // Hour 3: 03:00 AEST (UTC+10) -> 17:00 UTC previous day
+  assert.equal(melbourneHourToUtc('2026-04-05', 3), '2026-04-04T17:00:00.000Z');
+
+  // 2. Spring forward day (2026-10-04, AEST -> AEDT)
+  // Hour 1: 01:00 AEST (UTC+10) -> 15:00 UTC previous day
+  assert.equal(melbourneHourToUtc('2026-10-04', 1), '2026-10-03T15:00:00.000Z');
+  // Hour 2: nonexistent (skipped) -> must throw
+  assert.throws(() => melbourneHourToUtc('2026-10-04', 2), /ambiguous or nonexistent/);
+  // Hour 3: 03:00 AEDT (UTC+11) -> 16:00 UTC previous day
+  assert.equal(melbourneHourToUtc('2026-10-04', 3), '2026-10-03T16:00:00.000Z');
+
+  // 3. Invalid hourday values
+  assert.throws(() => melbourneHourToUtc('2026-10-04', -1), /Invalid Melbourne local sensor hour/);
+  assert.throws(() => melbourneHourToUtc('2026-10-04', 24), /Invalid Melbourne local sensor hour/);
+  assert.throws(() => melbourneHourToUtc('2026-10-04', 1.5), /Invalid Melbourne local sensor hour/);
+});
+
+test('default loading on same instance: count change without revision time fails closed', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class MutableClient extends OpenDataSoftClient {
+    currentRow = row1;
+    currentLastModified: string | null = null;
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.currentRow],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.currentLastModified,
+      };
+    }
+  }
+
+  const client = new MutableClient();
+  const connector = createConnector({ client });
+
+  const r1 = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'default-load-run-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.equal(r1.pedestrianObservations[0]?.total_count, 94);
+
+  // Second run on same instance with modified count, without revision timestamp
+  client.currentRow = row2;
+  client.currentLastModified = null;
+
+  const r2 = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'default-load-run-2',
+  }));
+  assert.equal(r2.kind, 'failure');
+  if (r2.kind !== 'failure') return;
+  assert.equal(r2.code, 'validation_failed');
+  assert.match(r2.message, /Conflicting duplicate sensor-hour readings across versions without revision order/);
+});
+
+test('default loading on same instance: count change with identical revision time fails closed', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class MutableClient extends OpenDataSoftClient {
+    currentRow = row1;
+    currentLastModified: string | null = '2024-10-30T10:00:00.000Z';
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.currentRow],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.currentLastModified,
+      };
+    }
+  }
+
+  const client = new MutableClient();
+  const connector = createConnector({ client });
+
+  const r1 = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'identical-time-run-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.equal(r1.pedestrianObservations[0]?.total_count, 94);
+
+  // Second run on same instance with modified count and identical revision timestamp
+  client.currentRow = row2;
+  client.currentLastModified = '2024-10-30T10:00:00.000Z';
+
+  const r2 = await connector.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'identical-time-run-2',
+  }));
+  assert.equal(r2.kind, 'failure');
+  if (r2.kind !== 'failure') return;
+  assert.equal(r2.code, 'validation_failed');
+  assert.match(r2.message, /Conflicting duplicate sensor-hour readings with identical revision timestamp/);
+});
+
+test('checkpoint saving and next load across instances: without revision time fails closed', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class TestClient extends OpenDataSoftClient {
+    constructor(private row: unknown, private lastModified: string | null = null) {
+      super();
+    }
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.lastModified,
+      };
+    }
+  }
+
+  const c1 = createConnector({ client: new TestClient(row1, null) });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'across-instance-no-time-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.ok(r1.checkpointAfter);
+
+  const c2 = createConnector({ client: new TestClient(row2, null) });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: r1.checkpointAfter,
+    runId: 'across-instance-no-time-2',
+  }));
+  assert.equal(r2.kind, 'failure');
+  if (r2.kind !== 'failure') return;
+  assert.equal(r2.code, 'validation_failed');
+  assert.match(r2.message, /Conflicting duplicate sensor-hour readings across versions without revision order/);
+});
+
+test('checkpoint saving and next load across instances: identical revision time fails closed', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class TestClient extends OpenDataSoftClient {
+    constructor(private row: unknown, private lastModified: string | null = null) {
+      super();
+    }
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.lastModified,
+      };
+    }
+  }
+
+  const c1 = createConnector({ client: new TestClient(row1, '2024-10-30T10:00:00.000Z') });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'across-instance-same-time-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.ok(r1.checkpointAfter);
+
+  const c2 = createConnector({ client: new TestClient(row2, '2024-10-30T10:00:00.000Z') });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: r1.checkpointAfter,
+    runId: 'across-instance-same-time-2',
+  }));
+  assert.equal(r2.kind, 'failure');
+  if (r2.kind !== 'failure') return;
+  assert.equal(r2.code, 'validation_failed');
+  assert.match(r2.message, /Conflicting duplicate sensor-hour readings with identical revision timestamp/);
+});
+
+test('checkpoint saving and next load across instances: older revision time arriving late fails closed', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class TestClient extends OpenDataSoftClient {
+    constructor(private row: unknown, private lastModified: string | null = null) {
+      super();
+    }
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.lastModified,
+      };
+    }
+  }
+
+  const c1 = createConnector({ client: new TestClient(row1, '2024-10-30T12:00:00.000Z') });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'across-instance-older-time-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.ok(r1.checkpointAfter);
+
+  // Instance 2 loads checkpoint from run 1 (which had 12:00:00Z), but upstream returns 10:00:00Z (older)
+  const c2 = createConnector({ client: new TestClient(row2, '2024-10-30T10:00:00.000Z') });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: r1.checkpointAfter,
+    runId: 'across-instance-older-time-2',
+  }));
+  assert.equal(r2.kind, 'failure');
+  if (r2.kind !== 'failure') return;
+  assert.equal(r2.code, 'validation_failed');
+  assert.match(r2.message, /Conflicting duplicate sensor-hour readings with older revision timestamp arriving late/);
+});
+
+test('checkpoint saving and next load across instances: strictly newer revision time succeeds', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+  const row2 = {
+    ...row1,
+    direction_2: 83,
+    pedestriancount: 100,
+  };
+
+  class TestClient extends OpenDataSoftClient {
+    constructor(private row: unknown, private lastModified: string | null = null) {
+      super();
+    }
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.lastModified,
+      };
+    }
+  }
+
+  const c1 = createConnector({ client: new TestClient(row1, '2024-10-30T10:00:00.000Z') });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'across-instance-newer-time-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.ok(r1.checkpointAfter);
+
+  // Instance 2 loads checkpoint from run 1 (10:00:00Z), and upstream returns 12:00:00Z (strictly newer)
+  const c2 = createConnector({ client: new TestClient(row2, '2024-10-30T12:00:00.000Z') });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: r1.checkpointAfter,
+    runId: 'across-instance-newer-time-2',
+  }));
+  assert.equal(r2.kind, 'success');
+  if (r2.kind !== 'success') return;
+  assert.equal(r2.pedestrianObservations[0]?.total_count, 100);
+  assert.notEqual(r1.sourceRevision, r2.sourceRevision);
+  assert.equal(r2.sourceRecords[0]?.source_updated_at, '2024-10-30T12:00:00.000Z');
+
+  const cp2 = parseHourlyCheckpoint(r2.checkpointAfter);
+  assert.equal(cp2?.summaries[0]?.versionId, r2.pedestrianObservations[0]?.version_id);
+  assert.equal(cp2?.summaries[0]?.sourceUpdatedAt, '2024-10-30T12:00:00.000Z');
+  assert.equal(cp2?.summaries[0]?.count, 100);
+});
+
+test('checkpoint saving and next load across instances: identical replay succeeds idempotently', async () => {
+  const row1 = {
+    id: 1671020241030,
+    location_id: 167,
+    sensing_date: '2024-10-30',
+    hourday: 10,
+    direction_1: 17,
+    direction_2: 77,
+    pedestriancount: 94,
+    sensor_name: 'Lat526_T',
+  };
+
+  class TestClient extends OpenDataSoftClient {
+    constructor(private row: unknown, private lastModified: string | null = null) {
+      super();
+    }
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [this.row],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T00:00:00.000Z',
+        lastModified: this.lastModified,
+      };
+    }
+  }
+
+  const c1 = createConnector({ client: new TestClient(row1, '2024-10-30T10:00:00.000Z') });
+  const r1 = await c1.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: null,
+    runId: 'across-instance-replay-1',
+  }));
+  assert.equal(r1.kind, 'success');
+  if (r1.kind !== 'success') return;
+  assert.ok(r1.checkpointAfter);
+
+  const c2 = createConnector({ client: new TestClient(row1, '2024-10-30T10:00:00.000Z') });
+  const r2 = await c2.collect(parseConnectorInput({
+    sourceId,
+    window: { kind: 'snapshot', revision: '2024-10-30' },
+    checkpoint: r1.checkpointAfter,
+    runId: 'across-instance-replay-2',
+  }));
+  assert.equal(r2.kind, 'success');
+  if (r2.kind !== 'success') return;
+  assert.equal(r2.pedestrianObservations[0]?.total_count, 94);
+  assert.equal(r2.pedestrianObservations[0]?.version_id, r1.pedestrianObservations[0]?.version_id);
+  assert.equal(r2.sourceRevision, r1.sourceRevision);
+});
+
+
+
+
+
+test('hourly checkpoint rejects corrupt JSON and unvalidated summary fields before requesting upstream', async () => {
+  let calls = 0;
+  class NeverRequestedClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      calls += 1;
+      throw new Error('Invalid state must fail before the upstream request');
+    }
+  }
+  const validSummary = {
+    recordId: 'record-1', sensorHourKey: '167:2024-10-29T23:00:00.000Z',
+    versionId: 'version-1', sourceUpdatedAt: null, count: 3,
+  };
+  for (const checkpoint of [
+    '{invalid-json',
+    JSON.stringify({ cursor: '2024-10-30', summaries: [{ ...validSummary, sourceUpdatedAt: 'yesterday' }] }),
+    JSON.stringify({ cursor: '2024-10-30', summaries: [{ ...validSummary, count: -1 }] }),
+    JSON.stringify({ cursor: '2024-10-30', summaries: [{ ...validSummary, sensorHourKey: '167:2024-99-99T23:00:00Z' }] }),
+    JSON.stringify({ cursor: '2024-10-30', summaries: [validSummary, validSummary] }),
+    JSON.stringify({ cursor: 'not-a-cursor', summaries: [] }),
+  ]) {
+    const result = await createConnector({ client: new NeverRequestedClient() }).collect(parseConnectorInput({
+      sourceId, window: { kind: 'snapshot', revision: '2024-10-30' }, checkpoint, runId: 'invalid-checkpoint',
+    }));
+    assert.equal(result.kind, 'failure');
+    if (result.kind === 'failure') {
+      assert.equal(result.code, 'validation_failed');
+      assert.match(result.message, /Invalid hourly checkpoint state/);
+    }
+  }
+  assert.equal(calls, 0);
+});
+
+test('hourly checkpoint enforces the shared 50000-summary bound', () => {
+  const summary = {
+    recordId: 'record-1', sensorHourKey: '167:2024-10-29T23:00:00.000Z',
+    versionId: 'version-1', sourceUpdatedAt: null, count: 3,
+  };
+  assert.equal(MAX_HOURLY_SUMMARIES, 50_000);
+  assert.throws(() => parseHourlyCheckpoint(JSON.stringify({
+    cursor: '2024-10-30', summaries: Array(MAX_HOURLY_SUMMARIES + 1).fill(summary),
+  })), /Invalid hourly checkpoint state/);
+});
+
+test('hourly output checkpoint contains only the collected window even when history includes older hours', async () => {
+  class CurrentWindowClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [{ id: 'hour-11', location_id: 167, sensing_date: '2024-10-30', hourday: 11,
+          direction_1: 1, direction_2: 2, pedestriancount: 3 }],
+        totalCount: 1, pageCount: 1, fetchedAt: '2026-09-29T00:00:00Z', lastModified: null,
+      };
+    }
+  }
+  const previous = {
+    cursor: '2024-10-30T00:00:00Z', summaries: [{ recordId: 'old-hour', sensorHourKey: '167:2024-10-29T23:00:00.000Z',
+      versionId: 'old-version', sourceUpdatedAt: null, count: 2 }],
+  };
+  for (const isolated of [true, false]) {
+    const connector = createConnector({ client: new CurrentWindowClient(), isolated });
+    const result = await connector.collect(parseConnectorInput({ sourceId,
+      window: { kind: 'time', from: '2024-10-30T00:00:00Z', to: '2024-10-30T01:00:00Z' },
+      checkpoint: JSON.stringify(previous), runId: 'current-window-state',
+    }));
+    assert.equal(result.kind, 'success');
+    if (result.kind !== 'success') continue;
+    const checkpoint = parseHourlyCheckpoint(result.checkpointAfter);
+    assert.equal(checkpoint?.summaries.length, 1);
+    assert.equal(checkpoint?.summaries[0]?.sensorHourKey, '167:2024-10-30T00:00:00.000Z');
+    assert.equal(checkpoint?.cursor, '2024-10-30T01:00:00Z');
+  }
+});

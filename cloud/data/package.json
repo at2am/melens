@@ -10,7 +10,7 @@
     "build": "tsc --project tsconfig.json && node scripts/copy-manifests.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "npm run build && cd dist && node --test",
-    "ingest": "node dist/src/jobs/ingest.js",
+    "ingest": "node --env-file-if-exists=../../.env dist/src/jobs/ingest.js",
     "verify": "node dist/src/jobs/verify.js",
     "probe": "node dist/src/jobs/probe.js"
   },

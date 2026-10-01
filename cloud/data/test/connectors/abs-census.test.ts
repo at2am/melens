@@ -120,6 +120,8 @@ test('ABS Census DataPacks normalization produces valid SourceRecords and AreaIn
   assert.equal(southbankPersons.source_area_code, '206041122');
   assert.equal(southbankPersons.source_area_vintage, '2021');
   assert.equal(southbankPersons.assertion_kind, 'observation');
+  assert.equal(southbankPersons.period_start, '2021-08-10T00:00:00Z');
+  assert.equal(southbankPersons.period_end, '2021-08-11T00:00:00.000Z');
 
   // Check SA1 support
   const sa1Indicator = result.areaIndicators.find(
@@ -200,4 +202,21 @@ test('ABS Census connector with official source disabled never reads bundled fix
   if (result.kind !== 'failure') return;
   assert.equal(result.code, 'upstream_unavailable');
   assert.equal(result.completeness.complete, false);
+});
+
+test('ABS Census production defaults ignore environment fixture and URL overrides', async () => {
+  const previousFixture = process.env.ABS_CENSUS_FIXTURE_PATH;
+  const previousUrl = process.env.ABS_CENSUS_DATA_URL;
+  process.env.ABS_CENSUS_FIXTURE_PATH = fileURLToPath(new URL('../fixtures/abs_census.json', import.meta.url));
+  process.env.ABS_CENSUS_DATA_URL = 'https://example.invalid/unreviewed-census.json';
+  try {
+    const result = await new AbsCensusConnector({ officialArchives: false }).collect(input);
+    assert.equal(result.kind, 'failure');
+    if (result.kind === 'failure') assert.equal(result.code, 'upstream_unavailable');
+  } finally {
+    if (previousFixture === undefined) delete process.env.ABS_CENSUS_FIXTURE_PATH;
+    else process.env.ABS_CENSUS_FIXTURE_PATH = previousFixture;
+    if (previousUrl === undefined) delete process.env.ABS_CENSUS_DATA_URL;
+    else process.env.ABS_CENSUS_DATA_URL = previousUrl;
+  }
 });

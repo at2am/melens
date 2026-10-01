@@ -5,11 +5,12 @@ import { HttpClient, HttpFailure } from '../../core/http.js';
 import type { GeoRecord, GeoRecordSource, SourceRecord } from '../../core/types.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
-const SOURCE_ID = 'ticketmaster.events';
-const ENDPOINT = 'https://app.ticketmaster.com/discovery/v2/events.json';
-const MELBOURNE = { lat: -37.8136, lon: 144.9631 };
-const SEARCH_RADIUS_KM = 80;
-const PAGE_SIZE = 100;
+export const SOURCE_ID = 'ticketmaster.events';
+export const ENDPOINT = 'https://app.ticketmaster.com/discovery/v2/events.json';
+export const MELBOURNE = { lat: -37.8136, lon: 144.9631 };
+export const SEARCH_RADIUS_KM = 80;
+export const PAGE_SIZE = 100;
+export const DEEP_PAGING_LIMIT = 1000;
 
 const venueSchema = z.object({
   id: z.string().optional(),
@@ -94,8 +95,9 @@ export function normalizeTicketEvents(events: readonly TicketEvent[], input: Con
     if (seen.has(event.id)) throw new Error('Duplicate Ticketmaster event ID');
     seen.add(event.id);
     const status = event.dates.status?.code ?? 'unknown';
-    const cancelled = status === 'canceled';
-    const unscheduled = status === 'postponed' || event.dates.start.dateTBA === true
+    const statusLower = status.toLowerCase();
+    const cancelled = statusLower === 'canceled' || statusLower === 'cancelled';
+    const unscheduled = statusLower === 'postponed' || event.dates.start.dateTBA === true
       || event.dates.start.dateTBD === true;
     const startAt = unscheduled ? null : timestamp(event.dates.start.dateTime);
     const suppliedEnd = timestamp(event.dates.end?.dateTime);
@@ -143,11 +145,13 @@ export function normalizeTicketEvents(events: readonly TicketEvent[], input: Con
   return { sourceRecords, geoRecords, geoRecordSources };
 }
 
-function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavailable'
-  | 'schema_changed' | 'auth_failed' | 'incomplete_window' | 'validation_failed'): ConnectorResult {
+export function failure(input: ConnectorInput, code: 'rate_limited' | 'upstream_unavailable'
+  | 'schema_changed' | 'auth_failed' | 'incomplete_window' | 'validation_failed',
+  retryAfterSeconds: number | null = null,
+  message = 'Ticketmaster event window could not be validated'): ConnectorResult {
   return { kind: 'failure', sourceId: SOURCE_ID, runId: input.runId,
     checkedAt: new Date().toISOString(), code,
-    message: 'Ticketmaster event window could not be validated', retryAfterSeconds: null,
+    message, retryAfterSeconds,
     completeness: { complete: false, expected_records: null, fetched_records: 0,
       expected_pages: null, fetched_pages: 0,
       evidence: 'All pages within the 1000-result API deep-paging limit are required' },
@@ -163,7 +167,7 @@ export class TicketmasterConnector implements Connector {
     if (input.sourceId !== SOURCE_ID || input.window.kind !== 'time') {
       return failure(input, 'validation_failed');
     }
-    const key = this.keyProvider();
+    const key = this.keyProvider()?.trim();
     if (!key) return failure(input, 'auth_failed');
     try {
       const events: TicketEvent[] = [];
@@ -171,7 +175,7 @@ export class TicketmasterConnector implements Connector {
       let total: number | null = null;
       let pages: number | null = null;
       for (let page = 0; ; page += 1) {
-        if (page * PAGE_SIZE >= 1000) return failure(input, 'incomplete_window');
+        if (page * PAGE_SIZE >= DEEP_PAGING_LIMIT) return failure(input, 'incomplete_window');
         const url = new URL(ENDPOINT);
         url.searchParams.set('apikey', key);
         url.searchParams.set('countryCode', 'AU');
@@ -192,7 +196,7 @@ export class TicketmasterConnector implements Connector {
         }
         total = body.page.totalElements;
         pages = body.page.totalPages;
-        if (total > 1000) return failure(input, 'incomplete_window');
+        if (total > DEEP_PAGING_LIMIT) return failure(input, 'incomplete_window');
         events.push(...(body._embedded?.events ?? []));
         if (page + 1 >= Math.max(1, pages)) break;
       }
@@ -212,7 +216,9 @@ export class TicketmasterConnector implements Connector {
     } catch (error) {
       const code = error instanceof HttpFailure ? error.code
         : error instanceof z.ZodError ? 'schema_changed' : 'validation_failed';
-      return failure(input, code);
+      const retryAfterSeconds = error instanceof HttpFailure && error.retryAfterMs !== null
+        ? Math.ceil(error.retryAfterMs / 1000) : null;
+      return failure(input, code, retryAfterSeconds);
     }
   }
 }

@@ -39,5 +39,11 @@
     ],
     "staging_retention_days": 1,
     "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/"
+  },
+  "invariants": {
+    "cold_start_relocation_protection": "When relocation is detected on cold start without upstream migration moment, valid_from reflects snapshot observation time rather than backdating new coordinates to installation date",
+    "transition_gap_preservation": "Upstream absence of relocation moment preserves the unknown interval between versions without fabricating an effective start date",
+    "baseline_evidence_requirement": "Cold-start fallback to installation_date strictly requires verified baseline snapshot evidence matching current coordinates with no relocation indications; uncataloged sensors preserve history as unlocated",
+    "closed_interval_output": "Closed historical versions are emitted in output bundle alongside current location versions to maintain downstream historical observation joins"
   }
 }

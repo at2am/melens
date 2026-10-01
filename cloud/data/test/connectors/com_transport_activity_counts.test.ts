@@ -58,7 +58,7 @@ test('T032: source.json manifest parses cleanly and maintains review_required ca
   // Upstream verification metadata
   assert.equal(manifestRaw.upstream_status, 'blocked / unavailable');
   assert.equal(UPSTREAM_STATUS, 'blocked / unavailable');
-  assert.equal(UPSTREAM_VERIFICATION_DATE, '2026-09-29');
+  assert.equal(UPSTREAM_VERIFICATION_DATE, '2026-09-30');
   assert.equal(UPSTREAM_ERROR_CODE, 'NotFoundResource');
   assert.ok(manifestRaw.notes?.includes('404'), 'Manifest notes must document HTTP 404 verification');
   assert.ok(manifestRaw.notes?.includes('blocked / unavailable'), 'Manifest notes must document blocked/unavailable status');
@@ -650,4 +650,69 @@ test('T032 Error Handling: correctly translates upstream failures and invalid st
   if (scResult.kind === 'failure') {
     assert.equal(scResult.code, 'schema_changed');
   }
+});
+
+test('GM-10 Delivery Standard: official alternative dataset audit and reproducible 404 blocked verification',
+  { skip: process.env.RUN_LIVE_PUBLIC_DATA !== '1' }, async () => {
+  // 1. Invariant: live collection fails closed, NEVER substitutes fixture data to fake admission
+  const liveResult = await connector.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: 'latest' },
+    checkpoint: null,
+    runId: 'gm-10-live-verification',
+  }));
+
+  assert.equal(liveResult.kind, 'failure', 'Live collection must fail closed and never falsely claim success');
+  if (liveResult.kind === 'failure') {
+    assert.equal(liveResult.completeness.complete, false);
+    assert.equal(liveResult.completeness.fetched_records, 0);
+    assert.ok(
+      liveResult.code === 'schema_changed' || liveResult.code === 'upstream_unavailable',
+      `Failure code must be schema_changed or upstream_unavailable, got ${liveResult.code}`,
+    );
+    assert.ok(
+      liveResult.completeness.evidence.includes('404') || liveResult.code === 'upstream_unavailable',
+      'Failure evidence must indicate HTTP 404 or network unavailability',
+    );
+  }
+
+  // 2. Official Alternative Audit: evaluate why "traffic-count-vehicle-classification-2014-2017" cannot substitute T032
+  // We model the candidate alternative schema to demonstrate the contract violations against T032 invariants:
+  const candidateAlternativeDataset = {
+    dataset_id: 'traffic-count-vehicle-classification-2014-2017',
+    temporal_granularity_minutes: 60, // hourly, NOT 5-minute
+    vintage_end_year: 2017, // ended 2017, NOT ongoing
+    cadence_seconds: null, // static historical survey, NOT hourly updates
+    supported_modes: ['vehicle'] as const, // vehicle only, lacks pedestrian counts
+    has_pedestrian_counts: false,
+    has_5_min_sampling: false,
+    has_ongoing_cadence: false,
+  };
+
+  // Invariant check: candidate alternative must NOT violate 5-minute sampling rule
+  assert.notEqual(
+    candidateAlternativeDataset.temporal_granularity_minutes,
+    SAMPLING_INTERVAL_MINUTES,
+    'Alternative cannot replace T032: temporal granularity is hourly (60 min), violating 5-minute sampling invariant',
+  );
+
+  // Invariant check: candidate alternative must NOT violate modal breakdown rule
+  assert.equal(
+    candidateAlternativeDataset.has_pedestrian_counts,
+    false,
+    'Alternative cannot replace T032: lacks continuous pedestrian counts',
+  );
+
+  // Invariant check: candidate alternative must NOT violate ongoing cadence rule
+  assert.equal(
+    candidateAlternativeDataset.has_ongoing_cadence,
+    false,
+    'Alternative cannot replace T032: survey ended in 2017 and is not an ongoing stream',
+  );
+
+  // 3. Governance Invariants: source remains blocked, candidate, review_required
+  const manifestRaw = JSON.parse(await readFile(manifestPath, 'utf8'));
+  assert.equal(manifestRaw.upstream_status, 'blocked / unavailable');
+  assert.equal(manifestRaw.license_status, 'review_required');
+  assert.equal(manifestRaw.access_status, 'candidate');
 });

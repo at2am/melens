@@ -83,10 +83,10 @@ export const SAMPLING_INTERVAL_MS = SAMPLING_INTERVAL_MINUTES * 60 * 1000;
 export const UPSTREAM_CADENCE_SECONDS = 3600;
 
 /**
- * Upstream operational verification metadata (2026-09-29)
+ * Upstream operational verification metadata (2026-09-30)
  */
 export const UPSTREAM_STATUS = 'blocked / unavailable' as const;
-export const UPSTREAM_VERIFICATION_DATE = '2026-09-29';
+export const UPSTREAM_VERIFICATION_DATE = '2026-09-30';
 export const UPSTREAM_ERROR_CODE = 'NotFoundResource';
 export const UPSTREAM_VERIFIED_MESSAGE = 'The requested dataset transport-activity-counts does not exist.';
 

@@ -41,10 +41,13 @@ export function gtfsRouteTypeToMode(routeType: number): GtfsTransportMode {
     case 1:
       return 'metro';
     case 2:
+    case 400:
       return 'train';
     case 3:
+    case 700:
       return 'bus';
     case 4:
+    case 1000:
       return 'ferry';
     case 5:
       return 'cable_tram';

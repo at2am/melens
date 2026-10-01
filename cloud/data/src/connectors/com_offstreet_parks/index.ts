@@ -14,6 +14,10 @@
  *     as real-time available bays or sensor observations (is_realtime_occupancy: false, parkingObservations: []).
  *  3. 来源继续保持 review_required，待真实采集和许可复核后再计完成:
  *     Rights status remains 'review_required', public_query_allowed: false.
+ *  4. 同物业同类型多行确定性聚合 (G23):
+ *     Upstream rows are surveyed at establishment level without official establishment sub-keys.
+ *     Multiple establishment rows sharing (census_year, property_id, parking_type) are deterministically deduplicated,
+ *     sorted, and aggregated by summing annual capacity into property-level facilities.
  */
 
 import { createHash } from 'node:crypto';

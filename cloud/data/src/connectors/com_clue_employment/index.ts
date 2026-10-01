@@ -47,7 +47,7 @@ export type ClueIndustryKey = (typeof CLUE_INDUSTRIES)[number]['key'];
 export const clueEmploymentRowSchema = z.object({
   census_year: z.union([z.string(), z.number()])
     .transform(val => String(val).trim())
-    .refine(val => /^\d{4}(?:-01-01)?$/.test(val), 'Invalid CLUE census year')
+    .refine(val => /^\d{4}(?:-01-01(?:T00:00:00(?:\.000)?(?:Z|[+-]\d{2}:?\d{2})?)?)?$/.test(val), 'Invalid CLUE census year')
     .transform(val => val.slice(0, 4)),
   block_id: z.number().int(),
   clue_small_area: z.string().trim().min(1),
@@ -226,13 +226,43 @@ export function normalizeClueEmploymentRow(
   return { sourceRecord, indicators };
 }
 
+export interface ClueEmploymentConnectorOptions {
+  client?: OpenDataSoftClient;
+  portalUrl?: string;
+  fetchMetadataRevision?: boolean;
+}
+
 export class ClueEmploymentConnector implements Connector {
   readonly sourceId = SOURCE_ID;
+  private readonly client: OpenDataSoftClient;
+  private readonly portalUrl: string;
+  private readonly autoFetchMetadata: boolean;
 
   constructor(
-    private readonly client: OpenDataSoftClient = new OpenDataSoftClient(),
-    private readonly portalUrl: string = DEFAULT_PORTAL_URL,
-  ) {}
+    clientOrOptions?: OpenDataSoftClient | ClueEmploymentConnectorOptions,
+    portalUrl: string = DEFAULT_PORTAL_URL,
+  ) {
+    if (clientOrOptions instanceof OpenDataSoftClient) {
+      this.client = clientOrOptions;
+      this.portalUrl = portalUrl;
+      this.autoFetchMetadata = false;
+    } else if (clientOrOptions && typeof clientOrOptions === 'object') {
+      this.client = clientOrOptions.client ?? new OpenDataSoftClient();
+      this.portalUrl = clientOrOptions.portalUrl ?? DEFAULT_PORTAL_URL;
+      this.autoFetchMetadata = clientOrOptions.fetchMetadataRevision ?? false;
+    } else {
+      this.client = new OpenDataSoftClient();
+      this.portalUrl = portalUrl;
+      this.autoFetchMetadata = false;
+    }
+  }
+
+  async fetchMetadataRevision(): Promise<string> {
+    return this.client.fetchDatasetDataProcessed({
+      portalUrl: this.portalUrl,
+      datasetId: DATASET_ID,
+    });
+  }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
     const checkedAt = new Date().toISOString();
@@ -274,6 +304,19 @@ export class ClueEmploymentConnector implements Connector {
         orderBy: 'block_id ASC',
       });
 
+      if (response.records.length === 0) {
+        throw new Error(`No CLUE employment records found for census year ${year}`);
+      }
+
+      let sourceUpdatedAt = response.lastModified;
+      if (sourceUpdatedAt === null && this.autoFetchMetadata) {
+        try {
+          sourceUpdatedAt = await this.fetchMetadataRevision();
+        } catch {
+          // If metadata endpoint is unavailable, retain null
+        }
+      }
+
       const sourceRecords: SourceRecord[] = [];
       const areaIndicators: AreaIndicator[] = [];
       const seenNativeIds = new Set<string>();
@@ -293,7 +336,7 @@ export class ClueEmploymentConnector implements Connector {
           row,
           input.runId,
           response.fetchedAt,
-          response.lastModified,
+          sourceUpdatedAt,
         );
         sourceRecords.push(normalized.sourceRecord);
         areaIndicators.push(...normalized.indicators);
@@ -308,7 +351,7 @@ export class ClueEmploymentConnector implements Connector {
         runId: input.runId,
         fetchedAt: response.fetchedAt,
         sourceRevision,
-        sourceLatestUpdateAt: response.lastModified,
+        sourceLatestUpdateAt: sourceUpdatedAt,
         checkpointAfter,
         completeness: {
           complete: true,

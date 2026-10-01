@@ -27,6 +27,7 @@ import {
   type RegisteredSource,
 } from '../../src/core/registry.js';
 import { parseSourceRecord } from '../../src/validation/record.js';
+import { validateGeoRecordGeography } from '../../src/validation/geography.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturePath = join(__dirname, '../fixtures/com_offstreet_parks.json');
@@ -266,6 +267,8 @@ test('T033 Full Collection: collects all fixture records and adheres to domain i
     assert.equal(g.rights_status, 'review_required');
     assert.equal(g.public_query_allowed, false);
     assert.equal(g.freshness_state, 'unknown');
+    const geoValidation = validateGeoRecordGeography(g);
+    assert.equal(geoValidation.valid, true, `GeoRecord geography must be valid: ${geoValidation.issues.join('; ')}`);
   }
 });
 
@@ -933,4 +936,87 @@ test('T033 Regression G23: full 2024 annual ingestion passes identity and integr
   const commBay = result.parkingBays.find(b => b.bay_id.includes('578328'));
   assert.ok(commBay, 'Commercial parkingBay must exist');
   assert.equal(commBay.public_access, true);
+
+  // Validate geography on all produced geoRecords
+  for (const g of result.geoRecords) {
+    const geoValidation = validateGeoRecordGeography(g);
+    assert.equal(geoValidation.valid, true, `All annual records must have valid geography: ${geoValidation.issues.join('; ')}`);
+  }
+});
+
+test('T033 Regression G23: all 24 permutations of 4 multi-row establishment records yield identical version_id and facility', () => {
+  const r1: ComOffstreetParkRawRecord = {
+    census_year: '2024',
+    block_id: 442,
+    property_id: '100194',
+    base_property_id: '100194',
+    building_address: '111-133 Adderley Street WEST MELBOURNE VIC 3003',
+    clue_small_area: 'West Melbourne (Residential)',
+    parking_type: 'Private',
+    parking_spaces: 6,
+    longitude: 144.947123124,
+    latitude: -37.81081148,
+  };
+  const r2: ComOffstreetParkRawRecord = { ...r1, parking_spaces: 3 };
+  const r3: ComOffstreetParkRawRecord = { ...r1, parking_spaces: 4 };
+  const r4: ComOffstreetParkRawRecord = { ...r1, parking_spaces: 7 };
+
+  const baseline = normalizeOffstreetRecord([r1, r2, r3, r4], 'perm-batch', '2026-09-29T10:00:00Z', '2025-07-01T00:00:00Z');
+  assert.equal(baseline.facility.annual_capacity, 20);
+
+  function permute<T>(arr: T[]): T[][] {
+    if (arr.length <= 1) return [arr];
+    const result: T[][] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const rest = [...arr.slice(0, i), ...arr.slice(i + 1)];
+      for (const p of permute(rest)) {
+        result.push([arr[i]!, ...p]);
+      }
+    }
+    return result;
+  }
+
+  const allPerms = permute([r1, r2, r3, r4]);
+  assert.equal(allPerms.length, 24);
+
+  for (const p of allPerms) {
+    const bundle = normalizeOffstreetRecord(p, 'perm-batch', '2026-09-29T10:00:00Z', '2025-07-01T00:00:00Z');
+    assert.deepEqual(bundle, baseline, 'Every permutation of input establishment rows must produce identical bundle');
+  }
+});
+
+test('T033 Official Bounded Verification: property 100008 query returns 2 rows (13 and 6) and normalizes to 19 spaces without live vacancies', async (t) => {
+  let records: OdsRecords;
+  try {
+    const client = new OpenDataSoftClient();
+    records = await client.fetchRecords({
+      portalUrl: 'https://data.melbourne.vic.gov.au',
+      datasetId: 'off-street-car-parks-with-capacity-and-type',
+      where: "property_id = '100008' and census_year = date'2024'",
+      orderBy: 'parking_spaces ASC',
+    });
+  } catch (error) {
+    if (!(error instanceof HttpFailure) || error.code !== 'upstream_unavailable') throw error;
+    t.skip(`Network unavailable for live official verification: ${error.message}`);
+    return;
+  }
+
+  // Schema validation, normalization, and business assertions MUST be outside the network catch block!
+  assert.equal(records.records.length, 2, 'Official upstream must return exactly 2 rows for property 100008 in 2024');
+  const spaces = records.records.map((r: any) => r.parking_spaces).sort((a: number, b: number) => a - b);
+  assert.deepEqual(spaces, [6, 13], 'Official records must have capacities 6 and 13');
+
+  const bundle = normalizeOffstreetRecord(
+    records.records as ComOffstreetParkRawRecord[],
+    'live-batch-001',
+    records.fetchedAt,
+    records.lastModified,
+  );
+  assert.equal(bundle.facility.annual_capacity, 19, 'Sum of 13 and 6 must be 19');
+  assert.equal(bundle.facility.is_public_candidate, false, 'Private parking is not a public candidate');
+  assert.equal(bundle.parkingBay.public_access, false);
+  assert.equal(bundle.facility.is_realtime_occupancy, false);
+  const geoValidation = validateGeoRecordGeography(bundle.geoRecord);
+  assert.equal(geoValidation.valid, true);
+  assert.deepEqual(geoValidation.issues, []);
 });

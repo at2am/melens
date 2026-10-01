@@ -9,6 +9,7 @@ import { parseConnectorInput, type ConnectorInput } from '../core/connector.js';
 import { loadConfig } from '../core/config.js';
 import { GcsStore } from '../core/gcs.js';
 import { BigQueryPublisher } from '../core/publisher.js';
+import { withPublishedPedestrianHistory } from '../core/pedestrian-history.js';
 import { loadConnector, loadSourceRegistry } from '../core/registry.js';
 import type { CsaSuccess } from '../connectors/csa_recorded_offences/index.js';
 import { normalizeCsaStatistics } from '../normalization/area-indicators.js';
@@ -91,12 +92,14 @@ export async function ingest(args: readonly string[],
   const checkpoint = checkpointState?.manifest.checkpoint ?? null;
   const runId = `run_${createHash('sha256').update(`${source.source_id}\n${JSON.stringify(window)}`)
     .digest('hex').slice(0, 40)}`;
-  const input = parseConnectorInput({ sourceId: source.source_id, window, checkpoint, runId });
+  const bigquery = new BigQuery({ projectId: config.projectId });
+  const input = await withPublishedPedestrianHistory(
+    parseConnectorInput({ sourceId: source.source_id, window, checkpoint, runId }), config, bigquery);
   const connector = await loadConnector(entry);
   // Only source collection consumes the upstream request quota. Google Cloud
   // publication and checkpoint calls are not upstream source requests.
   const result = await collectGuard(() => connector.collect(input));
-  const publisher = new BigQueryPublisher(config, new BigQuery({ projectId: config.projectId }), gcs);
+  const publisher = new BigQueryPublisher(config, bigquery, gcs);
   if (result.kind === 'failure') {
     await publisher.recordConnectorFailure(source, result,
       window.kind === 'time' ? window.from : null,

@@ -11,7 +11,7 @@
     "ASGS_GCCSA:2GMEL:2021"
   ],
   "coverage_from": "2021-08-10T00:00:00Z",
-  "coverage_to": "2026-08-10T00:00:00Z",
+  "coverage_to": "2021-08-11T00:00:00Z",
   "cadence_seconds": null,
   "check_interval_seconds": null,
   "license_status": "verified_open",

@@ -40,6 +40,7 @@ RAW_REFERENCE = re.compile(r"`melens_ingest\.[A-Za-z_][A-Za-z0-9_]*`", re.IGNORE
 # depend on these views and need no raw-dataset authorization of their own.
 AUTHORIZED_RAW_VIEWS = frozenset({
     "v_geo_records_history",
+    "v_geo_records_current",
     "v_parking_current",
     "v_parking_unmatched_observations",
     "v_pedestrian_observations",

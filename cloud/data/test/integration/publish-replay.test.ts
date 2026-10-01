@@ -16,6 +16,7 @@ import type { DataConfig } from '../../src/core/config.js';
 import { addCompletedWindow, type CheckpointManifest, GcsStore,
   type StoredObject } from '../../src/core/gcs.js';
 import { BigQueryPublisher } from '../../src/core/publisher.js';
+import { withPublishedPedestrianHistory } from '../../src/core/pedestrian-history.js';
 import type { DataSource, GeoRecord, SourceRecord, SyncBatch } from '../../src/core/types.js';
 
 const checkedAt = '2026-09-28T01:00:00Z';
@@ -726,7 +727,7 @@ test('GCP acceptance: real GoogleSQL, both write paths, replay, ordering, refere
 }, async t => {
   assert.ok(devProject);
   const id = randomUUID().replaceAll('-', '').slice(0, 16);
-  const cloudConfig: DataConfig = { ...config, projectId: devProject,
+  const cloudConfig: DataConfig = { ...config, projectId: devProject, maxBytesBilled: '100000000',
     ingestDataset: `publish_test_${id}`, queryDataset: `publish_views_${id}`, bucketName: `melens-publish-test-${id}` };
   const bq = new BigQuery({ projectId: devProject, location: config.region });
   const storage = new Storage({ projectId: devProject });
@@ -752,6 +753,8 @@ test('GCP acceptance: real GoogleSQL, both write paths, replay, ordering, refere
       .replaceAll('`melens_query.', `\`${devProject}.${cloudConfig.queryDataset}.`);
     await query(qualify(ddl));
     await query(qualify(await readFile(new URL('../../../sql/002_core_views.sql', import.meta.url), 'utf8')));
+    await query(qualify(await readFile(new URL('../../../sql/004_street_views.sql', import.meta.url), 'utf8')));
+    await query(qualify(await readFile(new URL('../../../sql/007_changes_views.sql', import.meta.url), 'utf8')));
     // A static GTFS-style evidence record may belong to a different admitted source.
     const evidenceSource: DataSource = { ...source, source_id: 'test.evidence' };
     await publisher.publish({ source: evidenceSource, windowFrom: null, windowTo: null, initialCheckpoint: null,
@@ -836,6 +839,53 @@ test('GCP acceptance: real GoogleSQL, both write paths, replay, ordering, refere
         await assert.rejects(publisher.publish(later), /withdrawn or narrowed/);
       });
     }
+    await t.test('hourly correction history survives reload and rejects unorderable changed native IDs', async () => {
+      const owner: DataSource = { ...source, source_id: 'melbourne.pedestrian.hourly',
+        topic: 'pedestrian', record_granularity: 'sensor_hour' };
+      const hourly = (version: string, nativeId: string, total: number,
+        sensorId = '1', updatedAt: string | null = null): ConnectorSuccess => ({
+        ...result, sourceId: owner.source_id, sourceRevision: version, sourceLatestUpdateAt: null,
+        retainableRawRecords: null, geoRecords: [], geoRecordSources: [], boundaries: [],
+        areaIndicators: [], parkingBays: [], parkingObservations: [], parkingRules: [], sensorLocations: [],
+        sourceRecords: [{ ...record, source_id: owner.source_id, source_record_id: nativeId,
+          version_id: version, published_at: null, observed_at: checkedAt,
+          source_updated_at: updatedAt, assertion_kind: 'observation' }],
+        pedestrianObservations: [{ batch_id: 'fixture', source_id: owner.source_id, schema_version: 1,
+          fetched_at: checkedAt, sensor_id: sensorId, observed_at: checkedAt,
+          version_id: version, source_record_id: nativeId,
+          total_count: total, direction_a_count: null, direction_b_count: null }],
+      });
+      const publication = { source: owner, initialCheckpoint: window.initialCheckpoint,
+        windowFrom: '2026-09-28T00:00:00Z', windowTo: '2026-09-28T02:00:00Z' };
+      await publisher.publish({ ...publication, result: hourly('original', 'native-1', 10) });
+      const restored = await withPublishedPedestrianHistory({ sourceId: owner.source_id, runId: 'reloaded',
+        window: { kind: 'time', from: publication.windowFrom, to: publication.windowTo },
+        checkpoint: publication.windowTo }, cloudConfig, bq);
+      const parsed = z.object({ cursor: z.string(), summaries: z.array(z.object({
+        count: z.number(), sourceUpdatedAt: z.string().nullable(), recordId: z.string(),
+      })) }).parse(JSON.parse(restored.checkpoint ?? 'null'));
+      assert.equal(parsed.cursor, publication.windowTo);
+      assert.deepEqual(parsed.summaries.map(row => [row.recordId, row.count, row.sourceUpdatedAt]),
+        [['native-1', 10, null]]);
+      await assert.rejects(publisher.publish({ ...publication,
+        result: hourly('unorderable-correction', 'native-2', 11) }),
+      /BigQuery validation failed for pedestrian_observations/);
+      const facts = await query(`WITH batches AS (
+        SELECT batch_id, state FROM \`${devProject}.${cloudConfig.ingestDataset}.sync_batches\`
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC) = 1
+      ) SELECT COUNT(*) AS n FROM \`${devProject}.${cloudConfig.ingestDataset}.pedestrian_observations\` p
+        JOIN batches b USING (batch_id)
+        WHERE p.source_id = @sourceId AND b.state = 'published'`, { sourceId: owner.source_id });
+      assert.equal(Number(facts[0]?.n), 1);
+      await publisher.publish({ ...publication,
+        result: hourly('zz-old', 'native-3', 20, '2', '2026-09-28T00:00:00Z') });
+      await publisher.publish({ ...publication,
+        result: hourly('aa-new', 'native-4', 21, '2', '2026-09-28T00:02:00Z') });
+      assert.deepEqual(await query(`SELECT total_count FROM \`${devProject}.${cloudConfig.queryDataset}.v_pedestrian_observations\`
+        WHERE source_id = @sourceId AND sensor_id = '2'`, { sourceId: owner.source_id }),
+      [{ total_count: 21 }]);
+      await publisher.pauseSource(owner);
+    });
   } finally {
     const cleanup = await Promise.allSettled([
       ...createdDatasets.map(name => bq.dataset(name).delete({ force: true })),

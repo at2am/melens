@@ -4,13 +4,13 @@ import type { GeoRecord, GeoRecordSource, SourceRecord } from '../../core/types.
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 
 export const SOURCE_ID = 'victoria.transport.gtfs_realtime';
-const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/gtfs-realtime';
-const BASE_URL = 'https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/';
-const MAX_FEED_BYTES = 8_000_000;
-const MAX_ENTITIES = 20_000;
+export const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/gtfs-realtime';
+export const BASE_URL = 'https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/';
+export const MAX_FEED_BYTES = 8_000_000;
+export const MAX_ENTITIES = 20_000;
 
 export type AlertMode = 'metro_train' | 'yarra_tram';
-const FEEDS: readonly { mode: AlertMode; path: string; resourceUrl: string }[] = [
+export const FEEDS: readonly { mode: AlertMode; path: string; resourceUrl: string }[] = [
   { mode: 'metro_train', path: 'metro/service-alerts',
     resourceUrl: `${LANDING_URL}/resource/2a90e184-ac14-468a-92ff-9618cb43fb77` },
   { mode: 'yarra_tram', path: 'tram/service-alerts',
@@ -49,7 +49,7 @@ export interface ParsedAlertFeed {
 }
 
 /** Bounded decoder for the GTFS-Realtime fields used by the two Service Alerts feeds. */
-class WireReader {
+export class WireReader {
   private position = 0;
   constructor(private readonly bytes: Uint8Array) {}
 
@@ -123,7 +123,7 @@ function timestamp(reader: WireReader, wire: number): string {
   if (Number.isNaN(date.valueOf())) throw new Error('Invalid GTFS timestamp');
   return date.toISOString();
 }
-function parsePeriod(reader: WireReader): AlertPeriod {
+export function parsePeriod(reader: WireReader): AlertPeriod {
   let start: string | null = null;
   let end: string | null = null;
   reader.fields((field, wire, value) => {
@@ -148,7 +148,7 @@ function parseTrip(reader: WireReader): Pick<AlertSelector,
   });
   return { tripId, tripRouteId, tripStartDate, tripStartTime };
 }
-function parseSelector(reader: WireReader): AlertSelector {
+export function parseSelector(reader: WireReader): AlertSelector {
   let agencyId: string | null = null;
   let routeId: string | null = null;
   let routeType: number | null = null;
@@ -190,7 +190,7 @@ function translated(reader: WireReader): string | null {
   return translations.find(entry => entry.language?.toLowerCase().startsWith('en'))?.value
     ?? translations[0]?.value ?? null;
 }
-function parseAlert(reader: WireReader, id: string): ParsedAlert {
+export function parseAlert(reader: WireReader, id: string): ParsedAlert {
   const activePeriods: AlertPeriod[] = [];
   const communicationPeriods: AlertPeriod[] = [];
   const impactPeriods: AlertPeriod[] = [];
@@ -277,10 +277,23 @@ function failure(input: ConnectorInput, code: ConnectorFailure['code'], fetchedF
     sourceLatestUpdateAt: null };
 }
 
-function singlePeriod(alert: ParsedAlert): AlertPeriod | null {
+export function singlePeriod(alert: ParsedAlert): AlertPeriod | null {
   // active_period is the display window. It cannot substitute for a service
   // impact interval when deriving the fact's valid time.
   return alert.impactPeriods.length === 1 ? alert.impactPeriods[0] ?? null : null;
+}
+
+export function deriveAlertFeedsRevision(feeds: readonly {
+  mode: AlertMode; parsed: ParsedAlertFeed;
+}[], latestUpdate: string | null): string | null {
+  if (feeds.length === 0) return null;
+  const canonicalModes = feeds.slice().sort((a, b) => a.mode.localeCompare(b.mode)).map(feed => ({
+    mode: feed.mode,
+    feedTimestamp: feed.parsed.feedTimestamp,
+    feedVersion: feed.parsed.feedVersion,
+    alerts: [...feed.parsed.alerts].sort((a, b) => a.id.localeCompare(b.id)),
+  }));
+  return sourceVersionId(latestUpdate, canonicalModes);
 }
 
 export function normalizeAlertFeeds(feeds: readonly {
@@ -288,6 +301,7 @@ export function normalizeAlertFeeds(feeds: readonly {
 }[], input: ConnectorInput): {
   sourceRecords: SourceRecord[]; geoRecords: GeoRecord[]; geoRecordSources: GeoRecordSource[];
   latestUpdate: string | null;
+  sourceRevision: string | null;
 } {
   const sourceRecords: SourceRecord[] = [];
   const geoRecords: GeoRecord[] = [];
@@ -301,7 +315,7 @@ export function normalizeAlertFeeds(feeds: readonly {
       originalUrl: feed.resourceUrl, sourceTime: null });
     const parentVersion = sourceVersionId(update, {
       mode: feed.mode, feedVersion: feed.parsed.feedVersion,
-      ids: feed.parsed.alerts.map(alert => alert.id).sort() });
+      alerts: [...feed.parsed.alerts].sort((a, b) => a.id.localeCompare(b.id)) });
     sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
       fetched_at: feed.fetchedAt, source_record_id: parentId, version_id: parentVersion,
       original_url: feed.resourceUrl, raw_uri: null, published_at: null,
@@ -314,7 +328,8 @@ export function normalizeAlertFeeds(feeds: readonly {
       const alertId = sourceRecordId({ sourceId: SOURCE_ID,
         nativeId: `alert:${feed.mode}:${alert.id}`, originalUrl: feed.resourceUrl,
         sourceTime: null });
-      const version = sourceVersionId(null, alert);
+      const version = sourceVersionId(update, {
+        mode: feed.mode, feedVersion: feed.parsed.feedVersion, alert });
       const period = singlePeriod(alert);
       const provenance = { batch_id: input.runId, source_id: SOURCE_ID,
         schema_version: 1, fetched_at: feed.fetchedAt };
@@ -352,13 +367,32 @@ export function normalizeAlertFeeds(feeds: readonly {
         version_id: version, ...link, original_url: feed.resourceUrl });
     }
   }
-  return { sourceRecords, geoRecords, geoRecordSources, latestUpdate };
+  const sourceRevision = deriveAlertFeedsRevision(feeds, latestUpdate);
+  return { sourceRecords, geoRecords, geoRecordSources, latestUpdate, sourceRevision };
+}
+
+export interface TransportGtfsRealtimeConnectorOptions {
+  client?: HttpClient;
+  keyProvider?: () => string | undefined;
 }
 
 export class TransportGtfsRealtimeConnector implements Connector {
   readonly sourceId = SOURCE_ID;
-  constructor(private readonly client = new HttpClient(),
-    private readonly keyProvider: () => string | undefined = () => process.env.TRANSPORT_VICTORIA_KEY_ID) {}
+  private readonly client: HttpClient;
+  private readonly keyProvider: () => string | undefined;
+
+  constructor(
+    clientOrOptions: HttpClient | TransportGtfsRealtimeConnectorOptions = new HttpClient(),
+    keyProvider: () => string | undefined = () => process.env.TRANSPORT_VICTORIA_KEY_ID,
+  ) {
+    if (clientOrOptions instanceof HttpClient) {
+      this.client = clientOrOptions;
+      this.keyProvider = keyProvider;
+    } else {
+      this.client = clientOrOptions.client ?? new HttpClient();
+      this.keyProvider = clientOrOptions.keyProvider ?? keyProvider;
+    }
+  }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
     if (input.sourceId !== SOURCE_ID) return failure(input, 'validation_failed', 0);
@@ -385,7 +419,7 @@ export class TransportGtfsRealtimeConnector implements Connector {
     const alertCount = feeds.reduce((sum, feed) => sum + feed.parsed.alerts.length, 0);
     return { kind: 'success', sourceId: SOURCE_ID, runId: input.runId,
       fetchedAt: feeds.at(-1)?.fetchedAt ?? new Date().toISOString(),
-      sourceRevision: normalized.latestUpdate,
+      sourceRevision: normalized.sourceRevision,
       sourceLatestUpdateAt: normalized.latestUpdate,
       checkpointAfter: input.window.kind === 'time' ? input.window.to : input.window.revision,
       completeness: { complete: true, method: 'feed_snapshot',
@@ -403,3 +437,4 @@ export class TransportGtfsRealtimeConnector implements Connector {
 }
 
 export const connector: Connector = new TransportGtfsRealtimeConnector();
+export default connector;

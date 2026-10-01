@@ -25,7 +25,7 @@ const feedTimestamp = '2026-09-28T00:05:00.000Z';
 const selector: AlertSelector = {
   agencyId: '2', routeId: '2-FLI', routeType: 2, stopId: '19499',
   directionId: 0, tripId: 'TRIP-FLI-01', tripRouteId: '2-FLI',
-  tripStartDate: '20260928', tripStartTime: '07:50:00',
+  tripStartDate: null, tripStartTime: null,
 };
 
 async function staticVersion() {
@@ -176,6 +176,53 @@ test('mixed route and stop selectors cannot locate the whole alert at one stop',
   const joined = joinGtfsAlertLocations({ alerts: alerts.geoRecords,
     alertSources: alerts.geoRecordSources, staticVersions: [version] });
   assert.equal(joined.mappings[0]?.status, 'ambiguous');
+  assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
+});
+
+test('malformed trip-instance constraints cannot supply an alert location', async () => {
+  const version = await staticVersion();
+  for (const constraints of [
+    { tripStartDate: '19000101', tripStartTime: '99:99:99' },
+    { tripStartDate: '20260230', tripStartTime: '07:50:00' },
+  ]) {
+    const alerts = normalizedAlerts(feed(version.normalized.feedVersion,
+      [{ ...selector, ...constraints }]));
+    const joined = joinGtfsAlertLocations({ alerts: alerts.geoRecords,
+      alertSources: alerts.geoRecordSources, staticVersions: [version] });
+    assert.equal(joined.mappings[0]?.status, 'invalid_alert');
+    assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
+    assert.deepEqual(joined.geoRecordSources, alerts.geoRecordSources);
+  }
+});
+
+test('valid trip-instance constraints stay unresolved without static calendar and frequency proof', async () => {
+  const version = await staticVersion();
+  for (const constraints of [
+    { tripStartDate: '20260928', tripStartTime: null },
+    { tripStartDate: null, tripStartTime: '07:50:00' },
+    { tripStartDate: '20260928', tripStartTime: '25:15:35' },
+  ]) {
+    const alerts = normalizedAlerts(feed(version.normalized.feedVersion,
+      [{ ...selector, ...constraints }]));
+    const joined = joinGtfsAlertLocations({ alerts: alerts.geoRecords,
+      alertSources: alerts.geoRecordSources, staticVersions: [version] });
+    assert.equal(joined.mappings[0]?.status, 'trip_instance_unverified');
+    assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
+    assert.equal(joined.geoRecords[0]?.location_confidence, 'unverified');
+    assert.equal(joined.geoRecordSources.some(link =>
+      link.evidence_role === 'gtfs_static_stop_location'), false);
+    assert.deepEqual(joined.geoRecordSources, alerts.geoRecordSources);
+  }
+});
+
+test('a matched stop alongside an unverified trip instance cannot locate the whole alert', async () => {
+  const version = await staticVersion();
+  const alerts = normalizedAlerts(feed(version.normalized.feedVersion, [
+    selector, { ...selector, tripStartDate: '20260928', tripStartTime: '07:50:00' },
+  ]));
+  const joined = joinGtfsAlertLocations({ alerts: alerts.geoRecords,
+    alertSources: alerts.geoRecordSources, staticVersions: [version] });
+  assert.equal(joined.mappings[0]?.status, 'trip_instance_unverified');
   assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
 });
 

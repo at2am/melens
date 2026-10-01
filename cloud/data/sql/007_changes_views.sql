@@ -39,7 +39,9 @@ SELECT geo_record_id, version_id, source_id, topic, title, summary,
        original_url, geometry, geometry_geojson, location_role,
        location_confidence, area_refs, observed_at, published_at,
        valid_from, valid_to, fetched_at, freshness_state,
-       record_status, assertion_kind, is_prediction,
+       IF(record_status = 'active' AND valid_from > CURRENT_TIMESTAMP(),
+          'planned', record_status) AS record_status,
+       assertion_kind, is_prediction,
        IF(valid_from > CURRENT_TIMESTAMP(), 'future', 'current') AS time_state
 FROM `melens_query.v_geo_records_current`
 WHERE (topic = 'road_disruption'

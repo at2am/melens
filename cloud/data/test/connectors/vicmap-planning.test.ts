@@ -392,3 +392,187 @@ test('VicmapPlanningConnector.collect handles network or upstream HTTP failures'
     assert.equal(result.completeness.complete, false);
   }
 });
+
+test('normalizePlanningControl supports diverse Victorian overlay scheme codes (HO, DDO, SCO, EAO) and rejects zone scheme codes in overlay layer', async () => {
+  const fixture = await loadFixture();
+  const overlayLayer = layers.find(l => l.kind === 'overlay')!;
+  const baseOverlayFeature = fixture.overlay.collection.features[0] as { properties: Record<string, unknown>; geometry: unknown };
+  const layerEditedAt = '2024-03-31T00:00:00.000Z';
+
+  // Test various real overlay scheme codes
+  for (const scheme of ['HO', 'DDO', 'SCO', 'EAO', 'SBO', 'PAO', 'PO']) {
+    const feature = {
+      ...baseOverlayFeature,
+      properties: {
+        ...baseOverlayFeature.properties,
+        scheme_code: scheme,
+        zone_code: `${scheme}1`,
+      },
+    };
+    const control = normalizePlanningControl(feature, overlayLayer, input.runId, fetchedAt, layerEditedAt);
+    assert.equal(control.sourceRecord.assertion_kind, 'plan');
+    const summary = JSON.parse(control.geoRecords[0]?.summary ?? '{}');
+    assert.equal(summary.scheme_code, scheme);
+    assert.equal(summary.control_kind, 'overlay');
+  }
+
+  // Reject zone scheme code ('ZN') in overlay layer
+  const wrongOverlay = {
+    ...baseOverlayFeature,
+    properties: {
+      ...baseOverlayFeature.properties,
+      scheme_code: 'ZN',
+    },
+  };
+  assert.throws(
+    () => normalizePlanningControl(wrongOverlay, overlayLayer, input.runId, fetchedAt, layerEditedAt),
+    /layer and scheme code disagree/,
+  );
+});
+
+test('VicmapPlanningConnector.collect reproduces E01 external blocker: fails closed when zone layer returns empty objectIds', async () => {
+  const fixture = await loadFixture();
+
+  class EmptyZoneClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      // Overlay layer (id 2) returns normal metadata and ids
+      if (pathname.endsWith('/2')) {
+        return { body: fixture.overlay.metadata as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/2/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          return { body: fixture.overlay.ids as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+        return { body: fixture.overlay.collection as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+
+      // Zone layer (id 3) returns metadata, but query returns EMPTY objectIds (E01 symptom)
+      if (pathname.endsWith('/3')) {
+        return { body: fixture.zone.metadata as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/3/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          return { body: { objectIdFieldName: 'OBJECTID', objectIds: [] } as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+      }
+
+      throw new Error(`Unexpected request URL: ${request.url.toString()}`);
+    }
+  }
+
+  const connector = new VicmapPlanningConnector(new EmptyZoneClient());
+  const result = await connector.collect(input);
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.sourceId, SOURCE_ID);
+    assert.equal(result.code, 'incomplete_window');
+    assert.equal(result.completeness.complete, false);
+    assert.equal(result.message, 'Vicmap planning snapshot could not be validated');
+  }
+});
+
+test('VicmapPlanningConnector.collect fails closed when overlay layer returns empty objectIds', async () => {
+  const fixture = await loadFixture();
+
+  class EmptyOverlayClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      if (pathname.endsWith('/2')) {
+        return { body: fixture.overlay.metadata as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/2/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          return { body: { objectIdFieldName: 'OBJECTID', objectIds: [] } as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+      }
+      if (pathname.endsWith('/3')) {
+        return { body: fixture.zone.metadata as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/3/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          return { body: fixture.zone.ids as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+        return { body: fixture.zone.collection as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+
+      throw new Error(`Unexpected request URL: ${request.url.toString()}`);
+    }
+  }
+
+  const connector = new VicmapPlanningConnector(new EmptyOverlayClient());
+  const result = await connector.collect(input);
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.sourceId, SOURCE_ID);
+    assert.equal(result.code, 'incomplete_window');
+    assert.equal(result.completeness.complete, false);
+  }
+});
+
+test('VicmapPlanningConnector.collect fails closed on duplicate objectIds or unexpected features', async () => {
+  class DuplicateIdClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      if (pathname.endsWith('/2')) {
+        return { body: { id: 2, objectIdField: 'OBJECTID', editingInfo: { dataLastEditDate: 1711843200000 } } as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/2/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          // Duplicate object ID [201, 201]
+          return { body: { objectIdFieldName: 'OBJECTID', objectIds: [201, 201] } as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+      }
+      throw new Error(`Unexpected request URL: ${request.url.toString()}`);
+    }
+  }
+
+  const connector = new VicmapPlanningConnector(new DuplicateIdClient());
+  const result = await connector.collect(input);
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.code, 'incomplete_window');
+    assert.equal(result.completeness.complete, false);
+  }
+});
+
+test('VicmapPlanningConnector.collect fails closed when page feature count does not match chunk size', async () => {
+  const fixture = await loadFixture();
+
+  class IncompletePageClient extends HttpClient {
+    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      if (pathname.endsWith('/2')) {
+        return { body: fixture.overlay.metadata as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      if (pathname.endsWith('/2/query')) {
+        if (url.searchParams.get('returnIdsOnly') === 'true') {
+          return { body: fixture.overlay.ids as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+        }
+        // Returns empty features array instead of requested feature
+        return { body: { type: 'FeatureCollection', features: [] } as T, status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+      throw new Error(`Unexpected request URL: ${request.url.toString()}`);
+    }
+  }
+
+  const connector = new VicmapPlanningConnector(new IncompletePageClient());
+  const result = await connector.collect(input);
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.code, 'incomplete_window');
+    assert.equal(result.completeness.complete, false);
+  }
+});

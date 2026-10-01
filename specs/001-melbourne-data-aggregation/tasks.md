@@ -94,7 +94,7 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 - [X] T045 [US2] 用官方边界和来源位置证据识别 City of Melbourne、Greater Melbourne、Victoria 与海外同名地；按 [quality-rules.md](quality-rules.md#3-空间归属与新闻合并) 将仅提及地点保留 `mentioned_place`，区域级结果不伪造精确点，无效坐标隔离地理映射，于 `cloud/data/src/normalization/news-location.ts`。
 - [X] T046 [P] [US2] 按来源原生 ID、规范化 URL 和 [quality-rules.md](quality-rules.md#3-空间归属与新闻合并) 的跨来源两项独立证据门槛合并重复报道，冲突时不合并；保留 `GeoRecordSource` 的每个原文链接，来源更正/撤稿保留历史版本，于 `cloud/data/src/normalization/news-dedup.ts`。
 - [X] T047 [US2] 发布新闻/犯罪报道与 CSA 区域统计分开的当前和历史查询视图，公开列受 `rights_status` 限制；更正/撤稿可按状态追溯，`crime_news` 不转成犯罪率，于 `cloud/data/sql/005_news_views.sql`。
-- [X] T048 [US2] 以预先固定的维州事发、同名海外地、仅提及和多地点新闻各至少 10 条及双人裁定基准，另用重复报道、警方/统计混合、取消活动样本验证 FR-009/FR-010、SC-004 和来源可追溯，于 `cloud/data/test/integration/us2-news.test.ts`。
+- [ ] T048 [US2] 以预先固定的维州事发、同名海外地、仅提及和多地点新闻各至少 10 条及双人裁定基准，另用重复报道、警方/统计混合、取消活动样本验证 FR-009/FR-010、SC-004 和来源可追溯，于 `cloud/data/test/integration/us2-news.test.ts`。
 - [X] T049 [US2] 按 [quality-rules.md](quality-rules.md#2-八类信息的首期覆盖) 的最近 30 天、至少 5 个不同报道和 2 个发布日期核验 GDELT 墨尔本犯罪新闻覆盖、警方许可结果和首期来源计数；证据不足时标记 FR-002／SC-001 未达标并触发 T050，于 `cloud/data/docs/validation/crime-news-coverage.md`。
 - [X] T050 [US2] 若 T049 发现犯罪新闻覆盖不足，调查许可明确、能按维州地理证据筛选的本地报道来源，记录公开入口、再利用条款、更新节奏与字段映射于 `cloud/data/docs/source-policies/local-crime-news-alternative.md`；选定来源后由集成人员在 `specs/001-melbourne-data-aggregation/source-ids.md` 分配规范 ID。若 GDELT 已达标则记录不启动替代来源的依据。
 - [ ] T051 [US2] 仅在 T050 选定许可合规的替代来源后接入其元数据与原文链接，沿用 T045/T046 的地理和去重规则，独占 `cloud/data/src/connectors/local_crime_news_alt/index.ts`、`cloud/data/src/connectors/local_crime_news_alt/source.json`、`cloud/data/test/fixtures/local_crime_news_alt.json`；未选定时 FR-002／SC-001 保持未达标。
@@ -107,10 +107,10 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 
 **Independent Test**: 两个 LGA/SA2 查询返回可比指标及来源；不同年份/地域单位不直接比较，缺失/抑制值不是零。
 
-- [X] T052 [P] [US3] 接入来源 #13 ABS Census DataPacks，保留 Census 年份、指标定义、SA1/SA2 等地域代码和同版 ASGS `vintage`；独占 `cloud/data/src/connectors/abs_census/index.ts`、`cloud/data/src/connectors/abs_census/source.json`、`cloud/data/test/fixtures/abs_census.json`。官方 SA1／SA2／LGA ZIP 按范围读取 G01／G02，实读 32,176 条地区表记录及九项选定指标；正式发布仍须来源准入与 2021 ASGS 边界验收。
+- [X] T052 [P] [US3] 接入来源 #13 ABS Census DataPacks，保留 Census 年份、指标定义、SA1/SA2 等地域代码和同版 ASGS `vintage`；独占 `cloud/data/src/connectors/abs_census/index.ts`、`cloud/data/src/connectors/abs_census/source.json`、`cloud/data/test/fixtures/abs_census.json`。官方 SA1／SA2／LGA ZIP 按范围读取 G01／G02，实读 32,176 条地区表记录及九项选定指标；已通过许可准入并在开发集发布／重放 144,792 指标，其中 3,969 匹配 2021 LGA/SA2 同版边界；仅一个统计期，区域类别门槛仍未完成。
 - [X] T053 [P] [US3] 接入来源 #14 City of Melbourne CLUE 分街区就业及配套 CLUE 街区边界，保留 block ID、年度、行业和抑制单元，不补零；同一代理独占两个**独立登记**的数据集目录 `cloud/data/src/connectors/com_clue_employment/index.ts`、`cloud/data/src/connectors/com_clue_employment/source.json`、`cloud/data/src/connectors/com_clue_blocks/index.ts`、`cloud/data/src/connectors/com_clue_blocks/source.json` 及各自样例 `cloud/data/test/fixtures/com_clue_employment.json`、`cloud/data/test/fixtures/com_clue_blocks.json`。
 - [X] T054 [P] [US3] 接入来源 #18 City of Melbourne 微气候传感器，保留温度/湿度/风/颗粒物/噪声的观测时刻、单位、缺测与当前设备依据，不把历史位置表当现有清单；独占 `cloud/data/src/connectors/com_microclimate/index.ts`、`cloud/data/src/connectors/com_microclimate/source.json`、`cloud/data/test/fixtures/com_microclimate.json`。
-- [X] T055 [P] [US3] 接入来源 #21 Homes Victoria 季度租金，保留季度、LGA/郊区地域、统计口径与空值，不当作当前挂牌租金；独占 `cloud/data/src/connectors/homes_victoria_rents/index.ts`、`cloud/data/src/connectors/homes_victoria_rents/source.json`、`cloud/data/test/fixtures/homes_victoria_rents.json`。官方目录发现 XLSX 后按七张房型表解析，真实读取 58,618 条记录；正式发布仍须通过来源准入与区域边界验收。
+- [X] T055 [P] [US3] 接入来源 #21 Homes Victoria 季度租金，保留季度、LGA/郊区地域、统计口径与空值，不当作当前挂牌租金；独占 `cloud/data/src/connectors/homes_victoria_rents/index.ts`、`cloud/data/src/connectors/homes_victoria_rents/source.json`、`cloud/data/test/fixtures/homes_victoria_rents.json`。官方目录发现 XLSX 后按七张房型表解析，真实读取 58,618 条记录；已通过许可准入并发布／重放 Jun/Sep 2025 两季度 1,106 条；官方统计地域版次仍缺，区域边界保持未匹配。
 - [X] T056 [P] [US3] 接入来源 #22 Vicmap Planning zones/overlays，保留多边形、覆盖层类别、发布版本与有效时间；规划现状不自动标为项目获批；独占 `cloud/data/src/connectors/vicmap_planning/index.ts`、`cloud/data/src/connectors/vicmap_planning/source.json`、`cloud/data/test/fixtures/vicmap_planning.json`。
 - [X] T057 [P] [US3] 接入来源 #23 City of Melbourne Development Activity Monitor，保留项目点位、月度更新及 `mooted`/`approved`/`under_construction`/`completed` 来源状态，不合并为统一“已获批”；独占 `cloud/data/src/connectors/com_development_monitor/index.ts`、`cloud/data/src/connectors/com_development_monitor/source.json`、`cloud/data/test/fixtures/com_development_monitor.json`。
 - [X] T058 [US3] 将 ABS/CSA/CLUE/租金映射为 `AreaIndicator`，本阶段官方统计 `assertion_kind = observation`；`status` 仅 `observed`/`suppressed`/`missing`，“只有 `observed` 状态可有数值；`suppressed` 与 `missing` 不填零”，跨年比较要求明确边界映射，于 `cloud/data/src/normalization/area-indicators.ts`。
@@ -144,11 +144,11 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 
 - [ ] T069 对 UC-04／UC-05 的 P0 数据前置链路单独验收：行人分钟/历史计数与位置版本、非计划道路中断、GTFS 静态站点与实时警报可分别按来源时间和地理证据查询，缺口不补零；此项只证明本 feature 的数据前置条件，项目 P0 产品端到端由对应 UC 验收，于 `cloud/data/test/integration/p0-pedestrian-transport.test.ts`。
 
-**T069 本地进度**：离线集成测试已覆盖行人分钟/小时与位置迁移、缺测不补零、道路父子影响和 GTFS 警报定位失败关闭（3 项通过）。T031/T063 的真实 KeyID、T066 的生产版本证据及 BigQuery 开发集查询尚缺，故保留未完成。
+**T069 本地进度**：离线集成测试已覆盖行人分钟/小时与位置迁移、缺测不补零、道路父子影响和 GTFS 警报定位失败关闭（3 项通过）。用户已将 Key 加入 Secret Manager；T031/T063 私有云端实测已成功，但道路时间、GTFS 更正版本、T066 生产关联及 BigQuery 开发集联合查询尚缺，故保留未完成。
 - [ ] T070 将**选定的**已实现且许可通过的来源按各自 cadence 增量部署到 Cloud Run Jobs，建立 Cloud Scheduler 调度和 Secret Manager **引用**；脚本可先只发布 P0／首期 A 级来源，后续再发布 B 级，仅集成人员执行项目级变更，于 `cloud/data/infra/deploy.sh`。
 - [ ] T071 [P] 定义每来源调度、重叠窗口、回补策略和成本上限；不定期动态来源接入前声明 `check_interval_seconds`，生产部署前填写每来源每日请求上限、BigQuery 单次计费字节上限和项目月度预算数值及 50%/80%/100% 告警，达到上限按 [quality-rules.md](quality-rules.md#6-抽样与运行准入) 停止相应任务；行人最近一小时 15 分钟重取、道路约 60 秒、季度/静态来源按发布版本，避免分钟级 load job 滥用，配置于 `cloud/data/infra/schedules.json`。
 
-**T071 预算进度（2026-09-30）**：用户确定开发项目每月 AUD 100；GCP 已创建并读回仅覆盖 `melens-510012` 的月度预算及 50%/80%/100% 当期支出告警，默认账单 IAM 收件人保持启用。部署脚本在 `--apply` 前会复核真实预算。预算消息解析与非 P0 调度暂停逻辑已通过 4 项本地测试，但 Pub/Sub/Cloud Run/IAM 和真实投递尚未部署。各来源请求／查询限额与云端运行验证仍缺，T071 保持未完成；预算告警不等于硬性停费。
+**T071 预算进度（2026-10-01）**：项目月度 AUD 100、50%/80%/100% 当期支出告警已读回，默认账单 IAM 收件人启用。私有 Cloud Run、认证 Pub/Sub push 与专用 IAM 已部署；普通账单通知已自然投递，Pacific 月界修复后真实阈值烟雾测试暂停临时调度，重复消息暂停零项，临时资源已清理、生产允许列表归零。GCS 并发锁／每日及执行请求限额、BigQuery 单次扫描上限均已云端验证，四个全局 enforcement 标志为 true。来源专属身份和剩余来源成本参数尚缺，T071 保持未完成；预算通知不构成硬性停费。证据见 `cloud/data/docs/validation/budget-response.md` 和 `cloud-guards.md`。
 - [X] T072 [P] 按 [quality-rules.md](quality-rules.md#4-时间新鲜度与查询空结果) 的最近成功检查与两倍检查预算，计算最近检查、最近成功、上游最新时间、失败码、数据缺口及 `current`/`late`/`stale`/`unknown`；上游明确无变化不因旧记录时间被误报为抓取失败，不把同步失败写成“无记录”，于 `cloud/data/src/core/health.ts`。
 - [X] T073 创建 `v_source_health`、`v_source_coverage` 与来源异常延迟查询，使空结果仍可按覆盖与健康区分没有匹配、未覆盖及来源故障；生产查询身份仅能访问已批准的 `melens_query` 视图，不能访问原始对象或秘密，于 `cloud/data/sql/008_health_views.sql`。
 - [X] T074 [P] 验证失败来源、恢复后重放、延迟/过期状态、健康来源无匹配、地区未覆盖及至少一次调度下的逻辑去重；空记录不得单独当作“无事件”，于 `cloud/data/test/integration/source-health.test.ts`。
@@ -201,3 +201,8 @@ flowchart LR
 1. **P0 数据前置**：完成 Setup/Foundation，先并行完成行人分钟/历史计数、传感器位置、非计划道路、静态/实时 GTFS；T069 证明数据链路，UC-04/UC-05 另行证明产品 P0 端到端完成。
 2. **首期 ≥10 来源**：项目 P0 门槛通过后，展开停车三表、GDELT、CSA、Ticketmaster 和其他 A 级来源；在市界、ASGS、停车三表、行人两表、道路中断、GDELT、CSA、Ticketmaster、ABS Census 中选已授权且**真实同步**者，按 T077 验收 FR-002 八类覆盖。Police/VicEmergency 不纳入保底，GDELT 本地犯罪报道不足时执行 T050/T051。
 3. **增量扩展**：T070 部署脚本先发布 P0/首期 A 级，T077 不等待 B 级；B 级来源分波次合并后用同一脚本再次部署。外部 key、许可和实际更新验证是上线门槛。地图和 Agent SQL 由后续 spec 接续 BigQuery 只读视图。
+
+**2026-10-01 并行审查补充**：T048 重新打开。40 条新闻基准尚未完成双人独立裁定，不能将状态补齐当作满分认证；已修复测试评估器的硬编码评分。T066 已阻止未经验证的班次日期／时间生成坐标；T069 的正向样例及 GM-26 测试的正向 selector 仅去除两项班次实例约束，与新共享契约对齐。三个交通接口密钥实测成功仍不等于准入／发布，具体问题见交通验证记录。
+
+
+**2026-10-01 Gemini 交付整合**：GM-01 至 GM-26 的 26 组分支及返工已纳入，接收版本、补修与门槛见 `cloud/data/docs/validation/gemini-merge-review-2026-10-01.md`。小时行人采集已读取已发布历史，发布器按 sensor-hour 检查跨版本修订依据；冷启动位置不再追溯安装日，道路 offsetless 时间保持未知，新闻盲审材料单独交付。来源准入、位置历史持久化、GTFS 关联、停车规则闭环和运行验收仍待完成。本批 GM 子任务是原 T 任务的细分交付，任务总数仍为 77，已完成仍为 61，不据候选代码合并关闭真实验收任务。

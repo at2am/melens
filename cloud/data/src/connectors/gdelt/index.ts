@@ -45,15 +45,21 @@ function toUtcTimestamp(gdeltDate: string): string | null {
   return Number.isNaN(Date.parse(iso)) ? null : iso;
 }
 
-function articleUrl(rawUrl: string): string | null {
+export function articleUrl(rawUrl: string): string | null {
   try {
-    const url = new URL(rawUrl);
+    const url = new URL(rawUrl.trim());
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
     url.hash = '';
-    for (const key of url.searchParams.keys()) {
-      if (key.startsWith('utm_') || key === 'fbclid' || key === 'gclid') url.searchParams.delete(key);
+    const keys = [...url.searchParams.keys()];
+    for (const key of keys) {
+      if (/^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$)/i.test(key)) {
+        url.searchParams.delete(key);
+      }
     }
     url.searchParams.sort();
+    if (url.pathname.length > 1) {
+      url.pathname = url.pathname.replace(/\/+$/, '');
+    }
     return url.toString();
   } catch {
     return null;
@@ -61,14 +67,21 @@ function articleUrl(rawUrl: string): string | null {
 }
 
 export function parseLocationMentions(raw: string): GdeltLocationMention[] {
-  return raw.split(';').flatMap((item) => {
+  const seen = new Set<string>();
+  const mentions: GdeltLocationMention[] = [];
+  for (const item of raw.split(';')) {
     const fields = item.split('#');
     const name = fields[1]?.trim();
     const countryCode = fields[2]?.trim();
     const adm1Code = fields[3]?.trim();
-    if (!name || !countryCode || !adm1Code) return [];
-    return [{ name, countryCode, adm1Code, featureId: fields[7]?.trim() || null }];
-  });
+    if (!name || !countryCode || !adm1Code) continue;
+    const featureId = fields[7]?.trim() || null;
+    const key = `${countryCode}#${adm1Code}#${name}#${featureId ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    mentions.push({ name, countryCode, adm1Code, featureId });
+  }
+  return mentions;
 }
 
 export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): GdeltArticleCandidate[] {
@@ -77,12 +90,19 @@ export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): G
   let entries: Record<string, Uint8Array>;
   try {
     entries = unzipSync(bytes, {
-      filter: (entry) => entry.name === entryName && entry.originalSize <= MAX_CSV_BYTES,
+      filter: (entry) => (
+        entry.name === entryName ||
+        entry.name.endsWith(`/${entryName}`) ||
+        entry.name.toLowerCase() === entryName.toLowerCase()
+      ) && entry.originalSize <= MAX_CSV_BYTES,
     });
   } catch {
     throw new Error('GDELT archive is invalid');
   }
-  const csv = entries[entryName];
+  const entryKey = Object.keys(entries).find((k) =>
+    k === entryName || k.endsWith(`/${entryName}`) || k.toLowerCase() === entryName.toLowerCase()
+  );
+  const csv = entryKey ? entries[entryKey] : undefined;
   if (!csv) throw new Error('GDELT archive lacks the expected bounded GKG CSV entry');
   const lines = new TextDecoder('utf-8', { fatal: true }).decode(csv).split('\n');
   if (lines.length > MAX_ROWS_PER_FILE + 1) throw new Error('GDELT archive exceeds row limit');
@@ -104,9 +124,9 @@ export function parseGkgArchive(bytes: Uint8Array, expectedTimestamp: string): G
       articleUrl: url,
       gkgProcessedAt: processedAt,
       sourceName: field(3),
-      rawLocationNames: mentions.map((mention) => mention.name),
+      rawLocationNames: Array.from(new Set(mentions.map((mention) => mention.name))),
       victoriaMentions,
-      themes: field(7).split(';').filter(Boolean),
+      themes: Array.from(new Set(field(7).split(';').filter(Boolean))),
     });
   }
   return candidates;
@@ -167,16 +187,69 @@ export class GdeltConnector implements Connector {
       }
     }
 
+    const rawCandidateCount = articles.length;
+    // Deduplicate candidate articles by normalized URL (logicalId) within the same window
+    const mergedArticles = new Map<string, GdeltArticleCandidate>();
+
+    for (const article of articles) {
+      const logicalId = digest(`${SOURCE_ID}\0${article.articleUrl}`);
+      const existing = mergedArticles.get(logicalId);
+      if (!existing) {
+        mergedArticles.set(logicalId, {
+          gkgRecordId: article.gkgRecordId,
+          articleUrl: article.articleUrl,
+          gkgProcessedAt: article.gkgProcessedAt,
+          sourceName: article.sourceName,
+          rawLocationNames: [...article.rawLocationNames],
+          victoriaMentions: [...article.victoriaMentions],
+          themes: [...article.themes],
+        });
+      } else {
+        // Merge identical article occurring in the same window (e.g. across multiple 15-min intervals or duplicate entries)
+        const timeDiff = article.gkgProcessedAt.localeCompare(existing.gkgProcessedAt);
+        // Deterministic tie-break: prefer later timestamp; if identical timestamp, tie-break by gkgRecordId string comparison
+        const isPreferred = timeDiff > 0 || (timeDiff === 0 && article.gkgRecordId.localeCompare(existing.gkgRecordId) > 0);
+        const gkgRecordId = isPreferred ? article.gkgRecordId : existing.gkgRecordId;
+        const gkgProcessedAt = isPreferred ? article.gkgProcessedAt : existing.gkgProcessedAt;
+        const sourceName = (isPreferred ? article.sourceName : existing.sourceName) || existing.sourceName || article.sourceName;
+
+        // Merge locations and themes deterministically
+        const rawLocationNames = Array.from(new Set([...existing.rawLocationNames, ...article.rawLocationNames])).sort();
+        const themes = Array.from(new Set([...existing.themes, ...article.themes])).sort();
+
+        // Merge victoriaMentions by unique key and sort deterministically
+        const mentionMap = new Map<string, GdeltLocationMention>();
+        for (const m of [...existing.victoriaMentions, ...article.victoriaMentions]) {
+          const key = `${m.countryCode}#${m.adm1Code}#${m.name}#${m.featureId ?? ''}`;
+          if (!mentionMap.has(key)) mentionMap.set(key, m);
+        }
+        const victoriaMentions = Array.from(mentionMap.values()).sort((a, b) =>
+          `${a.countryCode}#${a.adm1Code}#${a.name}#${a.featureId ?? ''}`.localeCompare(
+            `${b.countryCode}#${b.adm1Code}#${b.name}#${b.featureId ?? ''}`
+          )
+        );
+
+        mergedArticles.set(logicalId, {
+          gkgRecordId,
+          articleUrl: existing.articleUrl,
+          gkgProcessedAt,
+          sourceName,
+          rawLocationNames,
+          victoriaMentions,
+          themes,
+        });
+      }
+    }
+
     const sourceRecords: SourceRecord[] = [];
     const geoRecords: GeoRecord[] = [];
     const geoRecordSources: GeoRecordSource[] = [];
-    const seen = new Set<string>();
-    for (const article of articles) {
-      const logicalId = digest(`${SOURCE_ID}\0${article.articleUrl}`);
+
+    // Sort entries deterministically by logicalId to ensure replay order is invariant to input order
+    const sortedEntries = Array.from(mergedArticles.entries()).sort(([idA], [idB]) => idA.localeCompare(idB));
+
+    for (const [logicalId, article] of sortedEntries) {
       const versionId = digest(`${article.gkgRecordId}\0${article.gkgProcessedAt}\0${article.rawLocationNames.join(';')}\0${article.themes.join(';')}`);
-      const key = `${logicalId}:${versionId}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
       const provenance = {
         batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
         fetched_at: checkedAt,
@@ -209,23 +282,25 @@ export class GdeltConnector implements Connector {
       });
     }
 
+    const deduplicatedCandidates = sortedEntries.map(([, article]) => article);
+
     return {
       kind: 'success', sourceId: SOURCE_ID, runId: input.runId, fetchedAt: checkedAt,
       sourceRevision: lastModified, sourceLatestUpdateAt: new Date(to - FIFTEEN_MINUTES).toISOString(),
       checkpointAfter: input.window.to,
       completeness: {
         complete: true, method: 'feed_snapshot', expected_records: null,
-        fetched_records: articles.length,
+        fetched_records: rawCandidateCount,
         expected_pages: expectedFiles, fetched_pages: fetchedFiles,
         evidence: 'Every requested 15-minute GKG ZIP and its 27-column CSV were read',
       },
-      inputCount: articles.length, outputCount: sourceRecords.length,
-      rejectedCount: articles.length - sourceRecords.length,
+      inputCount: rawCandidateCount, outputCount: sourceRecords.length,
+      rejectedCount: rawCandidateCount - sourceRecords.length,
       sourceRecords, geoRecords, geoRecordSources,
       boundaries: [], areaIndicators: [], parkingBays: [], parkingObservations: [],
       parkingRules: [], sensorLocations: [], pedestrianObservations: [],
       retainableRawRecords: null,
-      articleCandidates: articles,
+      articleCandidates: deduplicatedCandidates,
     };
   }
 }

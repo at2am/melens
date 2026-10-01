@@ -1,11 +1,14 @@
 # Melbourne 公共数据源覆盖与准入核查报告 (Source Coverage & Admission Register)
 
 > **任务标识**: T076  
-> **核查依据**: [`specs/001-melbourne-data-aggregation/source-ids.md`](../../specs/001-melbourne-data-aggregation/source-ids.md)、[`specs/001-melbourne-data-aggregation/quality-rules.md`](../../specs/001-melbourne-data-aggregation/quality-rules.md)、[`specs/001-melbourne-data-aggregation/tasks.md`](../../specs/001-melbourne-data-aggregation/tasks.md)、[`cloud/data/src/core/registry.ts`](../src/core/registry.ts)、[`specs/001-melbourne-data-aggregation/gemini-handoff.md`](../../specs/001-melbourne-data-aggregation/gemini-handoff.md)  
-> **基准日期**: 2026-09-30  
-> **准入总则**: 依据 [`quality-rules.md`](../../specs/001-melbourne-data-aggregation/quality-rules.md) §1 与运行时注册器规则，各来源分别核实官方许可、适用的凭据、调用配额、留存期和真实采集后才能激活并发布；首期八类样本门槛另行验收。公开样例（fixtures）仅证明本地解析行为，绝不代表准入通过。`active` 表示来源清单和开发集查询可用，不表示已部署定时作业。
+> **核查依据**: [`specs/001-melbourne-data-aggregation/source-ids.md`](../../../specs/001-melbourne-data-aggregation/source-ids.md)、[`specs/001-melbourne-data-aggregation/quality-rules.md`](../../../specs/001-melbourne-data-aggregation/quality-rules.md)、[`specs/001-melbourne-data-aggregation/tasks.md`](../../../specs/001-melbourne-data-aggregation/tasks.md)、[`cloud/data/src/core/registry.ts`](../src/core/registry.ts)、[`specs/001-melbourne-data-aggregation/gemini-handoff.md`](../../../specs/001-melbourne-data-aggregation/gemini-handoff.md)
+> **基准日期**: 2026-10-01
+> **准入总则**: 依据 [`quality-rules.md`](../../../specs/001-melbourne-data-aggregation/quality-rules.md) §1 与运行时注册器规则，各来源分别核实官方许可、适用的凭据、调用配额、留存期和真实采集后才能激活并发布；首期八类样本门槛另行验收。公开样例（fixtures）仅证明本地解析行为，绝不代表准入通过。`active` 表示来源清单和开发集查询可用，不表示已部署定时作业。
 
-2026-09-30 发布补充：市界、CLUE 2025 街区、ABS ASGS 2021／2026 快照、开发项目及 Homes Victoria 租金已作为 `verified_open` / `active` 在 GCP 开发集发布，共五个独立来源。可查询边界共 1,527 个；开发项目 1,450 条（现行 326 条、完成历史 1,124 条）；租金两季度 1,106 条且均未匹配边界。2026 ABS 快照中的 LGA 实际为 2025 版。证据见[市界](source-policies/municipal-boundary.md)、[CLUE](source-policies/clue-blocks-admission.md)、[ABS](source-policies/asgs-boundaries.md)、[开发项目](source-policies/development-monitor-admission.md)和[租金](source-policies/homes-victoria-rents-admission.md)专项记录。下文 2026-09-29 的旧审计快照若写“全部候选”或“0 active”，以本次发布结果为准。孤立 staging 清理已独立部署且连续七次定时成功；来源定时部署仍未完成。
+2026-09-30 发布补充：市界、CLUE 2025 街区、ABS ASGS 2021／2026 快照、开发项目及 Homes Victoria 租金及 ABS Census 已作为 `verified_open` / `active` 在 GCP 开发集发布，共六个独立来源。可查询边界共 1,527 个；开发项目 1,450 条（现行 326 条、完成历史 1,124 条）；租金两季度 1,106 条且均未匹配边界；2021 Census 有 144,792 个指标，其中 3,969 个匹配同版 LGA/SA2 边界。2026 ABS 快照中的 LGA 实际为 2025 版。证据见[市界](source-policies/municipal-boundary.md)、[CLUE](source-policies/clue-blocks-admission.md)、[ABS](source-policies/asgs-boundaries.md)、[开发项目](source-policies/development-monitor-admission.md)、[租金](source-policies/homes-victoria-rents-admission.md)和[Census](source-policies/abs-census-admission.md)专项记录。下文 2026-09-29 的旧审计快照若写“全部候选”或“0 active”，以本次发布结果为准。孤立 staging 清理已独立部署且连续七次定时成功；来源定时部署仍未完成。
+
+
+2026-10-01 Gemini 整合补充：26 组交付和 41 个分支提交的净改动已接收，详见[整合复核](validation/gemini-merge-review-2026-10-01.md)。下文历史 G23／E01 及安装日回溯描述以本次结果为准。T033 已按官方 establishment 行粒度聚合容量，物业 100008 的 13＋6 得到年度容量 19；T056 交付记录包含恢复后的 439 个 zone 和 1,888 个 overlay，保持完整分页及空层失败关闭。T030 冷启动从首次观测开始，不追溯安装日；跨作业位置历史和不可变闭合版本仍阻断。T034 已接通已发布 BigQuery 小时历史读取与按 sensor-hour 的发布排序检查。道路 offsetless 时间改为 null 并保留原文，未取得时区依据；GTFS 双模式 revision／不可变版本已修，当前快照成员与静态同版证据仍待集成。来源 active／发布数继续为 6，来源定时仍关闭，八类覆盖仍为 1/8。
 
 ---
 
@@ -20,23 +23,23 @@
 * **连接器代码目录总数**: **24 个**连接器目录（覆盖 22 个候选来源 + 2 个领域配套表；#2 警方新闻与 #19 应急警报因法律与使用条款限制按政策冻结，尚未创建连接器目录）。
 * **运行时注册器状态 (Runtime Registry)**:
   * 动态加载成功率：**24/24 个目录全部成功加载共享 `Connector` 接口**（此前关于 T032 未导出标准 Connector 的记录已失效，T032 现已导出统一实例并由注册器加载成功）；
-  * 运行时准入裁决：**5 个 `verified_open` / `active`**（市界、CLUE 街区、ABS ASGS、开发项目、Homes Victoria 租金），其余 19 个连接器仍为 `review_required` / `candidate`；
-  * 活跃已准入数：`registry.active().length === 5`（已准入 **5/24 个连接器**）。
+  * 运行时准入裁决：**6 个 `verified_open` / `active`**（市界、CLUE 街区、ABS ASGS、开发项目、Homes Victoria 租金、ABS Census），其余 18 个连接器仍为 `review_required` / `candidate`；
+  * 活跃已准入数：`registry.active().length === 6`（已准入 **6/24 个连接器**）。
 * **工程执行四级阶段状态对账 (Four-tier Verification Status)**:
   1. **模块加载 (Module Loaded)**: **24/24 成功**。所有 24 个连接器代码目录均导出冻结的 `Connector` 接口，无模块加载失败（2 个条件源按政策冻结，无代码）；
   2. **样例解析 (Sample Parsing Verified)**: **24/24 验证**。本地单元测试与 fixture 解析逻辑通过，仅验证本地数据处理与 schema 映射；
-  3. **真实采集状态 (Real Upstream Collection)**: **五个来源已采集并发布**。其他公开接口快照与离线归档有解析成功实例（如停车传感器 6,324 条、停车限制 4,263 条/8,035 规则、行人位置 134 条、GTFS 静态归档 60 线/4,485 站），但仍存在关键上游阻断、真实数据冲突及凭据与关联硬伤：
+  3. **真实采集状态 (Real Upstream Collection)**: **六个来源已采集并发布**。其他公开接口快照与离线归档有解析成功实例（如停车传感器 6,324 条、停车限制 4,263 条/8,035 规则、行人位置 134 条、GTFS 静态归档 60 线/4,485 站），但仍存在关键上游阻断、真实数据冲突及凭据与关联硬伤：
      - **T032 (#17)**: 官方配置端点返回 **HTTP 404 / NotFoundResource**，采集按规则失败关闭（G01 阻断保持）；
-     - **T033 (#20)**: 原 G02 年份查询 HTTP 400 与分页硬上限已修复（`census_year = date'2024'` 实测 HTTP 200 返回 7,185 条）；当前阻断为 **G23**：官方 2024 真实数据中存在同物业、同车位类型多行冲突记录（如物业 100008 private 有 13 与 6 两条记录），默认连接器因重复冲突校验失败退出；
+     - **T033 (#20)**: Gemini 交付记录已按官方 establishment 行粒度完成同物业／同类型容量聚合；物业 100008 的 13＋6 为 19，G23 原重复冲突已修。年度容量不表示实时空位，许可及云端发布另验。
      - **T055 (#21)**: 默认连接器经 DataVic 目录拉取官方 XLSX 实读 **58,618 条**（`complete = true`，无 fixture 回退，原 G03 关闭）；文件 `Last-Modified` 作为更正顺序，2025 年两季度 1,106 条已发布，全部保持边界未解析；
-     - **T056 (#22)**: ArcGIS FeatureServer 规划分区层（zone layer 3）对 Melbourne LGA 及全量查询均返回**空对象列表 (`objectIds: []`)**，连接器按规则 fail-closed（E01 外部受阻保持成立；overlay 图层 Melbourne 计数 1,888）；
+     - **T056 (#22)**: Gemini 记录官方服务恢复为 439 个 zone／1,888 个 overlay，完整分页及 scheme_code 分类已修；两层缺失或为空仍失败关闭。许可及开发集发布待完成。
      - **T054 (#18)**: 测量指标已接入规范化 `areaIndicators`（5 条 fixture 生成 65 条 AreaIndicator，覆盖温度、湿度、风、PM、噪声等 13 类），保留单位与 null 缺值，不再仅留在被忽略的额外数组（原 G04 关闭）；待云端真实环境拉取与发布验收；
      - **T057 (#23)**: 仅有竣工年时 `observed_at = null` 且保留缺时说明，住宅数缺失保留 null，保留年粒度（原 G10 关闭）；1,450 条真实开发项目已发布；
-     - **T034 (#24)**: 同一 sensor-hour 计数更正已更新批次修订，消除批次复用风险；但上游无更新时间证据，版本排序待集成；夏令时 fail-closed 验证通过；
-     - **T030 (#8)**: 内存中及显式历史已能识别迁移，但冷启动仍回填安装日期，关闭的旧区间未进入连接器返回结果，历史区间持久化与作业接线待集成；
-     - **凭据缺失**: Transport Victoria 接口（#9, #15, #16）缺 Secret Manager `transport_victoria_key_id`，Ticketmaster (#12) 缺 `ticketmaster_discovery_api_key`；
+     - **T034 (#24)**: 从已发布 BigQuery 同窗口观测读取有界更正历史；发布器按 sensor-hour 与对应 source_record 检查修订证据，UTC coverage checkpoint 不承载历史摘要。真实行人联合发布与运行验收待完成。
+     - **T030 (#8)**: 冷启动首次观测区间替代安装日回溯；跨 Cloud Run 历史状态及不可变 closure 发布仍缺，保持候选。
+     - **凭据已配置**: 两个 Secret 已有启用版本 1；Transport Victoria 三个私有云端接口已成功读取，时间与版本问题仍阻断发布；Ticketmaster 的条款及留存门槛仍未通过；
      - **键脱节与版本错位**: 停车传感器 6,324 条记录中 `marker_id`/`bay_id` 完全缺失（0 条可关联），与车位/规则表仅 10 个重叠车位；CLUE 2025 年街区法定重组导致历史就业统计空间脱节。
-  4. **云端发布状态 (Publication Status)**: **5/24 连接器已在开发集发布**（市界 1 条、CLUE 街区 603 条、ABS 2021 边界 443 条和 2026 快照 480 条、开发项目 1,450 条、租金两季度 1,106 条）；来源定时作业和首期端到端验收未完成。
+  4. **云端发布状态 (Publication Status)**: **6/24 连接器已在开发集发布**（市界 1 条、CLUE 街区 603 条、ABS 2021 边界 443 条和 2026 快照 480 条、开发项目 1,450 条、租金两季度 1,106 条、Census 144,792 个指标）；来源定时作业和首期端到端验收未完成。
 * **八类核心信息样本门槛 (FR-002 / Quality Rules §2)**: **1 / 8 类通过**。市界独立版本与 ABS 2021 Greater Melbourne GCCSA、80 个同版 LGA 已可查询；其余七类仍未通过。
 
 ---
@@ -60,23 +63,23 @@
 | **#5** `melbourne.parking.bays` | T027 | `melens integration` | **成功 (True)** | **通过** (`com_parking_bays.json`, 438 B) | **已采 29,053 行**：官方快照获取成功，但 23,981 行（82.5%）`kerbsideid` 为空；仅有点坐标，无车位面多边形 | **未发布 (0 条)** | **未准入 (Candidate)**。缺少车位面几何与稳定键，阻断三表关联；禁止虚构车位多边形。 |
 | **#6** `melbourne.parking.restrictions` | T028 | `melens integration` | **成功 (True)** | **通过** (`com_parking_restrictions.json`, 1.40 KB) | **已采 4,263 条/8,035 规则**：快照解析成功；但数据停留在 2022-11-13 快照；`bayid` 无法与 Sensors 的 `kerbsideid` 映射 | **未发布 (0 条)** | **未准入 (Candidate)**。数据版本陈旧；缺少节假日判定事实；三表无法凑齐 30 个有效车位。 |
 | **#7** `melbourne.pedestrian.minute` | T029 | `melens integration` | **成功 (True)** | **通过** (`com_pedestrian_minute.json`, 312 B) | **逻辑验证**：15 分钟重叠拉取与缺口不补零逻辑验证完成；未开展连续 24 小时真实接口拉取 | **未发布 (0 条)** | **未准入 (Candidate)**。P0 核心数据源；缺少云端连续 24 小时运行证据；待 T069 联合发布验收。 |
-| **#8** `melbourne.pedestrian.locations` | T030 | `melens integration` | **成功 (True)** | **通过** (`com_pedestrian_locations.json`, 2.29 KB) | **已采 134 点位**：快照拉取成功；内存及显式注入历史时能识别迁移，但冷启动仍回填安装日期，关闭的旧区间未进入返回值 | **未发布 (0 条)** | **未准入 (Candidate)**。历史区间持久化与作业接线待集成；待与分钟读数（#7）联合验证空间挂接。 |
-| **#9** `victoria.transport.road_unplanned` | T031 | `melens integration` | **成功 (True)** | **通过** (`tv_road_unplanned.json`, 1.18 KB) | **凭据阻断**：Transport Victoria v3 接口已适配，但 Secret Manager 缺失 `transport_victoria_key_id`，未产生实时调用 | **未发布 (0 条)** | **未准入 (Candidate)**。P0 核心数据源；依赖 Secret Manager 凭据注入与 20次/分限流实盘校验。 |
+| **#8** `melbourne.pedestrian.locations` | T030 | `melens integration` | **成功 (True)** | **通过** (`com_pedestrian_locations.json`, 2.29 KB) | **已采 134 点位**：快照拉取成功；冷启动从首次观测开始，历史更早区间保持未知；跨作业状态及不可变闭合版本仍未接通 | **未发布 (0 条)** | **未准入 (Candidate)**。历史区间持久化与作业接线待集成；待与分钟读数（#7）联合验证空间挂接。 |
+| **#9** `victoria.transport.road_unplanned` | T031 | `melens integration` | **成功 (True)** | **通过** (`tv_road_unplanned.json`, 1.18 KB) | **密钥已配置**：启用版本 1 经私有云端实测成功，三页完整 291／290 个影响要素；更新时间无时区，第二次转换后 16 个来源事实落在未来，发布暂阻断 | **未发布 (0 条)** | **未准入 (Candidate)**。P0 核心数据源；依赖 Secret Manager 凭据注入与 20次/分限流实盘校验。 |
 | **#10** (基础 1) `melbourne.municipal_boundary` | T022 | `melens integration` | **成功 (True)** | **通过** (`com_municipal_boundary.json`, 274 B) | **已验证 1 面要素**：City of Melbourne 市界；当前版本 `com_municipal:1:2008-07-01` | **开发集已发布 (1 条)** | **已准入 (`verified_open` / `active`)**。`v_boundaries` 可查一条有效地理面；尚未部署定时作业，不能单独满足行政边界类别门槛。 |
 | **#11** (基础 2) `abs.asgs.boundaries` | T023 | `melens integration` | **成功 (True)** | **通过** (`abs_asgs_boundaries.json`, 329 B) | **官方 2021 实采 445 要素、2026 快照 482 要素**：分别 443／480 地理面，另各有 2 条官方非空间 LGA 来源事实保留 | **开发集已发布 (923 面)** | **已准入 (`verified_open` / `active`)**。2021 有 1 GCCSA、1 STE、80 LGA、361 SA2；2026 快照有 1 GCCSA、1 STE、398 SA2，另 80 LGA 为原始 2025 版。 |
-| **#12** `ticketmaster.events` | T042 | `melens integration` | **成功 (True)** | **通过** (`ticketmaster.json`, 1.02 KB) | **双重阻断**：① Secret Manager 缺失 `ticketmaster_discovery_api_key`；② 官方 ToS 严禁商业缓存并要求 24 小时删除，BigQuery 尚缺下架流水线 | **未发布 (0 条)** | **未准入 (Blocked)**。凭据缺失且数据留存条款阻断；待项目拥有者申请 Key 并评估替代源（如 What's On）。 |
-| **#13** `abs.census` | T052 | `melens integration` | **样例解析通过** | **通过** (`abs_census.json`, 2.97 KB) | **官方 ZIP 实读**：按范围提取维州 SA1／SA2／LGA 的 G01／G02，32,176 条地区表记录、144,792 个选定指标；2021 Melbourne LGA 总人口 149,615 | **未发布 (0 条)** | **未准入 (Candidate)**。九项指标已接入；待许可/配额审核及同版 2021 ASGS 边界联合发布。 |
+| **#12** `ticketmaster.events` | T042 | `melens integration` | **成功 (True)** | **通过** (`ticketmaster.json`, 1.02 KB) | **条款阻断**：Secret Manager 已有启用版本 1；缓存与快速删除条件尚未在 BigQuery 留存流程中落实 | **未发布 (0 条)** | **未准入 (Blocked)**。密钥已配置，数据留存条款仍阻断；待完成来源政策和替代源评估。 |
+| **#13** `abs.census` | T052 | `melens integration` | **成功 (True)** | **通过** (`abs_census.json`, 2.97 KB) | **官方 ZIP 实读**：六个 G01/G02 CSV，32,176 地区表事实、144,792 个指标；参考日为 2021-08-10，不延伸至 2026 | **开发集已发布 (144,792 指标)** | **已准入 (`verified_open` / `active`)**。720 指标匹配 80 个 2021 LGA，3,249 匹配 361 个 2021 SA2，其余 140,823 显式未匹配；仅一个统计期，区域类别门槛仍未通过。 |
 | **#14** `melbourne.clue.employment` | T053 | `melens integration` | **成功 (True)** | **通过** (`com_clue_employment.json`, 3.34 KB) | **空间错位阻断**：2002–2024 年 CLUE 就业统计解析正常；但 2025 年官方重组 Small Blocks 边界，二者无法直接挂接 | **未发布 (0 条)** | **未准入 (Blocked)**。街区重组空间错位；官方 crosswalk 缺失前标记 `boundary_mapping_status = missing`。 |
 | **配套 1** `melbourne.clue.blocks` | T053 | `melens integration` | **成功 (True)** | **通过** (`com_clue_blocks.json`, 2.74 KB) | **官方实采 603 面**：2025 年对齐的 Small Blocks 空间多边形底图 | **开发集已发布 (603 面)** | **已准入 (`verified_open` / `active`)**。独立空间来源；与 2002–2024 年就业表仍版本错位，禁止按 block ID 直接挂接。 |
-| **#15** `victoria.transport.road_planned` | T061 | `melens integration` | **成功 (True)** | **通过** (`tv_road_planned.json`, 1.70 KB) | **凭据阻断**：分页与 Token 双模式适配完成，严格保持 `assertion_kind = plan`；但缺失 `transport_victoria_key_id` | **未发布 (0 条)** | **未准入 (Candidate)**。依赖 Secret Manager 凭据注入与 20次/分限流实盘校验。 |
-| **#16** `victoria.transport.gtfs_realtime` | T063 | `melens integration` | **成功 (True)** | **通过** (`tv_gtfs_realtime.json`, 1.04 KB) | **凭据阻断**：Protobuf 解析管道就绪，仅含火车与电车（官方无公交 Service Alerts）；缺失 `transport_victoria_key_id` | **未发布 (0 条)** | **未准入 (Candidate)**。P0 核心数据源；需注入凭据并与静态 GTFS 联合定位。 |
+| **#15** `victoria.transport.road_planned` | T061 | `melens integration` | **成功 (True)** | **通过** (`tv_road_planned.json`, 1.70 KB) | **密钥已配置**：Token 两次各 19 页完整 9,450／9,452 事件，零拒绝；更新时间缺时区，现有 Victorian 转换仍需正式依据；准入与版本发布未验证 | **未发布 (0 条)** | **未准入 (Candidate)**。依赖 Secret Manager 凭据注入与 20次/分限流实盘校验。 |
+| **#16** `victoria.transport.gtfs_realtime` | T063 | `melens integration` | **成功 (True)** | **通过** (`tv_gtfs_realtime.json`, 1.04 KB) | **密钥已配置**：两个官方火车／电车 protobuf feed 完整返回 19 警报、21 来源事实；实时版本冲突和静态同版匹配仍待修订 | **未发布 (0 条)** | **未准入 (Candidate)**。P0 核心数据源；需注入凭据并与静态 GTFS 联合定位。 |
 | **配套 2** `victoria.transport.gtfs_static` | T062 | `melens integration` | **成功 (True)** | **通过** (官方 ZIP 读取) | **已采 60 路线/4,485 站**：按 HTTP Range 读取官方 275MB 归档，解析 60 路线、4,485 站点、96,483 trips；子包无 `feed_info` | **未发布 (0 条)** | **未准入 (Candidate)**。独立配套表；子包版本取自验证头，与实时 feed 的版本同一性尚未证明。 |
 | **#17** `melbourne.transport.activity_counts` | T032 | `melens integration` | **成功 (True)** | **通过** (共享 Connector) | **上游 404 阻断 (G01)**：2026-09-30 复测官方配置端点仍返回 **HTTP 404 / NotFoundResource**；连接器按规则 fail-closed 报错 `schema_changed (404)` | **未发布 (0 条)** | **未准入 (Blocked)**。官方端点仍不可用；严禁以 fixture 冒充上线；保持候选受阻。 |
 | **#18** `melbourne.microclimate` | T054 | `melens integration` | **成功 (True)** | **通过** (`com_microclimate.json`, 3.02 KB，5 条样例产生 65 条 `AreaIndicator`) | **规范化指标已接入 (G04 已关闭)**：13 类测量指标（温度、湿度、风速风向、PM2.5、PM10、噪声等）已进入公共发布器读取的 `areaIndicators`，保留单位与 null 缺测；未开展云端实盘采集 | **未发布 (0 条)** | **未准入 (Candidate)**。候选交付已通过；测量事实已可规范化消费；待云端真实环境拉取与发布验收。 |
 | **#19** `victoria.emergency.alerts` | T064, T065 | `null` (冻结) | **无代码 (None)** | **无样例** | **政策阻断**：EMV 严禁高频自动化抓取；公开 RSS 仅限个人阅读；重大生命安全法律责任；连接器禁止开工 | **未发布 (0 条)** | **未准入 (Blocked)**。条件性来源审查未通过；不计入首期上线保底数；须与 EMV 签署书面协议。 |
-| **#20** `melbourne.offstreet_parks` | T033 | `melens integration` | **成功 (True)** | **通过** (`com_offstreet_parks.json`, 9.32 KB) | **同物业多行冲突阻断 (G23)**：原 G02 已修复（`census_year = date'2024'` 实测 HTTP 200 返回 7,185 条）；但 2024 真实数据同物业同类型多行冲突（如物业 100008 private 有 13 与 6 两条记录），导致 `validation_failed: Conflicting duplicate record detected` 采集失败关闭 | **未发布 (0 条)** | **未准入 (Blocked)**。上游 2024 真实数据行粒度非 `year + property_id + parking_type` 唯一；待官方行粒度/聚合规则确认或子记录区分；严格限制年度容量不得充当实时空位。 |
+| **#20** `melbourne.offstreet_parks` | T033 | `melens integration` | **成功 (True)** | **通过** (`com_offstreet_parks.json`, 9.32 KB) | **行粒度修复已交付**：官方 2024 切片 7,185 行，同物业／同类型 establishment 容量确定性聚合；100008 的 13＋6 为 19。详见 GM-06 证据 | **未发布 (0 条)** | **未准入 (Candidate)**。G23 原重复冲突已修；年度容量不是实时空位，许可及开发集发布另验。 |
 | **#21** `homes_victoria.rents` | T055 | `melens integration` | **成功 (True)** | **通过** (`homes_victoria_rents.json`, 59.6 KB) | **官方 XLSX 实读 58,618 条**：七张房型表、106 个季度；文件 `Last-Modified` 为 `2026-02-20T01:17:41Z`，用于更正排序；9,308 条抑制值保留 null | **开发集已发布 (1,106 条)** | **已准入 (`verified_open` / `active`)**。Jun/Sep 2025 各 553 条，182 条抑制值为 null；全部 `boundary_mapping_status = missing`，尚不能渲染为 LGA 多边形。 |
-| **#22** `victoria.vicmap.planning` | T056 | `melens integration` | **成功 (True)** | **通过** (`vicmap_planning.json`, 2.51 KB) | **官方 Zone 层为空 (E01)**：ArcGIS REST layer 2 (overlay) 正常（Melbourne overlay 计数 1,888），但 layer 3 (zone) 对 Melbourne LGA 及全量查询均返回空数组 **`objectIds: []`**，连接器按规则 fail-closed | **未发布 (0 条)** | **未准入 (Blocked)**。外部上游受阻（E01 仍成立）；连接器保持失败关闭；两层均有数据前严禁仅凭单层上线或放宽门禁。 |
+| **#22** `victoria.vicmap.planning` | T056 | `melens integration` | **成功 (True)** | **通过** (`vicmap_planning.json`, 2.51 KB) | **官方恢复记录已交付**：Melbourne 439 个 zone＋1,888 个 overlay，分页及图层分类验证。详见 GM-13 证据 | **未发布 (0 条)** | **未准入 (Candidate)**。保留双层完整性与空层失败关闭；许可及开发集发布另验。 |
 | **#23** `melbourne.development_monitor` | T057 | `melens integration` | **成功 (True)** | **通过** (`com_development_monitor.json`, 28.2 KB) | **已采 1,450 条**：官方 `data_processed` 前后校验稳定；保留四种项目状态、年粒度与缺值 | **开发集已发布 (1,450 条)** | **已准入 (`verified_open` / `active`)**。历史 1,124 已完成、现行 267 拟议／获批与 59 在建；1,450 点位均有非空几何。未将无版本 CLUE block ID 连到 2025 多边形；定时仍关闭。 |
 | **#24** `melbourne.pedestrian.hourly` | T034 | `melens integration` | **成功 (True)** | **通过** (`com_pedestrian_hourly.json`, 679 B) | **批次修订已修复，版本顺序待集成**：计数更正已更新 `sourceRevision`，批次复用风险已消除；夏令时异常小时 fail-closed 验证通过；但上游无更新时间证据，更正版本先后顺序待集成 | **未发布 (0 条)** | **未准入 (Candidate)**。内容更正消除旧批次复用；版本排序策略待集成方确认；待与分钟和位置联合在 BigQuery 完成发布验收。 |
 
@@ -100,7 +103,7 @@
 | `melbourne.municipal_boundary` | `city` | `null` | `null` | `mccid_gis` | total_count = 1 and name = 'City of Melbourne' | `verified_open` / `active` | 10,000（官方响应显示的每日上限） | 无 | 无；许可、留存、真实发布证据见[专项记录](source-policies/municipal-boundary.md) |
 | `abs.asgs.boundaries` | `victoria` | `null` | `null` | `ASGS scheme + code + vintage` | Every official object ID exactly once; non-spatial records retain source facts | `verified_open` / `active` | 100（Melens 保守日限，不是官方发布配额） | 无 | 无；许可与实盘发布见[专项记录](source-policies/asgs-boundaries.md) |
 | `ticketmaster.events` | `greater_melbourne` | `null` | 86400 | `event.id` | Bounded start window; reject deep paging >1000 | `review_required` / `review_required` | 5,000 | `ticketmaster_discovery_api_key` | `coverage_area_refs`, `coverage_from`, `raw_retention_days`, `reviewed_at` |
-| `abs.census` | `greater_melbourne` | `null` | `null` | `vintage + scheme + region + metric` | ABS DataPacks validation; sample < 4 suppressed as null | `review_required` / `review_required` | `null` | 无 | `quota_requests_per_day`, `raw_retention_days`, `reviewed_at` |
+| `abs.census` | `victoria` | `null` | `null` | `vintage + scheme + region + table + metric` | Six official G01/G02 CSVs, validated ZIP ranges/checksums and selected headers; suppressed/missing remain null | `verified_open` / `active` | `100`（Melens 每日上限） | 无 | 无；[准入记录](source-policies/abs-census-admission.md) |
 | `melbourne.clue.employment` | `city` | 31536000 | `null` | `census_year + block_id` | Unique block_id + industry + year; null on suppression | `review_required` / `review_required` | `null` | 无 | `quota_requests_per_day`, `raw_retention_days`, `reviewed_at` |
 | `melbourne.clue.blocks` | `city` | `null` | `null` | `block_id` | All 603 polygons exported; unique block_id | `verified_open` / `active` | 10,000（官方响应显示的每日上限） | 无 | 无；许可与实盘发布见[专项记录](source-policies/clue-blocks-admission.md) |
 | `victoria.transport.road_planned` | `victoria` | 1800 | 1800 | `properties.id with geometry ordinal` | Numbered pages agree on totals; unique event IDs | `review_required` / `review_required` | 14,400 | `transport_victoria_key_id` | `coverage_area_refs`, `coverage_from`, `reviewed_at` |
@@ -119,7 +122,7 @@
 
 ## 3. 配套表与基础参考表专项治理 (Auxiliary & Foundational Tables)
 
-依据 [`source-ids.md`](../../specs/001-melbourne-data-aggregation/source-ids.md) 与架构契约，配套表和空间基础表承担关联查询、空间挂接与模式映射的基石职责。**严禁将其与业务主表混用同一个 `source_id` 或混入同一发布流水**，必须在目录中独立登记、独立版本化管理并独立计数：
+依据 [`source-ids.md`](../../../specs/001-melbourne-data-aggregation/source-ids.md) 与架构契约，配套表和空间基础表承担关联查询、空间挂接与模式映射的基石职责。**严禁将其与业务主表混用同一个 `source_id` 或混入同一发布流水**，必须在目录中独立登记、独立版本化管理并独立计数：
 
 ### 3.1 基础空间参考表 1: 墨尔本市法定市界 (`melbourne.municipal_boundary`, 已准入 #10)
 * **所属任务**: T022 (Foundation)
@@ -159,7 +162,7 @@
 
 ## 4. 两个条件性来源审查与隔离状态 (Conditional Sources)
 
-依据 [`tasks.md`](../../specs/001-melbourne-data-aggregation/tasks.md) Phase 4 与 Phase 6 的架构约束，#2 Victoria Police 与 #19 VicEmergency 被列为条件性来源（Conditional Sources），**严禁计入首期上线来源保底数（≥10 个）**。在获得明确的官方书面授权前，禁止编写爬虫或接入非公开订阅：
+依据 [`tasks.md`](../../../specs/001-melbourne-data-aggregation/tasks.md) Phase 4 与 Phase 6 的架构约束，#2 Victoria Police 与 #19 VicEmergency 被列为条件性来源（Conditional Sources），**严禁计入首期上线来源保底数（≥10 个）**。在获得明确的官方书面授权前，禁止编写爬虫或接入非公开订阅：
 
 ### 4.1 Victoria Police 新闻 (`victoria.police.news`, 候选 #2)
 * **关联任务**: T043 (许可与访问审查) -> T044 (仅在允许后开发连接器)。
@@ -191,10 +194,10 @@
 2. 凡存在任何一项未满足（`missing_requirements.length > 0`），系统自动将该清单强制判定为 `license_status = 'review_required'`，并将 `ready` 或 `active` 状态强制降级为 `access_status = 'candidate'`。
 3. **实测表现**:
    * **24/24 个目录全部成功加载共享 `Connector` 接口**：所有目录均已导出符合规范的 `connector` 对象并通过 `loadConnector()` 校验；
-   * **清单声明状态与运行时对齐**：市界、CLUE 街区、ABS ASGS、开发项目和 Homes Victoria 租金声明并运行于 `verified_open` / `active`；其余 19 个连接器声明并运行于 `review_required` / `candidate`；
-   * **缺项降级裁决**：除上述五个来源外的 19 个连接器目录仍存在未满足项（如 `quota_requests_per_day` 未定、`reviewed_at` 未签署、`raw_retention_days` 缺少审计等）；
+   * **清单声明状态与运行时对齐**：市界、CLUE 街区、ABS ASGS、开发项目、Homes Victoria 租金及 ABS Census 声明并运行于 `verified_open` / `active`；其余 18 个连接器声明并运行于 `review_required` / `candidate`；
+   * **缺项降级裁决**：除上述六个来源外的 18 个连接器目录仍存在未满足项（如 `quota_requests_per_day` 未定、`reviewed_at` 未签署、`raw_retention_days` 缺少审计等）；
    * **T032 接口状态纠正**：此前文档曾报告 `com_transport_activity_counts` (T032) 未导出标准 Connector 对象且 manifest 声明 `verified_open/ready` 缺 10 项元数据。**当前实际运行时状态为：T032 已成功导出标准 `Connector` 对象，注册器动态加载成功，其 manifest 声明状态为 `review_required` / `candidate`，缺少项仅为 `coverage_from` 与 `reviewed_at` 两项**；
-   * **活跃已准入总数**：运行时注册器得出的活跃已准入来源总数为 **5 个** (`registry.active().length === 5`)。
+   * **活跃已准入总数**：运行时注册器得出的活跃已准入来源总数为 **6 个** (`registry.active().length === 6`)。
 
 ### 5.2 真实上游阻断深度剖析 (Deep Dive on Real Upstream Blockers)
 
@@ -231,7 +234,7 @@
 #### 6. G10 · 已修复 · T057：`melbourne.development_monitor` 事实精度伪造修复 (原 G10 已关闭)
 * **核查位置**: `cloud/data/src/connectors/com_development_monitor/index.ts`。
 * **修复与复核证据**: 此前仅有竣工年时伪造 1 月 1 日时刻及住宅缺值填 0 的问题已彻底修复。仅有竣工年时输出 `observed_at = null` 且保留缺时说明，竣工年保留年粒度区间；缺失住宅数量严格保留为 null，真实来源为 0 时才输出 0；完整保留 mooted / approved / under construction / completed 四种项目状态，测试全数通过。
-* **当前状态**: 官方元数据 `data_processed` 在分页前后校验稳定；1,450 条已开发集发布，`v_change_timeline` 可查 59 在建、267 拟议／获批及 1,124 完成历史。后续删除项目的 tombstone 策略仍待实现，定时发布关闭。
+* **当前状态**: 官方元数据 `data_processed` 在分页前后校验稳定；1,450 条已开发集发布，`v_change_timeline` 可查 59 在建、267 拟议／获批及 1,124 完成历史。完整快照成员过滤已部署并通过 BigQuery 行为验证；最新完整版本缺少的项目退出当前视图，保留历史、不伪造取消状态。定时发布仍关闭。
 
 #### 7. T034：`melbourne.pedestrian.hourly` 批次修订修复，版本顺序待集成
 * **核查位置**: `cloud/data/src/connectors/com_pedestrian_hourly/index.ts`。
@@ -243,9 +246,9 @@
 * **复核证据**: G08 部分修复。在内存中或显式注入历史时能识别迁移；但冷启动时仍回填安装日期，关闭的旧区间未进入 Connector 返回结果（共享发布器只消费 Connector 返回数组）。
 * **待集成项**: 历史区间持久化、旧版本更正及作业接线待与集成方协同完成；在链路实现前保持待集成，不把安装日当作新坐标的生效证据。
 
-#### 9. 凭据缺失阻断 (Secret Manager Credentials Missing)
-* **Transport Victoria 体系 (#9, #15, #16)**: `tv_road_unplanned`、`tv_road_planned`、`tv_gtfs_realtime` 均已完成 v3 REST 或 Protobuf 解码适配，但生产调用强依赖 Secret Manager 中的 `transport_victoria_key_id`。当前 Secret Manager 尚未注入用户真实 Key，无法进行真实网络请求；
-* **Ticketmaster (#12)**: 缺失 Secret Manager 中的 `ticketmaster_discovery_api_key`；且其 API 使用条款严格限制本地长期缓存，并要求 24 小时事件删除流水线，当前 BigQuery 尚未实现来源级下架机制。
+#### 9. 凭据配置与接口验证
+* **Transport Victoria 体系 (#9, #15, #16)**: `tv_road_unplanned`、`tv_road_planned`、`tv_gtfs_realtime` 均已完成 v3 REST 或 Protobuf 解码适配，但生产调用强依赖 Secret Manager 中的 `transport_victoria_key_id`。用户已加入启用版本 1，云端运行时通过 Secret 引用进行接口验证；
+* **Ticketmaster (#12)**: `ticketmaster_discovery_api_key` 已有启用版本 1；且其 API 使用条款严格限制本地长期缓存，并要求 24 小时事件删除流水线，当前 BigQuery 尚未实现来源级下架机制。
 
 #### 10. 核心业务键脱节与版本错位阻断
 * **停车三表脱节 (#4, #5, #6)**: 现场拉取传感器快照 6,324 条，其中历史关键键 `marker_id`/`bay_id` 缺失率为 100%（0 条可匹配）；车位表 29,053 行中 82.5% 缺失 `kerbsideid` 且无车位多边形面；规则表停留在 2022 年快照。三表重叠可关联车位仅 10 个，远低于门槛要求的 30 个，严格禁止计算或暴露 `may_park_now = yes`；
@@ -255,7 +258,7 @@
 
 ## 6. 八类核心信息首期最低样本门槛审计 (Quality Rules §2 Gate)
 
-对照 [`quality-rules.md`](../../specs/001-melbourne-data-aggregation/quality-rules.md) §2 规定的八类信息首期最低验收样本标准，当前实际达标审计结果如下：
+对照 [`quality-rules.md`](../../../specs/001-melbourne-data-aggregation/quality-rules.md) §2 规定的八类信息首期最低验收样本标准，当前实际达标审计结果如下：
 
 | # | 信息类别 | 最低验收样本门槛 (Quality Rules §2) | 对应候选来源 | 当前状态与关键证据核查 | 准入达标判定 |
 |---|---|---|---|---|---|
@@ -263,10 +266,10 @@
 | **2** | **本地犯罪资讯** | 最近 30 天至少 5 个不同本地犯罪报道，来自至少 2 个发布日期；另有 CSA 的区域统计样本，二者分开显示 | #1 `gdelt.news`, #2 `victoria.police.news` (条件性), #3 `victoria.csa.recorded_offences` | CSA 季度统计已具备测试样本（仅 LGA 级）；警方网页条件性冻结；GDELT 过滤出的本地犯罪报道 30 天内数量未知（DOC 接口超时）。处于替代源调查状态（T050）。 | **未达标** (犯罪新闻证据不足) |
 | **3** | **路边停车** | 至少 30 个三表可关联车位及 10 个限制缺失、冲突或过期样本，按 SC-005 验证 | #4 `melbourne.parking.sensors`, #5 `melbourne.parking.bays`, #6 `melbourne.parking.restrictions` | **核心阻断**: 实测 API 数据发现 Sensors 与 Bays 仅有 4,825 个重叠 `kerbsideid`，而 Restrictions 仅有 10 个与二者重合。三表无法凑齐 30 个有效关联车位。严格禁止输出 `may_park_now = yes`。 | **严重阻断** (Key Join 破裂) |
 | **4** | **行人** | 至少 2 个传感器、2 个不同小时的真实观测及对应有效位置；缺分钟不补零 | #7 `melbourne.pedestrian.minute`, #8 `melbourne.pedestrian.locations`, #24 `melbourne.pedestrian.hourly` | 分钟读数、传感器位置、历史小时三个连接器均已实现；夏令时异常小时处理已就绪。小时更正已更新批次修订消除复用风险（原 G09 已修复），但版本排序策略待集成；传感器迁移在内存中可识别但冷启动与历史区间持久化待集成（G08 待集成）；待在 BigQuery 开发集完成连续多小时发布与联合验收 (T069)。 | **未达标** (P0 链路待实盘发布) |
-| **5** | **交通中断** | 最近 14 天至少 3 个不同道路事件，覆盖 2 个来源日期；当前与解除状态可由真实或独立验收样例验证 | #9 `victoria.transport.road_unplanned`, #15 `victoria.transport.road_planned`, #16 `victoria.transport.gtfs_realtime` (+ 配套静态 GTFS) | 接口契约与限流已冻结；但 Transport Victoria 全线接口强依赖 Secret Manager 中的 `transport_victoria_key_id`。目前密钥尚未注入，无云端真实批次发布。 | **未达标** (缺少 API 密钥) |
+| **5** | **交通中断** | 最近 14 天至少 3 个不同道路事件，覆盖 2 个来源日期；当前与解除状态可由真实或独立验收样例验证 | #9 `victoria.transport.road_unplanned`, #15 `victoria.transport.road_planned`, #16 `victoria.transport.gtfs_realtime` (+ 配套静态 GTFS) | 接口契约与限流已冻结；但 Transport Victoria 全线接口强依赖 Secret Manager 中的 `transport_victoria_key_id`。密钥已配置，三类交通接口已完整读取；时间与版本校验尚未完成，无真实批次发布。 | **未达标** (未发布和未验收) |
 | **6** | **行政边界** | City of Melbourne 市界、Greater Melbourne 所属 GCCSA 及至少 2 个 LGA 的同版边界可查询 | #10 `melbourne.municipal_boundary`, #11 `abs.asgs.boundaries` | `v_boundaries` 可查询 City 市界（市府 2008 版）、Greater Melbourne GCCSA（ABS 2021 版）及 Melbourne、Port Phillip、Yarra 等 80 个 ABS 2021 同版 LGA；地理面非空，样例 LGA 面积为正。 | **已达标** (市府与 ABS 方案、版本分别标注) |
-| **7** | **活动** | 未来 30 天至少 5 个不同活动，覆盖至少 2 个场馆，且有日期、状态和原始链接 | #12 `ticketmaster.events` | 依赖 Secret Manager 注入 Ticketmaster Developer Key；且其 API 使用条款严格限制长期缓存并要求 24 小时删除机制，当前 BigQuery 缺少下架机制。替代源（如 What's On）尚未建立。 | **未达标** (凭据与条款阻断) |
-| **8** | **区域统计** | 至少 2 个地区、2 个统计期的真实指标，保留原始统计地域和边界版本 | #3 `victoria.csa.recorded_offences`, #13 `abs.census`, #14 `melbourne.clue.employment`, #21 `homes_victoria.rents` | Homes Victoria Jun/Sep 2025 各 553 条已发布，原始 LGA 名称与抑制值均保留，但 1,106 条全部缺少可核实的 LGA 代码／边界版次并明确标记 `boundary_mapping_status = missing`；ABS DataPack 实读但未发布，CLUE 历史边界错位、CSA 缺官方 LGA 代码。 | **未达标** (地图边界版本未匹配) |
+| **7** | **活动** | 未来 30 天至少 5 个不同活动，覆盖至少 2 个场馆，且有日期、状态和原始链接 | #12 `ticketmaster.events` | 依赖 Secret Manager 注入 Ticketmaster Developer Key；且其 API 使用条款严格限制长期缓存并要求 24 小时删除机制，当前 BigQuery 缺少下架机制。替代源（如 What's On）尚未建立。 | **未达标** (条款与发布验收待完成) |
+| **8** | **区域统计** | 至少 2 个地区、2 个统计期的真实指标，保留原始统计地域和边界版本 | #3 `victoria.csa.recorded_offences`, #13 `abs.census`, #14 `melbourne.clue.employment`, #21 `homes_victoria.rents` | Homes Victoria Jun/Sep 2025 各 553 条已发布，原始 LGA 名称与抑制值均保留，但 1,106 条全部缺少可核实的 LGA 代码／边界版次并明确标记 `boundary_mapping_status = missing`；ABS Census 144,792 指标已发布，3,969 匹配 ASGS 2021 面，但仅一个参考日，CLUE 历史边界错位、CSA 缺官方 LGA 代码。 | **未达标** (地图边界版本未匹配) |
 
 ---
 
@@ -296,7 +299,7 @@ flowchart TD
    * **T054 (#18)**: 13 类环境测量指标已接入规范化 `areaIndicators`（原 G04 关闭），待云端真实环境拉取与发布验收；
    * **T055 (#21)**: 官方 DataVic XLSX 58,618 条实读通过（原 G03 关闭），Jun/Sep 2025 两季度 1,106 条已开发集发布；文件级 `Last-Modified` 作为更正顺序。LGA 边界版次仍缺，全部保持 `boundary_mapping_status = missing`；
    * **T056 (#22)**: 追踪 Vicmap Planning layer 3 zone 数据服务恢复进度（目前 zone 全层为空，overlay 正常 1,888 个），两层要素均可完整获取前保持 fail-closed；
-   * **T057 (#23)**: 竣工年精度伪造与住宅缺值强制填 0 已修复（原 G10 关闭），保留年粒度与 null 缺测；1,450 条开发项目已开发集发布，后续删除项目的 tombstone 策略仍待实现；
+   * **T057 (#23)**: 竣工年精度伪造与住宅缺值强制填 0 已修复（原 G10 关闭），保留年粒度与 null 缺测；1,450 条开发项目已开发集发布，完整快照成员过滤已部署并验证，消失项目退出当前视图且保留历史；
    * **T034 (#24)**: 计数更正更新批次修订消除复用风险，更正版本排序策略待与集成方确认；
    * **T030 (#8)**: 传感器迁移在冷启动与历史区间持久化方面的接线待与集成方协同完成。
 3. **数据关联破裂修复方案**:
@@ -336,3 +339,11 @@ flowchart TD
     * **E01 (T056)**: 详细记录 ArcGIS REST layer 3 (zone) 对 Melbourne LGA 及全量查询均返回**空要素列表 (`objectIds: []`)**，连接器按规则 fail-closed；
   * **逐来源完善准入证据档案**: 逐一补齐 24 个候选来源与 2 个配套表的维护负责人 (`connector_owner`)、原生记录键、完整性规则、每日调用配额、Secret Manager 凭据需求及具体的准入待核实项（`missing_requirements`）；
   * **维护零明文凭据标准**: 仅引用 Secret Manager 规范标识符（`transport_victoria_key_id`、`ticketmaster_discovery_api_key`），杜绝任何示例或真实明文凭据。
+
+* **2026-09-30 (Census 与云端防护)**：ABS Census 批次 `batch_f090301c8942cbb474b9ee3dc9447eb2fbd8d400` 真实发布并重跑返回同 ID，32,176 来源事实与 144,792 指标无拒绝；80 LGA／361 SA2 同版匹配共 3,969 指标。当前六个 active、18 个 candidate，仍仅行政边界 1/8 通过。GCS 请求限额／并发锁和 BigQuery 扫描限额已通过[云端检查](validation/cloud-guards.md)。Transport Victoria／Ticketmaster Secret 名称已存在，但版本列表为空；用户确认尚无 Transport Victoria KeyID。
+
+* **2026-09-30（用户补充凭据）**：两个 Secret 的版本 1 已启用，已通过仅元数据检查确认。早前版本为空的记录是当时状态；当前转为云端接口验证。密钥值未在本地读取或记录，Ticketmaster 条款／留存门槛保持待审。
+
+* **2026-10-01（并行审查）**：三个 subagent 独立处理部署／HTTP 安全、GTFS 关联与新闻验收。当前全量 457 通过、6 个默认跳过的 GCP 验收、0 失败。预算普通消息、阈值暂停、重复投递和清理均已通过，四项全局防护验证为 true。三个交通接口私有云端读取成功，但时间、版本及发布门槛仍待关闭；Ticketmaster 保留条款门槛。
+
+* **2026-10-01（交通云端实测）**：Transport Key 经 Cloud Run Secret 引用读取，三个接口完整成功，未保存 raw 或发布 BigQuery。非计划道路更新时间缺时区并产生未来时间；GTFS 多模式修订及生产关联待修。详见[交通实测记录](validation/transport-private-probe-2026-10-01.md)；GM-14/GM-16 可按其证据并行修订，交接原始范围保持有效。

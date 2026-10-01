@@ -16,7 +16,7 @@ function notification(overrides: Record<string, unknown> = {},
   attributes: Record<string, string> = {}) {
   const payload = {
     costAmount: 100.25,
-    costIntervalStart: '2026-08-31T14:00:00Z',
+    costIntervalStart: '2026-09-01T07:00:00Z',
     budgetAmount: 100,
     budgetAmountType: 'SPECIFIED_AMOUNT',
     alertThresholdExceeded: 1,
@@ -63,6 +63,25 @@ test('budget action pauses only enabled allowlisted jobs and handles duplicate d
   assert.deepEqual(await handleBudgetAction(notification({ costAmount: 50 }), config, scheduler, now),
     { paused: [], ignored: true });
   assert.equal(calls.length, 3);
+});
+
+test('monthly budgets follow Pacific billing time across Melbourne month changes', () => {
+  assert.equal(shouldPauseForBudget(notification(), config,
+    new Date('2026-09-30T14:30:00Z')), true);
+  assert.equal(shouldPauseForBudget(notification(), config,
+    new Date('2026-10-01T06:59:59Z')), true);
+  assert.equal(shouldPauseForBudget(notification(), config,
+    new Date('2026-10-01T07:00:00Z')), false);
+  assert.equal(shouldPauseForBudget(notification({ costIntervalStart: '2026-10-01T07:00:00Z' }),
+    config, new Date('2026-10-01T07:00:00Z')), true);
+});
+
+test('Pacific winter budgets retain the January period until February 1 at 08:00 UTC', () => {
+  const january = notification({ costIntervalStart: '2027-01-01T08:00:00Z' });
+  assert.equal(shouldPauseForBudget(january, config, new Date('2027-02-01T00:00:00Z')), true);
+  assert.equal(shouldPauseForBudget(january, config, new Date('2027-02-01T08:00:00Z')), false);
+  assert.equal(shouldPauseForBudget(notification({ costIntervalStart: '2027-02-01T08:00:00Z' }),
+    config, new Date('2027-02-01T08:00:00Z')), true);
 });
 
 test('budget action fails closed on cross-project, duplicate and P0 jobs', () => {

@@ -2997,47 +2997,60 @@ export const sc004HumanBenchmarkCatalog: readonly HumanBenchmarkStory[] = [
   },
 ];
 
-export interface SC004EvaluationReport {
-  status: 'pending_human_adjudication' | 'adjudicated_complete';
-  sc004Certified: boolean;
+export type SC004EvaluationReport = {
+  sc004Certified: false;
   totalStories: number;
   adjudicatedCount: number;
   pendingCount: number;
-  interAnnotatorAgreementRate: number | null;
-  adjudicatedAccuracy: number | null;
-  unverifiedPointCount: number;
+  adjudicatedAccuracy: null;
+  unverifiedPointCount: null;
   message: string;
-}
+} & (
+  | { status: 'pending_human_adjudication'; interAnnotatorAgreementRate: null }
+  | { status: 'adjudicated_unscored'; interAnnotatorAgreementRate: number }
+);
 
 /**
  * Evaluates the SC-004 Benchmark Catalog against independent human adjudication.
  *
  * If any stories are pending adjudication, SC-004 CANNOT be certified.
- * Only when all candidate stories carry verified independent human annotations
- * and arbitrated consensus can accuracy and precision thresholds be calculated.
+ * Complete, independently attributed annotations can establish agreement only.
+ * The catalog has no model outputs or geometry evidence to score against the
+ * consensus, so accuracy, point safety and certification remain unverified.
  */
 export function evaluateSC004HumanBenchmark(
   catalog: readonly HumanBenchmarkStory[]
 ): SC004EvaluationReport {
   const totalStories = catalog.length;
-  const pendingStories = catalog.filter(
-    s => s.adjudication_status === 'pending_human_adjudication' || s.adjudicatedConsensus === null
-  );
-  const adjudicatedStories = catalog.filter(
-    s => s.adjudication_status === 'adjudicated' && s.adjudicatedConsensus !== null
-  );
+  const adjudicatedStories = catalog.filter(story => {
+    const first = story.annotator1;
+    const second = story.annotator2;
+    const consensus = story.adjudicatedConsensus;
+    return story.adjudication_status === 'adjudicated'
+      && first.annotatorId !== null && first.annotatorId.trim().length > 0
+      && second.annotatorId !== null && second.annotatorId.trim().length > 0
+      && first.annotatorId.trim() !== second.annotatorId.trim()
+      && first.role !== null && first.scope !== null && first.permitsPoint !== null
+      && second.role !== null && second.scope !== null && second.permitsPoint !== null
+      && consensus !== null
+      && consensus.adjudicatorId !== null && consensus.adjudicatorId.trim().length > 0
+      && consensus.adjudicatedAt !== null && Number.isFinite(Date.parse(consensus.adjudicatedAt))
+      && consensus.role !== null && consensus.scope !== null && consensus.permitsPoint !== null
+      && consensus.rationale !== null && consensus.rationale.trim().length > 0;
+  });
+  const pendingCount = totalStories - adjudicatedStories.length;
 
-  if (pendingStories.length > 0) {
+  if (pendingCount > 0 || totalStories === 0) {
     return {
       status: 'pending_human_adjudication',
       sc004Certified: false,
       totalStories,
       adjudicatedCount: adjudicatedStories.length,
-      pendingCount: pendingStories.length,
+      pendingCount,
       interAnnotatorAgreementRate: null,
       adjudicatedAccuracy: null,
-      unverifiedPointCount: 0,
-      message: `SC-004 evaluation BLOCKED: ${pendingStories.length} of ${totalStories} benchmark stories have adjudication_status 'pending_human_adjudication'. Independent dual-annotator human adjudication is strictly required. Automated synthetic suites cannot substitute for human review.`,
+      unverifiedPointCount: null,
+      message: `SC-004 evaluation BLOCKED: ${pendingCount} of ${totalStories} benchmark stories lack complete, independently attributed adjudication. Independent dual-annotator human adjudication is strictly required. An empty catalog cannot establish the benchmark.`,
     };
   }
 
@@ -3056,18 +3069,18 @@ export function evaluateSC004HumanBenchmark(
       agreementCount += 1;
     }
   }
-  const interAnnotatorAgreementRate = totalStories > 0 ? agreementCount / totalStories : 0;
+  const interAnnotatorAgreementRate = agreementCount / totalStories;
 
   return {
-    status: 'adjudicated_complete',
-    sc004Certified: true,
+    status: 'adjudicated_unscored',
+    sc004Certified: false,
     totalStories,
     adjudicatedCount: adjudicatedStories.length,
     pendingCount: 0,
     interAnnotatorAgreementRate,
-    adjudicatedAccuracy: 1.0,
-    unverifiedPointCount: 0,
-    message: 'SC-004 human benchmark evaluation complete: all items adjudicated by independent human review.',
+    adjudicatedAccuracy: null,
+    unverifiedPointCount: null,
+    message: 'SC-004 remains unscored: independently attributed adjudication is complete, but model outputs and geometry evidence are absent. Annotator agreement does not measure model accuracy or verify point coordinates.',
   };
 }
 
@@ -3155,13 +3168,35 @@ test('SC-004 Human Benchmark: Catalog structure, pending adjudication status, an
 });
 
 // ----------------------------------------------------------------------------
-// SUITE 13: SC-004 Human Benchmark Evaluation Harness Logic (Simulated Complete Adjudication)
+// SUITE 13: SC-004 Human Benchmark Evaluation Gates
 // ----------------------------------------------------------------------------
 
-test('SC-004 Human Benchmark: Evaluation harness logic with simulated completed human adjudication', () => {
-  // Simulate complete independent human adjudication for the 40 benchmark stories
-  // to verify the evaluation algorithm calculation logic
-  const simulatedAdjudicatedSuite: HumanBenchmarkStory[] = sc004HumanBenchmarkCatalog.map(story => {
+test('SC-004 Human Benchmark: status and consensus placeholders cannot certify an unreviewed catalog', () => {
+  const statusOnlyCatalog = sc004HumanBenchmarkCatalog.map((story): HumanBenchmarkStory => ({
+    ...story,
+    adjudication_status: 'adjudicated',
+    adjudicatedConsensus: {
+      adjudicatorId: null,
+      adjudicatedAt: null,
+      role: null,
+      scope: null,
+      permitsPoint: null,
+      areaRefs: [],
+      rationale: null,
+    },
+  }));
+  const report = evaluateSC004HumanBenchmark(statusOnlyCatalog);
+  assert.equal(report.status, 'pending_human_adjudication');
+  assert.equal(report.sc004Certified, false);
+  assert.equal(report.adjudicatedCount, 0);
+  assert.equal(report.pendingCount, 40);
+  assert.equal(report.adjudicatedAccuracy, null);
+  assert.equal(report.unverifiedPointCount, null);
+  assert.equal(evaluateSC004HumanBenchmark([]).sc004Certified, false);
+});
+
+test('SC-004 Human Benchmark: attributed annotations remain unscored without model outputs', () => {
+  const simulatedAdjudicatedSuite = sc004HumanBenchmarkCatalog.map((story): HumanBenchmarkStory => {
     // Determine expected ground truth role and scope based on category
     let role: LocationRole = 'mentioned_place';
     let scope: NewsScope = story.candidateExpectedScope;
@@ -3192,7 +3227,7 @@ test('SC-004 Human Benchmark: Evaluation harness logic with simulated completed 
 
     return {
       ...story,
-      adjudication_status: 'adjudicated' as const,
+      adjudication_status: 'adjudicated',
       annotator1: {
         annotatorId: 'HUMAN-ANNO-1',
         role,
@@ -3220,24 +3255,27 @@ test('SC-004 Human Benchmark: Evaluation harness logic with simulated completed 
   });
 
   const report = evaluateSC004HumanBenchmark(simulatedAdjudicatedSuite);
-  assert.equal(report.status, 'adjudicated_complete');
-  assert.equal(report.sc004Certified, true);
+  assert.equal(report.status, 'adjudicated_unscored');
+  assert.equal(report.sc004Certified, false);
   assert.equal(report.totalStories, 40);
   assert.equal(report.adjudicatedCount, 40);
   assert.equal(report.pendingCount, 0);
   assert.equal(report.interAnnotatorAgreementRate, 1.0);
+  assert.equal(report.adjudicatedAccuracy, null);
+  assert.equal(report.unverifiedPointCount, null);
 
-  // Negative test: verify that if an unverified point coordinate leak occurs,
-  // zero-tolerance precision check strictly fails SC-004
-  const evaluateWithPointLeak = (
-    catalog: readonly HumanBenchmarkStory[],
-    unverifiedPointLeaks: number
-  ): boolean => {
-    if (unverifiedPointLeaks > 0) {
-      return false; // Zero tolerance: strictly fails
-    }
-    return true;
-  };
-  assert.equal(evaluateWithPointLeak(simulatedAdjudicatedSuite, 1), false, 'Zero tolerance: 1 leaked point coordinate must fail SC-004');
-  assert.equal(evaluateWithPointLeak(simulatedAdjudicatedSuite, 0), true, 'Zero unverified points satisfies SC-004 precision requirement');
+  const oneReviewerCatalog = simulatedAdjudicatedSuite.map(story => ({
+    ...story,
+    annotator2: { ...story.annotator2, annotatorId: story.annotator1.annotatorId },
+  }));
+  const oneReviewerReport = evaluateSC004HumanBenchmark(oneReviewerCatalog);
+  assert.equal(oneReviewerReport.status, 'pending_human_adjudication');
+  assert.equal(oneReviewerReport.sc004Certified, false);
+  assert.equal(oneReviewerReport.pendingCount, 40);
+
+  const unattributedCatalog = simulatedAdjudicatedSuite.map(story => ({
+    ...story,
+    annotator2: { ...story.annotator2, annotatorId: null },
+  }));
+  assert.equal(evaluateSC004HumanBenchmark(unattributedCatalog).adjudicatedCount, 0);
 });

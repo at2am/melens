@@ -8,7 +8,8 @@ import { HttpClient, HttpFailure } from '../../core/http.js';
 import type { SourceRecord } from '../../core/types.js';
 
 export const SOURCE_ID = 'victoria.csa.recorded_offences';
-const CATALOG_URL = 'https://discover.data.vic.gov.au/api/3/action/package_show?id=data-tables-recorded-offences';
+export const CATALOG_URL = 'https://discover.data.vic.gov.au/api/3/action/package_show?id=data-tables-recorded-offences';
+export const LANDING_URL = 'https://discover.data.vic.gov.au/dataset/data-tables-recorded-offences';
 const MAX_XLSX_BYTES = 40_000_000;
 const MAX_XML_BYTES = 5_000_000;
 const MAX_TABLE_ROWS = 10_000;
@@ -142,7 +143,7 @@ function sharedString(value: unknown): string {
   throw new Error('CSA XLSX has unsupported shared string');
 }
 
-function monthEnding(value: string): CsaOffenceStat['monthEnding'] {
+export function monthEnding(value: string): CsaOffenceStat['monthEnding'] {
   const month = value.trim().toLowerCase();
   if (month === 'march' || month === 'mar') return 'March';
   if (month === 'june' || month === 'jun') return 'June';
@@ -151,7 +152,7 @@ function monthEnding(value: string): CsaOffenceStat['monthEnding'] {
   throw new Error('CSA XLSX contains an unsupported year-ending month');
 }
 
-function monthNumber(month: CsaOffenceStat['monthEnding']): number {
+export function monthNumber(month: CsaOffenceStat['monthEnding']): number {
   switch (month) {
     case 'March': return 3;
     case 'June': return 6;
@@ -160,7 +161,7 @@ function monthNumber(month: CsaOffenceStat['monthEnding']): number {
   }
 }
 
-function numericValue(raw: string | null): CsaValue {
+export function numericValue(raw: string | null): CsaValue {
   if (raw === null || raw.trim() === '') return { status: 'missing', count: null, sourceMarker: raw };
   const value = Number(raw.trim());
   if (Number.isSafeInteger(value) && value >= 0) return { status: 'observed', count: value };
@@ -170,7 +171,7 @@ function numericValue(raw: string | null): CsaValue {
   throw new Error('CSA XLSX offence count has an unknown nonnumeric marker');
 }
 
-function parseRate(raw: string | null): number | null {
+export function parseRate(raw: string | null): number | null {
   if (raw === null || raw.trim() === '' || /^(\*|s|suppressed|np|n\.p\.)$/i.test(raw.trim())) return null;
   const value = Number(raw.trim());
   if (!Number.isFinite(value) || value < 0) throw new Error('CSA XLSX rate is invalid');
@@ -275,10 +276,38 @@ function failure(input: ConnectorInput, code: ConnectorFailure['code'], message:
   };
 }
 
+export interface CsaRecordedOffencesConnectorOptions {
+  readonly http?: HttpClient | undefined;
+  readonly catalogUrl?: string | undefined;
+  readonly rawWorkbookBytes?: Uint8Array | undefined;
+  readonly catalogJson?: unknown;
+}
+
 export class CsaRecordedOffencesConnector implements Connector {
   readonly sourceId = SOURCE_ID;
+  private readonly http: HttpClient;
+  private readonly catalogUrl: string;
+  private readonly rawWorkbookBytes?: Uint8Array | undefined;
+  private readonly catalogJson?: unknown;
 
-  constructor(private readonly http = new HttpClient(), private readonly catalogUrl = CATALOG_URL) {}
+  constructor(
+    httpOrOptions?: HttpClient | CsaRecordedOffencesConnectorOptions,
+    catalogUrl = CATALOG_URL,
+  ) {
+    if (httpOrOptions && 'getJson' in httpOrOptions) {
+      this.http = httpOrOptions;
+      this.catalogUrl = catalogUrl;
+    } else if (httpOrOptions && typeof httpOrOptions === 'object') {
+      const opts = httpOrOptions as CsaRecordedOffencesConnectorOptions;
+      this.http = opts.http ?? new HttpClient();
+      this.catalogUrl = opts.catalogUrl ?? catalogUrl;
+      this.rawWorkbookBytes = opts.rawWorkbookBytes;
+      this.catalogJson = opts.catalogJson;
+    } else {
+      this.http = new HttpClient();
+      this.catalogUrl = catalogUrl;
+    }
+  }
 
   async collect(input: ConnectorInput): Promise<CsaSuccess | ConnectorFailure> {
     const checkedAt = new Date().toISOString();
@@ -288,10 +317,16 @@ export class CsaRecordedOffencesConnector implements Connector {
     let resource: CsaResource;
     let bytes: Uint8Array;
     try {
-      const catalog = await this.http.getJson({ url: this.catalogUrl, timeoutMs: 30_000 });
+      const catalog = this.catalogJson !== undefined
+        ? { body: this.catalogJson }
+        : await this.http.getJson({ url: this.catalogUrl, timeoutMs: 30_000 });
       resource = selectCsaResource(catalog.body, input.window.revision);
-      const workbook = await this.http.getBytes({ url: resource.url, timeoutMs: 120_000 });
-      bytes = workbook.body;
+      if (this.rawWorkbookBytes) {
+        bytes = this.rawWorkbookBytes;
+      } else {
+        const workbook = await this.http.getBytes({ url: resource.url, timeoutMs: 120_000 });
+        bytes = workbook.body;
+      }
     } catch (error) {
       const code = error instanceof HttpFailure ? error.code : 'schema_changed';
       return failure(input, code, 'CSA catalog or selected LGA workbook could not be fetched', checkedAt);
@@ -334,3 +369,4 @@ export class CsaRecordedOffencesConnector implements Connector {
 }
 
 export const connector = new CsaRecordedOffencesConnector();
+export default connector;

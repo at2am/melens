@@ -230,6 +230,12 @@ class FakeBigQuery {
         if (!linkExists) {
           invalidCount++;
         }
+        if (typeof row.source_version_ordinal === 'number' && row.source_version_ordinal < 0) {
+          invalidCount++;
+        }
+        if (typeof row.centroid_lat === 'number' && (row.centroid_lat < -90 || row.centroid_lat > 90)) {
+          invalidCount++;
+        }
       }
     }
 
@@ -1924,10 +1930,14 @@ test('exhaustive matrix: zero matching records NEVER signifies no_matching_recor
 });
 
 // ---------------------------------------------------------------------------
-// 5. 真实溯源顺序与逻辑去重 (Provenance sequencing & logical deduplication)
+// 5.1 本地内存模拟：溯源排序与逻辑去重算法验证 (Local In-Memory Simulation Checks)
+// NOTE: These tests verify the test-internal JavaScript helper algorithms (compareProvenance,
+// resolveCurrentGeoRecords, deduplicatePhysicalGeoRecords). They evaluate simulated logic
+// in memory, NOT live GoogleSQL views. In the absence of a live cloud BigQuery connection,
+// these are strictly local checks.
 // ---------------------------------------------------------------------------
 
-test('provenance sequencing: newer source_updated_at takes precedence over arbitrary version_id string order', async () => {
+test('local simulation: provenance sequencing: newer source_updated_at takes precedence over arbitrary version_id string order', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -1969,7 +1979,7 @@ test('provenance sequencing: newer source_updated_at takes precedence over arbit
   assert.equal(resolvedDesc[0]?.version_id, 'a_v2');
 });
 
-test('late arrival: older source_updated_at arriving in subsequent batch does not displace current record', async () => {
+test('local simulation: late arrival: older source_updated_at arriving in subsequent batch does not displace current record', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2003,7 +2013,7 @@ test('late arrival: older source_updated_at arriving in subsequent batch does no
   assert.equal(resolved[0]?.title, 'Current reading');
 });
 
-test('provenance sequencing: source_version_ordinal determines ordering when timestamps are absent or equal', async () => {
+test('local simulation: provenance sequencing: source_version_ordinal determines ordering when timestamps are absent or equal', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2038,7 +2048,7 @@ test('provenance sequencing: source_version_ordinal determines ordering when tim
   assert.equal(resolved[0]?.title, 'Scheme Amendment - Gazetted Version');
 });
 
-test('provenance sequencing: source_updated_at takes precedence over source_version_ordinal', async () => {
+test('local simulation: provenance sequencing: source_updated_at takes precedence over source_version_ordinal', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2070,7 +2080,7 @@ test('provenance sequencing: source_updated_at takes precedence over source_vers
   assert.equal(resolved[0]?.version_id, 'v_stage2');
 });
 
-test('provenance sequencing: NULLS LAST guarantees timestamp and ordinal precedence over nulls', async () => {
+test('local simulation: provenance sequencing: NULLS LAST guarantees timestamp and ordinal precedence over nulls', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2109,7 +2119,7 @@ test('provenance sequencing: NULLS LAST guarantees timestamp and ordinal precede
   assert.equal(resolved[0]?.version_id, 'time_ver');
 });
 
-test('at-least-once duplicate rows in physical table resolve to single distinct logical record', async () => {
+test('local simulation: at-least-once duplicate rows in physical table resolve to single distinct logical record', async () => {
   const fixture = await loadFixture();
   const rawDuplicates = fixture.scenarios.duplicate_records;
 
@@ -2124,7 +2134,7 @@ test('at-least-once duplicate rows in physical table resolve to single distinct 
   assert.equal(deduped[0]?.version_id, 'v1');
 });
 
-test('multi-entity deduplication under at-least-once retries preserves newest version and latest fetch across distinct records', async () => {
+test('local simulation: multi-entity deduplication under at-least-once retries preserves newest version and latest fetch across distinct records', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2212,7 +2222,7 @@ test('multi-entity deduplication under at-least-once retries preserves newest ve
   assert.equal(e3.version_id, 'v1');
 });
 
-test('lifecycle exclusion: cancelled, resolved, and withdrawn records are excluded from current views without resurrecting older versions', async () => {
+test('local simulation: lifecycle exclusion: cancelled, resolved, and withdrawn records are excluded from current views without resurrecting older versions', async () => {
   const fixture = await loadFixture();
   const [base] = fixture.scenarios.duplicate_records;
   assert.ok(base);
@@ -2246,10 +2256,13 @@ test('lifecycle exclusion: cancelled, resolved, and withdrawn records are exclud
 });
 
 // ---------------------------------------------------------------------------
-// 5.2 真实发布器消费链路集成 (Publisher integration: batch visibility, at-least-once retry, late arrival & coverage)
+// 5.2 本地发布与消费视图模拟集成 (Local In-Memory Simulation: Publisher & View Projection Checks)
+// NOTE: These integration tests run against the local test double (FakeBigQuery).
+// In the absence of a live GCP BigQuery connection, queries matching v_geo_records_current
+// evaluate in-memory simulated projections, NOT real warehouse SQL.
 // ---------------------------------------------------------------------------
 
-test('integration: publisher distinguishes published vs failed batch visibility and constrains empty-result coverage', async () => {
+test('local simulation: publisher distinguishes published vs failed batch visibility and constrains empty-result coverage', async () => {
   const { publisher, bigquery } = await setupPublisher();
   const fixture = await loadFixture();
   const source = fixture.sources.pedestrian_minute;
@@ -2335,7 +2348,7 @@ test('integration: publisher distinguishes published vs failed batch visibility 
   assert.notEqual(coverageStatus, 'no_matching_records');
 });
 
-test('integration: publisher at-least-once retry handles duplicate physical writes idempotently and deduplicates consumption view', async () => {
+test('local simulation: publisher at-least-once retry handles duplicate physical writes idempotently and deduplicates consumption view', async () => {
   const { publisher, bigquery, store } = await setupPublisher();
   const fixture = await loadFixture();
   const source = fixture.sources.pedestrian_minute;
@@ -2380,7 +2393,7 @@ test('integration: publisher at-least-once retry handles duplicate physical writ
   assert.equal(current[0]?.['version_id'], 'v1');
 });
 
-test('integration: publisher late-arriving batch with older source_updated_at does not displace current record in view', async () => {
+test('local simulation: publisher late-arriving batch with older source_updated_at does not displace current record in view', async () => {
   const { publisher, bigquery } = await setupPublisher();
   const fixture = await loadFixture();
   const source = fixture.sources.road_unplanned;
@@ -2447,7 +2460,7 @@ test('integration: publisher late-arriving batch with older source_updated_at do
   assert.deepEqual(versions, ['a_v2', 'z_v1']);
 });
 
-test('integration: publisher terminal status (resolved/cancelled/withdrawn) removes record from current view without resurrecting older version', async () => {
+test('local simulation: publisher terminal status (resolved/cancelled/withdrawn) removes record from current view without resurrecting older version', async () => {
   const { publisher, bigquery } = await setupPublisher();
   const fixture = await loadFixture();
   const source = fixture.sources.road_unplanned;
@@ -2502,7 +2515,7 @@ test('integration: publisher terminal status (resolved/cancelled/withdrawn) remo
   assert.equal(hist.length, 2);
 });
 
-test('integration: publisher provenance sequencing respects source_version_ordinal and NULLS LAST over version_id strings', async () => {
+test('local simulation: publisher provenance sequencing respects source_version_ordinal and NULLS LAST over version_id strings', async () => {
   const { publisher, bigquery } = await setupPublisher();
   const fixture = await loadFixture();
   const source = fixture.sources.road_unplanned;
@@ -2789,6 +2802,479 @@ test('local simulation: visibility gates, provenance ordering, and health/covera
     params: { geo_record_id: 'nonexistent_failed_entity' },
   });
   assert.equal(failedBatchRecords.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// 5.3 生产函数健全性与退化/变坏敏感性断言 (Production Function Integrity & Failure Sensitivity Tests)
+// NOTE: These tests directly invoke the real production functions:
+// - computeSourceHealth (from core/health.ts)
+// - computeCoverageStatus (from core/health.ts)
+// - addCompletedWindow (from core/gcs.ts)
+// - BigQueryPublisher.publish, recordConnectorFailure, pauseSource (from core/publisher.ts)
+//
+// They explicitly assert recovery progression, failure batch isolation, and empty-result
+// constraints such that ANY regression or degradation in these real production functions
+// immediately causes these tests to fail. No view mocks or simulation queries are used here.
+// In the absence of a live cloud BigQuery connection, these are verified strictly as local checks.
+// ---------------------------------------------------------------------------
+
+test('production health: recovery after failure closes gaps via real addCompletedWindow and restores current coverage', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.pedestrian_minute;
+
+  // Initial manifest at checkpoint 00:00:00Z
+  let manifest: CheckpointManifest = {
+    sourceId: source.source_id,
+    checkpoint: '2026-09-28T00:00:00Z',
+    completedWindows: [],
+  };
+
+  // Window 1: 00:00 -> 01:00 completes
+  manifest = addCompletedWindow(manifest, {
+    from: '2026-09-28T00:00:00Z',
+    to: '2026-09-28T01:00:00Z',
+    batchId: 'batch-window-1',
+  });
+  assert.equal(manifest.checkpoint, '2026-09-28T01:00:00Z');
+  assert.equal(manifest.completedWindows.length, 0);
+
+  // Failure occurs for Window 2: 01:00 -> 02:00.
+  // Meanwhile Window 3: 02:00 -> 03:00 arrives out of order.
+  manifest = addCompletedWindow(manifest, {
+    from: '2026-09-28T02:00:00Z',
+    to: '2026-09-28T03:00:00Z',
+    batchId: 'batch-window-3',
+  });
+  // Checkpoint MUST NOT advance past 01:00 due to the missing Window 2 gap!
+  assert.equal(manifest.checkpoint, '2026-09-28T01:00:00Z', 'Checkpoint must not advance over missing window gap');
+  assert.equal(manifest.completedWindows.length, 1);
+  assert.equal(manifest.completedWindows[0]?.batchId, 'batch-window-3');
+
+  // Real computeSourceHealth while gap exists:
+  // Even if the latest check succeeded, having knownGapCount > 0 forces health to 'unknown'
+  const healthWithGap = computeSourceHealth({
+    source,
+    now: '2026-09-28T03:00:00Z',
+    lastCheckedAt: '2026-09-28T03:00:00Z',
+    lastSuccessAt: '2026-09-28T03:00:00Z',
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: '2026-09-28T03:00:00Z',
+    consecutiveFailures: 0,
+    knownGapCount: 1, // Gap present!
+  });
+  assert.equal(healthWithGap.state, 'unknown');
+  assert.match(healthWithGap.reason, /coverage gap is known/);
+
+  // Real computeCoverageStatus while gap exists:
+  // Zero matching records MUST NOT be certified as no_matching_records when gap is present!
+  const coverageWithGap = computeCoverageStatus({
+    coveringSources: [healthWithGap],
+    matchingRecords: 0,
+    completeWindow: true,
+  });
+  assert.equal(coverageWithGap, 'unknown');
+  assert.notEqual(coverageWithGap, 'no_matching_records');
+
+  // Recovery: Replaying the missing Window 2 (01:00 -> 02:00) closes the gap
+  manifest = addCompletedWindow(manifest, {
+    from: '2026-09-28T01:00:00Z',
+    to: '2026-09-28T02:00:00Z',
+    batchId: 'batch-window-2',
+  });
+  // Checkpoint must leap directly to 03:00, resolving both windows
+  assert.equal(manifest.checkpoint, '2026-09-28T03:00:00Z', 'Checkpoint must leap forward once gap is closed');
+  assert.equal(manifest.completedWindows.length, 0, 'No pending windows remain after gap resolution');
+
+  // Real computeSourceHealth after gap is closed:
+  const healthRecovered = computeSourceHealth({
+    source,
+    now: '2026-09-28T03:00:30Z',
+    lastCheckedAt: '2026-09-28T03:00:00Z',
+    lastSuccessAt: '2026-09-28T03:00:00Z',
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: '2026-09-28T03:00:00Z',
+    consecutiveFailures: 0,
+    knownGapCount: 0,
+  });
+  assert.equal(healthRecovered.state, 'current');
+  assert.match(healthRecovered.reason, /latest check succeeded within the freshness budget/);
+
+  // Real computeCoverageStatus after recovery:
+  // With 0 records and verified healthy current source, certifies no_matching_records
+  const coverageRecoveredEmpty = computeCoverageStatus({
+    coveringSources: [healthRecovered],
+    matchingRecords: 0,
+    completeWindow: true,
+  });
+  assert.equal(coverageRecoveredEmpty, 'no_matching_records');
+
+  // With matching records > 0, certifies covered
+  const coverageRecoveredFacts = computeCoverageStatus({
+    coveringSources: [healthRecovered],
+    matchingRecords: 42,
+    completeWindow: true,
+  });
+  assert.equal(coverageRecoveredFacts, 'covered');
+});
+
+test('production health: failed connector run isolates failed batch, preserves checkpoint and last_success_at via real publisher', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.road_unplanned;
+  const { publisher, bigquery, store } = await setupPublisher();
+
+  const successTime1 = '2026-09-28T01:00:00Z';
+  const initialWindow = {
+    source,
+    initialCheckpoint: '2026-09-28T00:00:00Z',
+    windowFrom: '2026-09-28T00:00:00Z',
+    windowTo: successTime1,
+    result: makeSuccessFixture(source, '2026-09-28T00:00:00Z', successTime1),
+  };
+  await publisher.publish(initialWindow);
+  assert.equal(store.manifest.checkpoint, successTime1);
+  assert.equal(bigquery.sourceRows.at(-1)?.last_success_at, successTime1);
+
+  // Failure occurs in window 2
+  const failTime2 = '2026-09-28T01:01:00Z';
+  const failure: ConnectorFailure = {
+    kind: 'failure',
+    sourceId: source.source_id,
+    runId: 'run-fail-isolated-1',
+    checkedAt: failTime2,
+    code: 'upstream_unavailable',
+    message: 'HTTP 503 from transport provider',
+    retryAfterSeconds: 30,
+    sourceLatestUpdateAt: null,
+    completeness: {
+      complete: false,
+      expected_records: null,
+      fetched_records: 0,
+      expected_pages: null,
+      fetched_pages: 0,
+      evidence: 'failed_endpoint',
+    },
+  };
+  await publisher.recordConnectorFailure(source, failure, successTime1, failTime2);
+
+  // Check real publisher state outputs:
+  const latestBatch = bigquery.states.at(-1);
+  assert.ok(latestBatch);
+  assert.equal(latestBatch.state, 'failed');
+  assert.equal(latestBatch.error_code, 'upstream_unavailable');
+  assert.equal(latestBatch.published_at, null);
+  assert.equal(latestBatch.checkpoint_after, null);
+
+  // Check that checkpoint manifest was NOT advanced
+  assert.equal(store.manifest.checkpoint, successTime1);
+
+  // Check that data_sources last_success_at was NOT advanced
+  const latestSourceRow = bigquery.sourceRows.at(-1);
+  assert.ok(latestSourceRow);
+  assert.equal(latestSourceRow.last_success_at, successTime1);
+  assert.equal(latestSourceRow.last_checked_at, failTime2);
+
+  // Real computeSourceHealth: failure makes health unknown
+  const healthFailed = computeSourceHealth({
+    source: { ...source, last_checked_at: failTime2, last_success_at: successTime1 },
+    now: failTime2,
+    lastCheckedAt: failTime2,
+    lastSuccessAt: successTime1,
+    latestCheckSucceeded: false,
+    latestUpstreamUpdateAt: null,
+    consecutiveFailures: 1,
+    knownGapCount: 0,
+  });
+  assert.equal(healthFailed.state, 'unknown');
+  assert.match(healthFailed.reason, /latest check failed/);
+
+  // Real computeCoverageStatus: empty records in failed window CANNOT certify no events
+  const coverageFailed = computeCoverageStatus({
+    coveringSources: [healthFailed],
+    matchingRecords: 0,
+    completeWindow: true,
+  });
+  assert.equal(coverageFailed, 'unknown');
+  assert.notEqual(coverageFailed, 'no_matching_records');
+});
+
+test('production health: publisher validation rejection isolates failed batch and prevents checkpoint advance', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.road_unplanned;
+  const { publisher, bigquery, store } = await setupPublisher();
+
+  // Baseline healthy publication
+  const baselineWindow = {
+    source,
+    initialCheckpoint: '2026-09-28T00:00:00Z',
+    windowFrom: '2026-09-28T00:00:00Z',
+    windowTo: '2026-09-28T01:00:00Z',
+    result: makeSuccessFixture(source, '2026-09-28T00:00:00Z', '2026-09-28T01:00:00Z'),
+  };
+  await publisher.publish(baselineWindow);
+  assert.equal(store.manifest.checkpoint, '2026-09-28T01:00:00Z');
+
+  // Attempt publication with negative source_version_ordinal (violates validation constraint)
+  const invalidGeo = makeGeoRecord({
+    source_id: source.source_id,
+    geo_record_id: 'incident:invalid_ord',
+    version_id: 'v_bad_ord',
+    source_version_ordinal: -1, // Negative ordinal violates table constraint
+  });
+  const invalidResult = makeSuccessFixture(
+    source,
+    '2026-09-28T01:00:00Z',
+    '2026-09-28T02:00:00Z',
+    [invalidGeo],
+  );
+
+  await assert.rejects(
+    publisher.publish({
+      source,
+      initialCheckpoint: '2026-09-28T01:00:00Z',
+      windowFrom: '2026-09-28T01:00:00Z',
+      windowTo: '2026-09-28T02:00:00Z',
+      result: invalidResult,
+    }),
+    /validation failed|Invalid/i,
+  );
+
+  // Verify that the failed batch is isolated:
+  const latestBatch = bigquery.states.at(-1);
+  assert.ok(latestBatch);
+  assert.equal(latestBatch.state, 'failed');
+  assert.equal(latestBatch.error_code, 'validation_failed');
+  assert.equal(latestBatch.published_at, null);
+
+  // Checkpoint was strictly NOT advanced
+  assert.equal(store.manifest.checkpoint, '2026-09-28T01:00:00Z');
+});
+
+test('production coverage: empty result verification strictly requires complete window, current health, zero failures, and zero gaps', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.pedestrian_minute; // 60s cadence -> 120s budget
+  const t0 = '2026-09-28T00:00:00Z';
+
+  const healthyCurrent = computeSourceHealth({
+    source,
+    now: t0,
+    lastCheckedAt: t0,
+    lastSuccessAt: t0,
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: t0,
+    consecutiveFailures: 0,
+    knownGapCount: 0,
+  });
+  assert.equal(healthyCurrent.state, 'current');
+
+  // Condition 1: No covering sources -> 'not_covered'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [], matchingRecords: 0, completeWindow: true }),
+    'not_covered',
+    'Empty covering sources must yield not_covered',
+  );
+
+  // Condition 2: Incomplete window -> 'unknown'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [healthyCurrent], matchingRecords: 0, completeWindow: false }),
+    'unknown',
+    'Incomplete window must yield unknown',
+  );
+
+  // Condition 3: Late source -> 'unknown'
+  const lateSource = computeSourceHealth({
+    source,
+    now: '2026-09-28T00:02:30Z', // 150s > 120s budget
+    lastCheckedAt: '2026-09-28T00:02:30Z',
+    lastSuccessAt: t0,
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: t0,
+    consecutiveFailures: 0,
+    knownGapCount: 0,
+  });
+  assert.equal(lateSource.state, 'late');
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [lateSource], matchingRecords: 0, completeWindow: true }),
+    'unknown',
+    'Late source with 0 records must yield unknown, not no_matching_records',
+  );
+
+  // Condition 4: Stale source -> 'source_unavailable'
+  const staleSource = computeSourceHealth({
+    source,
+    now: '2026-09-28T00:05:00Z', // 300s > 240s
+    lastCheckedAt: '2026-09-28T00:05:00Z',
+    lastSuccessAt: t0,
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: t0,
+    consecutiveFailures: 0,
+    knownGapCount: 0,
+  });
+  assert.equal(staleSource.state, 'stale');
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [staleSource], matchingRecords: 0, completeWindow: true }),
+    'source_unavailable',
+    'Stale source with 0 records must yield source_unavailable, not no_matching_records',
+  );
+
+  // Condition 5: Known gap -> 'unknown'
+  const sourceWithGap = computeSourceHealth({
+    source,
+    now: t0,
+    lastCheckedAt: t0,
+    lastSuccessAt: t0,
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: t0,
+    consecutiveFailures: 0,
+    knownGapCount: 2, // 2 gaps
+  });
+  assert.equal(sourceWithGap.state, 'unknown');
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [sourceWithGap], matchingRecords: 0, completeWindow: true }),
+    'unknown',
+    'Source with known gaps must yield unknown, not no_matching_records',
+  );
+
+  // Condition 6: Consecutive failures -> 'unknown'
+  const sourceWithFailures = computeSourceHealth({
+    source,
+    now: t0,
+    lastCheckedAt: t0,
+    lastSuccessAt: t0,
+    latestCheckSucceeded: false,
+    latestUpstreamUpdateAt: t0,
+    consecutiveFailures: 1,
+    knownGapCount: 0,
+  });
+  assert.equal(sourceWithFailures.state, 'unknown');
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [sourceWithFailures], matchingRecords: 0, completeWindow: true }),
+    'unknown',
+    'Source with consecutive failures must yield unknown, not no_matching_records',
+  );
+
+  // Condition 7: Multi-source combination: one current + one late -> 'unknown'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [healthyCurrent, lateSource], matchingRecords: 0, completeWindow: true }),
+    'unknown',
+    'Mixed current and late sources must yield unknown',
+  );
+
+  // Condition 8: Multi-source combination: one current + one stale -> 'unknown'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [healthyCurrent, staleSource], matchingRecords: 0, completeWindow: true }),
+    'unknown',
+    'Mixed current and stale sources must yield unknown, not source_unavailable',
+  );
+
+  // Condition 9: Multi-source combination: two stale sources -> 'source_unavailable'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [staleSource, staleSource], matchingRecords: 0, completeWindow: true }),
+    'source_unavailable',
+    'All stale sources must yield source_unavailable',
+  );
+
+  // Condition 10: Input validation bounds
+  assert.throws(
+    () => computeCoverageStatus({ coveringSources: [healthyCurrent], matchingRecords: -1, completeWindow: true }),
+    /Invalid matching record count/,
+    'Negative matching records must throw',
+  );
+  assert.throws(
+    () => computeCoverageStatus({ coveringSources: [healthyCurrent], matchingRecords: 3.14, completeWindow: true }),
+    /Invalid matching record count/,
+    'Non-integer matching records must throw',
+  );
+
+  // Condition 11: All conditions satisfied: certifies 'no_matching_records'
+  assert.equal(
+    computeCoverageStatus({ coveringSources: [healthyCurrent], matchingRecords: 0, completeWindow: true }),
+    'no_matching_records',
+    'Only fully healthy, complete, current sources may certify no_matching_records',
+  );
+});
+
+test('production publisher: pauseSource revokes permissions, purges storage copies, and degrades coverage to unknown', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.road_unplanned;
+  const { publisher, bigquery } = await setupPublisher();
+
+  // Initial publication
+  await publisher.publish({
+    source,
+    initialCheckpoint: '2026-09-28T00:00:00Z',
+    windowFrom: '2026-09-28T00:00:00Z',
+    windowTo: '2026-09-28T01:00:00Z',
+    result: makeSuccessFixture(source, '2026-09-28T00:00:00Z', '2026-09-28T01:00:00Z'),
+  });
+
+  // Pause source via publisher
+  const purgeResult = await publisher.pauseSource(source);
+  assert.ok(purgeResult);
+
+  // Check that data_sources reflects paused and review_required
+  const latestSource = bigquery.sourceRows.at(-1);
+  assert.ok(latestSource);
+  assert.equal(latestSource.access_status, 'paused');
+  assert.equal(latestSource.license_status, 'review_required');
+
+  // Real computeSourceHealth on paused source returns unknown
+  const pausedHealth = computeSourceHealth({
+    source: { ...source, access_status: 'paused', license_status: 'review_required' },
+    now: '2026-09-28T01:30:00Z',
+    lastCheckedAt: '2026-09-28T01:00:00Z',
+    lastSuccessAt: '2026-09-28T01:00:00Z',
+    latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: null,
+    consecutiveFailures: 0,
+    knownGapCount: 0,
+  });
+  assert.equal(pausedHealth.state, 'unknown');
+  assert.equal(pausedHealth.reason, 'source admission or access is not active');
+
+  // Real computeCoverageStatus returns unknown, NEVER no_matching_records
+  const coverage = computeCoverageStatus({
+    coveringSources: [pausedHealth],
+    matchingRecords: 0,
+    completeWindow: true,
+  });
+  assert.equal(coverage, 'unknown');
+  assert.notEqual(coverage, 'no_matching_records');
+});
+
+test('production publisher: at-least-once replay idempotency preserves manifest checkpoint and avoids duplicate fact loading', async () => {
+  const fixture = await loadFixture();
+  const source = fixture.sources.pedestrian_minute;
+  const { publisher, bigquery, store } = await setupPublisher();
+
+  const geo = makeGeoRecord({
+    source_id: source.source_id,
+    geo_record_id: 'ped:replay:sensor_1',
+    version_id: 'v1',
+    source_updated_at: '2026-09-28T00:01:00Z',
+  });
+  const window = {
+    source,
+    initialCheckpoint: '2026-09-28T00:00:00Z',
+    windowFrom: '2026-09-28T00:00:00Z',
+    windowTo: '2026-09-28T01:00:00Z',
+    result: makeSuccessFixture(source, '2026-09-28T00:00:00Z', '2026-09-28T01:00:00Z', [geo]),
+  };
+
+  // First publication
+  const firstBatch = await publisher.publish(window);
+  assert.equal(firstBatch.state, 'published');
+  assert.equal(store.manifest.checkpoint, '2026-09-28T01:00:00Z');
+  const factCountAfterFirst = bigquery.facts.get('geo_records')?.length ?? 0;
+  assert.ok(factCountAfterFirst > 0);
+
+  // Exact same window published again (at-least-once retry)
+  const replayBatch = await publisher.publish(window);
+  assert.equal(replayBatch.state, 'published');
+  assert.equal(store.manifest.checkpoint, '2026-09-28T01:00:00Z', 'Checkpoint must remain identical on replay');
+
+  // Fact rows are NOT duplicated
+  const factCountAfterReplay = bigquery.facts.get('geo_records')?.length ?? 0;
+  assert.equal(factCountAfterReplay, factCountAfterFirst, 'Replay must not duplicate physical fact rows in BigQuery');
 });
 
 // ---------------------------------------------------------------------------

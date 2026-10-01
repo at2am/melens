@@ -20,6 +20,7 @@ export class HttpFailure extends Error {
 export interface HttpRequest {
   url: string | URL;
   headers?: HeadersInit;
+  redirect?: RequestRedirect;
   timeoutMs?: number;
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -76,40 +77,92 @@ async function wait(delayMs: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+interface ResponseReadContext {
+  attempts: number;
+  signal: AbortSignal;
+  finish(): void;
+}
+
+function responseStream(response: Response, context: ResponseReadContext):
+  ReadableStream<Uint8Array<ArrayBuffer>> {
+  if (response.body === null) {
+    throw new HttpFailure('validation_failed', response.status, context.attempts);
+  }
+  const reader = response.body.getReader();
+  let finished = false;
+  let onAbort: () => void;
+  const finish = () => {
+    finished = true;
+    context.signal.removeEventListener('abort', onAbort);
+    context.finish();
+  };
+  const failure = () => new HttpFailure('upstream_unavailable', response.status,
+    context.attempts);
+  return new ReadableStream({
+    start(controller) {
+      onAbort = () => {
+        if (finished) return;
+        finish();
+        controller.error(failure());
+        void reader.cancel().catch(() => undefined).finally(() => reader.releaseLock());
+      };
+      if (context.signal.aborted) onAbort();
+      else context.signal.addEventListener('abort', onAbort, { once: true });
+    },
+    async pull(controller) {
+      if (finished) return;
+      try {
+        const next = await reader.read();
+        if (finished) return;
+        if (next.done) {
+          finish();
+          reader.releaseLock();
+          controller.close();
+        } else controller.enqueue(next.value);
+      } catch {
+        if (finished) return;
+        finish();
+        reader.releaseLock();
+        controller.error(failure());
+      }
+    },
+    async cancel(reason: unknown) {
+      if (finished) return;
+      finish();
+      try { await reader.cancel(reason); }
+      finally { reader.releaseLock(); }
+    },
+  });
+}
+
 export class HttpClient {
   async getJson(request: HttpRequest): Promise<HttpResponse<unknown>> {
-    const response = await this.get(request);
-    try {
-      return { ...response.meta, body: await response.raw.json() };
-    } catch {
-      throw new HttpFailure('validation_failed', response.meta.status, response.attempts);
-    }
+    return this.get(request, async (response, context): Promise<unknown> => {
+      try { return await response.json(); }
+      catch (error) {
+        const code = !context.signal.aborted && error instanceof SyntaxError
+          ? 'validation_failed' : 'upstream_unavailable';
+        throw new HttpFailure(code, response.status, context.attempts);
+      }
+    });
   }
 
   async getText(request: HttpRequest): Promise<HttpResponse<string>> {
-    const response = await this.get(request);
-    return { ...response.meta, body: await response.raw.text() };
+    return this.get(request, response => response.text());
   }
 
   async getBytes(request: HttpRequest): Promise<HttpResponse<Uint8Array<ArrayBuffer>>> {
-    const response = await this.get(request);
-    const buffer = await response.raw.arrayBuffer();
-    return { ...response.meta, body: new Uint8Array(buffer) };
+    return this.get(request, async response => new Uint8Array(await response.arrayBuffer()));
   }
 
   async getStream(request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
-    const response = await this.get(request);
-    if (response.raw.body === null) {
-      throw new HttpFailure('validation_failed', response.meta.status, response.attempts);
-    }
-    return { ...response.meta, body: response.raw.body };
+    return this.get(request, async (response, context) => responseStream(response, context),
+      'stream');
   }
 
-  private async get(request: HttpRequest): Promise<{
-    raw: Response;
-    attempts: number;
-    meta: Omit<HttpResponse<never>, 'body'>;
-  }> {
+  private async get<T>(request: HttpRequest,
+    readBody: (response: Response, context: ResponseReadContext) => Promise<T>,
+    mode: 'buffered' | 'stream' = 'buffered'): Promise<HttpResponse<T>> {
     const timeoutMs = positiveInteger(request.timeoutMs, 15_000, 'timeoutMs');
     const maxAttempts = positiveInteger(request.maxAttempts, 4, 'maxAttempts');
     const baseDelayMs = positiveInteger(request.baseDelayMs, 250, 'baseDelayMs');
@@ -127,47 +180,42 @@ export class HttpClient {
       const signal = request.signal
         ? AbortSignal.any([request.signal, controller.signal])
         : controller.signal;
-      let response: Response;
+      let response: Response | undefined;
       try {
         response = await fetch(url, {
           method: 'GET',
           ...(request.headers === undefined ? {} : { headers: request.headers }),
+          ...(request.redirect === undefined ? {} : { redirect: request.redirect }),
           signal,
         });
-      } catch {
-        clearTimeout(timeout);
-        if (request.signal?.aborted || attempt === maxAttempts) {
-          throw new HttpFailure('upstream_unavailable', null, attempt);
+        const fetchedAt = new Date().toISOString();
+        if (!response.ok) {
+          const code = failureCode(response.status);
+          const retryAfter = retryAfterMs(response.headers.get('retry-after'), Date.now());
+          await response.body?.cancel().catch(() => undefined);
+          throw new HttpFailure(code, response.status, attempt, retryAfter);
         }
-        await wait(Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1)), request.signal);
-        continue;
-      }
-      clearTimeout(timeout);
-      const fetchedAt = new Date().toISOString();
-      if (response.ok) {
+        const body = await readBody(response, { attempts: attempt, signal,
+          finish: () => clearTimeout(timeout) });
+        if (mode === 'buffered') clearTimeout(timeout);
         return {
-          raw: response,
-          attempts: attempt,
-          meta: {
-            status: response.status,
-            fetchedAt,
-            etag: response.headers.get('etag'),
-            lastModified: response.headers.get('last-modified'),
-            contentType: response.headers.get('content-type'),
-            contentRange: response.headers.get('content-range'),
-          },
+          body,
+          status: response.status,
+          fetchedAt,
+          etag: response.headers.get('etag'),
+          lastModified: response.headers.get('last-modified'),
+          contentType: response.headers.get('content-type'),
+          contentRange: response.headers.get('content-range'),
         };
+      } catch (error) {
+        clearTimeout(timeout);
+        const failure = error instanceof HttpFailure ? error
+          : new HttpFailure('upstream_unavailable', response?.status ?? null, attempt);
+        const retryable = failure.code === 'rate_limited' || failure.code === 'upstream_unavailable';
+        if (!retryable || request.signal?.aborted || attempt === maxAttempts) throw failure;
+        const exponentialDelay = baseDelayMs * 2 ** (attempt - 1);
+        await wait(Math.min(maxDelayMs, failure.retryAfterMs ?? exponentialDelay), request.signal);
       }
-
-      const code = failureCode(response.status);
-      const retryAfter = retryAfterMs(response.headers.get('retry-after'), Date.now());
-      await response.body?.cancel();
-      const retryable = code === 'rate_limited' || code === 'upstream_unavailable';
-      if (!retryable || attempt === maxAttempts) {
-        throw new HttpFailure(code, response.status, attempt, retryAfter);
-      }
-      const exponentialDelay = baseDelayMs * 2 ** (attempt - 1);
-      await wait(Math.min(maxDelayMs, retryAfter ?? exponentialDelay), request.signal);
     }
     throw new HttpFailure('upstream_unavailable', null, maxAttempts);
   }

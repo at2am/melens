@@ -15,7 +15,7 @@
 | **Staging & Raw Store** | Cloud Storage (`gs://${GCS_BUCKET}`) | 存放受许可保护的 `raw/` 原始报文、`staging/` 临时加载 ndjson、`checkpoints/` 清单及 `locks/` 批次与来源租约锁。 |
 | **Analytical Store** | BigQuery (`melens_ingest`) | 规范化事实数据主存储（受控写入）、同步批次跟踪表及入库前 5 维度质量门禁校验。 |
 | **Query Layer** | BigQuery (`melens_query`) | 面向下游应用和 Agent 的只读授权视图层。仅暴露已通过准入且已发布的干净数据。 |
-| **Secret Management** | Secret Manager | 第三方 API Key 与凭据的唯一安全存储。严禁源码、清单或环境变量出现明文。 |
+| **Secret Management** | Secret Manager | 云端作业的第三方 API Key 与凭据存储。严禁提交源码、清单、镜像或 `.env` 文件中的明文凭据。 |
 
 ### 1.2 运行时环境变量配置 (`loadConfig`)
 
@@ -31,6 +31,8 @@
 | `SECRET_NAMES` | 可选，逗号分隔的简单 Secret ID 列表 | 声明允许当前任务读取的 Secret Manager **简单 Secret ID** 白名单（例：`tv-api-key,ticketmaster-api-key`）。每个 ID 匹配 `^[A-Za-z0-9_-]{1,255}$` 且不得重复。**严禁传入包含斜杠的完整资源路径**（如 `projects/...` 会导致校验失败），**严禁包含任何密钥值**。 |
 
 Cloud Scheduler 的资源位置是 `australia-southeast1`，与采集任务、BigQuery 和存储桶的 `australia-southeast2` 分开配置。预算响应服务使用 `MELENS_SCHEDULER_LOCATION=australia-southeast1` 校验允许暂停的调度任务路径。
+
+本地运行 `npm run ingest` 时，Node.js 24 会从仓库根目录可选加载 `.env`。Ticketmaster Discovery API 连接器读取 `TICKETMASTER_DISCOVERY_API_KEY`。`.env` 已由 Git 忽略，只用于本机开发；Cloud Run 镜像不复制 `.env`，部署脚本继续把 Secret Manager 中的 `ticketmaster_discovery_api_key` 注入同名进程环境变量。
 
 ```bash
 # 环境变量配置示例（通过 loadConfig() 严格校验）：

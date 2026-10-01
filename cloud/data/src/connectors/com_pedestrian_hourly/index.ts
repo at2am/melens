@@ -93,10 +93,72 @@ function failure(
   };
 }
 
+export const MAX_HOURLY_SUMMARIES = 50_000;
+const checkpointCursorSchema = z.union([z.iso.datetime({ offset: false }), z.iso.date()]);
+const hourlyRecordSummarySchema = z.object({
+  recordId: z.string().min(1),
+  sensorHourKey: z.string().regex(/^\d+:/).refine(key =>
+    z.iso.datetime({ offset: false }).safeParse(key.slice(key.indexOf(':') + 1)).success,
+  'Invalid sensor-hour timestamp'),
+  versionId: z.string().min(1),
+  sourceUpdatedAt: z.iso.datetime({ offset: false }).nullable(),
+  count: z.number().int().nonnegative().nullable(),
+}).strict();
+const hourlyCheckpointSchema = z.object({
+  cursor: checkpointCursorSchema,
+  summaries: z.array(hourlyRecordSummarySchema).max(MAX_HOURLY_SUMMARIES),
+}).strict().superRefine((checkpoint, ctx) => {
+  const seen = new Set<string>();
+  for (const summary of checkpoint.summaries) {
+    if (seen.has(summary.sensorHourKey)) {
+      ctx.addIssue({ code: 'custom', message: 'Duplicate sensor-hour checkpoint summary' });
+    }
+    seen.add(summary.sensorHourKey);
+  }
+});
+const previousObservationSchema = z.object({
+  source_record_id: z.string().min(1),
+  sensor_id: z.string().regex(/^\d+$/),
+  observed_at: z.iso.datetime({ offset: false }),
+  version_id: z.string().min(1),
+  total_count: z.number().int().nonnegative().nullable(),
+}).passthrough();
+const legacyHourlyCheckpointSchema = z.object({
+  previousObservations: z.array(previousObservationSchema).max(MAX_HOURLY_SUMMARIES),
+  cursor: checkpointCursorSchema,
+}).strict();
+
+export type HourlyRecordSummary = z.infer<typeof hourlyRecordSummarySchema>;
+export type HourlyCheckpoint = z.infer<typeof hourlyCheckpointSchema>;
+
+export function parseHourlyCheckpoint(checkpoint: string | null): HourlyCheckpoint | null {
+  if (checkpoint === null) return null;
+  if (!/^[\[{]/.test(checkpoint.trim())) {
+    return { cursor: checkpointCursorSchema.parse(checkpoint), summaries: [] };
+  }
+  const parsed: unknown = JSON.parse(checkpoint);
+  const canonical = hourlyCheckpointSchema.safeParse(parsed);
+  if (canonical.success) return canonical.data;
+  const legacy = legacyHourlyCheckpointSchema.safeParse(parsed);
+  if (!legacy.success) throw new Error('Invalid hourly checkpoint state');
+  return hourlyCheckpointSchema.parse({
+    cursor: legacy.data.cursor,
+    summaries: legacy.data.previousObservations.map(obs => ({
+      recordId: obs.source_record_id,
+      sensorHourKey: `${obs.sensor_id}:${obs.observed_at}`,
+      versionId: obs.version_id,
+      sourceUpdatedAt: null,
+      count: obs.total_count,
+    })),
+  });
+}
+
 export interface HourlyConnectorOptions {
   portalUrl?: string;
   client?: OpenDataSoftClient;
   http?: HttpClient;
+  previousObservations?: readonly PedestrianObservation[];
+  isolated?: boolean;
 }
 
 export class PedestrianHourlyConnector implements Connector {
@@ -104,11 +166,38 @@ export class PedestrianHourlyConnector implements Connector {
   private readonly portalUrl: string;
   private readonly client: OpenDataSoftClient;
   private readonly http: HttpClient;
+  private readonly isolated: boolean;
+  private readonly knownSummariesByRecordId = new Map<string, HourlyRecordSummary>();
+  private readonly knownSummariesBySensorHour = new Map<string, HourlyRecordSummary>();
 
   constructor(options: HourlyConnectorOptions = {}) {
     this.portalUrl = options.portalUrl ?? DEFAULT_PORTAL_URL;
     this.client = options.client ?? new OpenDataSoftClient();
     this.http = options.http ?? new HttpClient();
+    this.isolated = options.isolated ?? false;
+
+    if (options.previousObservations) {
+      for (const obs of options.previousObservations) {
+        const summary: HourlyRecordSummary = {
+          recordId: obs.source_record_id,
+          sensorHourKey: `${obs.sensor_id}:${obs.observed_at}`,
+          versionId: obs.version_id,
+          sourceUpdatedAt: null,
+          count: obs.total_count,
+        };
+        if (summary.recordId) this.knownSummariesByRecordId.set(summary.recordId, summary);
+        this.knownSummariesBySensorHour.set(summary.sensorHourKey, summary);
+      }
+    }
+  }
+
+  getKnownSummaries(): readonly HourlyRecordSummary[] {
+    return Array.from(this.knownSummariesBySensorHour.values());
+  }
+
+  clearHistory(): void {
+    this.knownSummariesByRecordId.clear();
+    this.knownSummariesBySensorHour.clear();
   }
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
@@ -117,6 +206,19 @@ export class PedestrianHourlyConnector implements Connector {
     }
 
     try {
+      let parsedCheckpoint: HourlyCheckpoint | null;
+      try {
+        parsedCheckpoint = parseHourlyCheckpoint(input.checkpoint);
+      } catch {
+        return failure(input, 'validation_failed', 'Invalid hourly checkpoint state');
+      }
+      if (parsedCheckpoint && parsedCheckpoint.summaries.length > 0) {
+        for (const s of parsedCheckpoint.summaries) {
+          if (s.recordId) this.knownSummariesByRecordId.set(s.recordId, s);
+          if (s.sensorHourKey) this.knownSummariesBySensorHour.set(s.sensorHourKey, s);
+        }
+      }
+
       let where: string | undefined;
       let fromMs: number | null = null;
       let toMs: number | null = null;
@@ -174,6 +276,7 @@ export class PedestrianHourlyConnector implements Connector {
       const sourceRecords: SourceRecord[] = [];
       const pedestrianObservations: PedestrianObservation[] = [];
       const seen = new Map<string, string>();
+      const seenSensorHour = new Map<string, string>();
       let maxObservedAt: string | null = null;
 
       for (const unknownRow of response.records) {
@@ -203,15 +306,53 @@ export class PedestrianHourlyConnector implements Connector {
           sourceTime: observedAt,
         });
         const versionId = sourceVersionId(sourceUpdatedAt, row);
+        const sensorHourKey = `${sensorId}:${observedAt}`;
 
-        const earlier = seen.get(recordId);
-        if (earlier !== undefined) {
-          if (earlier !== versionId) {
+        const earlierRecord = seen.get(recordId);
+        if (earlierRecord !== undefined) {
+          if (earlierRecord !== versionId) {
             return failure(input, 'validation_failed', 'Conflicting duplicate sensor-hour readings');
           }
           continue;
         }
+
+        const earlierSensorHour = seenSensorHour.get(sensorHourKey);
+        if (earlierSensorHour !== undefined) {
+          if (earlierSensorHour !== versionId) {
+            return failure(input, 'validation_failed', 'Conflicting duplicate sensor-hour readings');
+          }
+          continue;
+        }
+
+        const priorSummary = this.knownSummariesBySensorHour.get(sensorHourKey)
+          ?? this.knownSummariesByRecordId.get(recordId);
+
+        if (priorSummary !== undefined && priorSummary.versionId !== versionId) {
+          if (sourceUpdatedAt === null || priorSummary.sourceUpdatedAt === null) {
+            return failure(input, 'validation_failed',
+              'Conflicting duplicate sensor-hour readings across versions without revision order');
+          }
+
+          const newTimeMs = Date.parse(sourceUpdatedAt);
+          const oldTimeMs = Date.parse(priorSummary.sourceUpdatedAt);
+          if (!Number.isFinite(newTimeMs) || !Number.isFinite(oldTimeMs)) {
+            return failure(input, 'validation_failed',
+              'Conflicting duplicate sensor-hour readings across versions without valid revision timestamp');
+          }
+
+          if (newTimeMs === oldTimeMs) {
+            return failure(input, 'validation_failed',
+              'Conflicting duplicate sensor-hour readings with identical revision timestamp');
+          }
+
+          if (newTimeMs < oldTimeMs) {
+            return failure(input, 'validation_failed',
+              'Conflicting duplicate sensor-hour readings with older revision timestamp arriving late');
+          }
+        }
+
         seen.set(recordId, versionId);
+        seenSensorHour.set(sensorHourKey, versionId);
 
         if (maxObservedAt === null || observedAt > maxObservedAt) {
           maxObservedAt = observedAt;
@@ -254,6 +395,26 @@ export class PedestrianHourlyConnector implements Connector {
         });
       }
 
+      // Keep only the collected window. Published history for each next window
+      // is supplied by the runner rather than accumulated in an unbounded cursor.
+      const currentSummaries = pedestrianObservations.map(obs => ({
+        recordId: obs.source_record_id,
+        sensorHourKey: `${obs.sensor_id}:${obs.observed_at}`,
+        versionId: obs.version_id,
+        sourceUpdatedAt,
+        count: obs.total_count,
+      }));
+      if (currentSummaries.length > MAX_HOURLY_SUMMARIES) {
+        return failure(input, 'incomplete_window', 'Hourly checkpoint window exceeds the bounded summary limit');
+      }
+      if (!this.isolated) {
+        this.clearHistory();
+        for (const summary of currentSummaries) {
+          this.knownSummariesByRecordId.set(summary.recordId, summary);
+          this.knownSummariesBySensorHour.set(summary.sensorHourKey, summary);
+        }
+      }
+
       const contentDigest = createHash('sha256')
         .update(sourceRecords.map(r => r.version_id).sort().join('\n'))
         .digest('hex');
@@ -264,9 +425,14 @@ export class PedestrianHourlyConnector implements Connector {
 
       const sourceRevision = `${baseRevision}@${contentDigest}`;
       const sourceLatestUpdateAt = sourceUpdatedAt;
-      const checkpointAfter = input.window.kind === 'time'
+      const baseCursor = input.window.kind === 'time'
         ? input.window.to
         : (targetRevision === 'latest' ? (latestSensingDate ?? sourceRevision) : (targetRevision ?? sourceRevision));
+
+      const checkpointAfter = JSON.stringify({
+        cursor: baseCursor,
+        summaries: currentSummaries,
+      });
 
       return {
         kind: 'success',
@@ -317,7 +483,7 @@ export class PedestrianHourlyConnector implements Connector {
   }
 }
 
-export function createConnector(options: HourlyConnectorOptions = {}): Connector {
+export function createConnector(options: HourlyConnectorOptions = {}): PedestrianHourlyConnector {
   return new PedestrianHourlyConnector(options);
 }
 

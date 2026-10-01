@@ -19,6 +19,10 @@ export const rowSchema = z.object({
   lastupdated: z.string().nullable().optional(),
   marker_id: z.union([z.string(), z.number()]).nullable().optional(),
   markerid: z.union([z.string(), z.number()]).nullable().optional(),
+  location: z.object({
+    lat: z.number().finite().min(-90).max(90).nullable().optional(),
+    lon: z.number().finite().min(-180).max(180).nullable().optional(),
+  }).nullable().optional(),
 }).passthrough();
 
 export type BayRow = z.infer<typeof rowSchema>;
@@ -119,13 +123,16 @@ export class ParkingBaysConnector implements Connector {
       for (const row of rows) {
         const kerbsideId = extractKerbsideId(row.kerbsideid);
         const markerId = extractMarkerId(row);
-        const hasCoords = hasValidCoordinates(row.latitude, row.longitude);
+        const locObj = row.location && typeof row.location === 'object' ? (row.location as { lat?: unknown; lon?: unknown }) : null;
+        const effectiveLat = row.latitude ?? (locObj?.lat !== undefined && locObj.lat !== null ? Number(locObj.lat) : null);
+        const effectiveLon = row.longitude ?? (locObj?.lon !== undefined && locObj.lon !== null ? Number(locObj.lon) : null);
+        const hasCoords = hasValidCoordinates(effectiveLat, effectiveLon);
 
         const nativeId = [
           row.roadsegmentid,
           kerbsideId ?? 'null',
-          row.latitude ?? 'null',
-          row.longitude ?? 'null',
+          effectiveLat ?? 'null',
+          effectiveLon ?? 'null',
         ].join(':');
 
         const recordId = sourceRecordId({
@@ -173,8 +180,8 @@ export class ParkingBaysConnector implements Connector {
         //   marker_id is null unless present upstream (export has no marker_id).
         // - When kerbsideid is null, preserve parking bay row if valid coordinates exist.
         if (hasCoords || kerbsideId !== null) {
-          const lat = typeof row.latitude === 'number' ? row.latitude : Number(row.latitude);
-          const lon = typeof row.longitude === 'number' ? row.longitude : Number(row.longitude);
+          const lat = typeof effectiveLat === 'number' ? effectiveLat : Number(effectiveLat);
+          const lon = typeof effectiveLon === 'number' ? effectiveLon : Number(effectiveLon);
 
           parkingBays.push({
             batch_id: input.runId,

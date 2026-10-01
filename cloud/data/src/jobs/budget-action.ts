@@ -50,7 +50,7 @@ export interface SchedulerClient {
 
 function month(date: Date): string {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit',
+    timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit',
   }).formatToParts(date);
   const year = parts.find(part => part.type === 'year')?.value;
   const monthNumber = parts.find(part => part.type === 'month')?.value;

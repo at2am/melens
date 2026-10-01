@@ -47,6 +47,10 @@ export const DATASET_ID = 'microclimate-sensors-data';
 export const LANDING_URL = `https://data.melbourne.vic.gov.au/explore/dataset/${DATASET_ID}/`;
 export const DEFAULT_PORTAL_URL = 'https://data.melbourne.vic.gov.au';
 
+export const CADENCE_SECONDS = 900;
+export const CADENCE_MS = CADENCE_SECONDS * 1000;
+export const ACTIVE_RECENCY_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export const ALLOWED_FIELDS = [
   'device_id',
   'received_at',
@@ -195,6 +199,14 @@ export interface CollectMicroclimateOptions {
   client?: OpenDataSoftClient;
   portalUrl?: string;
   fixtureRows?: unknown[];
+  fetchMetadataRevision?: boolean;
+}
+
+export async function fetchMicroclimateDataProcessed(
+  client: OpenDataSoftClient = new OpenDataSoftClient(),
+  portalUrl: string = DEFAULT_PORTAL_URL,
+): Promise<string> {
+  return client.fetchDatasetDataProcessed({ portalUrl, datasetId: DATASET_ID });
 }
 
 function digest(value: string): string {
@@ -308,6 +320,19 @@ export async function collectMicroclimate(
     const areaIndicators: AreaIndicator[] = [];
     const retainableRawRecords: unknown[] = [];
 
+    interface ParsedObservation {
+      row: ComMicroclimateRawRecord;
+      unknownRow: unknown;
+      observedAt: string;
+      sensorId: string;
+      recordId: string;
+      versionId: string;
+      geometry: string | null;
+      hasPoint: boolean;
+      point: { lon: number; lat: number } | null;
+    }
+
+    const observations: ParsedObservation[] = [];
     const seen = new Map<string, string>();
     let latestObservedAt: string | null = null;
 
@@ -326,7 +351,7 @@ export async function collectMicroclimate(
         originalUrl: LANDING_URL,
         sourceTime: observedAt,
       });
-      const versionId = sourceVersionId(observedAt, row);
+      const versionId = sourceVersionId(observedAt, { observation: row, validity: 'point_observation' });
 
       const earlier = seen.get(recordId);
       if (earlier !== undefined) {
@@ -351,6 +376,23 @@ export async function collectMicroclimate(
         ? JSON.stringify({ type: 'Point', coordinates: [point.lon, point.lat] })
         : null;
 
+      observations.push({
+        row,
+        unknownRow,
+        observedAt,
+        sensorId,
+        recordId,
+        versionId,
+        geometry,
+        hasPoint,
+        point,
+      });
+    }
+
+    for (const obs of observations) {
+      const { row, observedAt, sensorId, recordId, versionId, geometry, hasPoint, point, unknownRow } = obs;
+
+      // Invariant: Historical observations are strictly preserved as immutable observation facts
       sourceRecords.push({
         batch_id: input.runId,
         source_id: SOURCE_ID,
@@ -373,6 +415,11 @@ export async function collectMicroclimate(
         rights_status: 'review_required',
       });
 
+      // Telemetry proves a location at this instant, without an asset-status or
+      // validity interval. Current recency must be derived in a query, so replay
+      // cannot change immutable facts when its fetch time or neighbouring rows change.
+      const validTo = observedAt;
+
       sensorLocations.push({
         batch_id: input.runId,
         source_id: SOURCE_ID,
@@ -381,9 +428,9 @@ export async function collectMicroclimate(
         sensor_id: sensorId,
         version_id: versionId,
         geometry_geojson: geometry,
-        device_status: 'active',
+        device_status: null,
         valid_from: observedAt,
-        valid_to: null,
+        valid_to: validTo,
         source_record_id: recordId,
         source_updated_at: observedAt,
         source_version_ordinal: null,
@@ -424,15 +471,15 @@ export async function collectMicroclimate(
         summary,
         original_url: LANDING_URL,
         geometry_geojson: geometry,
-        centroid_lat: hasPoint ? point.lat : null,
-        centroid_lon: hasPoint ? point.lon : null,
+        centroid_lat: hasPoint ? point!.lat : null,
+        centroid_lon: hasPoint ? point!.lon : null,
         location_role: hasPoint ? 'sensor_site' : 'unknown',
         location_confidence: hasPoint ? 'source_coordinate' : 'unverified',
         area_refs: [],
         published_at: null,
         observed_at: observedAt,
         valid_from: observedAt,
-        valid_to: null,
+        valid_to: validTo,
         source_updated_at: observedAt,
         source_version_ordinal: null,
         freshness_state: 'unknown',
@@ -499,14 +546,25 @@ export async function collectMicroclimate(
       : (input.window.revision || latestObservedAt);
 
     let sourceLatestUpdateAt: string | null = null;
-    if (lastModified) {
+    if (options?.fetchMetadataRevision) {
       try {
-        sourceLatestUpdateAt = new Date(lastModified).toISOString();
+        const client = options?.client ?? new OpenDataSoftClient();
+        const portalUrl = options?.portalUrl ?? DEFAULT_PORTAL_URL;
+        sourceLatestUpdateAt = await fetchMicroclimateDataProcessed(client, portalUrl);
       } catch {
+        sourceLatestUpdateAt = null;
+      }
+    }
+    if (!sourceLatestUpdateAt) {
+      if (lastModified) {
+        try {
+          sourceLatestUpdateAt = new Date(lastModified).toISOString();
+        } catch {
+          sourceLatestUpdateAt = latestObservedAt;
+        }
+      } else {
         sourceLatestUpdateAt = latestObservedAt;
       }
-    } else {
-      sourceLatestUpdateAt = latestObservedAt;
     }
 
     const successResult: ConnectorSuccess = {
@@ -572,10 +630,15 @@ export class MicroclimateConnector implements Connector {
   constructor(
     private readonly client: OpenDataSoftClient = new OpenDataSoftClient(),
     private readonly portalUrl: string = DEFAULT_PORTAL_URL,
+    private readonly options?: Omit<CollectMicroclimateOptions, 'client' | 'portalUrl'>,
   ) {}
 
   async collect(input: ConnectorInput): Promise<ConnectorResult> {
-    return collectMicroclimate(input, { client: this.client, portalUrl: this.portalUrl });
+    return collectMicroclimate(input, {
+      client: this.client,
+      portalUrl: this.portalUrl,
+      ...this.options,
+    });
   }
 }
 

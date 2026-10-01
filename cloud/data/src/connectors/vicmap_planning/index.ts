@@ -11,7 +11,7 @@ import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
 export const SOURCE_ID = 'victoria.vicmap.planning';
 export const SERVICE_URL = 'https://services-ap1.arcgis.com/P744lA0wf4LlBZ84/ArcGIS/rest/services/Vicmap_Planning/FeatureServer';
 export const LGA_NAME = 'MELBOURNE';
-export const CHUNK_SIZE = 20;
+export const CHUNK_SIZE = 100;
 
 export const layers = [
   { kind: 'overlay', id: 2, landingUrl: 'https://discover.data.vic.gov.au/dataset/vicmap-planning-planning-scheme-overlay-polygon' },
@@ -91,7 +91,7 @@ export function normalizePlanningControl(
   if (fields.lga.toUpperCase() !== LGA_NAME || fields.lga_code !== '343') {
     throw new Error('Vicmap returned a planning control outside Melbourne LGA');
   }
-  if (fields.scheme_code !== (layer.kind === 'zone' ? 'ZN' : 'PO')) {
+  if (layer.kind === 'zone' ? fields.scheme_code !== 'ZN' : fields.scheme_code === 'ZN') {
     throw new Error('Vicmap planning layer and scheme code disagree');
   }
   const polygons = splitPolygon(feature.geometry);

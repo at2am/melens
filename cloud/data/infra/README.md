@@ -98,7 +98,7 @@ python3 cloud/data/infra/apply-sql.py \
   --project PROJECT_ID --apply --confirm-project PROJECT_ID
 ```
 
-The script creates the 12 append-only ingestion tables and 22 query views in numeric SQL-file order. It rejects unexpected DDL or changes to the reviewed list of ten views that directly read ingestion tables. After the views exist, it grants only those ten views access to the ingestion dataset; the query service identity receives no direct ingestion dataset access. Re-running the script refreshes the reviewed grants while retaining unrelated dataset ACL entries. `CREATE TABLE IF NOT EXISTS` does not migrate an existing schema, so inspect table changes before using this command for upgrades.
+The script creates the 12 append-only ingestion tables and 22 query views in numeric SQL-file order. It rejects unexpected DDL or changes to the reviewed list of eleven views that directly read ingestion tables. After the views exist, it grants only those eleven views access to the ingestion dataset; the query service identity receives no direct ingestion dataset access. The current geo view reads published snapshot membership so removed development projects remain historical. Re-running the script refreshes the reviewed grants while retaining unrelated dataset ACL entries. `CREATE TABLE IF NOT EXISTS` does not migrate an existing schema, so inspect table changes before using this command for upgrades.
 
 ## Before production
 
@@ -137,7 +137,7 @@ PAYLOAD="$(python3 - <<'PY'
 import json
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-start = datetime.now(ZoneInfo('Australia/Melbourne')).replace(
+start = datetime.now(ZoneInfo('America/Los_Angeles')).replace(
     day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 print(json.dumps({'costAmount': 100, 'costIntervalStart': start.isoformat().replace('+00:00', 'Z'),
                   'budgetAmount': 100, 'budgetAmountType': 'SPECIFIED_AMOUNT',

@@ -27,7 +27,7 @@ export const LANDING_URL = 'https://www.abs.gov.au/census/find-census-data/datap
 export const DEFAULT_CENSUS_YEAR = 2021;
 export const DEFAULT_ASGS_VINTAGE = '2021';
 export const DEFAULT_PERIOD_START: UtcTimestamp = '2021-08-10T00:00:00Z';
-export const DEFAULT_PERIOD_END: UtcTimestamp = '2026-08-10T00:00:00Z';
+export const DEFAULT_PERIOD_END: UtcTimestamp = '2021-08-11T00:00:00Z';
 export const DEFAULT_PUBLISHED_AT: UtcTimestamp = '2022-06-28T00:00:00Z';
 
 export type CensusGeographicScheme = 'ASGS_SA1' | 'ASGS_SA2' | 'ASGS_LGA';
@@ -112,11 +112,9 @@ export function boundaryIdFor(scheme: CensusGeographicScheme, code: string, vint
   return `${scheme}:${normalizeAreaCode(code)}:${vintage}`;
 }
 
-export interface ParsedCensusValue {
-  readonly status: CensusIndicatorStatus;
-  readonly value: number | null;
-  readonly raw: string | number | null;
-}
+export type ParsedCensusValue =
+  | { readonly status: 'observed'; readonly value: number; readonly raw: string | number }
+  | { readonly status: 'suppressed' | 'missing'; readonly value: null; readonly raw: string | number | null };
 
 /**
  * Confidentiality-suppressed values ('..', '-', 'np', 'suppressed', '*') and missing values maintain
@@ -241,7 +239,7 @@ export function normalizeCensusPayload(
   const asgsVintage = payload.asgs_vintage ?? DEFAULT_ASGS_VINTAGE;
   const publishedAt = payload.published_at ?? DEFAULT_PUBLISHED_AT;
   const periodStart = payload.observed_at ?? DEFAULT_PERIOD_START;
-  const periodEnd = DEFAULT_PERIOD_END;
+  const periodEnd = new Date(Date.parse(periodStart) + 86_400_000).toISOString();
 
   const sourceRecords: SourceRecord[] = [];
   const areaIndicators: AreaIndicator[] = [];
@@ -323,7 +321,7 @@ export function normalizeCensusPayload(
         };
 
         const indicator: AreaIndicator = parsed.status === 'observed'
-          ? { ...baseIndicator, status: 'observed', value: parsed.value as number }
+          ? { ...baseIndicator, status: 'observed', value: parsed.value }
           : { ...baseIndicator, status: parsed.status, value: null };
 
         areaIndicators.push(indicator);
@@ -390,8 +388,8 @@ export class AbsCensusConnector implements Connector {
 
   constructor(options: AbsCensusConnectorOptions = {}) {
     this.http = options.http ?? new HttpClient();
-    this.dataUrl = options.dataUrl ?? process.env.ABS_CENSUS_DATA_URL ?? null;
-    this.fixturePath = options.fixturePath ?? process.env.ABS_CENSUS_FIXTURE_PATH ?? null;
+    this.dataUrl = options.dataUrl ?? null;
+    this.fixturePath = options.fixturePath ?? null;
     this.rawData = options.rawData ?? null;
     this.officialArchives = options.officialArchives ?? true;
   }

@@ -15,7 +15,6 @@ import {
 import {
   normalizePlannedRoadSnapshot,
   parsePlannedRoadPage,
-  parseVictorianTimestamp,
 } from '../../src/connectors/tv_road_planned/index.js';
 import {
   normalizeRoadSnapshot,
@@ -382,12 +381,69 @@ export function queryViewHistory(
 }
 
 /**
- * Emulates `melens_query.v_geo_records_current` from 002_core_views.sql.
- * Selects ROW_NUMBER() OVER (PARTITION BY geo_record_id ORDER BY source_updated_at DESC NULLS LAST,
- * source_version_ordinal DESC NULLS LAST, version_id DESC) = 1
- * AND record_status NOT IN ('cancelled', 'resolved', 'withdrawn').
- * Crucial invariant:
- * Filtering lifecycle happens AFTER selecting the latest version!
+ * Test-local comparator that models the documented ordering contract.
+ * Changing production SQL does not change this comparator.
+ * ORDER BY source_updated_at DESC NULLS LAST,
+ *          source_version_ordinal DESC NULLS LAST,
+ *          version_id DESC
+ */
+export function canonicalGeoRecordComparator(a: GeoRecord, b: GeoRecord): number {
+  return compareGeoRecordProvenance(a, b);
+}
+
+/**
+ * Test-local simulation of the documented latest-record contract:
+ * QUALIFY ROW_NUMBER() OVER (
+ *   PARTITION BY geo_record_id
+ *   ORDER BY source_updated_at DESC NULLS LAST,
+ *            source_version_ordinal DESC NULLS LAST,
+ *            version_id DESC
+ * ) = 1
+ * AND record_status NOT IN ('cancelled', 'resolved', 'withdrawn')
+ *
+ * Alternate comparators are fixture controls for this simulation. They do not
+ * execute or mutate the production SQL. Suite 0 checks the production SQL text;
+ * Suite 7 executes the production views only when the GCP gate is enabled.
+ */
+export function selectLatestGeoRecord(
+  records: readonly GeoRecord[],
+  options?: {
+    comparator?: (a: GeoRecord, b: GeoRecord) => number;
+    filterLifecycleBeforeSort?: boolean;
+  },
+): GeoRecord | null {
+  const comparator = options?.comparator ?? canonicalGeoRecordComparator;
+  let candidates = [...records];
+  if (options?.filterLifecycleBeforeSort) {
+    candidates = candidates.filter(
+      (r) => !['cancelled', 'resolved', 'withdrawn'].includes(r.record_status),
+    );
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort(comparator);
+  const latest = candidates[0]!;
+  if (!options?.filterLifecycleBeforeSort) {
+    if (['cancelled', 'resolved', 'withdrawn'].includes(latest.record_status)) {
+      return null;
+    }
+  }
+  return latest;
+}
+
+/**
+ * [TEST-LOCAL SIMULATION HELPER ONLY - NOT PROOF OF PRODUCTION BIGQUERY SQL VIEWS]
+ * Emulates `melens_query.v_geo_records_current` from 002_core_views.sql in memory
+ * for fast offline unit/integration assertions.
+ *
+ * CAUTION: This function is strictly a test-local simulation. It DOES NOT prove
+ * that the production BigQuery GoogleSQL views (002_core_views.sql & 007_changes_views.sql)
+ * are validated. Real SQL view verification requires executing queries against
+ * actual BigQuery tables in Suite 7 (GCP Acceptance).
+ *
+ * Crucial invariant mirrored from SQL:
+ * - PARTITION BY geo_record_id ORDER BY source_updated_at DESC NULLS LAST, source_version_ordinal DESC NULLS LAST, version_id DESC
+ * - Lifecycle filtering (record_status NOT IN ('cancelled', 'resolved', 'withdrawn')) is evaluated
+ *   AFTER selecting ROW_NUMBER() = 1, NOT before!
  */
 export function queryViewCurrent(
   history: readonly ViewHistoryRow[],
@@ -612,6 +668,54 @@ async function readSql(name: string): Promise<string> {
     return await readFile(new URL(`../../sql/${name}`, import.meta.url), 'utf8');
   }
 }
+
+// Checks the shipped SQL structure. This does not execute GoogleSQL or certify
+// deployed views; the opt-in GCP suite below remains the execution gate.
+function assertCurrentViewOrderingStructure(sql: string): void {
+  const uncommented = sql.replace(/--[^\n]*/g, '');
+  const currentView = uncommented.match(
+    /CREATE OR REPLACE VIEW `melens_query\.v_geo_records_current` AS([\s\S]*?);/i,
+  )?.[1];
+  assert.ok(currentView, 'Production current view must exist');
+  const qualifyingStart = [...currentView.matchAll(/QUALIFY\s+ROW_NUMBER\(\)\s+OVER\s*\(/gi)].at(-1)?.index;
+  assert.ok(qualifyingStart !== undefined, 'Current view must rank logical versions');
+  const qualifying = currentView.slice(qualifyingStart);
+  assert.ok(qualifying, 'Current view must rank logical versions');
+  assert.match(
+    qualifying,
+    /^QUALIFY\s+ROW_NUMBER\(\)\s+OVER\s*\(\s*PARTITION BY geo_record_id\s+ORDER BY source_updated_at DESC NULLS LAST\s*,\s*source_version_ordinal DESC NULLS LAST\s*,\s*version_id DESC\s*\)\s*=\s*1\s+AND record_status NOT IN\s*\(\s*'cancelled'\s*,\s*'resolved'\s*,\s*'withdrawn'\s*\)\s*$/i,
+    'Current view must order by source time and ordinal, then filter lifecycle',
+  );
+  assert.doesNotMatch(
+    currentView.slice(0, currentView.indexOf(qualifying)),
+    /\brecord_status\b/i,
+    'Lifecycle filtering must not remove terminal versions before ranking',
+  );
+}
+
+test('US4 Suite 0: shipped SQL ordering structure rejects hash-only, reversed-time and pre-ranking lifecycle mutations', async () => {
+  const sql = await readSql('002_core_views.sql');
+  assertCurrentViewOrderingStructure(sql);
+  const marker = 'CREATE OR REPLACE VIEW `melens_query.v_geo_records_current` AS';
+  const start = sql.indexOf(marker);
+  assert.ok(start >= 0);
+  const mutateCurrent = (transform: (view: string) => string) =>
+    sql.slice(0, start) + transform(sql.slice(start));
+  const hashOnly = mutateCurrent((view) => view.replace(
+    /ORDER BY source_updated_at DESC NULLS LAST,\s*source_version_ordinal DESC NULLS LAST,\s*version_id DESC/,
+    'ORDER BY version_id DESC',
+  ));
+  const reversedTime = mutateCurrent((view) => view.replace(
+    'source_updated_at DESC NULLS LAST', 'source_updated_at ASC NULLS LAST',
+  ));
+  const prefiltered = mutateCurrent((view) => view.replace(
+    'WHERE g.source_id', "WHERE g.record_status NOT IN ('cancelled', 'resolved', 'withdrawn') AND g.source_id",
+  ));
+  for (const mutation of [hashOnly, reversedTime, prefiltered]) {
+    assert.notEqual(mutation, sql, 'Mutation must change the shipped SQL');
+    assert.throws(() => assertCurrentViewOrderingStructure(mutation));
+  }
+});
 
 async function loadSchemas(): Promise<Map<string, Array<{ name: string; type: string; mode: string }>>> {
   const ddl = await readSql('001_tables.sql');
@@ -1150,6 +1254,41 @@ test('US4 Suite 1: Event lifecycle, rescheduling and cancellation preserve versi
   assert.equal(ev1TimelineCancelled.time_state, 'cancelled');
   assert.equal(ev1TimelineCancelled.record_status, 'cancelled');
 
+  // Local comparator controls for the event cancellation fixture:
+  // Proves that production sorting contract is strictly enforced and that mutating the ordering logic
+  // causes sensitive test failure.
+  const cancelRecords = [ev1V1_versioned, ev1V2_versioned];
+  const canonicalCancel = selectLatestGeoRecord(cancelRecords);
+  assert.equal(
+    canonicalCancel,
+    null,
+    'Local contract sorting must select cancelled ev1V2 and exit it from current view',
+  );
+
+  // Mutation 1: Naive hash sorting (ev1V1 hash 'a31d...' > ev1V2 hash '3fff...')
+  const mutatedCancelByHash = selectLatestGeoRecord(cancelRecords, {
+    comparator: (a, b) => b.version_id.localeCompare(a.version_id),
+  });
+  assert.ok(mutatedCancelByHash, 'Mutation sensitivity: broken hash sorting incorrectly yields an active record');
+  assert.equal(
+    mutatedCancelByHash?.version_id,
+    ev1V1.version_id,
+    'Mutation sensitivity: naive hash sorting selects ev1V1 (planned) instead of ev1V2 (cancelled)',
+  );
+  assert.equal(mutatedCancelByHash?.record_status, 'planned');
+  assert.notEqual(canonicalCancel, mutatedCancelByHash);
+
+  // Mutation 2: Pre-filtering lifecycle before ranking
+  const mutatedCancelByPreFilter = selectLatestGeoRecord(cancelRecords, {
+    filterLifecycleBeforeSort: true,
+  });
+  assert.equal(
+    mutatedCancelByPreFilter?.record_status,
+    'planned',
+    'Mutation sensitivity: filtering lifecycle before ranking resurrects planned event',
+  );
+  assert.notEqual(canonicalCancel, mutatedCancelByPreFilter);
+
   // --------------------------------------------------------------------------
   // 3. Scenario 2: Event Rescheduling with Lexicographically Smaller Hash (G22)
   // --------------------------------------------------------------------------
@@ -1204,6 +1343,23 @@ test('US4 Suite 1: Event lifecycle, rescheduling and cancellation preserve versi
   assert.equal(eventsCurrentRescheduled.length, 1);
   assert.equal(eventsCurrentRescheduled[0]?.valid_from, '2026-11-20T09:00:00.000Z');
   assert.equal(eventsCurrentRescheduled[0]?.time_state, 'future');
+
+  // Local comparator controls for the event rescheduling fixture:
+  const reschedRecords = [ev1V1_versioned, ev1V3_versioned];
+  const canonicalResched = selectLatestGeoRecord(reschedRecords);
+  assert.equal(canonicalResched?.version_id, ev1V3.version_id);
+  assert.equal(canonicalResched?.valid_from, '2026-11-20T09:00:00.000Z');
+
+  // Mutation: Naive hash sorting (ev1V1 hash 'a31d...' > ev1V3 hash '1652...')
+  const mutatedReschedByHash = selectLatestGeoRecord(reschedRecords, {
+    comparator: (a, b) => b.version_id.localeCompare(a.version_id),
+  });
+  assert.equal(
+    mutatedReschedByHash?.valid_from,
+    '2026-10-01T09:00:00.000Z',
+    'Mutation sensitivity: naive hash sorting fails to update to rescheduled date',
+  );
+  assert.notEqual(canonicalResched?.valid_from, mutatedReschedByHash?.valid_from);
 
   // --------------------------------------------------------------------------
   // 4. Scenario 3: Delayed / Late-Arriving Older Versions (G22 Requirement)
@@ -1291,13 +1447,34 @@ test('US4 Suite 2: Future roadworks have geoRecordStatus planned, assertion plan
   const fetchedAt = '2026-09-28T02:30:00.000Z' as UtcTimestamp;
 
   const page = await loadPlannedRoadFixture();
-  const normalized = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
+  const unverified = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
+  assert.equal(unverified.geoRecords[0]?.valid_from, null, 'Offsetless wall clocks do not prove an absolute start');
+  assert.equal(unverified.geoRecords[0]?.valid_to, null, 'Offsetless wall clocks do not prove an absolute end');
+  assert.equal(unverified.geoRecords[0]?.source_updated_at, null, 'Offsetless update time cannot establish version order');
+
+  // Explicit offsets below are synthetic contract inputs. They do not establish
+  // the timezone of the real Transport Victoria offsetless fields.
+  const futureFeature = page.data.features[0];
+  assert.ok(futureFeature);
+  const verifiedFeatures = [{
+    ...futureFeature,
+    properties: {
+      ...futureFeature.properties,
+      duration: {
+        ...futureFeature.properties.duration,
+        start: '2026-10-01T20:00:00+10:00',
+        end: '2026-10-10T05:00:00+11:00',
+      },
+      lastUpdated: '2026-09-28T12:00:00+10:00',
+    },
+  }, ...page.data.features.slice(1)];
+  const normalized = normalizePlannedRoadSnapshot(verifiedFeatures, input, fetchedAt);
 
   assert.equal(normalized.sourceRecords.length, 2);
   assert.equal(normalized.geoRecords.length, 3); // Feature 1 GeometryCollection has 2 parts; Feature 2 has 1
 
   // 1. Future roadworks feature (PRD:OneView:123)
-  // Upstream: status 'Pending', start '2026-10-01T20:00:00' (Victorian local) -> 2026-10-01T10:00:00.000Z
+  // Synthetic status Pending and explicit start offset yield the known instant.
   const futurePart1 = normalized.geoRecords[0];
   const futurePart2 = normalized.geoRecords[1];
   assert.ok(futurePart1);
@@ -1385,7 +1562,7 @@ test('US4 Suite 2: Future roadworks have geoRecordStatus planned, assertion plan
     ...page.data.features[0]!,
     properties: {
       ...page.data.features[0]!.properties,
-      duration: { start: '2026-10-10T20:00:00', end: '2026-10-01T20:00:00' },
+      duration: { start: '2026-10-10T20:00:00+11:00', end: '2026-10-01T20:00:00+10:00' },
     },
   };
   assert.throws(
@@ -1430,8 +1607,8 @@ test('US4 Suite 3: GTFS Realtime alerts join static stops without fabricating co
     directionId: 0,
     tripId: 'TRIP-FLI-01',
     tripRouteId: '2-FLI',
-    tripStartDate: '20260928',
-    tripStartTime: '07:50:00',
+    tripStartDate: null,
+    tripStartTime: null,
   };
 
   function createAlertFeed(version: string | null, selectors: AlertSelector[]): ParsedAlertFeed {
@@ -1536,6 +1713,87 @@ test('US4 Suite 3: GTFS Realtime alerts join static stops without fabricating co
   assert.equal(mismatchedGeo.geometry_geojson, null);
   assert.equal(mismatchedGeo.centroid_lat, null);
   assert.equal(mismatchedGeo.centroid_lon, null);
+
+  // 3b. Static GTFS with no verifiable feed_version must return 'version_unverified'
+  // Case A: Normalized static GTFS has archive validator fallback ('archive-sha256:...') and empty feed_info
+  const archiveVersion = 'archive-sha256:verified-http-archive';
+  const unverifiedStaticSnapshot = { ...staticData.snapshot, feed_info: [] };
+  const unverifiedStaticVersion: StaticGtfsVersion = {
+    snapshot: unverifiedStaticSnapshot,
+    normalized: normalizeGtfsSnapshot(
+      unverifiedStaticSnapshot,
+      parseConnectorInput({
+        sourceId: STATIC_SOURCE_ID,
+        window: { kind: 'snapshot', revision: 'latest' },
+        checkpoint: null,
+        runId: 'unverified-static-archive-run',
+      }),
+      '2026-09-28T00:06:00.000Z',
+      { feedVersion: archiveVersion, tripStopMembershipComplete: false },
+    ),
+  };
+
+  const alertWithArchiveFeed = createAlertFeed(archiveVersion, [validSelector]);
+  const normArchiveAlert = normalizeRealtimeFeed(alertWithArchiveFeed);
+  const joinedArchiveStatic = joinGtfsAlertLocations({
+    alerts: normArchiveAlert.geoRecords,
+    alertSources: normArchiveAlert.geoRecordSources,
+    staticVersions: [unverifiedStaticVersion],
+  });
+
+  assert.equal(
+    joinedArchiveStatic.mappings[0]?.status,
+    'version_unverified',
+    'Static GTFS with archive validator fallback has no verifiable feed_version and must return version_unverified',
+  );
+  assert.equal(joinedArchiveStatic.geoRecords[0]?.geometry_geojson, null);
+  assert.equal(joinedArchiveStatic.geoRecords[0]?.centroid_lat, null);
+  assert.equal(joinedArchiveStatic.geoRecords[0]?.centroid_lon, null);
+  assert.equal(validateGeoRecordGeography(joinedArchiveStatic.geoRecords[0]!).valid, true);
+
+  // Case B: Static GTFS with empty feed_info even when alert specifies verifiedFeedVersion
+  const alertWithVerifiedFeed = createAlertFeed(verifiedFeedVersion, [validSelector]);
+  const normVerifiedAlert = normalizeRealtimeFeed(alertWithVerifiedFeed);
+  const joinedEmptyFeedInfo = joinGtfsAlertLocations({
+    alerts: normVerifiedAlert.geoRecords,
+    alertSources: normVerifiedAlert.geoRecordSources,
+    staticVersions: [
+      {
+        ...staticVersion,
+        snapshot: { ...staticData.snapshot, feed_info: [] },
+      },
+    ],
+  });
+
+  assert.equal(
+    joinedEmptyFeedInfo.mappings[0]?.status,
+    'version_unverified',
+    'Static GTFS with empty feed_info has no verifiable feed_version and must return version_unverified',
+  );
+  assert.equal(joinedEmptyFeedInfo.geoRecords[0]?.geometry_geojson, null);
+  assert.equal(joinedEmptyFeedInfo.geoRecords[0]?.centroid_lat, null);
+  assert.equal(joinedEmptyFeedInfo.geoRecords[0]?.centroid_lon, null);
+
+  // Case C: Static GTFS with blank feed_version in feed_info
+  const joinedBlankFeedVersion = joinGtfsAlertLocations({
+    alerts: normVerifiedAlert.geoRecords,
+    alertSources: normVerifiedAlert.geoRecordSources,
+    staticVersions: [
+      {
+        ...staticVersion,
+        snapshot: {
+          ...staticData.snapshot,
+          feed_info: [{ ...staticData.snapshot.feed_info[0]!, feed_version: '   ' }],
+        },
+      },
+    ],
+  });
+  assert.equal(
+    joinedBlankFeedVersion.mappings[0]?.status,
+    'version_unverified',
+    'Static GTFS with blank feed_version in feed_info must return version_unverified',
+  );
+  assert.equal(joinedBlankFeedVersion.geoRecords[0]?.geometry_geojson, null);
 
   // 4. Route-Only Alert (no stopId) preserves alert entity without fabricating a point
   const routeOnlySelector: AlertSelector = {
@@ -1667,6 +1925,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
       eventLocationStatus: 'Inactive',
       lastClosed: '2026-09-28T00:20:00Z',
       lastUpdated: '2026-09-28T00:22:00Z',
+      description: 'Lane reopened. Synthetic clearance variant 0',
     },
   };
 
@@ -1676,7 +1935,21 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   assert.equal(imp1V2.record_status, 'resolved');
   assert.equal(imp1V2.valid_to, '2026-09-28T00:20:00.000Z');
 
-  // After clearance: imp1 is removed from current views, retained in history
+  // Verify version ordering and hash independence for clearance (G22):
+  // This synthetic clearance has a smaller content hash than the active version.
+  assert.ok(
+    imp1V2.version_id.localeCompare(imp1.version_id) < 0,
+    'Cleared version hash MUST be lexicographically smaller than active version to prove non-hash ordering',
+  );
+  assert.ok(
+    imp1V2.source_updated_at! > imp1.source_updated_at!,
+    'Cleared version has more recent source_updated_at than initial active version',
+  );
+
+  // After clearance: imp1 is removed from current views, retained in history.
+  // NOTE: queryViewCurrent() is a test-local simulation helper for in-memory pipeline flow,
+  // not real BigQuery SQL execution (which requires the opt-in Suite 7).
+  // Comparators below are local fixture controls, not production mutations.
   const combinedHistory = queryViewHistory([...normalizedRun1.geoRecords, ...normalizedRun2.geoRecords]);
   const currentAfterClearance = queryViewCurrent(combinedHistory);
   const transportAfterClearance = queryViewTransportChangesCurrent(currentAfterClearance, '2026-09-28T00:30:00Z');
@@ -1687,6 +1960,26 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
     'Cleared incident MUST be removed from v_transport_changes_current',
   );
 
+  // Late-arriving older active version replay:
+  // Replaying older active version imp1 after imp1V2 must NOT revive the incident in current views,
+  // despite imp1 having a larger content hash.
+  const delayedHistoryClearance = queryViewHistory([imp1V2, imp1]);
+  const currentAfterDelayedClearance = queryViewCurrent(delayedHistoryClearance);
+  assert.equal(
+    currentAfterDelayedClearance.some((r) => r.geo_record_id === imp1.geo_record_id),
+    false,
+    'Delayed older active version MUST NOT revive cleared/resolved incident in current views',
+  );
+  const transportAfterDelayedClearance = queryViewTransportChangesCurrent(
+    currentAfterDelayedClearance,
+    '2026-09-28T00:30:00Z',
+  );
+  assert.equal(
+    transportAfterDelayedClearance.some((r) => r.geo_record_id === imp1.geo_record_id),
+    false,
+    'Delayed older active version MUST NOT appear in v_transport_changes_current',
+  );
+
   const timelineAfterClearance = queryViewChangeTimeline(combinedHistory, '2026-09-28T00:30:00Z');
   const imp1ClearedTimeline = timelineAfterClearance.find(
     (r) => r.geo_record_id === imp1.geo_record_id && r.version_id === imp1V2.version_id,
@@ -1694,6 +1987,83 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   assert.ok(imp1ClearedTimeline);
   assert.equal(imp1ClearedTimeline.time_state, 'resolved');
   assert.equal(imp1ClearedTimeline.record_status, 'resolved');
+
+  // --------------------------------------------------------------------------
+  // Local comparator controls for the incident-clearance fixture. Suite 0
+  // checks shipped SQL structure; Suite 7 is the real execution gate.
+  // --------------------------------------------------------------------------
+  const clearanceRecords = [imp1, imp1V2];
+
+  // 1. Local contract ordering: imp1V2 has newer source_updated_at ('2026-09-28T00:22:00Z' > '2026-09-28T00:01:00Z'),
+  // wins ROW_NUMBER() = 1, then lifecycle filter exits it from current view -> result is null (cleared).
+  const canonicalClearance = selectLatestGeoRecord(clearanceRecords);
+  assert.equal(
+    canonicalClearance,
+    null,
+    'Local contract sorting must select resolved imp1V2 and exit it from current view',
+  );
+
+  // 2. Mutation 1: Broken naive hash sorting (ORDER BY version_id DESC).
+  // Because the active version has the larger hash, hash sorting selects imp1.
+  const mutatedClearanceByHash = selectLatestGeoRecord(clearanceRecords, {
+    comparator: (a, b) => b.version_id.localeCompare(a.version_id),
+  });
+  assert.ok(mutatedClearanceByHash, 'Mutation sensitivity: broken hash sorting incorrectly yields an active record');
+  assert.equal(
+    mutatedClearanceByHash?.version_id,
+    imp1.version_id,
+    'Mutation sensitivity: broken hash sorting selects imp1 because its hash is larger',
+  );
+  assert.equal(
+    mutatedClearanceByHash?.record_status,
+    'active',
+    'Mutation sensitivity: broken hash sorting fails to resolve incident and keeps it active',
+  );
+  assert.notEqual(
+    canonicalClearance,
+    mutatedClearanceByHash,
+    'Canonical sorting MUST sensitively disagree with broken hash sorting',
+  );
+
+  // 3. Mutation 2: Broken pre-filtering lifecycle before ranking (WHERE status NOT IN ('resolved') ... QUALIFY ...).
+  // Pre-filtering discards imp1V2 first, leaving imp1 (active) as the "winner", reviving the cleared incident!
+  const mutatedClearanceByPreFilter = selectLatestGeoRecord(clearanceRecords, {
+    filterLifecycleBeforeSort: true,
+  });
+  assert.ok(mutatedClearanceByPreFilter, 'Mutation sensitivity: broken pre-filtering incorrectly yields a record');
+  assert.equal(
+    mutatedClearanceByPreFilter?.record_status,
+    'active',
+    'Mutation sensitivity: filtering lifecycle before ROW_NUMBER() incorrectly revives older active incident',
+  );
+  assert.notEqual(
+    canonicalClearance,
+    mutatedClearanceByPreFilter,
+    'Canonical sorting MUST sensitively disagree with broken pre-filter lifecycle mutation',
+  );
+
+  // 4. Mutation 3: Broken reverse chronological sorting (ORDER BY source_updated_at ASC).
+  const mutatedClearanceByReverseTime = selectLatestGeoRecord(clearanceRecords, {
+    comparator: (a, b) => a.source_updated_at!.localeCompare(b.source_updated_at!),
+  });
+  assert.equal(
+    mutatedClearanceByReverseTime?.record_status,
+    'active',
+    'Mutation sensitivity: reverse chronological order incorrectly selects older active incident',
+  );
+  assert.notEqual(
+    canonicalClearance,
+    mutatedClearanceByReverseTime,
+    'Canonical sorting MUST sensitively disagree with broken reverse-time sorting',
+  );
+
+  // 5. Test delayed arrival order: [imp1V2, imp1] vs [imp1, imp1V2] must yield identical canonical result
+  const delayedCanonical = selectLatestGeoRecord([imp1V2, imp1]);
+  assert.equal(
+    delayedCanonical,
+    null,
+    'Delayed older version arrival order must not change canonical clearance result',
+  );
 
   // 3. VicEmergency Policy Adherence
   // Read and verify policy documentation
@@ -1783,7 +2153,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
 // Suite 5: Planning Controls vs Transient Changes
 // ============================================================================
 
-test('US5 Suite 5: Long-term statutory planning controls stay distinct from transient roadworks or event closures', async () => {
+test('US4 Suite 5: Long-term statutory planning controls stay distinct from transient roadworks or event closures', async () => {
   const fetchedAt = '2026-09-29T00:00:00Z' as UtcTimestamp;
   const layerEditedAt = '2026-03-31T00:00:00Z' as UtcTimestamp;
 

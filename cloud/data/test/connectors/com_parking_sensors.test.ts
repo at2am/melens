@@ -420,3 +420,150 @@ test('Empty snapshot does not create observations or treat missing sensors as un
     assert.equal(result.geoRecords.length, 0);
   }
 });
+
+test('GM-03 Key census: official API schema with missing marker_id and bay_id retains 100% sensor coverage, keeps bay/marker null, and never asserts parking permission', async () => {
+  // Representative official snapshot matching the current City of Melbourne API:
+  // kerbsideid is 100% present, but marker_id and bay_id are 0% present (100% missing).
+  const officialBatch = [
+    {
+      kerbsideid: 9344,
+      lastupdated: '2024-12-30T00:44:37+00:00',
+      status_timestamp: '2024-08-18T08:23:46+00:00',
+      status_description: 'Unoccupied',
+      zone_number: 7394,
+      location: { lon: 144.95916, lat: -37.80494 },
+    },
+    {
+      kerbsideid: 9373,
+      lastupdated: '2025-01-10T02:44:36+00:00',
+      status_timestamp: '2024-08-14T09:22:05+00:00',
+      status_description: 'Unoccupied',
+      zone_number: 7392,
+      location: { lon: 144.95836, lat: -37.80329 },
+    },
+    {
+      kerbsideid: 8735,
+      lastupdated: '2024-12-04T23:44:37+00:00',
+      status_timestamp: '2024-11-28T02:30:57+00:00',
+      status_description: 'Present',
+      zone_number: 7084,
+      location: { lon: 144.96120, lat: -37.80223 },
+    },
+    {
+      kerbsideid: '24505',
+      lastupdated: '2025-01-09T05:44:36+00:00',
+      status_timestamp: '2023-08-21T00:09:03+00:00',
+      status_description: 'Present',
+      zone_number: 7800,
+      location: { lon: 144.95759, lat: -37.79756 },
+    },
+  ];
+
+  class OfficialSnapshotClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: officialBatch,
+        totalCount: officialBatch.length,
+        pageCount: 1,
+        fetchedAt: '2026-09-30T12:00:00Z',
+        lastModified: '2026-09-30T11:58:53Z',
+      };
+    }
+  }
+
+  const testConnector = new ParkingSensorsConnector(new OfficialSnapshotClient());
+  const result = await testConnector.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: '2026-09-30' },
+    checkpoint: null,
+    runId: 'census_proof_run',
+  }));
+
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  assert.equal(result.parkingObservations.length, 4);
+  assert.equal(result.sourceRecords.length, 4);
+
+  // Check key coverage invariants:
+  for (const obs of result.parkingObservations) {
+    // 1. sensor_id is 100% covered and formatted as kerbside:<id>
+    assert.ok(obs.sensor_id.startsWith('kerbside:'));
+    // 2. marker_id is strictly null - never fabricated or inferred from kerbsideid
+    assert.equal(obs.marker_id, null);
+    // 3. bay_id is strictly null - cannot claim bay join when absent upstream
+    assert.equal(obs.bay_id, null);
+  }
+
+  // Check occupancy derivations:
+  assert.equal(result.parkingObservations[0]?.occupied, false); // Unoccupied -> false
+  assert.equal(result.parkingObservations[1]?.occupied, false); // Unoccupied -> false
+  assert.equal(result.parkingObservations[2]?.occupied, true);  // Present -> true
+  assert.equal(result.parkingObservations[3]?.occupied, true);  // Present -> true
+
+  // Check rights and access status:
+  for (const record of result.sourceRecords) {
+    assert.equal(record.rights_status, 'review_required');
+    assert.equal(record.assertion_kind, 'observation');
+  }
+});
+
+test('GM-03 Timestamp absence: missing status_timestamp sets time_missing_reason and omits undated observation', async () => {
+  const batchWithoutTimestamp = [
+    {
+      kerbsideid: 5001,
+      lastupdated: '2026-09-30T10:00:00+00:00',
+      status_timestamp: null,
+      status_description: 'Unoccupied',
+      zone_number: 1000,
+      location: { lon: 144.95, lat: -37.81 },
+    },
+  ];
+
+  class MissingTimestampClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: batchWithoutTimestamp,
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2026-09-30T12:00:00Z',
+        lastModified: '2026-09-30T10:00:00Z',
+      };
+    }
+  }
+
+  const testConnector = new ParkingSensorsConnector(new MissingTimestampClient());
+  const result = await testConnector.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'snapshot', revision: '2026-09-30' },
+    checkpoint: null,
+    runId: 'missing_timestamp_run',
+  }));
+
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  assert.equal(result.sourceRecords.length, 1);
+  assert.equal(result.sourceRecords[0]?.observed_at, null);
+  assert.equal(result.sourceRecords[0]?.time_missing_reason, 'Status timestamp absent upstream');
+  // Undated observation must NOT be created to avoid corrupting time series
+  assert.equal(result.parkingObservations.length, 0);
+});
+
+test('GM-03 Validation: whitespace or empty kerbsideid is strictly rejected', () => {
+  assert.throws(
+    () => extractMarkerAndBayId({ kerbsideid: '   ' }),
+    /kerbsideid must not be empty/,
+  );
+  assert.throws(
+    () => extractMarkerAndBayId({ kerbsideid: '' }),
+    /kerbsideid must not be empty/,
+  );
+  assert.throws(
+    () => parseSensorRow({
+      kerbsideid: '   ',
+      lastupdated: '2026-09-30T10:00:00Z',
+    }),
+    /kerbsideid must not be empty/,
+  );
+});

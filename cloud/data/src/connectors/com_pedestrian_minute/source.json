@@ -14,6 +14,7 @@
   "check_interval_seconds": 900,
   "requires_monitoring": true,
   "license_status": "review_required",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
   "access_status": "candidate",
   "record_granularity": "sensor_minute",
   "connector_owner": "melens integration",
@@ -22,7 +23,15 @@
     "native_record_key": "location_id + sensing_datetime",
     "completeness_rule": "All pages match total_count; requested window plus 15-minute overlap remains inside the past-hour feed",
     "secret_names": [],
-    "allowed_fields": ["location_id", "sensing_datetime", "direction_1", "direction_2", "total_of_directions"],
+    "allowed_fields": [
+      "location_id",
+      "sensing_datetime",
+      "sensing_date",
+      "sensing_time",
+      "direction_1",
+      "direction_2",
+      "total_of_directions"
+    ],
     "staging_retention_days": 1,
     "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/"
   }

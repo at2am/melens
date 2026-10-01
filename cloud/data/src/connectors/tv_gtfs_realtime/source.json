@@ -14,6 +14,7 @@
   "check_interval_seconds": 60,
   "requires_monitoring": true,
   "license_status": "review_required",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "access_status": "candidate",
   "record_granularity": "full_feed_snapshot_and_alert_entity",
   "connector_owner": "melens integration",
@@ -26,7 +27,8 @@
     "allowed_fields": ["header.gtfs_realtime_version", "header.incrementality", "header.timestamp", "header.feed_version", "entity.id", "entity.alert.active_period", "entity.alert.communication_period", "entity.alert.impact_period", "entity.alert.informed_entity", "entity.alert.cause", "entity.alert.effect", "entity.alert.url", "entity.alert.header_text", "entity.alert.description_text"],
     "raw_retention_days": 0,
     "staging_retention_days": 1,
-    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime"
+    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime",
+    "reviewed_at": "2026-09-30T00:00:00Z"
   },
   "notes": "Public listing advertises Metro Train and Yarra Trams Service Alerts only; Bus has Trip Updates and Vehicle Positions, not a Service Alerts feed. Thus absent bus alerts never mean no bus disruption. KeyID must be provided by Secret Manager at deployment. FULL_DATASET disappearance is resolved using the latest successful snapshot per mode, not inferred as an explicit cancellation in this connector. NO_SERVICE describes service effect, not an alert tombstone. Static GTFS join must resolve route/stop IDs before assigning geometry."
 }

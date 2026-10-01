@@ -14,7 +14,8 @@ beforeEach(() => {
   PedestrianLocationsConnector.resetSharedState();
 });
 import { parseConnectorInput } from '../../src/core/connector.js';
-import { HttpFailure } from '../../src/core/http.js';
+import { HttpClient, HttpFailure } from '../../src/core/http.js';
+import { z } from 'zod';
 import { OpenDataSoftClient, OdsIncompleteWindow, type OdsQuery, type OdsRecords } from '../../src/core/opendatasoft.js';
 import { parseSourceManifest } from '../../src/core/registry.js';
 import type { PedestrianObservation, SensorLocation } from '../../src/core/types.js';
@@ -83,7 +84,7 @@ test('collect parses fixture records into canonical sensorLocations, sourceRecor
   const loc3 = result.sensorLocations.find(l => l.sensor_id === '3');
   assert.ok(loc3, 'Sensor 3 must exist');
   assert.equal(loc3.device_status, 'A');
-  assert.equal(loc3.valid_from, '2009-03-25T00:00:00.000Z');
+  assert.equal(loc3.valid_from, fetchedAt);
   assert.equal(loc3.valid_to, null);
   assert.ok(loc3.geometry_geojson?.includes('144.96429485'));
   assert.ok(loc3.geometry_geojson?.includes('-37.81101524'));
@@ -100,11 +101,11 @@ test('collect parses fixture records into canonical sensorLocations, sourceRecor
   const geo3Validation = validateGeoRecordGeography(geo3);
   assert.equal(geo3Validation.valid, true);
 
-  // Sensor with relocation note (location_id: 14) preserves install date and does NOT invent dates from note
+  // Sensor with a handoff note has no documented coordinate start date
   const loc14 = result.sensorLocations.find(l => l.sensor_id === '14');
   assert.ok(loc14, 'Sensor 14 must exist');
   assert.equal(loc14.device_status, 'A');
-  assert.equal(loc14.valid_from, '2009-03-24T00:00:00.000Z');
+  assert.equal(loc14.valid_from, fetchedAt);
   assert.equal(loc14.valid_to, null, 'Must not invent effective date from note: Sensor relocated to sensor ID 25 on 2/10/2019');
   assert.ok(loc14.geometry_geojson?.includes('144.96291897'));
   assert.ok(loc14.geometry_geojson?.includes('-37.82011242'));
@@ -143,7 +144,7 @@ test('collect parses fixture records into canonical sensorLocations, sourceRecor
     assert.equal(src.rights_status, 'review_required');
     assert.equal(src.assertion_kind, 'observation');
     assert.equal(src.source_id, SOURCE_ID);
-    assert.equal(src.time_missing_reason, 'The location row has no per-row source update timestamp');
+    assert.ok(src.time_missing_reason, 'Snapshot-only coordinate history must explain the missing official start time');
   }
 });
 
@@ -488,8 +489,8 @@ test('sensor relocation across multiple snapshots preserves stable sensor_id and
   assert.notEqual(loc1.version_id, loc3.version_id);
 
   // Verify lifecycle valid intervals:
-  // Stage 1 was valid from installation date until Stage 1 snapshot observation time
-  assert.equal(loc1.valid_from, '2020-01-15T00:00:00.000Z');
+  // Stage 1 begins at the first observed snapshot
+  assert.equal(loc1.valid_from, '2026-01-01T00:00:00.000Z');
   assert.equal(loc1.valid_to, '2026-01-01T00:00:00.000Z');
 
   // Stage 2 (relocation without official date) is valid from Stage 2 snapshot observation time,
@@ -503,7 +504,7 @@ test('sensor relocation across multiple snapshots preserves stable sensor_id and
   assert.equal(loc3.valid_to, null);
 });
 
-test('relocation across versions preserves original installation date for initial location, avoids backdating new coordinates, and keeps unknown transition gap unlocated (G08)', async () => {
+test('relocation across versions preserves first observation for initial location and keeps unknown history and transition gap unlocated (G08)', async () => {
   const rowV1 = {
     location_id: 3,
     sensor_description: 'Melbourne Central',
@@ -533,8 +534,8 @@ test('relocation across versions preserves original installation date for initia
   if (result1.kind !== 'success') return;
   const locV1 = result1.sensorLocations[0]!;
 
-  // Initial location: valid_from matches installation date
-  assert.equal(locV1.valid_from, '2009-03-25T00:00:00.000Z');
+  // Initial location: current coordinates are only known at the first snapshot
+  assert.equal(locV1.valid_from, '2026-01-01T00:00:00.000Z');
   assert.equal(locV1.valid_to, null);
 
   // In second snapshot: same sensor, installation_date unchanged, coordinates changed, NO valid_from provided
@@ -606,7 +607,7 @@ test('relocation across versions preserves original installation date for initia
   };
 
   // When both versions are passed:
-  // - Historical observation joins locV1
+  // - Reading before the first snapshot remains unlocated
   // - Gap observation is UNLOCATED (not misattributed to Site 1 or Site 2, and not ambiguous)
   // - After move joins locV2
   const joinedBoth = joinPedestrianObservations({
@@ -615,9 +616,8 @@ test('relocation across versions preserves original installation date for initia
     granularity: 'minute',
   });
 
-  assert.equal(joinedBoth[0]?.locationStatus, 'located');
-  assert.equal(joinedBoth[0]?.location?.version_id, locV1.version_id);
-  assert.ok(joinedBoth[0]?.location?.geometry_geojson?.includes('-37.81101524'));
+  assert.equal(joinedBoth[0]?.locationStatus, 'unlocated');
+  assert.equal(joinedBoth[0]?.location, null);
 
   assert.equal(joinedBoth[1]?.locationStatus, 'unlocated', 'Observation in unknown transition gap must be unlocated');
   assert.equal(joinedBoth[1]?.location, null);
@@ -668,11 +668,16 @@ test('relocation notes with natural language dates do not invent effective dates
   if (result.kind !== 'success') return;
 
   const loc = result.sensorLocations[0]!;
-  // valid_from must be installation_date, NOT 2021-04-15 or 2023-07-20 extracted from note!
-  assert.equal(loc.valid_from, '2012-04-10T00:00:00.000Z');
+  // valid_from must NOT be invented from natural language dates (2021-04-15 or 2023-07-20)
+  // and because it relocated, cold start must NOT backdate to installation date (2012-04-10)
+  assert.notEqual(loc.valid_from, '2021-04-15T00:00:00.000Z');
+  assert.notEqual(loc.valid_from, '2023-07-20T00:00:00.000Z');
+  assert.notEqual(loc.valid_from, '2012-04-10T00:00:00.000Z');
+  assert.equal(loc.valid_from, '2026-09-29T10:00:00.000Z');
   // valid_to must remain null, NOT invented from note!
   assert.equal(loc.valid_to, null);
   assert.equal(loc.device_status, 'A');
+  assert.match(result.sourceRecords[0]?.time_missing_reason ?? '', /Relocation detected on cold start/);
 });
 
 test('coordinate parsing: extracts coordinates from location object or top-level fields', async () => {
@@ -957,7 +962,7 @@ test('when migration is detected with historical evidence, result.sensorLocation
   assert.equal(result1.kind, 'success');
   if (result1.kind !== 'success') return;
   const initialLoc = result1.sensorLocations[0]!;
-  assert.equal(initialLoc.valid_from, '2009-03-25T00:00:00.000Z');
+  assert.equal(initialLoc.valid_from, '2026-01-01T00:00:00.000Z');
   assert.equal(initialLoc.valid_to, null);
 
   const relocatedRow = {
@@ -998,9 +1003,593 @@ test('when migration is detected with historical evidence, result.sensorLocation
   assert.ok(currentLoc.geometry_geojson?.includes('144.97'));
 
   assert.equal(closedLoc.valid_to, '2026-01-01T00:00:00.000Z');
-  assert.equal(closedLoc.valid_from, '2009-03-25T00:00:00.000Z');
+  assert.equal(closedLoc.valid_from, '2026-01-01T00:00:00.000Z');
   assert.ok(closedLoc.geometry_geojson?.includes('144.96429485'));
 
   assert.notEqual(currentLoc.version_id, closedLoc.version_id);
   assert.equal(currentLoc.sensor_id, closedLoc.sensor_id);
+});
+
+test('migration reproduced using real-shape snapshots of the same sensor (Sensor 47) across historical and current sites (GM-08)', async () => {
+  // Snapshot 1: Real-shape row for Sensor 47 at original site (St Francis Church at 266 Elizabeth St)
+  const realShapeSnap1 = {
+    location_id: 47,
+    sensor_description: 'Pushbox - St Francis Church 266 Elizabeth St',
+    sensor_name: 'Eli266_T',
+    installation_date: '2017-08-24',
+    note: null,
+    location_type: 'Outdoor',
+    status: 'A',
+    direction_1: 'North',
+    direction_2: 'South',
+    latitude: -37.81216,
+    longitude: 144.96282,
+    location: {
+      lon: 144.96282,
+      lat: -37.81216,
+    },
+  };
+
+  class Snap1Client extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [realShapeSnap1],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2022-01-01T00:00:00.000Z',
+        lastModified: '2022-01-01T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector1 = new PedestrianLocationsConnector({ client: new Snap1Client(), isolated: true });
+  const result1 = await connector1.collect(defaultInput);
+  assert.equal(result1.kind, 'success');
+  if (result1.kind !== 'success') return;
+
+  const locV1 = result1.sensorLocations[0]!;
+  assert.equal(locV1.sensor_id, '47');
+  assert.equal(locV1.valid_from, '2022-01-01T00:00:00.000Z');
+  assert.equal(locV1.valid_to, null);
+  assert.ok(locV1.geometry_geojson?.includes('144.96282'));
+
+  // Snapshot 2: Real-shape official row for Sensor 47 after move to 250 Elizabeth St (from City of Melbourne API)
+  const realShapeSnap2 = {
+    location_id: 47,
+    sensor_description: 'Pushbox Upgrade, 25/07/2023. Move to 250 Elizabeth Street from adjacent St. Francis Church at 266 Elizabeth.',
+    sensor_name: 'Eli250_T',
+    installation_date: '2017-08-24',
+    note: 'Pushbox Upgrade, 25/07/2023. Move to 250 Elizabeth Street from adjacent St. Francis Church at 266 Elizabeth.',
+    location_type: 'Outdoor',
+    status: 'A',
+    direction_1: 'North',
+    direction_2: 'South',
+    latitude: -37.81258467,
+    longitude: 144.9625775,
+    location: {
+      lon: 144.9625775,
+      lat: -37.81258467,
+    },
+  };
+
+  class Snap2Client extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [realShapeSnap2],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt: '2024-01-01T00:00:00.000Z',
+        lastModified: '2024-01-01T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector2 = new PedestrianLocationsConnector({
+    client: new Snap2Client(),
+    previousLocations: result1.sensorLocations,
+    isolated: true,
+  });
+
+  const result2 = await connector2.collect(defaultInput);
+  assert.equal(result2.kind, 'success');
+  if (result2.kind !== 'success') return;
+
+  // Both current and closed historical locations are included
+  assert.equal(result2.sensorLocations.length, 2);
+  const currentLoc = result2.sensorLocations[0]!;
+  const closedLoc = result2.sensorLocations[1]!;
+
+  // Current location:
+  assert.equal(currentLoc.sensor_id, '47');
+  assert.equal(currentLoc.valid_from, '2024-01-01T00:00:00.000Z');
+  assert.equal(currentLoc.valid_to, null);
+  assert.notEqual(currentLoc.valid_from, '2017-08-24T00:00:00.000Z', 'Must not backdate new coordinates to installation date');
+  assert.notEqual(currentLoc.valid_from, '2022-01-01T00:00:00.000Z', 'Must not fabricate effective starting point before observation');
+  assert.ok(currentLoc.geometry_geojson?.includes('144.9625775'));
+
+  // Closed historical location:
+  assert.equal(closedLoc.sensor_id, '47');
+  assert.equal(closedLoc.valid_from, '2022-01-01T00:00:00.000Z');
+  assert.equal(closedLoc.valid_to, '2022-01-01T00:00:00.000Z', 'Closed at last observed snapshot timestamp');
+  assert.ok(closedLoc.geometry_geojson?.includes('144.96282'));
+
+  // Downstream join testing observations across all three intervals:
+  // 1. Reading before the first old-site snapshot remains unknown
+  const obsAtOldSite: PedestrianObservation = {
+    batch_id: 'b1',
+    source_id: 'melbourne.pedestrian.minute',
+    schema_version: 1,
+    fetched_at: '2020-06-01T12:00:00Z',
+    sensor_id: '47',
+    observed_at: '2020-06-01T12:00:00Z',
+    version_id: 'v1',
+    direction_a_count: 15,
+    direction_b_count: 25,
+    total_count: 40,
+    source_record_id: 'obs:47:old',
+  };
+
+  // 2. Observed in unknown migration transition gap [2022-01-01, 2024-01-01)
+  const obsInGap: PedestrianObservation = {
+    ...obsAtOldSite,
+    observed_at: '2023-01-01T12:00:00Z',
+    source_record_id: 'obs:47:gap',
+  };
+
+  // 3. Observed at new site (2024)
+  const obsAtNewSite: PedestrianObservation = {
+    ...obsAtOldSite,
+    observed_at: '2024-06-01T12:00:00Z',
+    source_record_id: 'obs:47:new',
+  };
+
+  const joined = joinPedestrianObservations({
+    observations: [obsAtOldSite, obsInGap, obsAtNewSite],
+    locations: [currentLoc, closedLoc],
+    granularity: 'minute',
+  });
+
+  // No source evidence establishes the 2020 coordinate interval.
+  assert.equal(joined[0]?.locationStatus, 'unlocated');
+  assert.equal(joined[0]?.location, null);
+
+  // Gap observation is UNLOCATED: no fabrication of effective start or extension of old site
+  assert.equal(joined[1]?.locationStatus, 'unlocated', 'Transition gap observation must remain unlocated');
+  assert.equal(joined[1]?.location, null);
+
+  // New site observation is located at 250 Elizabeth St
+  assert.equal(joined[2]?.locationStatus, 'located');
+  assert.equal(joined[2]?.location?.version_id, currentLoc.version_id);
+  assert.ok(joined[2]?.location?.geometry_geojson?.includes('144.9625775'));
+});
+
+test('cold start ingestion of real-shape moved sensors (Sensors 37 & 47) fixes backdating new coordinates to installation date (GM-08)', async () => {
+  // Official real-shape rows from City of Melbourne API
+  const sensor37 = {
+    location_id: 37,
+    sensor_description: 'Lygon St',
+    sensor_name: 'Lyg260_T',
+    installation_date: '2015-02-11',
+    note: 'Pushbox Upgrade, 30/06/2023. Move from 174 to 260 Lygon Street (12/08/2024)',
+    location_type: 'Outdoor',
+    status: 'A',
+    direction_1: 'North',
+    direction_2: 'South',
+    latitude: -37.80107122,
+    longitude: 144.96704554,
+    location: {
+      lon: 144.96704554,
+      lat: -37.80107122,
+    },
+  };
+
+  const sensor47 = {
+    location_id: 47,
+    sensor_description: 'Pushbox Upgrade, 25/07/2023. Move to 250 Elizabeth Street from adjacent St. Francis Church at 266 Elizabeth.',
+    sensor_name: 'Eli250_T',
+    installation_date: '2017-08-24',
+    note: 'Pushbox Upgrade, 25/07/2023. Move to 250 Elizabeth Street from adjacent St. Francis Church at 266 Elizabeth.',
+    location_type: 'Outdoor',
+    status: 'A',
+    direction_1: 'North',
+    direction_2: 'South',
+    latitude: -37.81258467,
+    longitude: 144.9625775,
+    location: {
+      lon: 144.9625775,
+      lat: -37.81258467,
+    },
+  };
+
+  const fetchedAt = '2026-09-30T10:00:00.000Z';
+
+  class RealShapeColdStartClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [sensor37, sensor47],
+        totalCount: 2,
+        pageCount: 1,
+        fetchedAt,
+        lastModified: '2026-09-30T00:00:00.000Z',
+      };
+    }
+  }
+
+  // Fresh instance without injected history or shared state (Cold Start)
+  const connector = new PedestrianLocationsConnector({
+    client: new RealShapeColdStartClient(),
+    isolated: true,
+  });
+
+  const result = await connector.collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  const loc37 = result.sensorLocations.find(l => l.sensor_id === '37')!;
+  const loc47 = result.sensorLocations.find(l => l.sensor_id === '47')!;
+
+  // Sensor 37:
+  // Must NOT backdate 260 Lygon St coordinates to original install date (2015-02-11)
+  assert.notEqual(loc37.valid_from, '2015-02-11T00:00:00.000Z', 'Cold start must not backdate sensor 37 to 2015');
+  assert.equal(loc37.valid_from, fetchedAt);
+  assert.equal(loc37.valid_to, null);
+  assert.ok(loc37.geometry_geojson?.includes('144.96704554'));
+
+  const src37 = result.sourceRecords.find(s => s.source_record_id.endsWith(':37'))!;
+  assert.match(src37.time_missing_reason ?? '', /Relocation detected on cold start without official migration date/);
+
+  // Sensor 47:
+  // Must NOT backdate 250 Elizabeth St coordinates to original install date (2017-08-24)
+  assert.notEqual(loc47.valid_from, '2017-08-24T00:00:00.000Z', 'Cold start must not backdate sensor 47 to 2017');
+  assert.equal(loc47.valid_from, fetchedAt);
+  assert.equal(loc47.valid_to, null);
+  assert.ok(loc47.geometry_geojson?.includes('144.9625775'));
+
+  const src47 = result.sourceRecords.find(s => s.source_record_id.endsWith(':47'))!;
+  assert.match(src47.time_missing_reason ?? '', /Relocation detected on cold start without official migration date/);
+
+  // Downstream join testing: historical observations before cold start snapshot remain unlocated
+  const histObs37: PedestrianObservation = {
+    batch_id: 'b-hist',
+    source_id: 'melbourne.pedestrian.minute',
+    schema_version: 1,
+    fetched_at: '2020-01-01T00:00:00Z',
+    sensor_id: '37',
+    observed_at: '2020-01-01T00:00:00Z',
+    version_id: 'v-obs-hist',
+    direction_a_count: 5,
+    direction_b_count: 10,
+    total_count: 15,
+    source_record_id: 'obs:37:hist',
+  };
+
+  const currObs37: PedestrianObservation = {
+    ...histObs37,
+    observed_at: '2026-10-01T00:00:00Z',
+    source_record_id: 'obs:37:curr',
+  };
+
+  const joined = joinPedestrianObservations({
+    observations: [histObs37, currObs37],
+    locations: [loc37],
+    granularity: 'minute',
+  });
+
+  // Historical reading cannot be placed at 260 Lygon St without historical location record
+  assert.equal(joined[0]?.locationStatus, 'unlocated');
+  assert.equal(joined[0]?.location, null);
+
+  // Current reading is located at 260 Lygon St
+  assert.equal(joined[1]?.locationStatus, 'located');
+  assert.ok(joined[1]?.location?.geometry_geojson?.includes('144.96704554'));
+});
+
+test('cold start scenario 1: unlisted sensor 999 with relocation note uses fetchedAt and does not backdate (GM-08 R03)', async () => {
+  const row999 = {
+    location_id: 999,
+    sensor_description: '368 Elizabeth Street',
+    sensor_name: 'Eli368_T',
+    installation_date: '2016-03-01',
+    note: 'Relocated to 368 Elizabeth Street',
+    location_type: 'Outdoor',
+    status: 'A',
+    latitude: -37.8095,
+    longitude: 144.9615,
+  };
+  const fetchedAt = '2026-09-30T10:00:00.000Z';
+
+  class UnlistedRelocatedClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row999],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt,
+        lastModified: '2026-09-30T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector = new PedestrianLocationsConnector({
+    client: new UnlistedRelocatedClient(),
+    isolated: true,
+  });
+
+  const result = await connector.collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  const loc = result.sensorLocations[0]!;
+  assert.equal(loc.sensor_id, '999');
+  assert.notEqual(loc.valid_from, '2016-03-01T00:00:00.000Z', 'Must not backdate unlisted relocated sensor to installation date');
+  assert.equal(loc.valid_from, fetchedAt);
+  assert.equal(loc.valid_to, null);
+
+  const src = result.sourceRecords[0]!;
+  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+
+  // Joining historical observations prior to fetchedAt must leave them unlocated
+  const histObs: PedestrianObservation = {
+    batch_id: 'b-hist',
+    source_id: 'melbourne.pedestrian.minute',
+    schema_version: 1,
+    fetched_at: '2018-01-01T00:00:00Z',
+    sensor_id: '999',
+    observed_at: '2018-01-01T00:00:00Z',
+    version_id: 'v-obs-hist',
+    direction_a_count: 10,
+    direction_b_count: 15,
+    total_count: 25,
+    source_record_id: 'obs:999:hist',
+  };
+
+  const joined = joinPedestrianObservations({
+    observations: [histObs],
+    locations: [loc],
+    granularity: 'minute',
+  });
+  assert.equal(joined[0]?.locationStatus, 'unlocated');
+  assert.equal(joined[0]?.location, null);
+});
+
+test('cold start scenario 2: unlisted sensor 888 without note uses fetchedAt preserving history as unlocated (GM-08 R03)', async () => {
+  const row888 = {
+    location_id: 888,
+    sensor_description: 'Fresh Uncataloged Sensor',
+    sensor_name: 'Uncat888_T',
+    installation_date: '2015-05-15',
+    note: null,
+    location_type: 'Outdoor',
+    status: 'A',
+    latitude: -37.8105,
+    longitude: 144.9625,
+  };
+  const fetchedAt = '2026-09-30T10:00:00.000Z';
+
+  class UnlistedNoNoteClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row888],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt,
+        lastModified: '2026-09-30T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector = new PedestrianLocationsConnector({
+    client: new UnlistedNoNoteClient(),
+    isolated: true,
+  });
+
+  const result = await connector.collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  const loc = result.sensorLocations[0]!;
+  assert.equal(loc.sensor_id, '888');
+  // Without verified baseline snapshot evidence, must NOT blindly fallback to installation_date
+  assert.notEqual(loc.valid_from, '2015-05-15T00:00:00.000Z', 'Must not backdate unlisted sensor without baseline evidence');
+  assert.equal(loc.valid_from, fetchedAt);
+  assert.equal(loc.valid_to, null);
+
+  // Historical reading before fetchedAt remains unlocated
+  const histObs: PedestrianObservation = {
+    batch_id: 'b-hist',
+    source_id: 'melbourne.pedestrian.minute',
+    schema_version: 1,
+    fetched_at: '2017-06-01T00:00:00Z',
+    sensor_id: '888',
+    observed_at: '2017-06-01T00:00:00Z',
+    version_id: 'v-obs-hist',
+    direction_a_count: 8,
+    direction_b_count: 12,
+    total_count: 20,
+    source_record_id: 'obs:888:hist',
+  };
+
+  const currObs: PedestrianObservation = {
+    ...histObs,
+    observed_at: '2026-10-01T00:00:00Z',
+    source_record_id: 'obs:888:curr',
+  };
+
+  const joined = joinPedestrianObservations({
+    observations: [histObs, currObs],
+    locations: [loc],
+    granularity: 'minute',
+  });
+  assert.equal(joined[0]?.locationStatus, 'unlocated', 'Historical observation prior to fetchedAt must remain unlocated');
+  assert.equal(joined[0]?.location, null);
+  assert.equal(joined[1]?.locationStatus, 'located');
+});
+
+test('cold start scenario 3: sensor 777 with general relocation phrasing triggers relocation protection (GM-08 R03)', async () => {
+  const row777 = {
+    location_id: 777,
+    sensor_description: 'Flinders / Swanston',
+    sensor_name: 'FliSwa_T',
+    installation_date: '2014-11-20',
+    note: 'Relocated to corner of Flinders and Swanston Street',
+    location_type: 'Outdoor',
+    status: 'A',
+    latitude: -37.8175,
+    longitude: 144.9675,
+  };
+  const fetchedAt = '2026-09-30T10:00:00.000Z';
+
+  class GeneralPhrasingClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row777],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt,
+        lastModified: '2026-09-30T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector = new PedestrianLocationsConnector({
+    client: new GeneralPhrasingClient(),
+    isolated: true,
+  });
+
+  const result = await connector.collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  const loc = result.sensorLocations[0]!;
+  assert.equal(loc.sensor_id, '777');
+  assert.notEqual(loc.valid_from, '2014-11-20T00:00:00.000Z');
+  assert.equal(loc.valid_from, fetchedAt);
+  assert.equal(loc.valid_to, null);
+
+  const src = result.sourceRecords[0]!;
+  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+});
+
+test('cold start scenario 4: sensor 52 returning to original installation coordinates does not backdate (GM-08 R03)', async () => {
+  // Sensor 52 original installation coordinates: [144.9652, -37.8134]
+  // Snapshot has matching coordinates, but note indicates it moved away and returned
+  const row52Returned = {
+    location_id: 52,
+    sensor_description: 'Bourke Street Mall',
+    sensor_name: 'Bou292_T',
+    installation_date: '2013-09-02',
+    note: 'Sensor relocated to temporary site in 2020 and returned to original site in 2024',
+    location_type: 'Outdoor',
+    status: 'A',
+    latitude: -37.8134,
+    longitude: 144.9652,
+  };
+  const fetchedAt = '2026-09-30T10:00:00.000Z';
+
+  class ReturnedClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row52Returned],
+        totalCount: 1,
+        pageCount: 1,
+        fetchedAt,
+        lastModified: '2026-09-30T00:00:00.000Z',
+      };
+    }
+  }
+
+  const connector = new PedestrianLocationsConnector({
+    client: new ReturnedClient(),
+    isolated: true,
+  });
+
+  const result = await connector.collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  const loc = result.sensorLocations[0]!;
+  assert.equal(loc.sensor_id, '52');
+  // Matching original coordinates cannot prove continuous presence throughout history!
+  // Must NOT backdate to installation date (2013-09-02)
+  assert.notEqual(loc.valid_from, '2013-09-02T00:00:00.000Z', 'Must not backdate returning sensor to original install date');
+  assert.equal(loc.valid_from, fetchedAt);
+  assert.equal(loc.valid_to, null);
+
+  const src = result.sourceRecords[0]!;
+  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+
+  // Observation from intermediate period (e.g. 2021) cannot be placed at original site
+  const intermObs: PedestrianObservation = {
+    batch_id: 'b-interm',
+    source_id: 'melbourne.pedestrian.minute',
+    schema_version: 1,
+    fetched_at: '2021-06-01T00:00:00Z',
+    sensor_id: '52',
+    observed_at: '2021-06-01T00:00:00Z',
+    version_id: 'v-obs-interm',
+    direction_a_count: 50,
+    direction_b_count: 60,
+    total_count: 110,
+    source_record_id: 'obs:52:interm',
+  };
+
+  const joined = joinPedestrianObservations({
+    observations: [intermObs],
+    locations: [loc],
+    granularity: 'minute',
+  });
+  assert.equal(joined[0]?.locationStatus, 'unlocated', 'Intermediate observation while relocated must remain unlocated');
+});
+
+test('bounded read-only verification of official City of Melbourne pedestrian sensor locations endpoint (GM-08)', async t => {
+  const officialUrl = 'https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-sensor-locations/records?limit=5';
+  let body: unknown;
+  try {
+    body = (await new HttpClient().getJson({ url: officialUrl, timeoutMs: 10_000, maxAttempts: 1 })).body;
+  } catch (error) {
+    if (!(error instanceof HttpFailure) || error.code !== 'upstream_unavailable') throw error;
+    t.skip(`Official sensor endpoint unavailable: ${error.message}`);
+    return;
+  }
+  const data = z.object({
+    total_count: z.number().int().nonnegative(),
+    results: z.array(z.record(z.string(), z.unknown())),
+  }).parse(body);
+  assert.ok(data.total_count >= 100, `Expected at least 100 pedestrian sensors, got ${data.total_count}`);
+  assert.equal(data.results.length, 5);
+  const first = data.results[0];
+  assert.ok(first);
+  for (const field of ['location_id', 'latitude', 'longitude', 'location', 'status']) {
+    assert.ok(field in first);
+  }
+});
+
+test('default collection does not backdate coordinates when a known baseline happens to match', async t => {
+  const rows = [
+    { location_id: 3, installation_date: '2009-03-25', latitude: -37.81101524, longitude: 144.96429485, status: 'A' },
+    { location_id: 999, installation_date: '2015-02-11', latitude: -37.81, longitude: 144.96, status: 'A' },
+  ];
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests += 1;
+    return new Response(JSON.stringify({ total_count: rows.length, results: rows }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+  // Use the default HTTP client and default history options used by registry loading.
+  const result = await new PedestrianLocationsConnector().collect(defaultInput);
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+  assert.equal(requests, 1);
+  for (const location of result.sensorLocations) {
+    assert.equal(location.valid_from, result.fetchedAt);
+    assert.match(result.sourceRecords.find(record => record.source_record_id === location.source_record_id)?.time_missing_reason ?? '', /first observed in this snapshot/);
+    const observation: PedestrianObservation = {
+      batch_id: 'historical-reading', source_id: 'melbourne.pedestrian.minute', schema_version: 1,
+      fetched_at: '2020-01-01T00:00:00Z', sensor_id: location.sensor_id,
+      observed_at: '2020-01-01T00:00:00Z', version_id: 'reading-version',
+      direction_a_count: 1, direction_b_count: 1, total_count: 2, source_record_id: 'historical-record',
+    };
+    assert.equal(joinPedestrianObservations({ observations: [observation], locations: [location], granularity: 'minute' })[0]?.locationStatus, 'unlocated');
+  }
 });

@@ -17,7 +17,7 @@ class ApplySqlTest(unittest.TestCase):
         planned = apply_sql.plan_sql()
         self.assertEqual(sum(kind == "table" for _, kind, _, _ in planned), 12)
         self.assertEqual(sum(kind == "view" for _, kind, _, _ in planned), 22)
-        self.assertEqual(len(apply_sql.AUTHORIZED_RAW_VIEWS), 10)
+        self.assertEqual(len(apply_sql.AUTHORIZED_RAW_VIEWS), 11)
 
     def test_sql_split_ignores_semicolons_inside_comments_and_literals(self):
         statements = apply_sql.split_sql(

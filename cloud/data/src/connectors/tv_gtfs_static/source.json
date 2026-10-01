@@ -41,7 +41,7 @@
     "raw_retention_days": 30,
     "staging_retention_days": 7,
     "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-schedule",
-    "reviewed_at": "2026-09-29T00:00:00Z"
+    "reviewed_at": "2026-09-30T00:00:00Z"
   },
   "notes": "Official schedule ZIP is about 275 MB and updated weekly or as needed. The connector fetches only train/tram mode members via validated byte ranges, deriving an archive revision from the HTTP validator and preserving Last-Modified as source_updated_at. Current upstream mode ZIPs omit feed_info, so timetable valid_from/valid_to remain unknown. Sparse stop_times represent complete route/stop associations but not complete trip/stop membership; trip-specific alert joins must fail closed. Fixtures are test-only. Source remains a review_required candidate until access and reuse admission."
 }

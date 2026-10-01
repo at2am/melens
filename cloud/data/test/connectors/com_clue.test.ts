@@ -273,7 +273,12 @@ test('CLUE date field is a census year and mismatched response years fail closed
     row.block_id === 17 && row.census_year === '2024'));
   assert.equal(parseClueEmploymentRow({ ...row2024, census_year: '2024-01-01' }).census_year,
     '2024');
+  assert.equal(parseClueEmploymentRow({ ...row2024, census_year: '2024-01-01T00:00:00+00:00' }).census_year,
+    '2024');
+  assert.equal(parseClueEmploymentRow({ ...row2024, census_year: '2024-01-01T00:00:00Z' }).census_year,
+    '2024');
   assert.throws(() => parseClueEmploymentRow({ ...row2024, census_year: '2024-07-01' }));
+  assert.throws(() => parseClueEmploymentRow({ ...row2024, census_year: 'invalid-year' }));
 
   class WrongYearClient extends OpenDataSoftClient {
     override async fetchRecords(): Promise<OdsRecords> {
@@ -288,4 +293,110 @@ test('CLUE date field is a census year and mismatched response years fail closed
       runId: 'wrong-year' }));
   assert.equal(result.kind, 'failure');
   if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
+});
+
+test('CLUE employment empty response for requested year fails closed with validation_failed', async () => {
+  class EmptyClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return { records: [], totalCount: 0, pageCount: 0, fetchedAt: '2026-09-29T10:00:00Z', lastModified: null };
+    }
+  }
+
+  const connector = new ClueEmploymentConnector(new EmptyClient());
+  const result = await connector.collect(
+    parseConnectorInput({
+      sourceId: EMPLOYMENT_SOURCE_ID,
+      window: { kind: 'snapshot', revision: '1999' },
+      checkpoint: null,
+      runId: 'empty-test-run',
+    }),
+  );
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.code, 'validation_failed');
+    assert.ok(result.message.includes('No CLUE employment records found'));
+  }
+});
+
+test('CLUE employment duplicate (census_year, block_id) in batch fails closed with validation_failed', async () => {
+  const records = await loadEmploymentFixture();
+  const row2024 = parseClueEmploymentRow(records.find((row: any) =>
+    row.block_id === 17 && row.census_year === '2024'));
+
+  class DuplicateEmploymentClient extends OpenDataSoftClient {
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: [row2024, row2024],
+        totalCount: 2,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T10:00:00Z',
+        lastModified: '2025-06-01T00:00:00Z',
+      };
+    }
+  }
+
+  const connector = new ClueEmploymentConnector(new DuplicateEmploymentClient());
+  const result = await connector.collect(
+    parseConnectorInput({
+      sourceId: EMPLOYMENT_SOURCE_ID,
+      window: { kind: 'snapshot', revision: '2024' },
+      checkpoint: null,
+      runId: 'duplicate-test-run',
+    }),
+  );
+
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.code, 'validation_failed');
+    assert.ok(result.message.includes('Duplicate (census_year, block_id)'));
+  }
+});
+
+test('CLUE employment fetchMetadataRevision retrieves official data_processed and autoFetchMetadata populates sourceUpdatedAt', async () => {
+  const records = await loadEmploymentFixture();
+  const year2024Records = records.filter((r: any) => String(r.census_year) === '2024');
+  const officialProcessedTimestamp = '2026-03-16T21:34:59.000Z';
+
+  class MockMetadataClient extends OpenDataSoftClient {
+    override async fetchDatasetDataProcessed(): Promise<string> {
+      return officialProcessedTimestamp;
+    }
+
+    override async fetchRecords(): Promise<OdsRecords> {
+      return {
+        records: year2024Records,
+        totalCount: year2024Records.length,
+        pageCount: 1,
+        fetchedAt: '2026-09-29T10:00:00Z',
+        lastModified: null, // Records API omits Last-Modified header
+      };
+    }
+  }
+
+  const client = new MockMetadataClient();
+  const connector = new ClueEmploymentConnector({ client, fetchMetadataRevision: true });
+
+  const metadataTimestamp = await connector.fetchMetadataRevision();
+  assert.equal(metadataTimestamp, officialProcessedTimestamp);
+
+  const result = await connector.collect(
+    parseConnectorInput({
+      sourceId: EMPLOYMENT_SOURCE_ID,
+      window: { kind: 'snapshot', revision: '2024' },
+      checkpoint: null,
+      runId: 'metadata-test-run',
+    }),
+  );
+
+  assert.equal(result.kind, 'success');
+  if (result.kind !== 'success') return;
+
+  assert.equal(result.sourceLatestUpdateAt, officialProcessedTimestamp);
+  for (const record of result.sourceRecords) {
+    assert.equal(record.source_updated_at, officialProcessedTimestamp);
+  }
+  for (const indicator of result.areaIndicators) {
+    assert.equal(indicator.source_updated_at, officialProcessedTimestamp);
+  }
 });

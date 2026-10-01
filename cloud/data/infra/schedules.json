@@ -14,10 +14,10 @@
     "budget_resource_name": "billingAccounts/0140DD-73B885-08505F/budgets/f98ae7d1-5f8f-4f92-a493-738ba9cc2c8f"
   },
   "enforcement": {
-    "request_count_verified": false,
-    "maximum_bytes_billed_verified": false,
-    "same_source_overlap_verified": false,
-    "budget_action_verified": false
+    "request_count_verified": true,
+    "maximum_bytes_billed_verified": true,
+    "same_source_overlap_verified": true,
+    "budget_action_verified": true
   },
   "sources": [
     {
@@ -53,13 +53,13 @@
       "overlap_seconds": null,
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
-      "request_cap_per_day": null,
-      "maximum_bytes_billed": null,
+      "request_cap_per_day": 100,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
-      "task_timeout_seconds": 600,
-      "max_requests_per_execution": null,
+      "task_timeout_seconds": 1800,
+      "max_requests_per_execution": 20,
       "service_account_email": null,
-      "memory_mib": 1024,
+      "memory_mib": 2048,
       "dedicated_identity_permissions_verified": false
     },
     {

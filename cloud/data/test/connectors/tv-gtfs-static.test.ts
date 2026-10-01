@@ -16,6 +16,8 @@ import {
 import { parseConnectorInput } from '../../src/core/connector.js';
 import { HttpClient, type HttpRequest, type HttpResponse } from '../../src/core/http.js';
 import { SourceRegistry, loadConnector, parseSourceManifest } from '../../src/core/registry.js';
+import { normalizeAlertFeeds, type ParsedAlertFeed } from '../../src/connectors/tv_gtfs_realtime/index.js';
+import { joinGtfsAlertLocations } from '../../src/normalization/gtfs-alerts.js';
 import { validateGeoRecordGeography } from '../../src/validation/geography.js';
 
 const input = parseConnectorInput({
@@ -69,6 +71,9 @@ test('mode mapping correctly translates GTFS route types to canonical modes', ()
   assert.equal(gtfsRouteTypeToMode(5), 'cable_tram');
   assert.equal(gtfsRouteTypeToMode(6), 'gondola');
   assert.equal(gtfsRouteTypeToMode(7), 'funicular');
+  assert.equal(gtfsRouteTypeToMode(400), 'train');
+  assert.equal(gtfsRouteTypeToMode(700), 'bus');
+  assert.equal(gtfsRouteTypeToMode(1000), 'ferry');
   assert.equal(gtfsRouteTypeToMode(999), 'other');
 });
 
@@ -166,7 +171,7 @@ class ArchiveRangeClient extends HttpClient {
   readonly ranges: string[] = [];
   changed = false;
 
-  constructor(private readonly archive: Uint8Array) { super(); }
+  constructor(protected readonly archive: Uint8Array) { super(); }
 
   override async getStream(request: HttpRequest): Promise<HttpResponse<ReadableStream<Uint8Array<ArrayBuffer>>>> {
     const headers = new Headers(request.headers);
@@ -248,4 +253,206 @@ test('referential integrity violation in trips or stops triggers validation fail
     assert.equal(result.code, 'validation_failed');
     assert.ok(result.message.includes('unknown route'));
   }
+});
+
+test('official archive rejects a range response with corrupted entry CRC32 checksum', async () => {
+  const archive = zipSync({
+    '2/google_transit.zip': modeArchive(2),
+    '3/google_transit.zip': modeArchive(3),
+  }, { level: 0 });
+  class CorruptChecksumClient extends ArchiveRangeClient {
+    override async getStream(request: HttpRequest) {
+      const res = await super.getStream(request);
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        chunks.push(part.value);
+      }
+      const combined = Buffer.concat(chunks);
+      // Corrupt a byte in the payload range fetch for 2/google_transit.zip (range 3)
+      if (this.ranges.length === 3 && combined.length > 50) {
+        const idx = Math.floor(combined.length / 2);
+        const val = combined[idx];
+        if (val !== undefined) combined[idx] = val ^ 0xff;
+      }
+      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({ start(c) { c.enqueue(combined); c.close(); } });
+      return { ...res, body: stream };
+    }
+  }
+  const client = new CorruptChecksumClient(archive);
+  await assert.rejects(
+    fetchOfficialGtfsArchive(client, 'https://example.test/gtfs.zip'),
+    /checksum or size mismatch|unsupported or oversized ZIP entry/,
+  );
+});
+
+test('official archive rejects a range response with corrupted local header', async () => {
+  const archive = zipSync({
+    '2/google_transit.zip': modeArchive(2),
+    '3/google_transit.zip': modeArchive(3),
+  });
+  class CorruptHeaderClient extends ArchiveRangeClient {
+    override async getStream(request: HttpRequest) {
+      const res = await super.getStream(request);
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        chunks.push(part.value);
+      }
+      const combined = Buffer.concat(chunks);
+      // Corrupt local header signature for the first entry header request (which is range 2)
+      if (this.ranges.length === 2 && combined.length >= 4) {
+        combined[0] = 0x00;
+        combined[1] = 0x00;
+      }
+      const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({ start(c) { c.enqueue(combined); c.close(); } });
+      return { ...res, body: stream };
+    }
+  }
+  const client = new CorruptHeaderClient(archive);
+  await assert.rejects(
+    fetchOfficialGtfsArchive(client, 'https://example.test/gtfs.zip'),
+    /local header mismatch/,
+  );
+});
+
+test('official archive rejects a server response without strong validator', async () => {
+  const archive = zipSync({
+    '2/google_transit.zip': modeArchive(2),
+    '3/google_transit.zip': modeArchive(3),
+  });
+  class NoValidatorClient extends ArchiveRangeClient {
+    override async getStream(request: HttpRequest) {
+      const res = await super.getStream(request);
+      return { ...res, etag: null, lastModified: null };
+    }
+  }
+  const client = new NoValidatorClient(archive);
+  await assert.rejects(
+    fetchOfficialGtfsArchive(client, 'https://example.test/gtfs.zip'),
+    /server did not provide archive validator/,
+  );
+});
+
+test('official archive rejects Content-Range header mismatch', async () => {
+  const archive = zipSync({
+    '2/google_transit.zip': modeArchive(2),
+    '3/google_transit.zip': modeArchive(3),
+  });
+  class BadContentRangeClient extends ArchiveRangeClient {
+    override async getStream(request: HttpRequest) {
+      const res = await super.getStream(request);
+      return { ...res, contentRange: `bytes 0-100/${this.archive.length}` };
+    }
+  }
+  const client = new BadContentRangeClient(archive);
+  await assert.rejects(
+    fetchOfficialGtfsArchive(client, 'https://example.test/gtfs.zip'),
+    /Content-Range or response length mismatch/,
+  );
+});
+
+test('missing feed_info in official archive fails closed on calendar validity and cannot counterfeit GTFS version for alert joins', async () => {
+  const archive = zipSync({
+    '2/google_transit.zip': modeArchive(2),
+    '3/google_transit.zip': modeArchive(3),
+  }, { level: 6 });
+  const client = new ArchiveRangeClient(archive);
+  const result = await fetchOfficialGtfsArchive(client, 'https://example.test/gtfs.zip');
+
+  // 1. Upstream nested archives lack feed_info.txt
+  assert.equal(result.raw.feed_info.length, 0);
+
+  // 2. Normalization fails closed on timetable validity window
+  const normalized = normalizeGtfsSnapshot(parseGtfsSnapshot(result.raw), input, result.fetchedAt, {
+    feedVersion: result.archiveVersion,
+    sourceUpdatedAt: result.sourceUpdatedAt,
+    tripStopMembershipComplete: result.tripStopMembershipComplete,
+  });
+  assert.equal(normalized.validFrom, null);
+  assert.equal(normalized.validTo, null);
+  assert.equal(normalized.tripStopMembershipComplete, false);
+
+  const versionRecord = normalized.sourceRecords.find(r => r.source_record_id.includes('feed_version'));
+  assert.ok(versionRecord);
+  assert.equal(versionRecord.valid_from, null);
+  assert.equal(versionRecord.valid_to, null);
+  assert.equal(versionRecord.time_missing_reason, 'Feed info does not specify calendar start date');
+
+  // 3. The archive revision hash starts with archive-sha256: and is derived from HTTP validator
+  assert.match(normalized.feedVersion, /^archive-sha256:[a-f0-9]{64}$/);
+
+  // 4. Alert join fails closed when static archive lacks feed_info (cannot fake GTFS version with archive ETag)
+  const alertInput = parseConnectorInput({
+    sourceId: 'victoria.transport.gtfs_realtime',
+    window: { kind: 'snapshot', revision: '2026-09-29T01:00:00.000Z' },
+    checkpoint: null,
+    runId: 'alert-run',
+  });
+  const mockFeed: ParsedAlertFeed = {
+    gtfsRealtimeVersion: '2.0',
+    feedTimestamp: '2026-09-29T01:00:00.000Z',
+    feedVersion: normalized.feedVersion,
+    alerts: [{
+      id: 'ALT-1',
+      activePeriods: [],
+      communicationPeriods: [],
+      impactPeriods: [],
+      selectors: [{
+        agencyId: '2',
+        routeId: '2-r',
+        routeType: 2,
+        stopId: '2-s',
+        directionId: null,
+        tripId: null,
+        tripRouteId: null,
+        tripStartDate: null,
+        tripStartTime: null,
+      }],
+      cause: null,
+      effect: 1,
+      header: 'Disruption',
+      description: null,
+      url: null,
+    }],
+  };
+  const normalizedAlertsResult = normalizeAlertFeeds([
+    { mode: 'metro_train', resourceUrl: 'https://example.test/metro', parsed: mockFeed, fetchedAt: result.fetchedAt },
+  ], alertInput);
+
+  const joined = joinGtfsAlertLocations({
+    alerts: normalizedAlertsResult.geoRecords,
+    alertSources: normalizedAlertsResult.geoRecordSources,
+    staticVersions: [{
+      snapshot: parseGtfsSnapshot(result.raw),
+      normalized,
+    }],
+  });
+
+  // Must fail closed to version_unverified with no coordinates invented
+  assert.equal(joined.mappings[0]?.status, 'version_unverified');
+  assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
+
+  // Even if alert attempts to use raw ETag string, it fails closed
+  const etagFeed: ParsedAlertFeed = {
+    ...mockFeed,
+    feedVersion: '"test-archive"',
+  };
+  const etagAlerts = normalizeAlertFeeds([
+    { mode: 'metro_train', resourceUrl: 'https://example.test/metro', parsed: etagFeed, fetchedAt: result.fetchedAt },
+  ], alertInput);
+  const etagJoined = joinGtfsAlertLocations({
+    alerts: etagAlerts.geoRecords,
+    alertSources: etagAlerts.geoRecordSources,
+    staticVersions: [{
+      snapshot: parseGtfsSnapshot(result.raw),
+      normalized,
+    }],
+  });
+  assert.equal(etagJoined.mappings[0]?.status, 'version_unverified');
+  assert.equal(etagJoined.geoRecords[0]?.geometry_geojson, null);
 });

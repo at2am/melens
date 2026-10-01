@@ -22,7 +22,7 @@
     "native_record_key": "roadsegmentid + optional kerbsideid (string) + coordinate",
     "completeness_rule": "Full JSON export count equals independent records total_count; conflicting duplicate native IDs fail",
     "secret_names": [],
-    "allowed_fields": ["roadsegmentid", "kerbsideid", "roadsegmentdescription", "latitude", "longitude", "lastupdated"],
+    "allowed_fields": ["roadsegmentid", "kerbsideid", "roadsegmentdescription", "latitude", "longitude", "lastupdated", "location"],
     "staging_retention_days": 1,
     "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bays/"
   },

@@ -23,12 +23,17 @@ observations AS (
   FROM `melens_ingest.pedestrian_observations` AS o
   JOIN batches AS b USING (batch_id, source_id)
   JOIN sources AS s USING (source_id)
+  JOIN `melens_ingest.source_records` r
+    ON r.batch_id = o.batch_id AND r.source_id = o.source_id
+   AND r.source_record_id = o.source_record_id AND r.version_id = o.version_id
   WHERE b.state = 'published' AND b.published_at IS NOT NULL
     AND s.license_status IN ('verified_open', 'restricted')
     AND s.access_status = 'active'
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY o.source_id, o.sensor_id, o.observed_at
-    ORDER BY o.version_id DESC, o.fetched_at DESC, o.batch_id DESC
+    ORDER BY r.source_updated_at DESC NULLS LAST,
+             r.source_version_ordinal DESC NULLS LAST,
+             o.fetched_at DESC, o.batch_id DESC
   ) = 1
 ),
 locations AS (

@@ -370,6 +370,8 @@ export class BigQueryPublisher {
           ? 'AND r.version_id = t.source_version_id'
           : table.name === 'boundaries'
             ? "AND r.source_id = t.source_id AND r.batch_id = t.batch_id AND r.version_id = t.version_id AND r.rights_status IN ('verified_open', 'restricted')"
+            : table.name === 'pedestrian_observations'
+              ? 'AND r.source_id = t.source_id AND r.batch_id = t.batch_id AND r.version_id = t.version_id'
             : 'AND r.source_id = t.source_id';
         invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('source_records')} r WHERE r.source_record_id = t.source_record_id
           ${sourceMatch}
@@ -378,7 +380,26 @@ export class BigQueryPublisher {
       if (table.name === 'geo_records') invalid.push(`NOT EXISTS (
         SELECT 1 FROM ${path('geo_record_sources')} r WHERE r.geo_record_id = t.geo_record_id
           AND r.version_id = t.version_id AND ${visible('r')})`);
-      const ordering = table.name === 'boundaries' ? `(SELECT COUNT(*) FROM (
+      const ordering = table.name === 'pedestrian_observations' ? `(SELECT COUNT(*) FROM (
+        SELECT sensor_id, observed_at, COUNT(*) AS versions,
+          COUNTIF(source_updated_at IS NULL) AS missing_time,
+          COUNTIF(source_updated_at IS NOT NULL) AS has_time,
+          COUNTIF(source_version_ordinal IS NULL) AS missing_ordinal,
+          COUNT(DISTINCT TO_JSON_STRING(STRUCT(source_updated_at, source_version_ordinal))) AS positions
+        FROM (
+          SELECT t.sensor_id, t.observed_at, t.version_id,
+            r.source_updated_at, r.source_version_ordinal
+          FROM eligible AS t
+          JOIN ${path('source_records')} r ON r.batch_id = t.batch_id
+            AND r.source_id = t.source_id AND r.source_record_id = t.source_record_id
+            AND r.version_id = t.version_id
+          WHERE ${visible('r')}
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY t.source_id, t.sensor_id, t.observed_at, t.version_id
+            ORDER BY t.fetched_at DESC, t.batch_id DESC) = 1
+        ) GROUP BY sensor_id, observed_at
+        HAVING versions > 1 AND ((missing_time > 0 AND (has_time > 0 OR missing_ordinal > 0))
+          OR positions < versions)
+      ))` : table.name === 'boundaries' ? `(SELECT COUNT(*) FROM (
         SELECT boundary_id, COUNT(*) AS versions,
           COUNTIF(source_updated_at IS NULL) AS missing_time,
           COUNTIF(source_updated_at IS NOT NULL) AS has_time,
@@ -422,7 +443,7 @@ export class BigQueryPublisher {
         ), eligible AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
           FROM ${path(table.name)} t
-          WHERE ${visible('t')} AND ${tuple(logicalKeys)} IN (
+          WHERE t.source_id = @sourceId AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
             SELECT ${tuple(logicalKeys)} FROM batch_rows t
           )
         )
