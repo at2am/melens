@@ -423,6 +423,29 @@ export function normalizeGtfsSnapshot(
       originalUrl: LANDING_URL,
       sourceTime: validFrom ?? fetchedAt,
     });
+    // Only retained schedule fields go into the runtime reference. The official
+    // reader currently flattens mode archives, so feed_info cannot establish a
+    // publisher version for a particular realtime mode.
+    const reference = {
+      kind: 'gtfs_static_stop_reference',
+      schema_version: 1,
+      feed_version: feedVersion,
+      publisher_mode: null,
+      publisher_feed_info: null,
+      stop: {
+        stop_id: stop.stop_id, stop_name: stop.stop_name,
+        stop_lat: stop.stop_lat, stop_lon: stop.stop_lon,
+        location_type: stop.location_type ?? null,
+        parent_station: stop.parent_station ?? null,
+      },
+      routes: servingRouteIds.flatMap(routeId => {
+        const route = routesById.get(routeId);
+        return route ? [{ route_id: route.route_id,
+          route_short_name: route.route_short_name ?? null,
+          route_long_name: route.route_long_name ?? null,
+          route_type: route.route_type }] : [];
+      }),
+    };
     const stopContent = {
       stop_id: stop.stop_id,
       stop_name: stop.stop_name,
@@ -433,6 +456,7 @@ export function normalizeGtfsSnapshot(
       modes,
       route_ids: servingRouteIds,
       feed_version: feedVersion,
+      runtime_reference: reference,
     };
     const stopVersionId = sourceVersionId(sourceUpdatedAt, stopContent);
 
@@ -464,9 +488,6 @@ export function normalizeGtfsSnapshot(
     };
     const geometryJson = JSON.stringify(geometry);
 
-    const modeSummary = modes.length > 0 ? modes.join(', ') : 'unspecified';
-    const routesSummary = servingRouteIds.length > 0 ? servingRouteIds.join(', ') : 'none';
-
     geoRecords.push({
       batch_id: input.runId,
       source_id: SOURCE_ID,
@@ -477,7 +498,7 @@ export function normalizeGtfsSnapshot(
       topic: 'transport',
       assertion_kind: 'report',
       title: stop.stop_name,
-      summary: `Transport mode: ${modeSummary} | Stop ID: ${stop.stop_id} | Routes: ${routesSummary}`,
+      summary: JSON.stringify(reference),
       original_url: LANDING_URL,
       geometry_geojson: geometryJson,
       centroid_lat: stop.stop_lat,

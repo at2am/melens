@@ -709,7 +709,7 @@ test('US4 Suite 0: shipped SQL ordering structure rejects hash-only, reversed-ti
     'source_updated_at DESC NULLS LAST', 'source_updated_at ASC NULLS LAST',
   ));
   const prefiltered = mutateCurrent((view) => view.replace(
-    'WHERE g.source_id', "WHERE g.record_status NOT IN ('cancelled', 'resolved', 'withdrawn') AND g.source_id",
+    /WHERE\s*\(?g\.source_id/, "WHERE g.record_status NOT IN ('cancelled', 'resolved', 'withdrawn') AND (g.source_id",
   ));
   for (const mutation of [hashOnly, reversedTime, prefiltered]) {
     assert.notEqual(mutation, sql, 'Mutation must change the shipped SQL');

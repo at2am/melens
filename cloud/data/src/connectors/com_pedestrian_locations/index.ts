@@ -3,6 +3,11 @@ import { z } from 'zod';
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
 import { HttpFailure } from '../../core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient } from '../../core/opendatasoft.js';
+import {
+  pedestrianLocationCheckpointSchema,
+  pedestrianLocationHistorySchema,
+  pedestrianPointSchema,
+} from '../../core/pedestrian-location-history.js';
 import type { GeoRecord, GeoRecordSource, SensorLocation, SourceRecord } from '../../core/types.js';
 import { validateGeoRecordGeography } from '../../validation/geography.js';
 import { sourceRecordId, sourceVersionId } from '../../validation/record.js';
@@ -67,14 +72,11 @@ function geometryChanged(prevGeometry: string | null, currentGeometry: string | 
   if (prevGeometry === currentGeometry) return false;
   if (prevGeometry === null || currentGeometry === null) return true;
   try {
-    const p1 = JSON.parse(prevGeometry) as { type?: string; coordinates?: unknown };
-    const p2 = JSON.parse(currentGeometry) as { type?: string; coordinates?: unknown };
-    if (p1.type !== p2.type) return true;
-    if (Array.isArray(p1.coordinates) && Array.isArray(p2.coordinates)) {
-      const [lon1, lat1] = p1.coordinates as [number, number];
-      const [lon2, lat2] = p2.coordinates as [number, number];
-      return Math.abs(lon1 - lon2) > 1e-6 || Math.abs(lat1 - lat2) > 1e-6;
-    }
+    const p1 = pedestrianPointSchema.parse(JSON.parse(prevGeometry));
+    const p2 = pedestrianPointSchema.parse(JSON.parse(currentGeometry));
+    const [lon1, lat1] = p1.coordinates;
+    const [lon2, lat2] = p2.coordinates;
+    return Math.abs(lon1 - lon2) > 1e-6 || Math.abs(lat1 - lat2) > 1e-6;
   } catch {
     return true;
   }
@@ -86,38 +88,11 @@ function statusChanged(prevStatus: string | null, currentStatus: string | null):
   return norm(prevStatus) !== norm(currentStatus);
 }
 
-function coordsDiffer(lon1: number, lat1: number, lon2: number, lat2: number): boolean {
-  return Math.abs(lon1 - lon2) > 1e-5 || Math.abs(lat1 - lat2) > 1e-5;
-}
-
-export function isRelocationIndicated(note?: string | null, description?: string | null): boolean {
-  const text = `${note ?? ''} ${description ?? ''}`.toLowerCase();
-  if (!text.trim()) return false;
-  // If the note only indicates that traffic was handed off to another sensor ID (e.g. "relocated to sensor ID 25"),
-  // and does not describe physical relocation of this sensor to a new site/address or returning, do not treat as relocation.
-  if (/\brelocated\s+to\s+sensor\s*(id)?\s*\d+/i.test(text) && !/\b(move(d)?\s+(to|from)|relocat(ed|ion)?\s+(to\s+(?!sensor\b)|from|due|on)|returned\s+to)\b/i.test(text)) {
-    return false;
-  }
-  return /\b(relocat(ed|ion)?|move(d)?\s+(to|from)|move\s+(to|from)|former\s+sensor|returned\s+to|re-install(ed)?)\b/i.test(text);
-}
-
-export const CANONICAL_INSTALLATION_COORDINATES: Readonly<Record<string, readonly [number, number]>> = {
-  '3': [144.96429485, -37.81101524],
-  '14': [144.96291897, -37.82011242],
-  '52': [144.9652, -37.8134],
-  '10': [144.9600, -37.8100],
-  '25': [144.9660, -37.8190],
-  '42': [144.9620, -37.8050],
-  '37': [144.96650, -37.80480], // 174 Lygon St (original site)
-  '47': [144.96282, -37.81216], // 266 Elizabeth St / St Francis Church (original site)
-  '181': [144.9610, -37.8085], // 380 Elizabeth St (original site)
-};
-
 export interface PedestrianLocationsConnectorOptions {
   portalUrl?: string;
   client?: OpenDataSoftClient;
   previousLocations?: readonly SensorLocation[] | Iterable<SensorLocation> | Map<string, SensorLocation>;
-  baselineLocations?: readonly SensorLocation[] | Iterable<SensorLocation> | Map<string, SensorLocation>;
+  /** Legacy fixture option; every connector instance is now isolated. */
   isolated?: boolean;
 }
 
@@ -125,64 +100,17 @@ export class PedestrianLocationsConnector implements Connector {
   readonly sourceId = SOURCE_ID;
   private readonly portalUrl: string;
   private readonly client: OpenDataSoftClient;
-  private readonly isolated: boolean;
-  private readonly knownLocations = new Map<string, SensorLocation>();
-  private readonly historicalLocations: SensorLocation[] = [];
-  private readonly baselineCoordinates = new Map<string, [number, number]>();
-
-  private static readonly sharedKnownLocations = new Map<string, SensorLocation>();
-  private static readonly sharedHistoricalLocations: SensorLocation[] = [];
-
-  static resetSharedState(): void {
-    PedestrianLocationsConnector.sharedKnownLocations.clear();
-    PedestrianLocationsConnector.sharedHistoricalLocations.length = 0;
-  }
+  private readonly initialLocations: readonly SensorLocation[];
+  private knownLocations = new Map<string, SensorLocation>();
+  private historicalLocations: SensorLocation[] = [];
 
   constructor(options: PedestrianLocationsConnectorOptions = {}) {
     this.portalUrl = options.portalUrl ?? DEFAULT_PORTAL_URL;
     this.client = options.client ?? new OpenDataSoftClient();
-    this.isolated = options.isolated ?? false;
 
-    if (options.baselineLocations) {
-      const locs = options.baselineLocations instanceof Map
-        ? options.baselineLocations.values()
-        : options.baselineLocations;
-      for (const loc of locs) {
-        if (loc.geometry_geojson) {
-          try {
-            const parsed = JSON.parse(loc.geometry_geojson) as { type?: string; coordinates?: unknown };
-            if (Array.isArray(parsed.coordinates) && parsed.coordinates.length >= 2) {
-              const [lon, lat] = parsed.coordinates as [number, number];
-              if (Number.isFinite(lon) && Number.isFinite(lat)) {
-                this.baselineCoordinates.set(loc.sensor_id, [lon, lat]);
-              }
-            }
-          } catch {
-            // Not GeoJSON geometry
-          }
-        }
-      }
-    }
-
-    if (options.previousLocations) {
-      const locs = options.previousLocations instanceof Map
-        ? options.previousLocations.values()
-        : options.previousLocations;
-      for (const loc of locs) {
-        if (loc.valid_to === null) {
-          this.knownLocations.set(loc.sensor_id, loc);
-        } else {
-          this.historicalLocations.push(loc);
-        }
-      }
-    } else if (!this.isolated) {
-      for (const [k, v] of PedestrianLocationsConnector.sharedKnownLocations) {
-        this.knownLocations.set(k, v);
-      }
-      for (const h of PedestrianLocationsConnector.sharedHistoricalLocations) {
-        this.historicalLocations.push(h);
-      }
-    }
+    const previous = options.previousLocations instanceof Map
+      ? options.previousLocations.values() : options.previousLocations ?? [];
+    this.initialLocations = pedestrianLocationHistorySchema.parse(Array.from(previous));
   }
 
   getKnownLocations(): readonly SensorLocation[] {
@@ -201,29 +129,21 @@ export class PedestrianLocationsConnector implements Connector {
     if (input.sourceId !== SOURCE_ID) {
       return failure(input, 'validation_failed', `Expected source ID ${SOURCE_ID}, got ${input.sourceId}`);
     }
+    if (input.window.kind !== 'snapshot') {
+      return failure(input, 'validation_failed', 'Pedestrian locations require a complete snapshot');
+    }
 
-    if (input.checkpoint) {
+    let previousLocations = this.initialLocations;
+    if (input.checkpoint && /^[\s]*[\[{]/.test(input.checkpoint)) {
       try {
-        const parsed = JSON.parse(input.checkpoint);
-        const locs = Array.isArray(parsed)
-          ? parsed
-          : (parsed && typeof parsed === 'object' && Array.isArray(parsed.locations) ? parsed.locations : null);
-        if (locs) {
-          for (const loc of locs) {
-            if (loc && typeof loc === 'object' && typeof loc.sensor_id === 'string') {
-              const sensorLoc = loc as SensorLocation;
-              if (sensorLoc.valid_to === null) {
-                this.knownLocations.set(sensorLoc.sensor_id, sensorLoc);
-              } else {
-                this.historicalLocations.push(sensorLoc);
-              }
-            }
-          }
-        }
-      } catch {
-        // Not a JSON checkpoint
+        previousLocations = pedestrianLocationCheckpointSchema.parse(JSON.parse(input.checkpoint)).locations;
+      } catch (error) {
+        return failure(input, 'validation_failed', error instanceof Error ? error.message : 'Invalid published location history');
       }
     }
+    const knownLocations = new Map(previousLocations.filter(location => location.valid_to === null)
+      .map(location => [location.sensor_id, location]));
+    const historicalLocations = previousLocations.filter(location => location.valid_to !== null);
 
     try {
       const response = await this.client.fetchRecords({
@@ -241,14 +161,52 @@ export class PedestrianLocationsConnector implements Connector {
       }
 
       const sourceRecords: SourceRecord[] = [];
+      const closedSourceRecords: SourceRecord[] = [];
       const sensorLocations: SensorLocation[] = [];
       const closedLocations: SensorLocation[] = [];
       const geoRecords: GeoRecord[] = [];
       const geoRecordSources: GeoRecordSource[] = [];
       const seen = new Set<number>();
+      const rows = response.records.map(row => rowSchema.parse(row));
+      const snapshotRevision = sourceVersionId(sourceUpdatedAt,
+        [...rows].sort((a, b) => a.location_id - b.location_id));
+      z.iso.datetime({ offset: false }).parse(response.fetchedAt);
+      for (const previous of previousLocations) {
+        if (Date.parse(response.fetchedAt) < Date.parse(previous.fetched_at)) {
+          return failure(input, 'validation_failed', `Snapshot observation time precedes published history for sensor ${previous.sensor_id}`);
+        }
+        if (previous.source_updated_at !== null && (sourceUpdatedAt === null
+          || Date.parse(sourceUpdatedAt) < Date.parse(previous.source_updated_at))) {
+          return failure(input, 'validation_failed', `Snapshot source revision is missing or precedes published history for sensor ${previous.sensor_id}`);
+        }
+      }
 
-      for (const unknownRow of response.records) {
-        const row = rowSchema.parse(unknownRow);
+      const closeLocation = (previous: SensorLocation, validTo: string,
+        successorVersion: string | null, reason: string): void => {
+        const versionId = sourceVersionId(sourceUpdatedAt, {
+          kind: 'observed_location_interval_closure', previous_version_id: previous.version_id,
+          snapshot_revision: snapshotRevision, successor_version_id: successorVersion,
+          valid_from: previous.valid_from, valid_to: validTo,
+          geometry_geojson: previous.geometry_geojson, device_status: previous.device_status,
+        });
+        const closed: SensorLocation = { ...previous,
+          batch_id: input.runId, fetched_at: response.fetchedAt, version_id: versionId,
+          valid_to: validTo, source_updated_at: sourceUpdatedAt, source_version_ordinal: null,
+        };
+        closedLocations.push(closed);
+        historicalLocations.push(closed);
+        closedSourceRecords.push({
+          batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
+          fetched_at: response.fetchedAt, source_record_id: previous.source_record_id,
+          version_id: versionId, original_url: LANDING_URL, raw_uri: null,
+          published_at: null, observed_at: null, first_accessible_at: null,
+          time_missing_reason: reason, valid_from: previous.valid_from, valid_to: validTo,
+          source_updated_at: sourceUpdatedAt, source_version_ordinal: null,
+          record_status: 'corrected', assertion_kind: 'observation', rights_status: 'review_required',
+        });
+      };
+
+      for (const row of rows) {
 
         if (seen.has(row.location_id)) {
           return failure(input, 'validation_failed', `Duplicate location_id detected in snapshot: ${row.location_id}`);
@@ -279,23 +237,9 @@ export class PedestrianLocationsConnector implements Connector {
         const isRemoved = deviceStatus?.trim().toUpperCase() === 'R'
           || deviceStatus?.trim().toLowerCase() === 'removed';
 
-        const previousLocation = this.knownLocations.get(sensorId);
+        const previousLocation = knownLocations.get(sensorId);
         const isRelocated = previousLocation !== undefined && geometryChanged(previousLocation.geometry_geojson, geometry);
         const isStatusTransition = previousLocation !== undefined && statusChanged(previousLocation.device_status, deviceStatus);
-
-        // Check if coordinates differ from known initial installation coordinates on cold start
-        const canonicalCoords = this.baselineCoordinates.get(sensorId) ?? CANONICAL_INSTALLATION_COORDINATES[sensorId];
-        const hasBaselineEvidence = canonicalCoords !== undefined && hasPoint;
-        const canonicalDiffers = hasBaselineEvidence
-          && coordsDiffer(canonicalCoords[0], canonicalCoords[1], lon, lat);
-        const relocationDeclared = isRelocationIndicated(row.note, row.sensor_description);
-
-        // A sensor has relocated coordinates on cold start if:
-        // 1. Its coordinates differ from known initial installation coordinates (canonicalDiffers), OR
-        // 2. Its note/description explicitly indicates it was moved/relocated
-        //    (even if current coordinates match original baseline, e.g. returning to original site after moving).
-        const isColdStartRelocated = previousLocation === undefined
-          && (relocationDeclared || canonicalDiffers);
 
         // Effective dates:
         // Distinguish device installation date from coordinate valid interval.
@@ -304,63 +248,35 @@ export class PedestrianLocationsConnector implements Connector {
         // DO NOT backdate new coordinates to the original installation date,
         // and DO NOT claim fetch time is official move time.
         let validFrom: string;
-        let timeMissingReason: string | null = 'The location row has no per-row source update timestamp';
+        // Source-fact content must remain identical when the same version is replayed.
+        // The transition-specific explanation belongs to the new closure source fact.
+        const timeMissingReason = row.valid_from
+          ? 'Official valid_from defines the location interval; the row has no per-row publication or observation timestamp'
+          : 'The location interval starts at its earliest observed snapshot timestamp, not official relocation time or device installation date; prior history and any unobserved transition gap remain unknown';
 
         if (row.valid_from) {
-          const t = Date.parse(row.valid_from);
-          if (!Number.isFinite(t)) {
+          if (!z.iso.datetime({ offset: true }).safeParse(row.valid_from).success) {
             return failure(input, 'validation_failed', `Sensor ${row.location_id} has invalid valid_from timestamp: ${row.valid_from}`);
           }
-          validFrom = new Date(t).toISOString();
-          timeMissingReason = null;
+          validFrom = new Date(row.valid_from).toISOString();
         } else if (isRelocated || isStatusTransition) {
           validFrom = response.fetchedAt;
-          timeMissingReason = isRelocated
-            ? 'Relocation detected across versions without official relocation date; valid_from reflects earliest observed snapshot timestamp, not official relocation time'
-            : 'Status transition detected across versions without official change date; valid_from reflects earliest observed snapshot timestamp';
-        } else if (isColdStartRelocated) {
-          validFrom = response.fetchedAt;
-          timeMissingReason = 'Relocation detected on cold start without official migration date; valid_from reflects earliest observed snapshot timestamp, not official relocation time or device installation date';
         } else if (previousLocation) {
           validFrom = previousLocation.valid_from;
         } else {
           validFrom = response.fetchedAt;
-          timeMissingReason = 'Current coordinates first observed in this snapshot; installation date and matching baseline coordinates do not establish the historical coordinate interval';
         }
 
         let validTo: string | null = null;
         if (row.valid_to) {
-          const t = Date.parse(row.valid_to);
-          if (!Number.isFinite(t)) {
+          if (!z.iso.datetime({ offset: true }).safeParse(row.valid_to).success) {
             return failure(input, 'validation_failed', `Sensor ${row.location_id} has invalid valid_to timestamp: ${row.valid_to}`);
           }
-          validTo = new Date(t).toISOString();
+          validTo = new Date(row.valid_to).toISOString();
         }
 
         if (validTo !== null && Date.parse(validTo) < Date.parse(validFrom)) {
           return failure(input, 'validation_failed', `valid_to precedes valid_from for sensor ${row.location_id}`);
-        }
-
-        // Close previous location interval accurately
-        if (previousLocation && (isRelocated || isStatusTransition)) {
-          if (row.valid_from) {
-            (previousLocation as { valid_to: string | null }).valid_to = validFrom;
-          } else {
-            const prevEnd = previousLocation.source_updated_at ?? previousLocation.fetched_at;
-            const prevEndMs = Date.parse(prevEnd);
-            const prevFromMs = Date.parse(previousLocation.valid_from);
-            (previousLocation as { valid_to: string | null }).valid_to =
-              prevEndMs >= prevFromMs ? prevEnd : previousLocation.valid_from;
-          }
-          const closedLocation: SensorLocation = {
-            ...previousLocation,
-            batch_id: input.runId,
-          };
-          closedLocations.push(closedLocation);
-          this.historicalLocations.push(closedLocation);
-          if (!this.isolated) {
-            PedestrianLocationsConnector.sharedHistoricalLocations.push(closedLocation);
-          }
         }
 
         const recordId = sourceRecordId({
@@ -370,9 +286,19 @@ export class PedestrianLocationsConnector implements Connector {
           sourceTime: null,
         });
 
-        // Version ID captures source revision time and canonical row content.
-        // If a sensor moves to new coordinates or properties change, a new version ID is produced.
-        const versionId = sourceVersionId(sourceUpdatedAt, row);
+        // The observed interval is persisted evidence, not a provider relocation date.
+        const versionId = sourceVersionId(sourceUpdatedAt, { row, valid_from: validFrom, valid_to: validTo });
+        if (previousLocation && (isRelocated || isStatusTransition)) {
+          if (Date.parse(validFrom) <= Date.parse(previousLocation.valid_from)) {
+            return failure(input, 'validation_failed', `Changed sensor ${sensorId} needs a later location interval or explicit correction review`);
+          }
+          const lastConfirmed = Date.parse(previousLocation.fetched_at) >= Date.parse(previousLocation.valid_from)
+            ? previousLocation.fetched_at : previousLocation.valid_from;
+          closeLocation(previousLocation, row.valid_from ? validFrom : lastConfirmed,
+            versionId, row.valid_from
+              ? 'Previous location interval closed by the successor row official valid_from'
+              : 'Location or status changed without an official change date; previous interval ends at its last confirmed snapshot and the transition gap remains unknown');
+        }
 
         sourceRecords.push({
           batch_id: input.runId,
@@ -413,9 +339,10 @@ export class PedestrianLocationsConnector implements Connector {
         };
 
         sensorLocations.push(currentLocation);
-        this.knownLocations.set(sensorId, currentLocation);
-        if (!this.isolated) {
-          PedestrianLocationsConnector.sharedKnownLocations.set(sensorId, currentLocation);
+        if (validTo === null) knownLocations.set(sensorId, currentLocation);
+        else {
+          knownLocations.delete(sensorId);
+          historicalLocations.push(currentLocation);
         }
 
         const geoRecord: GeoRecord = {
@@ -473,16 +400,30 @@ export class PedestrianLocationsConnector implements Connector {
         });
       }
 
-      const checkpointAfter = input.window.kind === 'time'
-        ? input.window.to
-        : (input.window.revision === 'latest' ? (sourceUpdatedAt ?? response.fetchedAt) : input.window.revision);
+      for (const previous of previousLocations) {
+        if (previous.valid_to !== null || seen.has(Number(previous.sensor_id))) continue;
+        const lastConfirmed = Date.parse(previous.fetched_at) >= Date.parse(previous.valid_from)
+          ? previous.fetched_at : previous.valid_from;
+        closeLocation(previous, lastConfirmed, null,
+          'Sensor is absent from a complete successor snapshot; last confirmed location ends at its previous observed snapshot, with no inferred removal time or status');
+        knownLocations.delete(previous.sensor_id);
+      }
+
+      // Exposed state is only the last successful result, never an input to a later run.
+      this.knownLocations = knownLocations;
+      this.historicalLocations = historicalLocations;
+
+      const checkpointAfter = input.window.revision === 'latest'
+        ? (sourceUpdatedAt ?? response.fetchedAt) : input.window.revision;
 
       return {
         kind: 'success',
         sourceId: SOURCE_ID,
         runId: input.runId,
         fetchedAt: response.fetchedAt,
-        sourceRevision: sourceUpdatedAt ?? response.fetchedAt,
+        // This is an acquisition identity, not an upstream revision timestamp.
+        // A later unchanged check must persist its new location confirmation.
+        sourceRevision: `observation-snapshot:${response.fetchedAt}:${snapshotRevision}`,
         sourceLatestUpdateAt: sourceUpdatedAt,
         checkpointAfter,
         completeness: {
@@ -495,9 +436,9 @@ export class PedestrianLocationsConnector implements Connector {
           evidence: 'All OpenDataSoft pages match total_count',
         },
         inputCount: response.records.length,
-        outputCount: sourceRecords.length,
+        outputCount: sourceRecords.length + closedSourceRecords.length,
         rejectedCount: 0,
-        sourceRecords,
+        sourceRecords: [...sourceRecords, ...closedSourceRecords],
         geoRecords,
         geoRecordSources,
         boundaries: [],

@@ -55,6 +55,24 @@ The script explicitly enables Cloud Run, Cloud Scheduler, Cloud Storage, BigQuer
 
 `melens_query` views must be authorized against `melens_ingest` when created; granting the query identity raw-table access would bypass the view boundary. The view authorization and job-specific Scheduler binding happen with the SQL view and deployment tasks. The query service must also enforce read-only SQL, table allowlists, dry runs, result limits, timeouts, and `maximumBytesBilled`.
 
+## Source job deployment
+
+Use `source-identities.py` to provision and read back a dedicated identity before
+setting that source's `service_account_email`, verified flag and `enabled` flag.
+The current identity installer accepts the six admitted public sources; secret
+sources need their own reviewed per-secret provisioning extension. The shared
+warehouse grants ingestion writers access to all ingestion rows, while bucket
+objects are restricted to each source's paths. See [identity verification](../docs/validation/source-runtime-identities.md).
+
+`deploy.sh` requires an immutable image, complete source admission, request and
+query ceilings, actual budget readback, and a fresh identity readback. Sources
+with no declared monitoring interval get manual snapshot jobs; monitored snapshot
+sources get their reviewed daily check. The default creates schedules paused.
+Refresh the budget response allowlist and complete one real execution under each
+identity before resuming the selected schedules. `--start-schedules` is available
+for an already reviewed activation. Future P0 transport and pedestrian jobs must
+pass their independent admission and publication gates.
+
 ## Staging orphan cleanup
 
 The source deployment gates in `deploy.sh` do not block the independent retention cleanup. Build and push the same image used for ingestion, record its immutable digest, then inspect the cleanup plan:

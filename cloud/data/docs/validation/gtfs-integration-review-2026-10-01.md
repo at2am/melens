@@ -1,5 +1,7 @@
 # GTFS integration review, 2026-10-01
 
+Update: the later [GTFS runtime integration](gtfs-runtime-2026-10-01.md) adds a production caller and verifies per-mode complete-snapshot membership with real GoogleSQL. The engineering findings below describe the earlier review. Actual provider version evidence, source admission and live joint acceptance remain separate gates.
+
 This review covers the root-owned alert matcher and the remaining T066/T069 integration gates. Transport Victoria connector files and fixtures are assigned to Gemini and were read without edits. No credentials, live response bodies, or cloud resources were accessed or changed by this review.
 
 ## Verified behavior and correction

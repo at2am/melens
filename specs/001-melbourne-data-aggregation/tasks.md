@@ -144,11 +144,13 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 
 - [ ] T069 对 UC-04／UC-05 的 P0 数据前置链路单独验收：行人分钟/历史计数与位置版本、非计划道路中断、GTFS 静态站点与实时警报可分别按来源时间和地理证据查询，缺口不补零；此项只证明本 feature 的数据前置条件，项目 P0 产品端到端由对应 UC 验收，于 `cloud/data/test/integration/p0-pedestrian-transport.test.ts`。
 
-**T069 本地进度**：离线集成测试已覆盖行人分钟/小时与位置迁移、缺测不补零、道路父子影响和 GTFS 警报定位失败关闭（3 项通过）。用户已将 Key 加入 Secret Manager；T031/T063 私有云端实测已成功，但道路时间、GTFS 更正版本、T066 生产关联及 BigQuery 开发集联合查询尚缺，故保留未完成。
-- [ ] T070 将**选定的**已实现且许可通过的来源按各自 cadence 增量部署到 Cloud Run Jobs，建立 Cloud Scheduler 调度和 Secret Manager **引用**；脚本可先只发布 P0／首期 A 级来源，后续再发布 B 级，仅集成人员执行项目级变更，于 `cloud/data/infra/deploy.sh`。
+**T069 本地进度**：离线集成测试已覆盖行人分钟/小时与位置迁移、缺测不补零、道路父子影响和 GTFS 警报定位失败关闭（3 项通过）。用户已将 Key 加入 Secret Manager；T031/T063 私有云端实测已成功。位置历史已从已发布 BigQuery 恢复，并产生不可变闭合事实；GTFS 已接通静态引用读取与每模式完整快照成员。行人缺口／停用／冲突与 GTFS 空快照的生产 SQL 已通过真实 BigQuery 检查。仍缺道路时间依据、实际 P0 来源准入／重复发布、可证明的静态同版关联及开发集联合查询，故保留未完成。
+- [X] T070 将**选定的**已实现且许可通过的来源按各自 cadence 增量部署到 Cloud Run Jobs，建立 Cloud Scheduler 调度和 Secret Manager **引用**；脚本可先只发布 P0／首期 A 级来源，后续再发布 B 级，仅集成人员执行项目级变更，于 `cloud/data/infra/deploy.sh`。
+
+**T070 开发环境进度（2026-10-01）**：六个选定且已准入来源均已完成独立 Cloud Run Job 的真实执行验证，配有专用身份、请求及查询上限；两个每日快照检查调度已启用，预算暂停允许列表已接入。开发项目已通过实际 Scheduler 触发；租金完整历史发布 58,618 条记录，首次自然调度仍待下一次 01:20 UTC 观察。T070 的本波选定来源部署已完成。逐来源运行和调度记录见 `cloud/data/docs/validation/source-deployment-2026-10-01.md`。本波不激活仍为 candidate 的 P0 来源，不代表 ≥10 来源、八类覆盖或首期产品发布。
 - [ ] T071 [P] 定义每来源调度、重叠窗口、回补策略和成本上限；不定期动态来源接入前声明 `check_interval_seconds`，生产部署前填写每来源每日请求上限、BigQuery 单次计费字节上限和项目月度预算数值及 50%/80%/100% 告警，达到上限按 [quality-rules.md](quality-rules.md#6-抽样与运行准入) 停止相应任务；行人最近一小时 15 分钟重取、道路约 60 秒、季度/静态来源按发布版本，避免分钟级 load job 滥用，配置于 `cloud/data/infra/schedules.json`。
 
-**T071 预算进度（2026-10-01）**：项目月度 AUD 100、50%/80%/100% 当期支出告警已读回，默认账单 IAM 收件人启用。私有 Cloud Run、认证 Pub/Sub push 与专用 IAM 已部署；普通账单通知已自然投递，Pacific 月界修复后真实阈值烟雾测试暂停临时调度，重复消息暂停零项，临时资源已清理、生产允许列表归零。GCS 并发锁／每日及执行请求限额、BigQuery 单次扫描上限均已云端验证，四个全局 enforcement 标志为 true。来源专属身份和剩余来源成本参数尚缺，T071 保持未完成；预算通知不构成硬性停费。证据见 `cloud/data/docs/validation/budget-response.md` 和 `cloud-guards.md`。
+**T071 预算进度（2026-10-01）**：项目月度 AUD 100、50%/80%/100% 当期支出告警已读回，默认账单 IAM 收件人启用。私有 Cloud Run、认证 Pub/Sub push 与专用 IAM 已部署；普通账单通知已自然投递，Pacific 月界修复后真实阈值烟雾测试暂停临时调度，重复消息暂停零项，临时资源已清理。本轮六个已准入来源的专属身份、对象权限与作业绑定已实际读回；预算暂停允许列表已刷新为两个每日来源调度。GCS 并发锁／每日及执行请求限额、BigQuery 单次扫描上限均已云端验证，四个全局 enforcement 标志为 true。真实重放中验证查询超过 100/150 MB 后被拒绝，完整历史租金已成功，六个选定来源的单次查询上限现统一为 500 MB，以适应共享校验表增长；租金与 Census 的作业时限为 1,800 秒。剩余 P0 来源的身份、成本参数与分钟级查询总成本仍待完成，T071 保持未完成；预算通知不构成硬性停费。证据见 `cloud/data/docs/validation/budget-response.md`、`cloud-guards.md` 和 `source-deployment-2026-10-01.md`。
 - [X] T072 [P] 按 [quality-rules.md](quality-rules.md#4-时间新鲜度与查询空结果) 的最近成功检查与两倍检查预算，计算最近检查、最近成功、上游最新时间、失败码、数据缺口及 `current`/`late`/`stale`/`unknown`；上游明确无变化不因旧记录时间被误报为抓取失败，不把同步失败写成“无记录”，于 `cloud/data/src/core/health.ts`。
 - [X] T073 创建 `v_source_health`、`v_source_coverage` 与来源异常延迟查询，使空结果仍可按覆盖与健康区分没有匹配、未覆盖及来源故障；生产查询身份仅能访问已批准的 `melens_query` 视图，不能访问原始对象或秘密，于 `cloud/data/sql/008_health_views.sql`。
 - [X] T074 [P] 验证失败来源、恢复后重放、延迟/过期状态、健康来源无匹配、地区未覆盖及至少一次调度下的逻辑去重；空记录不得单独当作“无事件”，于 `cloud/data/test/integration/source-health.test.ts`。
@@ -206,3 +208,6 @@ flowchart LR
 
 
 **2026-10-01 Gemini 交付整合**：GM-01 至 GM-26 的 26 组分支及返工已纳入，接收版本、补修与门槛见 `cloud/data/docs/validation/gemini-merge-review-2026-10-01.md`。小时行人采集已读取已发布历史，发布器按 sensor-hour 检查跨版本修订依据；冷启动位置不再追溯安装日，道路 offsetless 时间保持未知，新闻盲审材料单独交付。来源准入、位置历史持久化、GTFS 关联、停车规则闭环和运行验收仍待完成。本批 GM 子任务是原 T 任务的细分交付，任务总数仍为 77，已完成仍为 61，不据候选代码合并关闭真实验收任务。
+
+
+**2026-10-01 本轮部署完成**：T070 对六个选定已准入来源已完成，当前任务总数 77、已完成 62、剩余 15。首次租金自然调度、P0 候选来源部署、分钟级来源成本和联合发布验收仍单独记录，不计为首期产品已发布。

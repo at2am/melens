@@ -42,6 +42,8 @@ export interface StaticGtfsVersion {
   /** Both values must describe the same downloaded GTFS archive. */
   snapshot: GtfsStaticSnapshot;
   normalized: NormalizedGtfsResult;
+  /** Runtime references require a publisher archive relationship for this mode. */
+  publisherMode?: AlertMode;
 }
 
 export type GtfsMappingStatus =
@@ -104,6 +106,8 @@ function publisherFeedVersion(staticFeed: PreparedStatic): string | null {
 }
 
 function versionMatches(alert: AlertSummary, staticFeed: PreparedStatic): boolean {
+  if (staticFeed.version.publisherMode !== undefined
+    && staticFeed.version.publisherMode !== alert.mode) return false;
   if (alert.feed_version === null || alert.feed_timestamp === null
     || alert.feed_version !== publisherFeedVersion(staticFeed)) return false;
   const timestamp = Date.parse(alert.feed_timestamp);

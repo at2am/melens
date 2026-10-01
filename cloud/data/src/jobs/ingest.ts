@@ -10,6 +10,8 @@ import { loadConfig } from '../core/config.js';
 import { GcsStore } from '../core/gcs.js';
 import { BigQueryPublisher } from '../core/publisher.js';
 import { withPublishedPedestrianHistory } from '../core/pedestrian-history.js';
+import { withPublishedPedestrianLocationHistory } from '../core/pedestrian-location-history.js';
+import { withPublishedGtfsLocations } from '../core/gtfs-runtime.js';
 import { loadConnector, loadSourceRegistry } from '../core/registry.js';
 import type { CsaSuccess } from '../connectors/csa_recorded_offences/index.js';
 import { normalizeCsaStatistics } from '../normalization/area-indicators.js';
@@ -93,8 +95,9 @@ export async function ingest(args: readonly string[],
   const runId = `run_${createHash('sha256').update(`${source.source_id}\n${JSON.stringify(window)}`)
     .digest('hex').slice(0, 40)}`;
   const bigquery = new BigQuery({ projectId: config.projectId });
-  const input = await withPublishedPedestrianHistory(
+  const countInput = await withPublishedPedestrianHistory(
     parseConnectorInput({ sourceId: source.source_id, window, checkpoint, runId }), config, bigquery);
+  const input = await withPublishedPedestrianLocationHistory(countInput, config, bigquery);
   const connector = await loadConnector(entry);
   // Only source collection consumes the upstream request quota. Google Cloud
   // publication and checkpoint calls are not upstream source requests.
@@ -111,10 +114,11 @@ export async function ingest(args: readonly string[],
   // exact source geography is documented; never attach a current LGA by guess.
   const normalized = source.source_id === 'victoria.csa.recorded_offences'
     ? normalizeCsaStatistics(result as CsaSuccess) : null;
-  const publishable = normalized === null ? result : {
+  const normalizedResult = normalized === null ? result : {
     ...result, areaIndicators: normalized.indicators,
     outputCount: result.outputCount + normalized.indicators.length,
   };
+  const publishable = await withPublishedGtfsLocations(normalizedResult, config, bigquery);
   const batch = await publisher.publish({ source, result: publishable,
     windowFrom: window.kind === 'time' ? window.from : null,
     windowTo: window.kind === 'time' ? window.to : null,

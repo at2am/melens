@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { beforeEach, test } from 'node:test';
+import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -10,9 +10,6 @@ import {
   parsePedestrianLocationRow,
 } from '../../src/connectors/com_pedestrian_locations/index.js';
 
-beforeEach(() => {
-  PedestrianLocationsConnector.resetSharedState();
-});
 import { parseConnectorInput } from '../../src/core/connector.js';
 import { HttpClient, HttpFailure } from '../../src/core/http.js';
 import { z } from 'zod';
@@ -201,7 +198,7 @@ test('relocation of a sensor generates a distinct version_id and joins historica
     }
   }
 
-  const connector2 = new PedestrianLocationsConnector({ client: new SecondSnapshotClient() });
+  const connector2 = new PedestrianLocationsConnector({ client: new SecondSnapshotClient(), previousLocations: result1.sensorLocations });
   const result2 = await connector2.collect(defaultInput);
   assert.equal(result2.kind, 'success');
   if (result2.kind !== 'success') return;
@@ -235,16 +232,20 @@ test('relocation of a sensor generates a distinct version_id and joins historica
     source_record_id: 'obs:2',
   };
 
-  // locV1 valid_to was automatically set by the connector when superseded by locV2
-  assert.equal(locV1.valid_to, '2026-09-15T00:00:00.000Z');
+  // The original result stays immutable; a distinct closure version supplies history.
+  assert.equal(locV1.valid_to, null);
+  const closedV1 = result2.sensorLocations.find(location => location.valid_to !== null);
+  assert.ok(closedV1);
+  assert.equal(closedV1.valid_to, '2026-09-15T00:00:00.000Z');
+  assert.notEqual(closedV1.version_id, locV1.version_id);
 
   const joined = joinPedestrianObservations({
     observations: [obsBefore, obsAfter],
-    locations: [locV1, locV2],
+    locations: [closedV1, locV2],
     granularity: 'minute',
   });
 
-  assert.equal(joined[0]?.location?.version_id, locV1.version_id);
+  assert.equal(joined[0]?.location?.version_id, closedV1.version_id);
   assert.equal(joined[1]?.location?.version_id, locV2.version_id);
   assert.equal(joined[0]?.locationStatus, 'located');
   assert.equal(joined[1]?.locationStatus, 'located');
@@ -433,7 +434,7 @@ test('sensor relocation across multiple snapshots preserves stable sensor_id and
     }
   }
 
-  const connector2 = new PedestrianLocationsConnector({ client: new Stage2Client() });
+  const connector2 = new PedestrianLocationsConnector({ client: new Stage2Client(), previousLocations: result1.sensorLocations });
   const result2 = await connector2.collect(defaultInput);
   assert.equal(result2.kind, 'success');
   if (result2.kind !== 'success') return;
@@ -465,7 +466,7 @@ test('sensor relocation across multiple snapshots preserves stable sensor_id and
     }
   }
 
-  const connector3 = new PedestrianLocationsConnector({ client: new Stage3Client() });
+  const connector3 = new PedestrianLocationsConnector({ client: new Stage3Client(), previousLocations: result2.sensorLocations });
   const result3 = await connector3.collect(defaultInput);
   assert.equal(result3.kind, 'success');
   if (result3.kind !== 'success') return;
@@ -491,13 +492,15 @@ test('sensor relocation across multiple snapshots preserves stable sensor_id and
   // Verify lifecycle valid intervals:
   // Stage 1 begins at the first observed snapshot
   assert.equal(loc1.valid_from, '2026-01-01T00:00:00.000Z');
-  assert.equal(loc1.valid_to, '2026-01-01T00:00:00.000Z');
+  assert.equal(loc1.valid_to, null);
+  assert.equal(result2.sensorLocations.find(location => location.valid_to !== null)?.valid_to, '2026-01-01T00:00:00.000Z');
 
   // Stage 2 (relocation without official date) is valid from Stage 2 snapshot observation time,
   // NOT backdated to 2020-01-15!
   assert.notEqual(loc2.valid_from, '2020-01-15T00:00:00.000Z');
   assert.equal(loc2.valid_from, '2026-05-01T00:00:00.000Z');
-  assert.equal(loc2.valid_to, '2026-05-01T00:00:00.000Z');
+  assert.equal(loc2.valid_to, null);
+  assert.equal(result3.sensorLocations.find(location => location.valid_to !== null)?.valid_to, '2026-05-01T00:00:00.000Z');
 
   // Stage 3 (decommissioned/removed) is valid from Stage 3 snapshot observation time
   assert.equal(loc3.valid_from, '2026-09-01T00:00:00.000Z');
@@ -572,12 +575,16 @@ test('relocation across versions preserves first observation for initial locatio
   assert.equal(locV2.valid_from, '2026-05-01T00:00:00.000Z');
   assert.equal(locV2.valid_to, null);
 
-  // 3. Previous location valid_to was closed at the last snapshot it was observed (2026-01-01)
-  assert.equal(locV1.valid_to, '2026-01-01T00:00:00.000Z');
+  // 3. A new immutable closure records the last confirmed snapshot.
+  assert.equal(locV1.valid_to, null);
+  const closedV1 = result2.sensorLocations.find(location => location.valid_to !== null);
+  assert.ok(closedV1);
+  assert.equal(closedV1.valid_to, '2026-01-01T00:00:00.000Z');
+  assert.notEqual(closedV1.version_id, locV1.version_id);
 
   // Verify time_missing_reason explains snapshot boundary
   const srcV2 = result2.sourceRecords[0]!;
-  assert.match(srcV2.time_missing_reason ?? '', /Relocation detected across versions/);
+  assert.match(srcV2.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 
   // Downstream verification with joinPedestrianObservations
   const obsHistorical: PedestrianObservation = {
@@ -612,7 +619,7 @@ test('relocation across versions preserves first observation for initial locatio
   // - After move joins locV2
   const joinedBoth = joinPedestrianObservations({
     observations: [obsHistorical, obsInGap, obsAfterMove],
-    locations: [locV1, locV2],
+    locations: [closedV1, locV2],
     granularity: 'minute',
   });
 
@@ -677,7 +684,7 @@ test('relocation notes with natural language dates do not invent effective dates
   // valid_to must remain null, NOT invented from note!
   assert.equal(loc.valid_to, null);
   assert.equal(loc.device_status, 'A');
-  assert.match(result.sourceRecords[0]?.time_missing_reason ?? '', /Relocation detected on cold start/);
+  assert.match(result.sourceRecords[0]?.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 });
 
 test('coordinate parsing: extracts coordinates from location object or top-level fields', async () => {
@@ -883,7 +890,7 @@ test('handles OdsIncompleteWindow and unparseable lastModified header gracefully
   assert.equal(result2.kind, 'success');
   if (result2.kind === 'success') {
     assert.equal(result2.sourceLatestUpdateAt, null);
-    assert.equal(result2.sourceRevision, '2026-09-29T10:00:00.000Z');
+    assert.match(result2.sourceRevision ?? '', /^observation-snapshot:2026-09-29T10:00:00\.000Z:[a-f0-9]{64}$/);
   }
 });
 
@@ -931,7 +938,7 @@ test('fresh instance without injected history (cold start) where coordinates cha
   assert.equal(loc.valid_to, null);
 
   const src = result.sourceRecords[0]!;
-  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+  assert.match(src.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 });
 
 test('when migration is detected with historical evidence, result.sensorLocations includes both current and closed records (G08)', async () => {
@@ -1236,7 +1243,7 @@ test('cold start ingestion of real-shape moved sensors (Sensors 37 & 47) fixes b
   assert.ok(loc37.geometry_geojson?.includes('144.96704554'));
 
   const src37 = result.sourceRecords.find(s => s.source_record_id.endsWith(':37'))!;
-  assert.match(src37.time_missing_reason ?? '', /Relocation detected on cold start without official migration date/);
+  assert.match(src37.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 
   // Sensor 47:
   // Must NOT backdate 250 Elizabeth St coordinates to original install date (2017-08-24)
@@ -1246,7 +1253,7 @@ test('cold start ingestion of real-shape moved sensors (Sensors 37 & 47) fixes b
   assert.ok(loc47.geometry_geojson?.includes('144.9625775'));
 
   const src47 = result.sourceRecords.find(s => s.source_record_id.endsWith(':47'))!;
-  assert.match(src47.time_missing_reason ?? '', /Relocation detected on cold start without official migration date/);
+  assert.match(src47.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 
   // Downstream join testing: historical observations before cold start snapshot remain unlocated
   const histObs37: PedestrianObservation = {
@@ -1326,7 +1333,7 @@ test('cold start scenario 1: unlisted sensor 999 with relocation note uses fetch
   assert.equal(loc.valid_to, null);
 
   const src = result.sourceRecords[0]!;
-  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+  assert.match(src.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 
   // Joining historical observations prior to fetchedAt must leave them unlocated
   const histObs: PedestrianObservation = {
@@ -1467,7 +1474,7 @@ test('cold start scenario 3: sensor 777 with general relocation phrasing trigger
   assert.equal(loc.valid_to, null);
 
   const src = result.sourceRecords[0]!;
-  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+  assert.match(src.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 });
 
 test('cold start scenario 4: sensor 52 returning to original installation coordinates does not backdate (GM-08 R03)', async () => {
@@ -1516,7 +1523,7 @@ test('cold start scenario 4: sensor 52 returning to original installation coordi
   assert.equal(loc.valid_to, null);
 
   const src = result.sourceRecords[0]!;
-  assert.match(src.time_missing_reason ?? '', /Relocation detected on cold start/);
+  assert.match(src.time_missing_reason ?? '', /earliest observed snapshot timestamp, not official relocation time/);
 
   // Observation from intermediate period (e.g. 2021) cannot be placed at original site
   const intermObs: PedestrianObservation = {
@@ -1583,7 +1590,7 @@ test('default collection does not backdate coordinates when a known baseline hap
   assert.equal(requests, 1);
   for (const location of result.sensorLocations) {
     assert.equal(location.valid_from, result.fetchedAt);
-    assert.match(result.sourceRecords.find(record => record.source_record_id === location.source_record_id)?.time_missing_reason ?? '', /first observed in this snapshot/);
+    assert.match(result.sourceRecords.find(record => record.source_record_id === location.source_record_id)?.time_missing_reason ?? '', /earliest observed snapshot timestamp/);
     const observation: PedestrianObservation = {
       batch_id: 'historical-reading', source_id: 'melbourne.pedestrian.minute', schema_version: 1,
       fetched_at: '2020-01-01T00:00:00Z', sensor_id: location.sensor_id,

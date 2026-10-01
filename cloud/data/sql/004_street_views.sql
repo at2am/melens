@@ -41,15 +41,46 @@ locations AS (
   FROM `melens_ingest.sensor_locations` AS l
   JOIN batches AS b USING (batch_id, source_id)
   JOIN sources AS s USING (source_id)
+  JOIN `melens_ingest.source_records` r
+    ON r.batch_id = l.batch_id AND r.source_id = l.source_id
+   AND r.source_record_id = l.source_record_id AND r.version_id = l.version_id
   WHERE b.state = 'published' AND b.published_at IS NOT NULL
     AND s.license_status IN ('verified_open', 'restricted')
     AND s.access_status = 'active'
   QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY l.sensor_id, l.valid_from
-    ORDER BY l.source_updated_at DESC NULLS LAST,
-             l.source_version_ordinal DESC NULLS LAST,
-             l.version_id DESC
+    PARTITION BY l.source_id, l.sensor_id, l.valid_from
+    ORDER BY r.source_updated_at DESC NULLS LAST,
+             r.source_version_ordinal DESC NULLS LAST,
+             l.fetched_at DESC, IF(l.valid_to IS NULL, 1, 0),
+             b.published_at DESC, l.batch_id DESC
   ) = 1
+),
+classified_locations AS (
+  SELECT l.*, CASE
+    WHEN l.geometry_geojson IS NULL OR TRIM(l.geometry_geojson) = ''
+      OR SAFE.ST_GEOGFROMGEOJSON(l.geometry_geojson) IS NULL
+      OR LOWER(TRIM(l.device_status)) LIKE '%decommission%' THEN 'unlocated'
+    WHEN l.device_status IS NOT NULL
+      AND LOWER(TRIM(l.device_status)) NOT IN ('a', 'active') THEN 'inactive'
+    ELSE 'located'
+  END AS location_state
+  FROM locations l
+),
+matches AS (
+  SELECT o.*, l.source_id AS location_source_id,
+    l.valid_from AS location_valid_from, l.valid_to AS location_valid_to,
+    l.device_status, l.geometry_geojson AS location_geometry_geojson, l.location_state,
+    COUNT(DISTINCT IF(l.sensor_id IS NULL, NULL,
+      TO_JSON_STRING(STRUCT(l.geometry_geojson, l.location_state)))) OVER (
+        PARTITION BY o.source_id, o.sensor_id, o.observed_at) AS location_variants,
+    ROW_NUMBER() OVER (
+      PARTITION BY o.source_id, o.sensor_id, o.observed_at
+      ORDER BY l.valid_from DESC NULLS LAST, l.fetched_at DESC NULLS LAST,
+        l.source_updated_at DESC NULLS LAST, l.batch_id DESC NULLS LAST) AS chosen
+  FROM observations o
+  LEFT JOIN classified_locations l
+    ON o.sensor_id = l.sensor_id AND l.valid_from <= o.observed_at
+   AND (l.valid_to IS NULL OR o.observed_at < l.valid_to)
 )
 SELECT
   o.source_id,
@@ -62,13 +93,16 @@ SELECT
   o.record_granularity,
   o.fetched_at,
   o.last_success_at AS source_last_success_at,
-  l.source_id AS location_source_id,
-  l.valid_from AS location_valid_from,
-  l.valid_to AS location_valid_to,
-  l.device_status,
-  l.geometry_geojson,
-  SAFE.ST_GEOGFROMGEOJSON(l.geometry_geojson) AS geometry,
-  IF(l.sensor_id IS NULL, 'unlocated', 'located') AS location_status,
+  o.location_source_id,
+  o.location_valid_from,
+  o.location_valid_to,
+  o.device_status,
+  IF(o.location_variants = 1 AND o.location_state = 'located',
+    o.location_geometry_geojson, NULL) AS geometry_geojson,
+  IF(o.location_variants = 1 AND o.location_state = 'located',
+    SAFE.ST_GEOGFROMGEOJSON(o.location_geometry_geojson), NULL) AS geometry,
+  CASE WHEN o.location_variants > 1 THEN 'ambiguous'
+    ELSE COALESCE(o.location_state, 'unlocated') END AS location_status,
   CASE
     WHEN o.cadence_seconds IS NULL AND o.check_interval_seconds IS NULL
       THEN 'versioned'
@@ -81,15 +115,8 @@ SELECT
       THEN 'late'
     ELSE 'stale'
   END AS source_freshness_state
-FROM observations AS o
-LEFT JOIN locations AS l
-  ON o.sensor_id = l.sensor_id
- AND l.valid_from <= o.observed_at
- AND (l.valid_to IS NULL OR o.observed_at < l.valid_to)
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY o.source_id, o.sensor_id, o.observed_at
-  ORDER BY l.valid_from DESC NULLS LAST, l.version_id DESC NULLS LAST
-) = 1;
+FROM matches AS o
+WHERE chosen = 1;
 
 -- Generic street facts and road events use the already licensed, published
 -- core views. Lifecycle and freshness remain separate columns.

@@ -23,6 +23,8 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
     .replace('WITH ', '')
     .replaceAll('`melens_ingest.sync_batches`', 'synthetic_batches')
     .replaceAll('`melens_ingest.geo_records`', 'synthetic_geo')
+    .replaceAll('`melens_ingest.source_records`', 'synthetic_sources')
+    .replaceAll('`melens_ingest.geo_record_sources`', 'synthetic_links')
     .replaceAll('`melens_query.v_geo_records_history`', 'synthetic_history');
   const query = `WITH synthetic_batches AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id,
@@ -42,6 +44,15 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
       TIMESTAMP(JSON_VALUE(row, '$.source_updated_at')) AS source_updated_at,
       CAST(NULL AS INT64) AS source_version_ordinal
     FROM UNNEST(JSON_QUERY_ARRAY(@records)) AS row
+  ), synthetic_sources AS (
+    SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
+      CAST(NULL AS STRING) AS source_record_id, CAST(NULL AS STRING) AS version_id,
+      CAST(NULL AS TIMESTAMP) AS source_updated_at FROM UNNEST(ARRAY<BOOL>[])
+  ), synthetic_links AS (
+    SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
+      CAST(NULL AS STRING) AS source_record_id, CAST(NULL AS STRING) AS source_version_id,
+      CAST(NULL AS STRING) AS geo_record_id, CAST(NULL AS STRING) AS version_id,
+      CAST(NULL AS STRING) AS evidence_role FROM UNNEST(ARRAY<BOOL>[])
   ), synthetic_history AS (
     SELECT * FROM synthetic_geo WHERE batch_id != 'failed'
   ), ${view}`;
@@ -69,9 +80,15 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
   ];
   const bigquery = new BigQuery({ projectId: project });
   async function ids(inputBatches: typeof batches, inputRecords = records): Promise<string[]> {
-    const [rows] = await bigquery.query({ query, location: 'australia-southeast2',
+    let rows: unknown;
+    try {
+      const [queried] = await bigquery.query({ query, location: 'australia-southeast2',
       maximumBytesBilled: '100000000', useQueryCache: false,
       params: { batches: JSON.stringify(inputBatches), records: JSON.stringify(inputRecords) } });
+      rows = queried;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Cloud query failed');
+    }
     return z.array(z.object({ geo_record_id: z.string() })).parse(rows)
       .map(row => row.geo_record_id).sort();
   }

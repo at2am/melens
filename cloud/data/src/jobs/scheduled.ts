@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { loadConfig } from '../core/config.js';
 import { loadSourceRegistry } from '../core/registry.js';
 import { ingest } from './ingest.js';
-import { GcsScheduledRequestStore, withScheduledRequestGuard } from './scheduled-guard.js';
+import { GcsScheduledRequestStore, withScheduledIngestionGuard } from './scheduled-guard.js';
 
 const sourceId = z.string().regex(/^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/);
 const positiveSeconds = z.coerce.number().int().positive().max(31_536_000);
@@ -95,12 +95,11 @@ export async function scheduledRun(env: NodeJS.ProcessEnv = process.env, now = n
     throw new Error(`Scheduled BigQuery query ceiling is missing: ${config.sourceId}`);
   }
   const store = new GcsScheduledRequestStore(new Storage({ projectId: cloud.projectId }), cloud.bucketName);
-  const run = async (args: readonly string[]): Promise<void> => ingest(args,
-    work => withScheduledRequestGuard(store, {
+  const run = async (args: readonly string[]): Promise<void> => withScheduledIngestionGuard(store, {
       sourceId: config.sourceId,
       dailyCap: config.dailyRequestCap,
       executionCap: config.executionRequestCap,
-    }, work), env);
+    }, collect => ingest(args, collect, env));
   if (config.mode === 'time') {
     if (source.coverage_from === null) {
       throw new Error(`Time source requires a reviewed initial cursor: ${config.sourceId}`);

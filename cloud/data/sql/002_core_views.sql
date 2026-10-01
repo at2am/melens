@@ -120,19 +120,50 @@ current_development_snapshot AS (
   SELECT batch_id
   FROM development_snapshots
   WHERE snapshot_at = (SELECT MAX(snapshot_at) FROM development_snapshots)
+),
+gtfs_mode_snapshots AS (
+  -- The parent source fact exists even when a successful mode feed is empty.
+  -- Use provider time per mode; a failed refresh or late backfill cannot advance it.
+  SELECT DISTINCT r.batch_id, r.source_record_id, r.version_id, r.source_updated_at,
+    REGEXP_EXTRACT(r.source_record_id,
+      r'^victoria\.transport\.gtfs_realtime:feed:(metro_train|yarra_tram):') AS mode
+  FROM `melens_ingest.source_records` r
+  JOIN batch_states b ON r.batch_id = b.batch_id AND r.source_id = b.source_id
+  WHERE r.source_id = 'victoria.transport.gtfs_realtime'
+    AND b.state = 'published' AND b.published_at IS NOT NULL
+    AND r.source_updated_at IS NOT NULL
+),
+current_gtfs_mode_snapshots AS (
+  SELECT * FROM gtfs_mode_snapshots
+  WHERE mode IS NOT NULL
+  QUALIFY source_updated_at = MAX(source_updated_at) OVER (PARTITION BY mode)
+),
+current_gtfs_members AS (
+  SELECT DISTINCT l.geo_record_id, l.version_id
+  FROM `melens_ingest.geo_record_sources` l
+  JOIN current_gtfs_mode_snapshots snapshot ON l.batch_id = snapshot.batch_id
+    AND l.source_record_id = snapshot.source_record_id
+    AND l.source_version_id = snapshot.version_id
+  WHERE l.source_id = 'victoria.transport.gtfs_realtime'
+    AND l.evidence_role = 'parent_feed_snapshot'
 )
 SELECT g.*
 FROM `melens_query.v_geo_records_history` AS g
 -- Development is a complete, versioned snapshot. A project removed from its
 -- latest published snapshot remains in history but is no longer current.
 -- Snapshot disappearance does not assert that the project was cancelled.
-WHERE g.source_id != 'melbourne.development_monitor'
+WHERE (g.source_id != 'melbourne.development_monitor'
    OR EXISTS (
      SELECT 1 FROM `melens_ingest.geo_records` AS member
      JOIN current_development_snapshot AS snapshot USING (batch_id)
      WHERE member.source_id = g.source_id
        AND member.geo_record_id = g.geo_record_id
-   )
+   ))
+  -- FULL_DATASET disappearance removes current membership, preserving history.
+  -- A NO_SERVICE effect or an omitted alert does not invent a cancellation.
+  AND (g.source_id != 'victoria.transport.gtfs_realtime'
+    OR EXISTS (SELECT 1 FROM current_gtfs_members member
+      WHERE member.geo_record_id = g.geo_record_id AND member.version_id = g.version_id))
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY geo_record_id
   ORDER BY source_updated_at DESC NULLS LAST,

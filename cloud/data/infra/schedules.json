@@ -23,7 +23,7 @@
     {
       "source_id": "abs.asgs.boundaries",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": null,
       "check_interval_seconds": null,
@@ -33,18 +33,18 @@
       "snapshot_revision": "2026",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 100,
-      "maximum_bytes_billed": 100000000,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 40,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-abs-asgs-122d62c0ed@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "abs.census",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": null,
       "check_interval_seconds": null,
@@ -58,14 +58,14 @@
       "secret_names": [],
       "task_timeout_seconds": 1800,
       "max_requests_per_execution": 20,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-abs-cens-d664f01422@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 2048,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "melbourne.clue.blocks",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": null,
       "check_interval_seconds": null,
@@ -75,13 +75,13 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 100,
-      "maximum_bytes_billed": 100000000,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 10,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-melbourn-7e72d3fc7e@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "melbourne.clue.employment",
@@ -107,7 +107,7 @@
     {
       "source_id": "melbourne.development_monitor",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": 2592000,
       "check_interval_seconds": 86400,
@@ -117,13 +117,13 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 100,
-      "maximum_bytes_billed": 100000000,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 20,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-melbourn-5810e1679c@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "melbourne.microclimate",
@@ -149,7 +149,7 @@
     {
       "source_id": "melbourne.municipal_boundary",
       "priority": "A",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": null,
       "check_interval_seconds": null,
@@ -159,13 +159,13 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 10,
-      "maximum_bytes_billed": 100000000,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 2,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-melbourn-e79cca08f4@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "melbourne.offstreet_parks",
@@ -381,7 +381,7 @@
     {
       "source_id": "homes_victoria.rents",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "snapshot",
       "cadence_seconds": 7776000,
       "check_interval_seconds": 86400,
@@ -391,13 +391,13 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 10,
-      "maximum_bytes_billed": 100000000,
+      "maximum_bytes_billed": 500000000,
       "secret_names": [],
-      "task_timeout_seconds": 600,
+      "task_timeout_seconds": 1800,
       "max_requests_per_execution": 3,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-homes-vi-3e470a48b8@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "ticketmaster.events",

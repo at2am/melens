@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RequestCapReached, withScheduledRequestGuard,
+import { RequestCapReached, withScheduledRequestGuard, withScheduledIngestionGuard,
   type ScheduledRequestStore } from '../../src/jobs/scheduled-guard.js';
 import { parseScheduledJobConfig, scheduledRun, scheduledWindow } from '../../src/jobs/scheduled.js';
 
@@ -172,4 +172,52 @@ test('overlapping runs in one process are rejected before sending', async () => 
     executionCap: 1 }, async () => {}), /already running in this process/);
   release?.();
   await first;
+});
+
+test('scheduled lease covers history and publication while only provider collection consumes quota', async () => {
+  const store = new MemoryRequestStore();
+  const originalFetch = globalThis.fetch;
+  const sent: string[] = [];
+  globalThis.fetch = async input => { sent.push(String(input)); return new Response('ok'); };
+  const replacement = globalThis.fetch;
+  try {
+    await withScheduledIngestionGuard(store, {
+      sourceId: 'melbourne.pedestrian.locations', dailyCap: 1, executionCap: 1,
+    }, async collect => {
+      assert.equal(store.active, true);
+      await fetch('https://bigquery.googleapis.com/history');
+      await collect(() => fetch('https://data.melbourne.vic.gov.au/snapshot'));
+      assert.equal(globalThis.fetch, replacement);
+      assert.equal(store.active, true);
+      await assert.rejects(store.withSourceLease('melbourne.pedestrian.locations', async () => {}),
+        /lease already held/);
+      await fetch('https://bigquery.googleapis.com/publish');
+    }, () => new Date('2026-10-01T01:00:00Z'));
+    assert.equal(sent.length, 3);
+    assert.equal(store.counts.get('melbourne.pedestrian.locations/2026-10-01'), 1);
+    assert.equal(store.active, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publication failure releases the scheduled lease after restoring the provider request guard', async () => {
+  const store = new MemoryRequestStore();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('ok');
+  const replacement = globalThis.fetch;
+  try {
+    await assert.rejects(withScheduledIngestionGuard(store, {
+      sourceId: 'gdelt.news', dailyCap: 1, executionCap: 1,
+    }, async collect => {
+      await collect(() => fetch('https://example.org/provider'));
+      assert.equal(globalThis.fetch, replacement);
+      assert.equal(store.active, true);
+      throw new Error('publication failed');
+    }), /publication failed/);
+    assert.equal(store.active, false);
+    assert.equal(globalThis.fetch, replacement);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

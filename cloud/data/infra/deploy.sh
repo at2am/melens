@@ -13,17 +13,20 @@ bucket=""
 image=""
 confirmation=""
 apply=false
+start_schedules=false
 sources=()
 
 usage() {
   cat <<'EOF'
 Usage: deploy.sh --project PROJECT_ID --environment dev|prod --bucket BUCKET
                  [--source SOURCE_ID ...] [--image IMAGE@sha256:DIGEST]
-                 [--apply --confirm-project PROJECT_ID]
+                 [--apply --confirm-project PROJECT_ID] [--start-schedules]
 
 Default: print a deployment plan without calling GCP. --apply is blocked until
 the selected manifests are admitted and every budget, quota and runtime guard
 in schedules.json is reviewed. Only project integrators should apply changes.
+Schedulers are created paused unless --start-schedules is explicitly supplied.
+Refresh the budget response allowlist before starting new schedules.
 EOF
 }
 
@@ -41,6 +44,7 @@ while (($# > 0)); do
       esac
       shift 2 ;;
     --apply) apply=true; shift ;;
+    --start-schedules) start_schedules=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument" >&2; usage >&2; exit 2 ;;
   esac
@@ -53,6 +57,9 @@ for source in "${sources[@]}"; do
   [[ "$source" =~ ^[a-z][a-z0-9]*([._][a-z0-9]+)*$ ]] || { echo 'Invalid source ID' >&2; exit 2; }
 done
 command -v python3 >/dev/null || { echo 'Missing python3' >&2; exit 2; }
+[[ "$start_schedules" == false || "$apply" == true ]] || {
+  echo '--start-schedules requires --apply' >&2; exit 2;
+}
 
 if [[ "$apply" == true ]]; then
   [[ "$confirmation" == "$project" ]] || { echo '--confirm-project must match --project' >&2; exit 2; }
@@ -171,13 +178,12 @@ for source_id in selected:
                 or any(evidence.get(field) is None for field in required)
                 or not evidence.get('allowed_fields')):
             raise SystemExit(f'Source admission is incomplete: {source_id}')
-        if secrets:
-            account = entry.get('service_account_email')
-            if (not isinstance(account, str)
-                    or not re.fullmatch(r'[a-z][a-z0-9-]+@' + re.escape(project) + r'\.iam\.gserviceaccount\.com', account)
-                    or account == f'melens-{environment}-ingest@{project}.iam.gserviceaccount.com'
-                    or entry.get('dedicated_identity_permissions_verified') is not True):
-                raise SystemExit(f'Dedicated service identity required for secret source: {source_id}')
+        account = entry.get('service_account_email')
+        if (not isinstance(account, str)
+                or not re.fullmatch(r'[a-z][a-z0-9-]+@' + re.escape(project) + r'\.iam\.gserviceaccount\.com', account)
+                or account == f'melens-{environment}-ingest@{project}.iam.gserviceaccount.com'
+                or entry.get('dedicated_identity_permissions_verified') is not True):
+            raise SystemExit(f'Verified dedicated service identity required: {source_id}')
 
     safe = [source_id, cron or 'manual', mode, str(interval or 0), str(overlap or 0),
             revision or '-', str(entry.get('request_cap_per_day') or 0),
@@ -258,6 +264,10 @@ PY
 bq --project_id="$project" show "${project}:melens_ingest" >/dev/null
 gcloud storage buckets describe "gs://${bucket}" --project="$project" >/dev/null
 
+identity_args=(--project "$project" --environment "$environment" --bucket "$bucket" --verify-only)
+for source in "${sources[@]}"; do identity_args+=(--source "$source"); done
+python3 "${ROOT}/infra/source-identities.py" "${identity_args[@]}"
+
 readonly INGEST_ACCOUNT="melens-${environment}-ingest@${project}.iam.gserviceaccount.com"
 readonly SCHEDULER_ACCOUNT="melens-${environment}-scheduler@${project}.iam.gserviceaccount.com"
 gcloud iam service-accounts describe "$SCHEDULER_ACCOUNT" --project="$project" >/dev/null
@@ -317,5 +327,16 @@ while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes
       --uri="$uri" --http-method=POST \
       --oauth-service-account-email="$SCHEDULER_ACCOUNT" \
       --max-retry-attempts=0 --quiet
+    scheduler_state="$(gcloud scheduler jobs describe "$scheduler" --project="$project" \
+      --location="$SCHEDULER_LOCATION" --format='value(state)')"
+    if [[ "$start_schedules" == true && "$scheduler_state" == PAUSED ]]; then
+      gcloud scheduler jobs resume "$scheduler" --project="$project" \
+        --location="$SCHEDULER_LOCATION" --quiet
+    elif [[ "$start_schedules" != true && "$scheduler_state" == ENABLED ]]; then
+      gcloud scheduler jobs pause "$scheduler" --project="$project" \
+        --location="$SCHEDULER_LOCATION" --quiet
+    elif [[ "$scheduler_state" != ENABLED && "$scheduler_state" != PAUSED ]]; then
+      echo 'Scheduler is not in an activatable state' >&2; exit 1
+    fi
   fi
 done <"$rows"

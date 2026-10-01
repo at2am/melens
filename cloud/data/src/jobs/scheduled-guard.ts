@@ -116,11 +116,13 @@ export interface RequestGuardConfig {
 let activeInProcess = false;
 const ledgerTraffic = new AsyncLocalStorage<boolean>();
 
-/** Charge before every outbound fetch attempt, including retries and failed calls. */
-export async function withScheduledRequestGuard<T>(
+export type CollectionGuard = <T>(work: () => Promise<T>) => Promise<T>;
+
+/** Hold the source lease from persisted-history reads through publication. */
+export async function withScheduledIngestionGuard<T>(
   store: ScheduledRequestStore,
   config: RequestGuardConfig,
-  work: () => Promise<T>,
+  work: (collect: CollectionGuard) => Promise<T>,
   clock: () => Date = () => new Date(),
 ): Promise<T> {
   sourceId.parse(config.sourceId);
@@ -131,40 +133,53 @@ export async function withScheduledRequestGuard<T>(
   activeInProcess = true;
   try {
     return await store.withSourceLease(config.sourceId, async () => {
-      const originalFetch = globalThis.fetch;
-      let requests = 0;
-      let guardFailure: Error | null = null;
-      globalThis.fetch = async (input, init) => {
-        if (ledgerTraffic.getStore()) return originalFetch(input, init);
-        if (guardFailure) throw guardFailure;
-        if (requests >= config.executionCap) {
-          guardFailure = new RequestCapReached(`Execution request cap reached: ${config.sourceId}`);
-          throw guardFailure;
-        }
-        requests += 1;
-        const date = clock();
-        if (!Number.isFinite(date.getTime())) {
-          guardFailure = new Error('Invalid request clock');
-          throw guardFailure;
-        }
+      let collected = false;
+      const collect: CollectionGuard = async callback => {
+        if (collected) throw new Error('A scheduled run may collect only once');
+        collected = true;
+        const originalFetch = globalThis.fetch;
+        let requests = 0;
+        let guardFailure: Error | null = null;
+        globalThis.fetch = async (input, init) => {
+          if (ledgerTraffic.getStore()) return originalFetch(input, init);
+          if (guardFailure) throw guardFailure;
+          if (requests >= config.executionCap) {
+            guardFailure = new RequestCapReached(`Execution request cap reached: ${config.sourceId}`);
+            throw guardFailure;
+          }
+          requests += 1;
+          const date = clock();
+          if (!Number.isFinite(date.getTime())) {
+            guardFailure = new Error('Invalid request clock');
+            throw guardFailure;
+          }
+          try {
+            await ledgerTraffic.run(true, () => store.charge(config.sourceId,
+              date.toISOString().slice(0, 10), config.dailyCap));
+          } catch (error) {
+            guardFailure = error instanceof Error ? error : new Error('Request ledger unavailable');
+            throw guardFailure;
+          }
+          return originalFetch(input, init);
+        };
         try {
-          await ledgerTraffic.run(true, () => store.charge(config.sourceId,
-            date.toISOString().slice(0, 10), config.dailyCap));
-        } catch (error) {
-          guardFailure = error instanceof Error ? error : new Error('Request ledger unavailable');
-          throw guardFailure;
+          const result = await callback().catch(error => { throw guardFailure ?? error; });
+          if (guardFailure) throw guardFailure;
+          return result;
+        } finally {
+          globalThis.fetch = originalFetch;
         }
-        return originalFetch(input, init);
       };
-      try {
-        const result = await work().catch(error => { throw guardFailure ?? error; });
-        if (guardFailure) throw guardFailure;
-        return result;
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
+      return work(collect);
     });
   } finally {
     activeInProcess = false;
   }
+}
+
+/** A bounded access probe needs only a collection, with the same quota checks. */
+export async function withScheduledRequestGuard<T>(store: ScheduledRequestStore,
+  config: RequestGuardConfig, work: () => Promise<T>, clock: () => Date = () => new Date(),
+): Promise<T> {
+  return withScheduledIngestionGuard(store, config, collect => collect(work), clock);
 }

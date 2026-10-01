@@ -5,6 +5,8 @@
 > **基准日期**: 2026-10-01
 > **准入总则**: 依据 [`quality-rules.md`](../../../specs/001-melbourne-data-aggregation/quality-rules.md) §1 与运行时注册器规则，各来源分别核实官方许可、适用的凭据、调用配额、留存期和真实采集后才能激活并发布；首期八类样本门槛另行验收。公开样例（fixtures）仅证明本地解析行为，绝不代表准入通过。`active` 表示来源清单和开发集查询可用，不表示已部署定时作业。
 
+2026-10-01 并行实现与开发部署：位置历史恢复、不可变闭合版本及 GTFS 静态引用／每模式完整快照成员已接入运行入口；无官方版本证明时仍不定位。六个已准入来源已部署 Cloud Run Jobs、读回专用 IAM 并全部通过真实执行；租金完整历史已发布 58,618 条记录。两个每日快照调度已启用，预算暂停机制已接入；T070 已完成，当前任务为 62/77。实际运行结果及调度状态以[来源部署记录](validation/source-deployment-2026-10-01.md)为准。首期仍只有六个独立来源、1/8 类通过；以下历史文字中的“未接线／来源调度全部关闭”以本次记录为准。
+
 2026-09-30 发布补充：市界、CLUE 2025 街区、ABS ASGS 2021／2026 快照、开发项目及 Homes Victoria 租金及 ABS Census 已作为 `verified_open` / `active` 在 GCP 开发集发布，共六个独立来源。可查询边界共 1,527 个；开发项目 1,450 条（现行 326 条、完成历史 1,124 条）；租金两季度 1,106 条且均未匹配边界；2021 Census 有 144,792 个指标，其中 3,969 个匹配同版 LGA/SA2 边界。2026 ABS 快照中的 LGA 实际为 2025 版。证据见[市界](source-policies/municipal-boundary.md)、[CLUE](source-policies/clue-blocks-admission.md)、[ABS](source-policies/asgs-boundaries.md)、[开发项目](source-policies/development-monitor-admission.md)、[租金](source-policies/homes-victoria-rents-admission.md)和[Census](source-policies/abs-census-admission.md)专项记录。下文 2026-09-29 的旧审计快照若写“全部候选”或“0 active”，以本次发布结果为准。孤立 staging 清理已独立部署且连续七次定时成功；来源定时部署仍未完成。
 
 
