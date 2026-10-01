@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 import { parseConnectorInput } from '../../src/core/connector.js';
-import { HttpClient, HttpFailure } from '../../src/core/http.js';
+import { HttpClient, HttpFailure, type HttpRequest } from '../../src/core/http.js';
 import { validateGeoRecordGeography } from '../../src/validation/geography.js';
 import { parseSourceRecord } from '../../src/validation/record.js';
 import { UnplannedRoadConnector, normalizeRoadSnapshot, parseRoadPage,
@@ -64,17 +64,15 @@ test('a pending impact stays out of current incident status and missing geometry
   assert.equal(result.geoRecords[0]?.record_status, 'planned');
   assert.equal(result.geoRecords[0]?.geometry_geojson, null);
   assert.equal(result.geoRecords[0]?.location_role, 'unknown');
-  assert.equal(result.sourceRecords.length, 2);
+  assert.equal(result.sourceRecords.length, 3);
 });
 
 test('parent incident deduplication, child impact links, parseSourceRecord and validateGeoRecordGeography invariants', async () => {
   const page = await fixture();
   const result = normalizeRoadSnapshot(page.data.features, input, fetchedAt);
 
-  // In fixture, feature 0 (00:01:00Z Active) and feature 1 (00:05:00Z Inactive) represent two distinct versions
   const parentRecords = result.sourceRecords.filter(r => r.source_record_id.endsWith(':incident:RUD-INC001'));
-  assert.equal(parentRecords.length, 2, 'Two distinct parent versions preserved across features');
-  assert.notEqual(parentRecords[0]?.version_id, parentRecords[1]?.version_id);
+  assert.equal(parentRecords.length, 1, 'One consistent parent incident accompanies two independently located impacts');
 
   // If two features share the EXACT SAME parent version, it must be deduplicated to 1
   const sameParentFeatures = [
@@ -108,13 +106,13 @@ test('parent incident deduplication, child impact links, parseSourceRecord and v
   // Each child impact geo record links to BOTH parent incident and child impact
   for (const geo of result.geoRecords) {
     const links = result.geoRecordSources.filter(l => l.geo_record_id === geo.geo_record_id);
-    assert.equal(links.length, 2);
+    assert.equal(links.length, 3);
     assert.ok(links.some(l => l.evidence_role === 'parent_incident'));
     assert.ok(links.some(l => l.evidence_role === 'child_impact'));
   }
 });
 
-test('incident without child impacts creates parent record, parent geoRecord, and single parent_incident link', async () => {
+test('incident without child impacts creates one parent geography with parent and snapshot evidence', async () => {
   const featureWithoutImpact = {
     type: 'Feature' as const,
     geometry: { type: 'Point', coordinates: [144.963, -37.814] },
@@ -133,7 +131,7 @@ test('incident without child impacts creates parent record, parent geoRecord, an
 
   const result = normalizeRoadSnapshot([featureWithoutImpact], input, fetchedAt);
 
-  assert.equal(result.sourceRecords.length, 1, 'Only parent source record emitted when impactId is absent');
+  assert.equal(result.sourceRecords.length, 2, 'The parent incident and complete snapshot are emitted when impactId is absent');
   assert.equal(result.sourceRecords[0]?.source_record_id, 'victoria.transport.road_unplanned:incident:RUD-INC-SINGLE');
   assert.deepEqual(parseSourceRecord(result.sourceRecords[0]), result.sourceRecords[0]);
 
@@ -144,8 +142,8 @@ test('incident without child impacts creates parent record, parent geoRecord, an
   assert.equal(result.geoRecords[0]?.centroid_lat, -37.814);
   assert.equal(validateGeoRecordGeography(result.geoRecords[0]!).valid, true);
 
-  // GeoRecordSources contains only parent_incident link
-  assert.equal(result.geoRecordSources.length, 1);
+  // The incident has one parent evidence link and one complete snapshot membership link.
+  assert.equal(result.geoRecordSources.length, 2);
   assert.equal(result.geoRecordSources[0]?.evidence_role, 'parent_incident');
   assert.equal(result.geoRecordSources[0]?.source_record_id, 'victoria.transport.road_unplanned:incident:RUD-INC-SINGLE');
 });
@@ -250,7 +248,7 @@ test('idempotency and replay: identical payload normalized at different fetchedA
   assert.equal(geo1.record_status, geo2.record_status);
 
   // SourceRecords comparison
-  for (let i = 0; i < result1.sourceRecords.length; i++) {
+  for (let i = 0; i < result1.sourceRecords.length - 1; i++) {
     const s1 = result1.sourceRecords[i]!;
     const s2 = result2.sourceRecords[i]!;
     assert.equal(s1.source_record_id, s2.source_record_id);
@@ -561,7 +559,7 @@ test('cloud probe offsetless clocks retain raw evidence and cannot certify fresh
         eventLocationStatus: 'Active', eventType: 'Crash', description: 'Probe observed crash',
         created: '2026-10-01T09:30:00', lastUpdated: '2026-10-01T09:49:04' } }] } });
   const result = normalizeRoadSnapshot(feature.data.features, input, '2026-09-30T23:53:48.526Z');
-  for (const source of result.sourceRecords) {
+  for (const source of result.sourceRecords.filter(row => !row.source_record_id.includes(':snapshot:'))) {
     assert.equal(source.source_updated_at, null);
     assert.equal(source.observed_at, null);
     assert.equal(source.valid_from, null);
@@ -624,6 +622,154 @@ test('parent incident changes propagate to child and snapshot revisions even wit
   assert.equal(first.latestUpdate, null);
   assert.equal(revised.latestUpdate, null);
   const replay = normalizeRoadSnapshot([offsetless], { ...input, runId: 'replay' }, '2026-10-03T00:00:00Z');
-  assert.equal(first.sourceRevision, replay.sourceRevision);
+  assert.notEqual(first.sourceRevision, replay.sourceRevision);
   assert.deepEqual(first.geoRecords.map(row => row.version_id), replay.geoRecords.map(row => row.version_id));
+});
+
+test('unrecognized or missing incident status and unknown impact status cannot become active', async () => {
+  const page = await fixture();
+  const feature = page.data.features[0];
+  assert.ok(feature);
+  for (const properties of [
+    { ...feature.properties, status: 'Unknown' },
+    { ...feature.properties, status: null },
+    { ...feature.properties, eventLocationStatus: 'CancelledElsewhere' },
+  ]) {
+    const changed = { ...feature, properties };
+    assert.throws(() => normalizeRoadSnapshot([changed], input, fetchedAt));
+    class ChangedClient extends HttpClient {
+      override async getJson() {
+        return { body: { ...page, meta: { ...page.meta, total_records: 1, count: 1 },
+          data: { ...page.data, features: [changed] } },
+        status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+      }
+    }
+    const result = await new UnplannedRoadConnector(new ChangedClient(), () => 'fixture-key', 0)
+      .collect(input);
+    assert.equal(result.kind, 'failure');
+    if (result.kind === 'failure') assert.equal(result.code, 'schema_changed');
+  }
+  const reopened = normalizeRoadSnapshot([{ ...feature,
+    properties: { ...feature.properties, status: 'Reopened', eventLocationStatus: 'Reopened' } }], input, fetchedAt);
+  assert.equal(reopened.geoRecords[0]?.record_status, 'active');
+});
+
+test('contradictory parent incident versions abort an otherwise complete snapshot', async () => {
+  const page = await fixture();
+  const feature = page.data.features[1];
+  assert.ok(feature);
+  const changed = { ...feature, properties: { ...feature.properties, status: 'Inactive' } };
+  const features = [page.data.features[0], changed].filter(feature => feature !== undefined);
+  assert.throws(() => normalizeRoadSnapshot(features, input, fetchedAt), /Conflicting parent incident/);
+  class ContradictoryClient extends HttpClient {
+    override async getJson() {
+      return { body: { ...page, data: { ...page.data, features } },
+        status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new UnplannedRoadConnector(new ContradictoryClient(), () => 'fixture-key', 0)
+    .collect(input);
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
+});
+
+test('complete snapshot evidence includes every impact and supports empty snapshots without fabricated resolution', async () => {
+  const page = await fixture();
+  const full = normalizeRoadSnapshot(page.data.features, input, fetchedAt);
+  const snapshot = full.sourceRecords.find(row => row.source_record_id.includes(':snapshot:'));
+  assert.ok(snapshot);
+  assert.equal(snapshot.source_record_id, `victoria.transport.road_unplanned:snapshot:${fetchedAt}`);
+  assert.equal(snapshot.observed_at, null);
+  assert.equal(snapshot.source_updated_at, null);
+  assert.equal(snapshot.first_accessible_at, fetchedAt);
+  parseSourceRecord(snapshot);
+  const membership = full.geoRecordSources.filter(link => link.evidence_role === 'road_snapshot_membership');
+  assert.equal(membership.length, full.geoRecords.length);
+  for (const record of full.geoRecords) {
+    const link = membership.find(link => link.geo_record_id === record.geo_record_id
+      && link.version_id === record.version_id);
+    assert.ok(link);
+    assert.equal(link.source_record_id, snapshot.source_record_id);
+    assert.equal(link.source_version_id, snapshot.version_id);
+  }
+  const empty = normalizeRoadSnapshot([], { ...input, runId: 'empty' }, '2026-09-28T00:07:00Z');
+  assert.equal(empty.sourceRecords.length, 1);
+  assert.equal(empty.geoRecords.length, 0);
+  assert.equal(empty.geoRecordSources.length, 0);
+  assert.notEqual(empty.sourceRevision, full.sourceRevision);
+  const replay = normalizeRoadSnapshot(page.data.features, { ...input, runId: 'repeat' }, '2026-09-28T00:08:00Z');
+  assert.notEqual(replay.sourceRevision, full.sourceRevision);
+  assert.deepEqual(replay.geoRecords.map(row => row.version_id), full.geoRecords.map(row => row.version_id));
+  const reordered = normalizeRoadSnapshot([...page.data.features].reverse(), input, fetchedAt);
+  assert.equal(reordered.sourceRevision, full.sourceRevision);
+});
+
+test('a successful empty API response still emits one complete snapshot proof', async () => {
+  class EmptyClient extends HttpClient {
+    override async getJson() {
+      return { body: { meta: { total_records: 0, total_pages: 0, page: 1, count: 0 },
+        data: { type: 'FeatureCollection', features: [] } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new UnplannedRoadConnector(new EmptyClient(), () => 'fixture-key', 0)
+    .collect(input);
+  assert.equal(result.kind, 'success');
+  if (result.kind === 'success') {
+    assert.equal(result.inputCount, 0);
+    assert.equal(result.outputCount, 1);
+    assert.equal(result.sourceRecords.length, 1);
+    assert.equal(result.geoRecords.length, 0);
+    assert.equal(result.completeness.complete, true);
+    assert.equal(result.completeness.expected_pages, 1);
+    assert.equal(result.completeness.fetched_pages, 1);
+  }
+});
+
+test('a no-impact incident geometry change creates matching evidence and geography versions', async () => {
+  const page = await fixture();
+  const first = page.data.features[0];
+  assert.ok(first);
+  const feature = { ...first, properties: { ...first.properties, impactId: null } };
+  const original = normalizeRoadSnapshot([feature], input, fetchedAt);
+  const changed = normalizeRoadSnapshot([{ ...feature,
+    geometry: { type: 'Point', coordinates: [144.99, -37.82] } }], input, fetchedAt);
+  assert.notEqual(original.geoRecords[0]?.version_id, changed.geoRecords[0]?.version_id);
+  assert.notEqual(original.sourceRecords[0]?.version_id, changed.sourceRecords[0]?.version_id);
+  assert.equal(changed.geoRecords[0]?.version_id, changed.sourceRecords[0]?.version_id);
+});
+
+test('impact attributes and raw time evidence survive normalization and change business versions', async () => {
+  const page = await fixture();
+  const first = page.data.features[0];
+  assert.ok(first);
+  const original = normalizeRoadSnapshot([first], input, fetchedAt);
+  const changed = normalizeRoadSnapshot([{ ...first,
+    properties: { ...first.properties, numberLanesImpacted: '3',
+      roadAccessType: 'Emergency services access only' } }], input, fetchedAt);
+  assert.notEqual(original.geoRecords[0]?.version_id, changed.geoRecords[0]?.version_id);
+  const summary = JSON.parse(changed.geoRecords[0]?.summary ?? '{}');
+  assert.equal(summary.source_properties.numberLanesImpacted, '3');
+  assert.equal(summary.source_properties.roadAccessType, 'Emergency services access only');
+  assert.equal(summary.reference.localRoadName, 'Example Road');
+});
+
+test('KeyID requests reject redirects and disable unpaced HTTP retries', async () => {
+  const page = await fixture();
+  class InspectClient extends HttpClient {
+    override async getJson(request: HttpRequest) {
+      const url = new URL(request.url);
+      assert.equal(url.searchParams.get('page'), '1');
+      assert.equal(url.searchParams.get('limit'), '100');
+      assert.equal(request.redirect, 'error');
+      assert.equal(request.maxAttempts, 1);
+      assert.equal(new Headers(request.headers).get('KeyID'), 'fixture-only-key');
+      assert.equal(url.href.includes('fixture-only-key'), false);
+      return { body: page, status: 200, fetchedAt, etag: null,
+        lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new UnplannedRoadConnector(new InspectClient(), () => 'fixture-only-key', 0)
+    .collect(input);
+  assert.equal(result.kind, 'success');
 });

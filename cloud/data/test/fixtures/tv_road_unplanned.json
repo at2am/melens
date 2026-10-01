@@ -2,9 +2,9 @@
   "meta": {"total_records": 2, "total_pages": 1, "page": 1, "limit": 100, "count": 2},
   "data": {"type": "FeatureCollection", "features": [
     {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[144.96, -37.81], [144.97, -37.82]]},
-      "properties": {"id": "RUD-INC001", "impactId": "IMP-1", "status": "Active", "eventLocationStatus": "Active", "eventType": "Crash", "description": "Lane blocked", "created": "2026-09-28T00:00:00Z", "lastUpdated": "2026-09-28T00:01:00Z", "endTime": "2026-09-28T03:00:00Z", "reference": {"localRoadName": "Example Road", "localGovernmentArea": "Melbourne"}, "impact": {"impactType": "Lanes closed"}}},
+      "properties": {"id": "RUD-INC001", "impactId": "IMP-1", "status": "Active", "eventLocationStatus": "Active", "eventType": "Crash", "description": "Lane blocked", "created": "2026-09-28T00:00:00Z", "lastUpdated": "2026-09-28T00:05:00Z", "lastClosed": "2026-09-28T00:04:00Z", "endTime": "2026-09-28T03:00:00Z", "reference": {"localRoadName": "Example Road", "localGovernmentArea": "Melbourne"}, "impact": {"impactType": "Lanes closed"}}},
     {"type": "Feature", "geometry": {"type": "Point", "coordinates": [144.98, -37.83]},
-      "properties": {"id": "RUD-INC001", "impactId": "IMP-2", "status": "Inactive", "eventLocationStatus": "Inactive", "eventType": "Crash", "description": "Lane blocked", "created": "2026-09-28T00:00:00Z", "lastUpdated": "2026-09-28T00:05:00Z", "lastClosed": "2026-09-28T00:04:00Z", "reference": {"localRoadName": "Example Road", "localGovernmentArea": "Melbourne"}, "impact": {"impactType": "Road closed"}}}
+      "properties": {"id": "RUD-INC001", "impactId": "IMP-2", "status": "Active", "eventLocationStatus": "Inactive", "eventType": "Crash", "description": "Lane blocked", "created": "2026-09-28T00:00:00Z", "lastUpdated": "2026-09-28T00:05:00Z", "lastClosed": "2026-09-28T00:04:00Z", "endTime": "2026-09-28T03:00:00Z", "reference": {"localRoadName": "Example Road", "localGovernmentArea": "Melbourne"}, "impact": {"impactType": "Road closed"}}}
   ]},
   "links": []
 }

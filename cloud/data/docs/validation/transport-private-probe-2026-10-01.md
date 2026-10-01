@@ -53,3 +53,7 @@ gcloud run jobs execute melens-dev-transport-probe --project=melens-510012 \
 ```
 
 Execute the three source overrides sequentially. Read only the probe's structured summaries and ledger counts. Source manifests and their Schedule enabled flags remain unchanged; T031/T061/T063/T066/T069/T070/T077 are not completed by these reads.
+
+## Later five-task revision
+
+The [five-task validation](five-task-parallel-2026-10-01.md) supersedes the earlier planned-road time uncertainty: the endpoint's own HTML dictionary explicitly establishes Victorian local time. Its revised private read succeeded with 9,603 events, 9,618 geography rows and one snapshot proof. Unplanned roads independently succeeded with 305 impact rows and one snapshot proof, while its undocumented offsetless clocks stayed null. Both had zero rejects and no publication or raw retention. The new image and exact execution IDs are in that record; old-image observations above remain historical evidence.

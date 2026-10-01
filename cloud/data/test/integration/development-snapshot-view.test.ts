@@ -47,7 +47,8 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
   ), synthetic_sources AS (
     SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
       CAST(NULL AS STRING) AS source_record_id, CAST(NULL AS STRING) AS version_id,
-      CAST(NULL AS TIMESTAMP) AS source_updated_at FROM UNNEST(ARRAY<BOOL>[])
+      CAST(NULL AS TIMESTAMP) AS source_updated_at,
+      CAST(NULL AS TIMESTAMP) AS fetched_at FROM UNNEST(ARRAY<BOOL>[])
   ), synthetic_links AS (
     SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
       CAST(NULL AS STRING) AS source_record_id, CAST(NULL AS STRING) AS source_version_id,

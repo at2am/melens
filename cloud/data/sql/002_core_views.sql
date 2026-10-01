@@ -146,6 +146,38 @@ current_gtfs_members AS (
     AND l.source_version_id = snapshot.version_id
   WHERE l.source_id = 'victoria.transport.gtfs_realtime'
     AND l.evidence_role = 'parent_feed_snapshot'
+),
+road_snapshots AS (
+  -- A complete road response proves membership at fetch time. Its timestamp
+  -- does not stand in for an incident time or an undocumented provider clock.
+  SELECT DISTINCT r.batch_id, r.source_id, r.source_record_id, r.version_id,
+    r.fetched_at AS snapshot_at
+  FROM `melens_ingest.source_records` r
+  JOIN batch_states b ON r.batch_id = b.batch_id AND r.source_id = b.source_id
+  WHERE r.source_id IN ('victoria.transport.road_unplanned', 'victoria.transport.road_planned')
+    AND b.state = 'published' AND b.published_at IS NOT NULL
+    AND STARTS_WITH(r.source_record_id, CONCAT(r.source_id, ':snapshot:'))
+    AND SAFE_CAST(SUBSTR(r.source_record_id, LENGTH(r.source_id) + 11) AS TIMESTAMP) = r.fetched_at
+),
+latest_road_snapshots AS (
+  SELECT * FROM road_snapshots
+  QUALIFY snapshot_at = MAX(snapshot_at) OVER (PARTITION BY source_id)
+),
+unambiguous_road_snapshots AS (
+  -- Repeated identical proofs are harmless. Two different snapshots claiming
+  -- the same observation time cannot be arbitrarily ordered by a content hash.
+  SELECT * FROM latest_road_snapshots
+  QUALIFY COUNT(DISTINCT CONCAT(source_record_id, '\x1f', version_id))
+    OVER (PARTITION BY source_id) = 1
+),
+current_road_members AS (
+  SELECT DISTINCT l.source_id, l.geo_record_id, l.version_id
+  FROM `melens_ingest.geo_record_sources` l
+  JOIN unambiguous_road_snapshots snapshot
+    ON l.batch_id = snapshot.batch_id AND l.source_id = snapshot.source_id
+    AND l.source_record_id = snapshot.source_record_id
+    AND l.source_version_id = snapshot.version_id
+  WHERE l.evidence_role = 'road_snapshot_membership'
 )
 SELECT g.*
 FROM `melens_query.v_geo_records_history` AS g
@@ -164,6 +196,13 @@ WHERE (g.source_id != 'melbourne.development_monitor'
   AND (g.source_id != 'victoria.transport.gtfs_realtime'
     OR EXISTS (SELECT 1 FROM current_gtfs_members member
       WHERE member.geo_record_id = g.geo_record_id AND member.version_id = g.version_id))
+  -- A disappeared road impact leaves current results without asserting that
+  -- the provider resolved it. Failed/unpublished snapshots preserve the last
+  -- complete published membership; an empty complete snapshot removes it all.
+  AND (g.source_id NOT IN ('victoria.transport.road_unplanned', 'victoria.transport.road_planned')
+    OR EXISTS (SELECT 1 FROM current_road_members member
+      WHERE member.source_id = g.source_id AND member.geo_record_id = g.geo_record_id
+        AND member.version_id = g.version_id))
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY geo_record_id
   ORDER BY source_updated_at DESC NULLS LAST,

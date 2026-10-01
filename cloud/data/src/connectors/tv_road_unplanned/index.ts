@@ -13,6 +13,7 @@ const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/unplanned-dis
 const API_URL = 'https://api.opendata.transport.vic.gov.au/api/opendata/roads/disruptions/unplanned/v3';
 const PAGE_SIZE = 100;
 const PAGE_DELAY_MS = 3100; // Safely below the documented 20 calls per 60 seconds.
+const NORMALIZATION_POLICY = 'explicit-offset-road-v2';
 
 /** Only explicitly offset timestamps prove an absolute instant. */
 export function parseVictorianTimestamp(value: string | null | undefined): string | null {
@@ -116,13 +117,24 @@ function geometryFor(feature: RoadFeature): ValidGeometry | null {
   }
 }
 
+const roadStatusSchema = z.enum(['Active', 'Inactive', 'Pending', 'Reopened']);
+
+function disruptionStatus(properties: RoadFeature['properties']): GeoRecord['record_status'] {
+  const incident = roadStatusSchema.parse(properties.status);
+  const impact = properties.eventLocationStatus == null
+    ? incident : roadStatusSchema.parse(properties.eventLocationStatus);
+  if (incident === 'Inactive' || impact === 'Inactive') return 'resolved';
+  if (incident === 'Pending' || impact === 'Pending') return 'planned';
+  return 'active';
+}
+
 export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: ConnectorInput,
   fetchedAt: string): { sourceRecords: SourceRecord[]; geoRecords: GeoRecord[];
     geoRecordSources: GeoRecordSource[]; latestUpdate: string | null; sourceRevision: string } {
   const sourceRecords: SourceRecord[] = [];
   const geoRecords: GeoRecord[] = [];
   const geoRecordSources: GeoRecordSource[] = [];
-  const seenParentVersions = new Set<string>();
+  const parentVersions = new Map<string, string>();
   const seenFeature = new Set<string>();
   let latestUpdate: string | null = null;
   for (const feature of features) {
@@ -137,10 +149,8 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
     const closedAt = parseVictorianTimestamp(p.lastClosed);
     if (updatedAt && (latestUpdate === null || updatedAt > latestUpdate)) latestUpdate = updatedAt;
 
-    const status = p.eventLocationStatus ?? p.status;
-    const isInactive = status === 'Inactive' || p.status === 'Inactive';
-    const isPending = status === 'Pending' || p.status === 'Pending';
-    const recordStatus = isInactive ? 'resolved' : isPending ? 'planned' : 'active';
+    const recordStatus = disruptionStatus(p);
+    const isInactive = recordStatus === 'resolved';
     const timezoneUnverified = [p.created, p.lastUpdated, p.lastClosed, p.endTime, p.nextUpdateDue]
       .some(hasUnverifiedTimezone);
     const parentTimeMissing = timezoneUnverified
@@ -163,13 +173,17 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
     const parentContent = { id: p.id, status: p.status, eventType: p.eventType,
       eventSubType: p.eventSubType, description: p.description, created: p.created,
       lastUpdated: p.lastUpdated, lastClosed: p.lastClosed, endTime: p.endTime,
-      nextUpdateDue: p.nextUpdateDue };
+      nextUpdateDue: p.nextUpdateDue,
+      ...(impactKey === null ? { feature } : {}) };
     const parentVersion = sourceVersionId(updatedAt, {
-      normalizationPolicy: 'explicit-offset-v1', content: parentContent,
+      normalizationPolicy: NORMALIZATION_POLICY, content: parentContent,
     });
-    const parentVersionKey = `${parentId}\u001f${parentVersion}`;
-    if (!seenParentVersions.has(parentVersionKey)) {
-      seenParentVersions.add(parentVersionKey);
+    const existingParentVersion = parentVersions.get(parentId);
+    if (existingParentVersion !== undefined && existingParentVersion !== parentVersion) {
+      throw new Error('Conflicting parent incident versions in one snapshot');
+    }
+    if (existingParentVersion === undefined) {
+      parentVersions.set(parentId, parentVersion);
       sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
         fetched_at: fetchedAt, source_record_id: parentId, version_id: parentVersion,
         original_url: LANDING_URL, raw_uri: null, published_at: null,
@@ -183,9 +197,9 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
     const childId = impactKey === null ? parentId : sourceRecordId({ sourceId: SOURCE_ID,
       nativeId: `impact:${parentKey}:${impactKey}`, originalUrl: LANDING_URL,
       sourceTime: updatedAt });
-    const childVersion = sourceVersionId(updatedAt, { parentVersion, geometry: feature.geometry,
-      impactId: impactKey, eventLocationStatus: p.eventLocationStatus,
-      impact: p.impact, reference: p.reference });
+    const childVersion = impactKey === null ? parentVersion
+      : sourceVersionId(updatedAt, { normalizationPolicy: NORMALIZATION_POLICY,
+        parentVersion, feature });
     if (impactKey !== null) {
       sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
         fetched_at: fetchedAt, source_record_id: childId, version_id: childVersion,
@@ -203,11 +217,15 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
       fetched_at: fetchedAt, geo_record_id: childId,
       version_id: childVersion, topic: 'road_disruption', assertion_kind: 'report',
       title: p.eventType ?? p.reference?.localRoadName ?? 'Road disruption',
-      summary: timezoneUnverified ? JSON.stringify({ description: p.description ?? null,
+      summary: JSON.stringify({ description: p.description ?? null,
+        incident_id: parentKey, impact_id: impactKey,
+        incident_status: p.status ?? null, impact_status: p.eventLocationStatus ?? null,
+        reference: p.reference ?? null, impact: p.impact ?? null,
+        source_properties: p,
         created: p.created ?? null, last_updated: p.lastUpdated ?? null,
         last_closed: p.lastClosed ?? null, end_time: p.endTime ?? null,
-        next_update_due: p.nextUpdateDue ?? null, timezone_status: 'unverified' })
-        : p.description ?? null,
+        next_update_due: p.nextUpdateDue ?? null,
+        timezone_status: timezoneUnverified ? 'unverified' : 'explicit_or_absent' }),
       original_url: LANDING_URL,
       geometry_geojson: geometry === null ? null : JSON.stringify(geometry),
       centroid_lon: point?.[0] ?? null,
@@ -230,8 +248,28 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
   }
   const canonical = [...features].sort((a, b) => a.properties.id.localeCompare(b.properties.id)
     || (a.properties.impactId ?? '').localeCompare(b.properties.impactId ?? ''));
+  const canonicalMembership = geoRecords.map(row => [row.geo_record_id, row.version_id])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const snapshotId = sourceRecordId({ sourceId: SOURCE_ID, nativeId: `snapshot:${fetchedAt}`,
+    originalUrl: LANDING_URL, sourceTime: null });
+  const snapshotVersion = sourceVersionId(null, { policy: 'complete-road-snapshot-v1',
+    canonicalMembership });
+  sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
+    fetched_at: fetchedAt, source_record_id: snapshotId, version_id: snapshotVersion,
+    original_url: LANDING_URL, raw_uri: null, published_at: null, observed_at: null,
+    first_accessible_at: fetchedAt,
+    time_missing_reason: 'Complete fetched snapshot; fetch time is not an incident source timestamp',
+    valid_from: null, valid_to: null, source_updated_at: null, source_version_ordinal: null,
+    record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
+  for (const row of geoRecords) {
+    geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
+      fetched_at: fetchedAt, geo_record_id: row.geo_record_id, version_id: row.version_id,
+      source_record_id: snapshotId, source_version_id: snapshotVersion,
+      evidence_role: 'road_snapshot_membership', original_url: LANDING_URL });
+  }
   return { sourceRecords, geoRecords, geoRecordSources, latestUpdate,
-    sourceRevision: sourceVersionId(null, { normalizationPolicy: 'explicit-offset-v1', features: canonical }) };
+    sourceRevision: sourceVersionId(null, { normalizationPolicy: NORMALIZATION_POLICY,
+      snapshot: [snapshotId, snapshotVersion], features: canonical }) };
 }
 
 export class UnplannedRoadConnector implements Connector {
@@ -257,10 +295,12 @@ export class UnplannedRoadConnector implements Connector {
         url.searchParams.set('page', String(page));
         url.searchParams.set('limit', String(PAGE_SIZE));
         const response = await this.client.getJson({ url, headers: { KeyID: key },
-          timeoutMs: 20000, maxAttempts: 3 });
+          redirect: 'error', timeoutMs: 20000, maxAttempts: 1 });
         const body = parseRoadPage(response.body);
         fetchedAt = response.fetchedAt;
         if (body.meta.page !== page || body.meta.count !== body.data.features.length
+          || (body.meta.total_records > 0 && body.meta.total_pages === 0)
+          || (body.meta.total_records === 0 && (body.meta.total_pages > 1 || body.meta.count > 0))
           || (expectedRecords !== null && body.meta.total_records !== expectedRecords)
           || (expectedPages !== null && body.meta.total_pages !== expectedPages)) {
           return failure(input, 'incomplete_window');
@@ -279,8 +319,8 @@ export class UnplannedRoadConnector implements Connector {
         checkpointAfter: input.window.kind === 'time' ? input.window.to : input.window.revision,
         completeness: { complete: true, method: 'pagination',
           expected_records: expectedRecords, fetched_records: features.length,
-          expected_pages: expectedPages, fetched_pages: Math.max(1, expectedPages ?? 1),
-          evidence: 'All v3 pages agreed on totals and every incident-impact pair was unique' },
+          expected_pages: Math.max(1, expectedPages ?? 1), fetched_pages: Math.max(1, expectedPages ?? 1),
+          evidence: 'All v3 pages agreed on totals and every incident-impact pair was unique; an empty zero-page dataset requires one header response' },
         inputCount: features.length, outputCount: normalized.sourceRecords.length,
         rejectedCount: 0, sourceRecords: normalized.sourceRecords,
         geoRecords: normalized.geoRecords,

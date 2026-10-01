@@ -194,7 +194,7 @@ test('T069 offline UC-05: unplanned road impacts preserve event time and source 
   assert.ok(active);
   assert.ok(resolved);
   assert.equal(active.observed_at, '2026-09-28T00:00:00.000Z');
-  assert.equal(active.source_updated_at, '2026-09-28T00:01:00.000Z');
+  assert.equal(active.source_updated_at, '2026-09-28T00:05:00.000Z');
   assert.equal(active.location_role, 'event_site');
   assert.equal(active.location_confidence, 'source_coordinate');
   assert.equal(validateGeoRecordGeography(active).valid, true);

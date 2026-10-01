@@ -41,7 +41,8 @@ test('production GTFS SQL uses latest published FULL_DATASET per mode, including
   ), synthetic_sources AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id, JSON_VALUE(row, '$.source_id') AS source_id,
       JSON_VALUE(row, '$.source_record_id') AS source_record_id, JSON_VALUE(row, '$.version_id') AS version_id,
-      TIMESTAMP(JSON_VALUE(row, '$.source_updated_at')) AS source_updated_at
+      TIMESTAMP(JSON_VALUE(row, '$.source_updated_at')) AS source_updated_at,
+      TIMESTAMP(JSON_VALUE(row, '$.source_updated_at')) AS fetched_at
     FROM UNNEST(JSON_QUERY_ARRAY(@parents)) row
   ), synthetic_links AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id, JSON_VALUE(row, '$.source_id') AS source_id,

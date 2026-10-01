@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 
 import { parseConnectorInput } from '../../src/core/connector.js';
@@ -35,12 +36,12 @@ async function fixture() {
 test('planned works retain schedule, affected segment, source status and geometry', async () => {
   const page = await fixture();
   const normalized = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
-  assert.equal(normalized.sourceRecords.length, 2);
+  assert.equal(normalized.sourceRecords.length, 3);
   assert.equal(normalized.geoRecords.length, 3);
   assert.equal(normalized.geoRecords[0]?.record_status, 'planned');
   assert.equal(normalized.geoRecords[0]?.assertion_kind, 'plan');
-  assert.equal(normalized.geoRecords[0]?.valid_from, null);
-  assert.equal(normalized.geoRecords[0]?.valid_to, null);
+  assert.equal(normalized.geoRecords[0]?.valid_from, '2026-10-01T10:00:00.000Z');
+  assert.equal(normalized.geoRecords[0]?.valid_to, '2026-10-09T18:00:00.000Z');
   assert.equal(normalized.geoRecords[0]?.geometry_geojson?.includes('LineString'), true);
   assert.equal(normalized.geoRecords[1]?.geometry_geojson?.includes('Point'), true);
   assert.equal(normalized.geoRecords[2]?.record_status, 'active');
@@ -50,12 +51,13 @@ test('planned works retain schedule, affected segment, source status and geometr
   const details = JSON.parse(normalized.geoRecords[0]?.summary ?? '{}');
   assert.equal(details.impact.direction, 'Northbound');
   assert.equal(details.duration.recurrences[0].duration, 'PT9H');
-  assert.equal(normalized.geoRecordSources.length, 3);
+  assert.equal(normalized.geoRecordSources.length, 6);
 });
 
-test('offsetless planning timestamps retain unverified wall clocks without inventing UTC instants', () => {
-  assert.equal(parseVictorianTimestamp('2026-01-20T12:00:00'), null);
-  assert.equal(parseVictorianTimestamp('2026-07-20T12:00:00'), null);
+test('documented Victorian clocks convert seasons and retain ambiguous or nonexistent DST clocks as null', () => {
+  assert.equal(parseVictorianTimestamp('2026-01-20T12:00:00'), '2026-01-20T01:00:00.000Z');
+  assert.equal(parseVictorianTimestamp('2026-07-20T12:00:00'), '2026-07-20T02:00:00.000Z');
+  assert.equal(parseVictorianTimestamp('2026-07-20T12:00:00.123'), '2026-07-20T02:00:00.123Z');
   assert.equal(parseVictorianTimestamp('2026-04-05T02:30:00'), null);
   assert.equal(parseVictorianTimestamp('2026-10-04T02:30:00'), null);
   assert.throws(() => parseVictorianTimestamp('2026-02-30T12:00:00'));
@@ -105,14 +107,14 @@ test('cancelled disruption retains schedule, geometry and segment facts with can
     },
   };
   const normalized = normalizePlannedRoadSnapshot([cancelledFeature], input, fetchedAt);
-  assert.equal(normalized.sourceRecords.length, 1);
+  assert.equal(normalized.sourceRecords.length, 2);
   assert.equal(normalized.geoRecords.length, 2);
   assert.equal(normalized.sourceRecords[0]?.record_status, 'cancelled');
   assert.equal(normalized.geoRecords[0]?.record_status, 'cancelled');
   assert.equal(normalized.geoRecords[1]?.record_status, 'cancelled');
   assert.equal(normalized.geoRecords[0]?.assertion_kind, 'plan');
-  assert.equal(normalized.geoRecords[0]?.valid_from, null);
-  assert.equal(normalized.geoRecords[0]?.valid_to, null);
+  assert.equal(normalized.geoRecords[0]?.valid_from, '2026-10-01T10:00:00.000Z');
+  assert.equal(normalized.geoRecords[0]?.valid_to, '2026-10-09T18:00:00.000Z');
   normalized.sourceRecords.forEach(row => assert.deepEqual(parseSourceRecord(row), row));
   normalized.geoRecords.forEach(row => assert.equal(validateGeoRecordGeography(row).valid, true));
 });
@@ -125,6 +127,8 @@ test('numbered snapshot validates totals, uses KeyID header and does not accept 
       assert.equal(url.searchParams.get('page'), '1');
       assert.equal(url.searchParams.get('limit'), '1000');
       assert.equal((request.headers as Record<string, string>).KeyID, 'fixture-key');
+      assert.equal(request.redirect, 'error');
+      assert.equal(request.maxAttempts, 1);
       return { body: page, status: 200, fetchedAt, etag: null,
         lastModified: null, contentType: 'application/json' };
     }
@@ -356,7 +360,7 @@ test('repeated payload replay produces strictly idempotent version and timestamp
   assert.equal(run1.geoRecords.length, run2.geoRecords.length);
   assert.equal(run1.latestUpdate, run2.latestUpdate);
 
-  for (let i = 0; i < run1.sourceRecords.length; i++) {
+  for (let i = 0; i < page.data.features.length; i++) {
     const s1 = run1.sourceRecords[i]!;
     const s2 = run2.sourceRecords[i]!;
     assert.equal(s1.source_record_id, s2.source_record_id);
@@ -382,15 +386,18 @@ test('repeated payload replay produces strictly idempotent version and timestamp
     assert.equal(g1.record_status, g2.record_status);
   }
 
-  for (let i = 0; i < run1.geoRecordSources.length; i++) {
-    const l1 = run1.geoRecordSources[i]!;
-    const l2 = run2.geoRecordSources[i]!;
+  const businessLinks1 = run1.geoRecordSources.filter(row => row.evidence_role === 'planned_disruption');
+  const businessLinks2 = run2.geoRecordSources.filter(row => row.evidence_role === 'planned_disruption');
+  for (let i = 0; i < businessLinks1.length; i++) {
+    const l1 = businessLinks1[i]!;
+    const l2 = businessLinks2[i]!;
     assert.equal(l1.geo_record_id, l2.geo_record_id);
     assert.equal(l1.version_id, l2.version_id);
     assert.equal(l1.source_record_id, l2.source_record_id);
     assert.equal(l1.source_version_id, l2.source_version_id);
     assert.equal(l1.evidence_role, l2.evidence_role);
   }
+  assert.notEqual(run1.sourceRevision, run2.sourceRevision, 'each complete observation needs new snapshot proof');
 });
 
 test('upstream content changes produce new version_id while maintaining stable source_record_id', async () => {
@@ -443,9 +450,9 @@ test('PlannedRoadConnector.collect replay idempotency over identical HTTP respon
   }
 });
 
-test('explicit planning timestamp offsets produce proven instants and missing timezone remains null', () => {
-  assert.equal(parseVictorianTimestamp('2026-07-20T12:00:00'), null);
-  assert.equal(parseVictorianTimestamp('2026-01-20T12:00:00'), null);
+test('explicit offsets remain authoritative alongside documented Victorian local time', () => {
+  assert.equal(parseVictorianTimestamp('2026-07-20T12:00:00'), '2026-07-20T02:00:00.000Z');
+  assert.equal(parseVictorianTimestamp('2026-01-20T12:00:00'), '2026-01-20T01:00:00.000Z');
   assert.equal(parseVictorianTimestamp('2026-09-30T12:00:00Z'), '2026-09-30T12:00:00.000Z');
   assert.equal(parseVictorianTimestamp('2026-09-30T12:00:00+10:00'), '2026-09-30T02:00:00.000Z');
   assert.throws(() => parseVictorianTimestamp('not-a-timestamp'));
@@ -463,24 +470,24 @@ test('planned provider status and immutable row identity survive crossing the sc
     .filter(([key]) => !['batch_id', 'fetched_at', 'first_accessible_at'].includes(key)));
   assert.deepEqual(first.geoRecords.map(stripAudit), replay.geoRecords.map(stripAudit));
   assert.equal(first.geoRecords[0]?.record_status, 'active');
-  assert.equal(first.sourceRevision, replay.sourceRevision);
+  assert.notEqual(first.sourceRevision, replay.sourceRevision);
 });
 
-test('unverified planning times retain schedule strings and payload revisions without certifying freshness', async () => {
+test('planning times use the official local convention and retain schedule strings without certifying freshness', async () => {
   const page = await fixture();
   const wallClockFeatures = page.data.features.map(feature => ({ ...feature, properties: {
     ...feature.properties, lastUpdated: '2026-09-28T12:00:00',
   } }));
   const first = normalizePlannedRoadSnapshot(wallClockFeatures, input, fetchedAt);
-  assert.equal(first.latestUpdate, null);
+  assert.equal(first.latestUpdate, '2026-09-28T02:00:00.000Z');
   assert.ok(first.sourceRevision);
-  for (const row of first.sourceRecords) {
-    assert.equal(row.source_updated_at, null);
-    assert.match(row.time_missing_reason ?? '', /timezone unverified/);
+  for (const row of first.sourceRecords.filter(row => !row.source_record_id.includes(':snapshot:'))) {
+    assert.equal(row.source_updated_at, '2026-09-28T02:00:00.000Z');
     parseSourceRecord(row);
   }
   const detail = JSON.parse(first.geoRecords[0]?.summary ?? '{}');
-  assert.equal(detail.timezone_status, 'unverified');
+  assert.equal(detail.timezone_status, 'documented_victorian_local_or_explicit_offset');
+  assert.equal(detail.source_timezone, 'Australia/Melbourne');
   assert.ok(detail.duration.start);
   const original = wallClockFeatures[0];
   assert.ok(original);
@@ -489,4 +496,169 @@ test('unverified planning times retain schedule strings and payload revisions wi
   assert.notEqual(first.sourceRevision, revised.sourceRevision);
   assert.equal(first.sourceRevision,
     normalizePlannedRoadSnapshot([...wallClockFeatures].reverse(), input, fetchedAt).sourceRevision);
+});
+
+test('complete snapshot links every geometry version and an empty snapshot does not infer cancellation', async () => {
+  const page = await fixture();
+  const full = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
+  const snapshot = full.sourceRecords.find(row => row.source_record_id === `${SOURCE_ID}:snapshot:${fetchedAt}`);
+  assert.ok(snapshot);
+  assert.equal(snapshot.source_updated_at, null);
+  assert.equal(snapshot.observed_at, null);
+  assert.equal(snapshot.published_at, null);
+  assert.equal(snapshot.first_accessible_at, fetchedAt);
+  assert.equal(snapshot.assertion_kind, 'observation');
+  assert.match(snapshot.time_missing_reason ?? '', /not event time/);
+  const membership = full.geoRecordSources.filter(row => row.evidence_role === 'road_snapshot_membership');
+  assert.equal(membership.length, full.geoRecords.length);
+  for (const row of full.geoRecords) {
+    assert.equal(membership.filter(link => link.geo_record_id === row.geo_record_id
+      && link.version_id === row.version_id && link.source_record_id === snapshot.source_record_id
+      && link.source_version_id === snapshot.version_id && link.batch_id === row.batch_id).length, 1);
+  }
+  const empty = normalizePlannedRoadSnapshot([], input, '2026-09-28T03:00:00.000Z');
+  assert.equal(empty.sourceRecords.length, 1);
+  assert.equal(empty.geoRecords.length, 0);
+  assert.equal(empty.geoRecordSources.length, 0);
+  assert.equal(empty.sourceRecords[0]?.record_status, 'active');
+  parseSourceRecord(empty.sourceRecords[0]);
+  assert.notEqual(empty.sourceRevision, full.sourceRevision);
+  assert.notEqual(empty.sourceRecords[0]?.version_id, snapshot.version_id);
+});
+
+test('DST repeated and skipped clocks remain visible as original values without false instants', async () => {
+  const page = await fixture();
+  const original = page.data.features[0];
+  assert.ok(original);
+  for (const wallClock of ['2026-04-05T02:30:00', '2026-10-04T02:30:00']) {
+    const result = normalizePlannedRoadSnapshot([{ ...original, properties: { ...original.properties,
+      lastUpdated: wallClock, duration: { start: wallClock, end: wallClock },
+    } }], input, fetchedAt);
+    assert.equal(result.sourceRecords[0]?.source_updated_at, null);
+    assert.equal(result.geoRecords[0]?.valid_from, null);
+    assert.equal(result.geoRecords[0]?.valid_to, null);
+    assert.equal(result.latestUpdate, null);
+    assert.equal(result.geoRecords[0]?.freshness_state, 'unknown');
+    assert.match(result.sourceRecords[0]?.time_missing_reason ?? '', /ambiguous or nonexistent/);
+    const detail = JSON.parse(result.geoRecords[0]?.summary ?? '{}');
+    assert.equal(detail.duration.start, wallClock);
+    assert.equal(detail.source_last_updated, wallClock);
+    assert.equal(detail.timezone_status, 'ambiguous_or_nonexistent_local_time');
+  }
+  assert.equal(parseVictorianTimestamp('2026-04-05T02:30:00+11:00'), '2026-04-04T15:30:00.000Z');
+  assert.equal(parseVictorianTimestamp('2026-04-05T02:30:00+10:00'), '2026-04-04T16:30:00.000Z');
+});
+
+test('inconsistent numbered metadata and empty continuations are incomplete, never successful empty snapshots', async () => {
+  const page = await fixture();
+  const oneFeature = page.data.features.slice(0, 1);
+  const invalidPages: unknown[] = [
+    { meta: { total_records: 1, total_pages: 0, page: 1, count: 1 },
+      data: { type: 'FeatureCollection', features: oneFeature } },
+    { meta: { total_records: 0, total_pages: 2, page: 1, count: 0 },
+      data: { type: 'FeatureCollection', features: [] } },
+    { meta: { total_records: 1, total_pages: 1, page: 1, count: 0 },
+      data: { type: 'FeatureCollection', features: [] } },
+    { type: 'FeatureCollection', features: [],
+      nextPageDetails: { hasMoreRecords: true, nextPageToken: 'next' } },
+    { type: 'FeatureCollection', features: oneFeature,
+      nextPageDetails: { hasMoreRecords: true, nextPageToken: '   ' } },
+  ];
+  for (const body of invalidPages) {
+    class InvalidPageClient extends HttpClient {
+      override async getJson() {
+        return { body, status: 200, fetchedAt, etag: null,
+          lastModified: null, contentType: 'application/json' };
+      }
+    }
+    const result = await new PlannedRoadConnector(new InvalidPageClient(), () => 'fixture-key', 0).collect(input);
+    assert.equal(result.kind, 'failure');
+    if (result.kind === 'failure') assert.equal(result.code, 'incomplete_window');
+  }
+});
+
+test('complete empty token snapshot still produces auditable snapshot source fact', async () => {
+  class EmptyClient extends HttpClient {
+    override async getJson() {
+      return { body: { type: 'FeatureCollection', features: [],
+        nextPageDetails: { hasMoreRecords: false, nextPageToken: null } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new PlannedRoadConnector(new EmptyClient(), () => 'fixture-key', 0).collect(input);
+  assert.equal(result.kind, 'success');
+  if (result.kind === 'success') {
+    assert.equal(result.inputCount, 0);
+    assert.equal(result.outputCount, 1);
+    assert.equal(result.geoRecords.length, 0);
+    assert.equal(result.completeness.complete, true);
+    assert.equal(result.sourceRecords[0]?.source_record_id, `${SOURCE_ID}:snapshot:${fetchedAt}`);
+  }
+});
+
+test('duplicate events across complete pages and a failed later page never yield partial membership proof', async () => {
+  const page = await fixture();
+  const oneFeature = page.data.features.slice(0, 1);
+  class DuplicateClient extends HttpClient {
+    calls = 0;
+    override async getJson() {
+      this.calls += 1;
+      return { body: { type: 'FeatureCollection', features: oneFeature,
+        nextPageDetails: { hasMoreRecords: this.calls === 1,
+          nextPageToken: this.calls === 1 ? 'next' : null } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const duplicate = await new PlannedRoadConnector(new DuplicateClient(), () => 'fixture-key', 0).collect(input);
+  assert.equal(duplicate.kind, 'failure');
+  if (duplicate.kind === 'failure') assert.equal(duplicate.code, 'validation_failed');
+  class LaterFailureClient extends HttpClient {
+    calls = 0;
+    override async getJson() {
+      this.calls += 1;
+      if (this.calls === 2) throw new HttpFailure('rate_limited', 429, 1, 30000);
+      return { body: { type: 'FeatureCollection', features: oneFeature,
+        nextPageDetails: { hasMoreRecords: true, nextPageToken: 'next' } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const partial = await new PlannedRoadConnector(new LaterFailureClient(), () => 'fixture-key', 0).collect(input);
+  assert.equal(partial.kind, 'failure');
+  if (partial.kind === 'failure') {
+    assert.equal(partial.code, 'rate_limited');
+    assert.equal(partial.completeness.complete, false);
+    assert.equal(partial.retryAfterSeconds, 30);
+    assert.equal('sourceRecords' in partial, false);
+  }
+});
+
+test('a real HTTP redirect cannot forward the KeyID to a second endpoint', async () => {
+  let forwardedRequests = 0;
+  const server = createServer((request, response) => {
+    if (request.url === '/redirect-target') {
+      forwardedRequests += 1;
+      response.end('{}');
+      return;
+    }
+    assert.equal(request.headers.keyid, 'fixture-key');
+    response.writeHead(302, { Location: '/redirect-target' });
+    response.end();
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const localUrl = `http://127.0.0.1:${address.port}/planned`;
+  class RedirectClient extends HttpClient {
+    override async getJson(request: Parameters<HttpClient['getJson']>[0]) {
+      return super.getJson({ ...request, url: localUrl, maxAttempts: 1 });
+    }
+  }
+  try {
+    const result = await new PlannedRoadConnector(new RedirectClient(), () => 'fixture-key', 0).collect(input);
+    assert.equal(result.kind, 'failure');
+    assert.equal(forwardedRequests, 0);
+    if (result.kind === 'failure') assert.doesNotMatch(result.message, /fixture-key/);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
 });

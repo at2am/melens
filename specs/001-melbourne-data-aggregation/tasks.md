@@ -76,6 +76,8 @@ description: "Melbourne public-data ingestion tasks, split for independent agent
 
 **T037/T039 当前状态**：SQL 视图和本地集成样例已就绪，但 T035 的真实三表映射与当前规则仍缺失。2026-09-30 将视图收紧为仅在已核实唯一 `marker_id` 时展示占用；不直接按同名 `bay_id` 把限制规则关联到车位，也不输出 `may_park_now = yes`。因此 T037 的规则关联和 T039 的 SC-005 真实样本尚未验收。
 
+**五任务并行进度（2026-10-01）**：T031/T061/T035/T037/T039 各由一个 subagent 开发并完成工程交付。道路加入完整／空快照证据和当前成员筛选；T061 从自身官方字典确认 Victorian local time，T031 仍不推断时区。新版私有云端读取分别得到 305 和 9,603 条道路记录，零拒绝；均未发布。真实 BigQuery 道路／GTFS／开发快照 SQL 3/3、停车 SQL 1/1 通过，开发环境视图已更新。停车判定修复无效或未知规则、节假日和迁移等误判，并按市府元数据将停车传感器频率修正为 120 秒。来源准入／重复发布、三表及当前规则证据、SC-002/SC-005 实测仍未齐，五项继续保持未勾选；见 `cloud/data/docs/validation/five-task-parallel-2026-10-01.md`。
+
 **Checkpoint**: A 级来源 #4–#9 与 T035–T039 满足本故事；#24 须提前完成 P0 数据前置验收，B 级 #17/#20 可在同一接口下增量发布。
 
 **历史行人复核（2026-09-29）**：T034 的小时计数已有样例和 Connector。官方 [小时计数说明](https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/) 对发布节奏有“每月”与质量栏“每日”的不一致描述，故清单仅规定每日检查，不声明确定发布周期。已让夏令时重复／不存在的本地小时失败关闭，不能据此伪造 UTC 观测；仍待真实窗口采集、异常小时处理策略及来源准入。

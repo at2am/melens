@@ -10,8 +10,8 @@
   "coverage_area_refs": [],
   "coverage_from": null,
   "coverage_to": null,
-  "cadence_seconds": 60,
-  "check_interval_seconds": 60,
+  "cadence_seconds": 120,
+  "check_interval_seconds": 120,
   "requires_monitoring": true,
   "license_status": "review_required",
   "access_status": "candidate",
@@ -36,5 +36,6 @@
     "staging_retention_days": 1,
     "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bay-sensors/"
   },
-  "join_warning": "Current API has no marker_id or bay_id. Sensor kerbsideid can match the bay export after numeric/string normalization, but restrictions have no complete crosswalk. Never infer legal parking from occupancy alone."
+  "join_warning": "Current API has no marker_id or bay_id. A sample kerbsideid match does not establish an admitted general crosswalk; restrictions have no verified mapping. Never infer legal parking from occupancy alone.",
+  "notes": "Official dataset metadata checked 2026-10-01: quality.update-frequency is 2 Minutes. Sensors are not operational on public holidays and can report construction-blocked bays as vacant. Network relays can delay readings. Public availability needs independent current rule/access evidence; neither a vacant sensor nor a successful fetch proves it."
 }

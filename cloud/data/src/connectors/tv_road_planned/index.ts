@@ -15,6 +15,11 @@ export const PAGE_SIZE = 1000;
 export const MAX_PAGES = 1000;
 // The linked OpenAPI still says 10/minute while the landing page says 20/minute.
 export const PAGE_DELAY_MS = 6100;
+const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v2';
+const localClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
 
 const optionalText = z.string().nullish();
 const recurrenceSchema = z.object({
@@ -76,7 +81,7 @@ export function parsePlannedRoadPage(value: unknown): RoadPage {
   return { kind: 'token', body: tokenPageSchema.parse(value) };
 }
 
-/** Only explicitly offset timestamps prove an absolute instant. */
+/** The official resource dictionary specifies Victorian local time. */
 export function parseVictorianTimestamp(value: string | null | undefined): string | null {
   if (value == null || value.trim() === '') return null;
   const text = value.trim();
@@ -86,9 +91,18 @@ export function parseVictorianTimestamp(value: string | null | undefined): strin
     if (!Number.isFinite(instant.valueOf()) || instant.toISOString().slice(0, 19) !== local[1]) {
       throw new Error('Invalid offsetless timestamp');
     }
-    // The provider has not documented whether this wall clock is UTC or Melbourne.
-    // Retain the original string in source content; never infer an absolute time.
-    return null;
+    const matches = [10, 11].map(hours => instant.valueOf() - hours * 3600_000)
+      .filter(candidate => {
+        const parts = localClock.formatToParts(new Date(candidate));
+        const part = (type: Intl.DateTimeFormatPartTypes) =>
+          parts.find(value => value.type === type)?.value;
+        const roundTrip = `${part('year')}-${part('month')}-${part('day')}`
+          + `T${part('hour')}:${part('minute')}:${part('second')}`;
+        return roundTrip === local[1];
+      });
+    // A repeated hour has two candidates; a skipped hour has none.
+    return matches.length === 1 && matches[0] !== undefined
+      ? new Date(matches[0]).toISOString() : null;
   }
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(text)
     || !z.iso.datetime({ offset: true }).safeParse(text).success) {
@@ -97,7 +111,7 @@ export function parseVictorianTimestamp(value: string | null | undefined): strin
   return new Date(text).toISOString();
 }
 
-function hasUnverifiedTimezone(value: string | null | undefined): boolean {
+function hasUnresolvedLocalTime(value: string | null | undefined): boolean {
   return value != null && value.trim() !== '' && parseVictorianTimestamp(value) === null;
 }
 
@@ -165,8 +179,8 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
     const updatedAt = parseVictorianTimestamp(p.lastUpdated);
     const start = parseVictorianTimestamp(p.duration?.start);
     const end = parseVictorianTimestamp(p.duration?.end);
-    const timezoneUnverified = [p.lastUpdated, p.duration?.start, p.duration?.end]
-      .some(hasUnverifiedTimezone);
+    const localTimeUnresolved = [p.lastUpdated, p.duration?.start, p.duration?.end]
+      .some(hasUnresolvedLocalTime);
     if (start !== null && end !== null && end < start) {
       throw new Error('Planned disruption ends before it starts');
     }
@@ -177,7 +191,7 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
     const sourceId = sourceRecordId({ sourceId: SOURCE_ID, nativeId: p.id,
       originalUrl: LANDING_URL, sourceTime: null });
     const sourceVersion = sourceVersionId(updatedAt, {
-      normalizationPolicy: 'explicit-offset-provider-status-v1', feature,
+      normalizationPolicy: NORMALIZATION_POLICY, feature,
     });
     const detail = JSON.stringify({ source_status: p.status, road: p.closedRoadName,
       start_intersection: p.startIntersectionRoadName,
@@ -190,7 +204,9 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
       event_due_to: p.eventDueTo, description: p.description,
       impact: p.impact, duration: p.duration,
       source_last_updated: p.lastUpdated ?? null,
-      timezone_status: timezoneUnverified ? 'unverified' : 'explicit_offset_or_absent',
+      source_timezone: 'Australia/Melbourne',
+      timezone_status: localTimeUnresolved ? 'ambiguous_or_nonexistent_local_time'
+        : 'documented_victorian_local_or_explicit_offset',
       validity_note: p.duration?.recurrences?.length
         ? 'Overall plan period; recurrence schedule determines impact times'
         : 'Overall plan period; traffic impact depends on source status' });
@@ -198,8 +214,8 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
       fetched_at: fetchedAt, source_record_id: sourceId, version_id: sourceVersion,
       original_url: LANDING_URL, raw_uri: null, published_at: null,
       observed_at: null, first_accessible_at: fetchedAt,
-      time_missing_reason: timezoneUnverified
-        ? 'Source creation time absent; source timestamp timezone unverified; wall clocks retained'
+      time_missing_reason: localTimeUnresolved
+        ? 'Source creation time absent; ambiguous or nonexistent Victorian local time retained without an absolute instant'
         : 'Source does not provide an event creation time',
       valid_from: start, valid_to: end, source_updated_at: updatedAt,
       source_version_ordinal: null, record_status: sourceRecordStatus, assertion_kind: 'plan',
@@ -233,8 +249,28 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         original_url: LANDING_URL });
     }
   }
+  const canonicalMembership = geoRecords.map(row => [row.geo_record_id, row.version_id])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const snapshotId = sourceRecordId({ sourceId: SOURCE_ID, nativeId: `snapshot:${fetchedAt}`,
+    originalUrl: LANDING_URL, sourceTime: null });
+  const snapshotVersion = sourceVersionId(null, { policy: 'complete-road-snapshot-v1',
+    canonicalMembership });
+  sourceRecords.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
+    fetched_at: fetchedAt, source_record_id: snapshotId, version_id: snapshotVersion,
+    original_url: LANDING_URL, raw_uri: null, published_at: null, observed_at: null,
+    first_accessible_at: fetchedAt,
+    time_missing_reason: 'Complete fetch snapshot membership; fetch time is not event time',
+    valid_from: null, valid_to: null, source_updated_at: null, source_version_ordinal: null,
+    record_status: 'active', assertion_kind: 'observation', rights_status: 'review_required' });
+  for (const row of geoRecords) {
+    geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
+      fetched_at: fetchedAt, geo_record_id: row.geo_record_id, version_id: row.version_id,
+      source_record_id: snapshotId, source_version_id: snapshotVersion,
+      evidence_role: 'road_snapshot_membership', original_url: LANDING_URL });
+  }
   return { sourceRecords, geoRecords, geoRecordSources, latestUpdate,
-    sourceRevision: sourceVersionId(null, { normalizationPolicy: 'explicit-offset-provider-status-v1',
+    sourceRevision: sourceVersionId(null, { normalizationPolicy: NORMALIZATION_POLICY,
+      snapshotId, snapshotVersion,
       features: [...features].sort((a, b) => a.properties.id.localeCompare(b.properties.id)) }) };
 }
 
@@ -265,7 +301,7 @@ export class PlannedRoadConnector implements Connector {
         url.searchParams.set('limit', String(PAGE_SIZE));
         const response = await this.client.getJson({ url,
           headers: { KeyID: key, ...(nextToken === null ? {} : { NextPageToken: nextToken }) },
-          timeoutMs: 25000, maxAttempts: 3 });
+          redirect: 'error', timeoutMs: 25000, maxAttempts: 1 });
         const parsed = parsePlannedRoadPage(response.body);
         fetchedAt = response.fetchedAt;
         fetchedPages = page;
@@ -274,6 +310,10 @@ export class PlannedRoadConnector implements Connector {
         if (parsed.kind === 'numbered') {
           const { meta, data } = parsed.body;
           if (meta.page !== page || meta.count !== data.features.length
+            || meta.total_pages > MAX_PAGES
+            || (meta.total_records === 0 && (meta.total_pages > 1 || meta.count !== 0))
+            || (meta.total_records > 0 && (meta.total_pages === 0 || meta.count === 0))
+            || (meta.total_pages > 0 && page > meta.total_pages)
             || (expectedRecords !== null && meta.total_records !== expectedRecords)
             || (expectedPages !== null && meta.total_pages !== expectedPages)) {
             return failure(input, 'incomplete_window');
@@ -286,7 +326,8 @@ export class PlannedRoadConnector implements Connector {
           features.push(...parsed.body.features);
           const details = parsed.body.nextPageDetails;
           if (!details.hasMoreRecords) break;
-          if (!details.nextPageToken || seenTokens.has(details.nextPageToken)) {
+          if (parsed.body.features.length === 0 || !details.nextPageToken?.trim()
+            || seenTokens.has(details.nextPageToken)) {
             return failure(input, 'incomplete_window');
           }
           nextToken = details.nextPageToken;

@@ -132,8 +132,19 @@ export function privateProbeSummary(result: ConnectorResult) {
     source_latest_update_at: result.sourceLatestUpdateAt,
     input_count: result.inputCount, output_count: result.outputCount,
     rejected_count: result.rejectedCount, completeness: result.completeness,
+    source_records: result.sourceRecords.length,
     geo_records: result.geoRecords.length,
     located_records: result.geoRecords.filter(record => record.geometry_geojson !== null).length,
+    source_time_missing_count: result.sourceRecords.filter(record =>
+      record.observed_at === null && record.published_at === null).length,
+    absolute_source_update_count: result.sourceRecords.filter(record =>
+      record.source_updated_at !== null).length,
+    road_snapshot_count: result.sourceRecords.filter(record =>
+      record.source_record_id.startsWith(`${result.sourceId}:snapshot:`)).length,
+    road_snapshot_membership_count: result.geoRecordSources.filter(link =>
+      link.evidence_role === 'road_snapshot_membership').length,
+    lifecycle_counts: Object.fromEntries(['active', 'planned', 'resolved', 'cancelled', 'withdrawn']
+      .map(status => [status, result.geoRecords.filter(record => record.record_status === status).length])),
     future_source_timestamp_count: result.sourceRecords.filter(record =>
       record.source_updated_at !== null
       && Date.parse(record.source_updated_at) > Date.parse(result.fetchedAt) + 300_000).length,

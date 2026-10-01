@@ -888,7 +888,7 @@ test('rules from com_parking_restrictions ensure undated, expired, unknown-holid
   assert.equal(unknownHolidayDecision.mayParkNow, 'unknown');
   assert.ok(unknownHolidayDecision.reasons.includes('rule_ambiguous'));
 
-  // 4. Rule with does_not_apply holiday applicability on a public holiday -> unknown (rule_ambiguous)
+  // 4. A rule that excludes public holidays gives no applicable rule that day.
   const doesNotApplyRule: ParkingRule = {
     ...datedRule,
     holiday_applicability: 'does_not_apply',
@@ -899,7 +899,7 @@ test('rules from com_parking_restrictions ensure undated, expired, unknown-holid
     melbournePublicHoliday: true,
   });
   assert.equal(holidayDecision.mayParkNow, 'unknown');
-  assert.ok(holidayDecision.reasons.includes('rule_ambiguous'));
+  assert.ok(holidayDecision.reasons.includes('no_current_rule'));
 
   // 5. Rule with exemption -> unknown (rule_ambiguous)
   const exemptionRule: ParkingRule = {

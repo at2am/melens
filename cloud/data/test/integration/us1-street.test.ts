@@ -2,15 +2,16 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { BigQuery } from '@google-cloud/bigquery';
+import { z } from 'zod';
+
 import type {
   DataSource,
-  GeoRecord,
   ParkingBay,
   ParkingObservation,
   ParkingRule,
   PedestrianObservation,
   SensorLocation,
-  SourceRecord,
 } from '../../src/core/types.js';
 import {
   evaluateParkingBay,
@@ -19,22 +20,25 @@ import {
 } from '../../src/normalization/parking.js';
 import {
   joinPedestrianObservations,
-  type LocatedPedestrianObservation,
 } from '../../src/normalization/pedestrian.js';
 import {
   normalizeRoadSnapshot,
   parseRoadPage,
+  UnplannedRoadConnector,
 } from '../../src/connectors/tv_road_unplanned/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
 import { ParkingBaysConnector } from '../../src/connectors/com_parking_bays/index.js';
 import { ParkingSensorsConnector } from '../../src/connectors/com_parking_sensors/index.js';
 import { ParkingRestrictionsConnector } from '../../src/connectors/com_parking_restrictions/index.js';
-import { HttpClient, type HttpResponse } from '../../src/core/http.js';
+import { PedestrianLocationsConnector } from '../../src/connectors/com_pedestrian_locations/index.js';
+import type { DataConfig } from '../../src/core/config.js';
+import { HttpClient, HttpFailure, type HttpResponse } from '../../src/core/http.js';
 import { OpenDataSoftClient, type OdsQuery, type OdsRecords } from '../../src/core/opendatasoft.js';
+import { withPublishedPedestrianLocationHistory } from '../../src/core/pedestrian-location-history.js';
+import { parseSourceRecord } from '../../src/validation/record.js';
 import {
   computeCoverageStatus,
   computeSourceHealth,
-  type SourceHealth,
 } from '../../src/core/health.js';
 
 /**
@@ -49,15 +53,15 @@ import {
  * not the real-source sample required for SC-005 production acceptance. The
  * current three City of Melbourne exports do not provide a verified three-way
  * crosswalk or current rule validity evidence, so T035 remains open.
- * The SC-002 timing examples below also use synthetic logs; a 24-hour cloud
- * observation window is still needed for operational acceptance.
+ * A 24-hour cloud observation window is still needed for SC-002 operational
+ * acceptance. Local examples cannot establish its denominator or visibility.
  *
  * 2. Parking bay evaluation using cloud/data/src/normalization/parking.ts:
  *    - Complete parking bay matching (marker_id to sensor, bay_id to rule,
  *      sensorBayId crosswalk).
  *    - Missing rules / conflict / expiration handling (mayParkNow: 'unknown').
  *    - Insufficient holiday evidence handling (unknown when holiday status is
- *      null for non-all_days rules).
+ *      null, including an all_days rule).
  *    - Conflicting rules never become an allow conclusion.
  *    - Stale occupancy observations (>2x cadence budget) marked as 'stale' and
  *      cannot prove current availability.
@@ -76,8 +80,7 @@ import {
  *    - Cleared road disruptions no longer active current events.
  *    - Source interruption / latency does not report as 'zero disruptions' or
  *      'realtime'.
- *    - SC-002 dynamic source monitoring: >= 95% latency threshold, sample size
- *      >= 20 guard, upstream interruption guard.
+ *    - Real-source SC-002 and SC-005 gates are documented separately.
  * ============================================================================
  */
 
@@ -92,14 +95,14 @@ const PROVENANCE = {
   fetched_at: '2026-09-28T00:08:00Z',
 };
 
-async function loadFixtureJson<T>(relativePath: string): Promise<T> {
+async function loadFixtureJson(relativePath: string): Promise<unknown> {
   try {
     const raw = await readFile(new URL(relativePath, import.meta.url), 'utf8');
-    return JSON.parse(raw) as T;
+    return JSON.parse(raw);
   } catch {
     const fallback = new URL(`../../test/fixtures/${relativePath.replace(/^.*fixtures\//, '')}`, import.meta.url);
     const raw = await readFile(fallback, 'utf8');
-    return JSON.parse(raw) as T;
+    return JSON.parse(raw);
   }
 }
 
@@ -184,8 +187,7 @@ test('Synthetic SC-005 contract: 30 complete parking bay samples cover weekdays 
     expectedReason: string;
   }> = [];
 
-  for (let i = 0; i < 30; i++) {
-    const sched = schedules[i]!;
+  for (const [i, sched] of schedules.entries()) {
     const bayId = `bay:complete:${i + 1}`;
     const markerId = `marker:complete:${i + 1}`;
     const sensorBayId = `sensor-bay:${i + 1}`;
@@ -210,7 +212,6 @@ test('Synthetic SC-005 contract: 30 complete parking bay samples cover weekdays 
 
     const now = new Date(sched.isoUtc);
     const observedAt = new Date(now.getTime() - 120 * 1000).toISOString();
-    const lastSuccessfulCheckAt = new Date(now.getTime() - 60 * 1000).toISOString();
 
     let occupied: boolean;
     let restrictionType: 'parking_allowed' | 'no_parking';
@@ -393,7 +394,7 @@ test('Synthetic SC-005 contract: 10 anomaly samples never claim immediate legal 
 
   const baseCrosswalk: VerifiedRuleCrosswalk = {
     bayId: baseBay.bay_id,
-    sensorBayId: baseObservation.bay_id!,
+    sensorBayId: 'sensor-bay:anomaly:base',
     ruleBayId: baseRule.bay_id,
     evidenceUrl: 'https://example.test/fixtures/parking-crosswalk/anomaly-base',
     verified: true,
@@ -687,30 +688,30 @@ test('Synthetic SC-005 contract: 10 anomaly samples never claim immediate legal 
     assert.ok(sample.decision.reasons.includes(sample.expectedReason),
       `Anomaly ${sample.name} missing reason ${sample.expectedReason}. Got: ${sample.decision.reasons.join(', ')}`);
 
-    // CRITICAL SC-005 GATE: 0 anomaly samples can EVER be described as allowing immediate legal parking
+    // Synthetic anomaly cases must never describe immediate legal parking.
     assert.notEqual(sample.decision.mayParkNow, 'yes',
       `CRITICAL FAILURE: Anomaly sample ${sample.name} allowed immediate parking!`);
   }
 
   const zeroAllowed = anomalyResults.filter(s => s.decision.mayParkNow === 'yes').length;
-  assert.equal(zeroAllowed, 0, 'SC-005 gate: Exactly 0 out of 10 anomaly samples can result in yes');
+  assert.equal(zeroAllowed, 0, 'Synthetic contract: Exactly 0 out of 10 anomaly samples can result in yes');
 });
 
-test('Current City of Melbourne parking fixtures cannot establish a legal parking permission', async () => {
-  type Fixture = { total_count: number; results: unknown[] };
+test('Current City of Melbourne API-shaped parking fixtures cannot establish a legal parking permission', async () => {
+  const fixtureSchema = z.object({ total_count: z.number().int().nonnegative(), results: z.array(z.unknown()) });
   const [bays, sensors, restrictions] = await Promise.all([
-    loadFixtureJson<Fixture>('../fixtures/com_parking_bays.json'),
-    loadFixtureJson<Fixture>('../fixtures/com_parking_sensors.json'),
-    loadFixtureJson<Fixture>('../fixtures/com_parking_restrictions.json'),
+    loadFixtureJson('../fixtures/com_parking_bays.json').then(value => fixtureSchema.parse(value)),
+    loadFixtureJson('../fixtures/com_parking_sensors.json').then(value => fixtureSchema.parse(value)),
+    loadFixtureJson('../fixtures/com_parking_restrictions.json').then(value => fixtureSchema.parse(value)),
   ]);
   const fetchedAt = '2026-09-28T13:10:00Z';
 
   class FixtureBayHttpClient extends HttpClient {
-    override async getJson<T>(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<T>> {
+    override async getJson(request: Parameters<HttpClient['getJson']>[0]): Promise<HttpResponse<unknown>> {
       const body = String(request.url).includes('/records?limit=0')
         ? { total_count: bays.total_count } : bays.results;
       return {
-        body: body as T, status: 200, fetchedAt,
+        body, status: 200, fetchedAt,
         etag: null, lastModified: null, contentType: 'application/json',
       };
     }
@@ -823,7 +824,7 @@ test('Parking edge cases: vehicle class, exemptions, missing keys, expired bays,
 
   const ruleCrosswalk: VerifiedRuleCrosswalk = {
     bayId: bay.bay_id,
-    sensorBayId: observation.bay_id!,
+    sensorBayId: 'sensor-bay:edge:1',
     ruleBayId: rule.bay_id,
     evidenceUrl: 'https://example.test/fixtures/parking-crosswalk/edge',
     verified: true,
@@ -892,8 +893,7 @@ test('Parking edge cases: vehicle class, exemptions, missing keys, expired bays,
     assert.equal(onHoliday.mayParkNow, 'yes');
 
     const notOnHoliday = evaluateParkingBay({ ...baseInput, rules: [phRule], melbournePublicHoliday: false });
-    assert.equal(notOnHoliday.mayParkNow, 'unknown');
-    assert.ok(notOnHoliday.reasons.includes('rule_ambiguous'));
+    assert.equal(notOnHoliday.mayParkNow, 'yes');
   }
 
   // 7. Missing bay marker (marker_id: null)
@@ -935,6 +935,72 @@ test('Parking edge cases: vehicle class, exemptions, missing keys, expired bays,
     assert.equal(decision.mayParkNow, 'unknown');
     assert.ok(decision.reasons.includes('no_current_rule'));
   }
+
+  const uncertainRules: Array<{ name: string; patch: Partial<ParkingRule> }> = [
+    { name: 'invalid validity start', patch: { valid_from: 'not-a-time' } },
+    { name: 'invalid validity end', patch: { valid_to: 'not-a-time' } },
+    { name: 'reversed validity', patch: { valid_from: '2026-09-01T00:00:00Z', valid_to: '2026-01-01T00:00:00Z' } },
+    { name: 'undated rule', patch: { valid_from: null } },
+    { name: 'missing start clock', patch: { start_minute_of_day: null } },
+    { name: 'missing end clock', patch: { end_minute_of_day: null } },
+    { name: 'missing weekday', patch: { days_of_week: [] } },
+    { name: 'unknown holiday policy', patch: { holiday_applicability: 'unknown' } },
+    { name: 'unknown restriction', patch: { restriction_type: 'untranslated_sign' } },
+    { name: 'unknown vehicle class', patch: { vehicle_class: 'unclassified' } },
+    { name: 'permit exemption', patch: { exemption: 'Permit holders excepted' } },
+    { name: 'overnight schedule without day ownership', patch: { start_minute_of_day: 1380, end_minute_of_day: 60 } },
+    { name: 'equal clock endpoints', patch: { start_minute_of_day: 630, end_minute_of_day: 630 } },
+  ];
+  for (const { name, patch } of uncertainRules) {
+    const uncertain = { ...rule, ...patch, rule_id: `uncertain:${name}` };
+    const onlyUncertain = evaluateParkingBay({ ...baseInput, rules: [uncertain] });
+    assert.equal(onlyUncertain.mayParkNow, 'unknown', name);
+    const alongsideAllow = evaluateParkingBay({ ...baseInput, rules: [rule, uncertain] });
+    assert.equal(alongsideAllow.mayParkNow, 'unknown', `${name} cannot be ignored beside an allow rule`);
+    assert.equal(alongsideAllow.occupied, false, `${name} must retain occupancy evidence`);
+  }
+
+  for (const irrelevantRule of [
+    { ...rule, rule_id: 'expired', valid_to: '2026-09-01T00:00:00Z' },
+    { ...rule, rule_id: 'future', valid_from: '2026-10-01T00:00:00Z' },
+    { ...rule, rule_id: 'tuesday', days_of_week: [2] },
+    { ...rule, rule_id: 'evening', start_minute_of_day: 1200, end_minute_of_day: 1320 },
+    { ...rule, rule_id: 'different-bay', bay_id: 'another-rule-bay' },
+  ]) {
+    const decision = evaluateParkingBay({ ...baseInput, rules: [rule, irrelevantRule] });
+    assert.equal(decision.mayParkNow, 'yes', `${irrelevantRule.rule_id} is proven irrelevant to this decision`);
+    assert.deepEqual(decision.appliedRuleIds, [rule.rule_id]);
+  }
+
+  const unknownHoliday = evaluateParkingBay({ ...baseInput, melbournePublicHoliday: null });
+  assert.equal(unknownHoliday.occupied, false);
+  assert.equal(unknownHoliday.mayParkNow, 'unknown', 'all_days does not supply missing authoritative holiday evidence');
+
+  const citySensor = { ...observation, source_id: 'melbourne.parking.sensors' };
+  for (const holiday of [true, null]) {
+    const decision = evaluateParkingBay({ ...baseInput, observations: [citySensor],
+      melbournePublicHoliday: holiday, cadenceSeconds: 120 });
+    assert.equal(decision.occupied, false, 'Source operating limits retain the reported reading');
+    assert.equal(decision.occupancyFreshness, 'unknown', 'City parking sensors do not prove current occupancy during holidays');
+    assert.equal(decision.mayParkNow, 'unknown');
+  }
+  const cityOrdinaryDay = evaluateParkingBay({ ...baseInput, observations: [citySensor], cadenceSeconds: 120 });
+  assert.equal(cityOrdinaryDay.occupancyFreshness, 'current');
+  assert.equal(cityOrdinaryDay.mayParkNow, 'yes', 'The synthetic complete association works within source operating limits');
+
+  for (const elapsedSeconds of [600, 601]) {
+    const freshUntil = evaluateParkingBay({ ...baseInput, observations: [{ ...observation,
+      observed_at: new Date(now.getTime() - elapsedSeconds * 1000).toISOString(),
+    }] });
+    assert.equal(freshUntil.mayParkNow, elapsedSeconds === 600 ? 'yes' : 'unknown');
+  }
+
+  const movedSensor = evaluateParkingBay({ ...baseInput, observations: [observation,
+    { ...observation, marker_id: 'different-marker',
+      observed_at: new Date(now.getTime() - 30_000).toISOString(), version_id: 'after-move' },
+  ] });
+  assert.equal(movedSensor.occupied, null, 'A newer observation at another marker supersedes this device old bay reading');
+  assert.equal(movedSensor.mayParkNow, 'unknown');
 });
 
 // ============================================================================
@@ -1234,13 +1300,73 @@ test('Pedestrian: inactive devices, decommissioned sensors, and ambiguous locati
 // PART 3: Road Disruption Clearance & Source Interruption (SC-002, SC-005)
 // ============================================================================
 
-test('Road Disruption: cleared incidents are resolved and excluded from active current events', async () => {
-  const fixture = await loadFixtureJson<{
-    meta: unknown;
-    data: { type: string; features: unknown[] };
-  }>('../fixtures/tv_road_unplanned.json');
+test('Pedestrian: published history survives cold runs, source disappearance, and reappearance without invented counts or move dates', async t => {
+  const config: DataConfig = { projectId: 'melens-fixture', region: 'australia-southeast2',
+    bucketName: 'fixture', ingestDataset: 'melens_ingest', queryDataset: 'melens_query',
+    secretNames: [], maxBytesBilled: '100000000' };
+  const bigquery = new BigQuery({ projectId: config.projectId });
+  const publishedIntervals = new Map<string, SensorLocation>();
+  t.mock.method(bigquery, 'query', async () => [Array.from(publishedIntervals.values(),
+    location => ({ location: JSON.stringify(location) }))]);
+  const input = parseConnectorInput({ sourceId: 'melbourne.pedestrian.locations',
+    window: { kind: 'snapshot', revision: 'synthetic-current' }, checkpoint: null, runId: 'first-location' });
+  const location = { location_id: 999, sensor_description: 'Synthetic move fixture',
+    installation_date: '2010-01-01', latitude: -37.81, longitude: 144.96, status: 'A' };
 
-  const parsed = parseRoadPage(fixture);
+  async function collect(records: unknown[], fetchedAt: string, runId: string) {
+    class SnapshotClient extends OpenDataSoftClient {
+      override async fetchRecords(): Promise<OdsRecords> {
+        return { records, fetchedAt, lastModified: null, pageCount: 1, totalCount: records.length };
+      }
+    }
+    const restored = await withPublishedPedestrianLocationHistory({ ...input, runId }, config, bigquery);
+    const result = await new PedestrianLocationsConnector({ client: new SnapshotClient() }).collect(restored);
+    assert.equal(result.kind, 'success');
+    if (result.kind !== 'success') throw new Error('Synthetic location collection failed');
+    for (const interval of result.sensorLocations) {
+      const fact = result.sourceRecords.find(record => record.source_record_id === interval.source_record_id
+        && record.version_id === interval.version_id && record.batch_id === interval.batch_id);
+      assert.ok(fact, 'An interval requires a same-batch source fact for publication');
+      parseSourceRecord(fact);
+      publishedIntervals.set(`${interval.sensor_id}:${interval.valid_from}`, interval);
+    }
+    return result;
+  }
+
+  await collect([location], '2026-09-28T00:00:00.000Z', 'initial');
+  await collect([location], '2026-09-28T00:10:00.000Z', 'confirmed');
+  const moved = await collect([{ ...location, longitude: 144.97 }], '2026-09-28T00:30:00.000Z', 'moved');
+  const previous = moved.sensorLocations.find(row => row.valid_to !== null);
+  const current = moved.sensorLocations.find(row => row.valid_to === null);
+  assert.equal(previous?.valid_to, '2026-09-28T00:10:00.000Z');
+  assert.equal(current?.valid_from, '2026-09-28T00:30:00.000Z');
+  assert.notEqual(current?.valid_from, '2010-01-01T00:00:00.000Z', 'Installation date is not location evidence');
+
+  const disappeared = await collect([], '2026-09-28T00:40:00.000Z', 'disappeared');
+  assert.equal(disappeared.geoRecords.length, 0);
+  assert.equal(disappeared.sensorLocations[0]?.valid_to, '2026-09-28T00:30:00.000Z');
+  assert.equal(disappeared.sensorLocations[0]?.device_status, 'A', 'Missing membership is not a reported removal status');
+  await collect([{ ...location, longitude: 144.98 }], '2026-09-28T01:00:00.000Z', 'reappeared');
+
+  const timestamps = ['2026-09-27T23:59:00Z', '2026-09-28T00:05:00Z',
+    '2026-09-28T00:20:00Z', '2026-09-28T00:45:00Z', '2026-09-28T01:05:00Z'];
+  const observations: PedestrianObservation[] = timestamps.map((observedAt, index) => ({
+    ...PROVENANCE, source_id: 'melbourne.pedestrian.minute', sensor_id: '999', observed_at: observedAt,
+    version_id: `count:${index}`, source_record_id: `minute:${index}`, direction_a_count: null,
+    direction_b_count: null, total_count: index === 2 ? null : index === 3 ? 0 : 3,
+  }));
+  const joined = joinPedestrianObservations({ observations,
+    locations: Array.from(publishedIntervals.values()), granularity: 'minute' });
+  assert.deepEqual(joined.map(row => row.locationStatus),
+    ['unlocated', 'located', 'unlocated', 'unlocated', 'located']);
+  assert.deepEqual(joined.map(row => row.observation.total_count), [3, 3, null, 0, 3]);
+  assert.equal(joined.length, timestamps.length, 'Missing minutes remain absent across source gaps');
+  assert.equal(joined[1]?.location?.geometry_geojson, JSON.stringify({ type: 'Point', coordinates: [144.96, -37.81] }));
+  assert.equal(joined[4]?.location?.geometry_geojson, JSON.stringify({ type: 'Point', coordinates: [144.98, -37.81] }));
+});
+
+test('Road disruption normalization retains clearance facts and exact parent, impact, and snapshot evidence', async () => {
+  const parsed = parseRoadPage(await loadFixtureJson('../fixtures/tv_road_unplanned.json'));
   const input = parseConnectorInput({
     sourceId: 'victoria.transport.road_unplanned',
     window: { kind: 'time', from: '2026-09-28T00:00:00Z', to: '2026-09-28T00:15:00Z' },
@@ -1249,7 +1375,7 @@ test('Road Disruption: cleared incidents are resolved and excluded from active c
   });
 
   const normalized = normalizeRoadSnapshot(parsed.data.features, input, '2026-09-28T00:06:00Z');
-  assert.equal(normalized.geoRecords.length, 2);
+  assert.equal(normalized.geoRecords.length, parsed.data.features.length);
 
   const activeRecord = normalized.geoRecords.find(r => r.record_status === 'active');
   const resolvedRecord = normalized.geoRecords.find(r => r.record_status === 'resolved');
@@ -1260,28 +1386,63 @@ test('Road Disruption: cleared incidents are resolved and excluded from active c
   assert.equal(activeRecord?.valid_to, null, 'Active incident must have null valid_to');
   assert.equal(resolvedRecord?.valid_to, '2026-09-28T00:04:00.000Z', 'Resolved incident must record closure timestamp');
 
-  // Emulate BigQuery view v_road_disruptions_current filter:
-  // WHERE topic = 'road_disruption' AND record_status = 'active'
-  //   AND (valid_from IS NULL OR valid_from <= now)
-  //   AND (valid_to IS NULL OR valid_to > now)
-  const queryTime = new Date('2026-09-28T00:05:00Z');
-  const currentDisruptions = normalized.geoRecords.filter(r => {
-    if (r.topic !== 'road_disruption') return false;
-    if (r.record_status !== 'active') return false;
-    if (r.valid_from !== null && Date.parse(r.valid_from) > queryTime.getTime()) return false;
-    if (r.valid_to !== null && Date.parse(r.valid_to) <= queryTime.getTime()) return false;
-    return true;
-  });
+  const parents = new Set<string>();
+  const snapshots = new Set<string>();
+  for (const record of normalized.geoRecords) {
+    const links = normalized.geoRecordSources.filter(link => link.geo_record_id === record.geo_record_id
+      && link.version_id === record.version_id);
+    assert.deepEqual(new Set(links.map(link => link.evidence_role)),
+      new Set(['parent_incident', 'child_impact', 'road_snapshot_membership']));
+    for (const link of links) {
+      const fact = normalized.sourceRecords.find(source => source.batch_id === record.batch_id
+        && source.source_record_id === link.source_record_id && source.version_id === link.source_version_id);
+      assert.ok(fact, 'Every accepted road record has exact source evidence');
+      parseSourceRecord(fact);
+      if (link.evidence_role === 'parent_incident') parents.add(link.source_record_id);
+      if (link.evidence_role === 'road_snapshot_membership') snapshots.add(link.source_record_id);
+    }
+  }
+  assert.equal(parents.size, 1, 'Independent child clearance does not create another parent incident');
+  assert.equal(snapshots.size, 1, 'The children belong to one complete source snapshot');
+});
 
-  assert.equal(currentDisruptions.length, 1);
-  assert.equal(currentDisruptions[0]?.geo_record_id, activeRecord?.geo_record_id);
+test('Road complete empty snapshots report membership, while outages expose no publishable disappearance or inferred clearance', async t => {
+  const parsed = parseRoadPage(await loadFixtureJson('../fixtures/tv_road_unplanned.json'));
+  const empty = parseRoadPage({ meta: { total_records: 0, total_pages: 0, page: 1, count: 0 },
+    data: { type: 'FeatureCollection', features: [] } });
+  const input = parseConnectorInput({ sourceId: 'victoria.transport.road_unplanned',
+    window: { kind: 'snapshot', revision: 'fixture' }, checkpoint: null, runId: 'road-populated' });
+  const client = new HttpClient();
+  let body = parsed;
+  let fetchedAt = '2026-09-28T00:06:00.000Z';
+  const request = t.mock.method(client, 'getJson', async (): Promise<HttpResponse<unknown>> => ({
+    body, fetchedAt, status: 200, etag: null, lastModified: null, contentType: 'application/json',
+  }));
+  const connector = new UnplannedRoadConnector(client, () => 'synthetic-key', 0);
+  const populated = await connector.collect(input);
+  assert.equal(populated.kind, 'success');
+  if (populated.kind !== 'success') throw new Error('Synthetic road snapshot failed');
+  body = empty;
+  fetchedAt = '2026-09-28T00:07:00.000Z';
+  const clearedMembership = await connector.collect({ ...input, runId: 'road-empty' });
+  assert.equal(clearedMembership.kind, 'success');
+  if (clearedMembership.kind !== 'success') throw new Error('Synthetic empty snapshot failed');
+  assert.equal(clearedMembership.completeness.complete, true);
+  assert.equal(clearedMembership.geoRecords.length, 0);
+  assert.equal(clearedMembership.sourceRecords.length, 1, 'An empty complete snapshot persists its own source fact');
+  assert.equal(clearedMembership.sourceRecords[0]?.first_accessible_at, fetchedAt);
+  assert.equal(clearedMembership.sourceRecords[0]?.valid_to, null,
+    'Absence from a snapshot does not invent incident clearance time');
+  assert.notEqual(clearedMembership.sourceRevision, populated.sourceRevision);
 
-  // Resolved incident is strictly EXCLUDED from current events view
-  assert.equal(currentDisruptions.some(r => r.geo_record_id === resolvedRecord?.geo_record_id), false);
-
-  // Both records remain available in historical view (v_road_disruptions_history)
-  const historyDisruptions = normalized.geoRecords.filter(r => r.topic === 'road_disruption');
-  assert.equal(historyDisruptions.length, 2);
+  request.mock.mockImplementation(async () => { throw new HttpFailure('upstream_unavailable', 503, 1); });
+  const interrupted = await connector.collect({ ...input, runId: 'road-outage' });
+  assert.equal(interrupted.kind, 'failure');
+  if (interrupted.kind !== 'failure') throw new Error('Outage was accepted');
+  assert.equal(interrupted.completeness.complete, false);
+  assert.equal('geoRecords' in interrupted, false);
+  assert.equal('sourceRecords' in interrupted, false,
+    'A failed fetch cannot replace the prior published snapshot with zero incidents');
 });
 
 test('Source Health & Empty Results: interruption and latency do not report as zero disruptions or realtime', () => {
@@ -1320,8 +1481,6 @@ test('Source Health & Empty Results: interruption and latency do not report as z
     last_source_update_at: '2026-09-28T01:00:00Z',
     record_granularity: 'incident_impact',
   };
-
-  const budgetSeconds = 120; // 2 * 60s
 
   // Scenario 1: Source is HEALTHY and CURRENT with 0 disruptions in database
   // Result: coverage_status is 'no_matching_records' (explicitly certified clean)
@@ -1428,159 +1587,26 @@ test('Source Health & Empty Results: interruption and latency do not report as z
     });
     assert.equal(coverage, 'not_covered');
   }
-});
 
-test('Synthetic SC-002 logs illustrate latency threshold and sample guards', () => {
-  /**
-   * SC-002 specification:
-   * "对首期每个需要持续监测的动态来源，在连续 24 小时、上游可访问的观察窗内，
-   * 至少 95% 的唯一新增或变更记录须在首次可访问后两个更新周期内可查询。"
-   * "上游不可用时段及来源没有发布新记录的窗口单独报告，不以零记录宣称通过；
-   * 若样本不足 20 条，继续观察并报告“样本不足”，不宣称通过。"
-   */
+  const baseline = {
+    source: roadSource, now: '2026-09-28T01:01:00Z', lastCheckedAt: '2026-09-28T01:01:00Z',
+    lastSuccessAt: '2026-09-28T01:01:00Z', latestCheckSucceeded: true,
+    latestUpstreamUpdateAt: '2026-09-27T01:00:00Z', consecutiveFailures: 0, knownGapCount: 0,
+  };
+  const unchanged = computeSourceHealth(baseline);
+  assert.equal(unchanged.state, 'current', 'A successful no-change response is not a new event, but still confirms source health');
+  assert.equal(unchanged.latestUpstreamUpdateAt, '2026-09-27T01:00:00Z');
 
-  interface Sc002RecordLog {
-    recordId: string;
-    firstAccessibleAt: string;
-    queryVisibleAt: string;
-  }
-
-  function evaluateSc002Compliance(input: {
-    cadenceSeconds: number;
-    observationWindowHours: number;
-    upstreamAvailable: boolean;
-    records: readonly Sc002RecordLog[];
-  }): {
-    status: 'pass' | 'fail' | 'sample_insufficient' | 'source_interrupted';
-    totalRecords: number;
-    onTimeRecords: number;
-    complianceRate: number | null;
-    maxAllowedLatencySeconds: number;
-  } {
-    const maxAllowedLatencySeconds = 2 * input.cadenceSeconds;
-
-    if (!input.upstreamAvailable) {
-      return {
-        status: 'source_interrupted',
-        totalRecords: input.records.length,
-        onTimeRecords: 0,
-        complianceRate: null,
-        maxAllowedLatencySeconds,
-      };
+  for (const uncertain of [
+    computeSourceHealth({ ...baseline, latestCheckSucceeded: false, consecutiveFailures: 1 }),
+    computeSourceHealth({ ...baseline, knownGapCount: 1 }),
+    computeSourceHealth({ ...baseline, source: { ...roadSource, access_status: 'candidate' } }),
+  ]) {
+    assert.equal(uncertain.state, 'unknown');
+    for (const matchingRecords of [0, 1]) {
+      assert.equal(computeCoverageStatus({ coveringSources: [unchanged, uncertain],
+        matchingRecords, completeWindow: true }), 'unknown',
+      'A healthy source cannot hide a second source outage, gap, or missing admission');
     }
-
-    if (input.records.length < 20) {
-      return {
-        status: 'sample_insufficient',
-        totalRecords: input.records.length,
-        onTimeRecords: 0,
-        complianceRate: null,
-        maxAllowedLatencySeconds,
-      };
-    }
-
-    let onTimeRecords = 0;
-    for (const record of input.records) {
-      const accessibleMs = Date.parse(record.firstAccessibleAt);
-      const visibleMs = Date.parse(record.queryVisibleAt);
-      const latencySeconds = (visibleMs - accessibleMs) / 1000;
-      if (latencySeconds <= maxAllowedLatencySeconds) {
-        onTimeRecords++;
-      }
-    }
-
-    const complianceRate = onTimeRecords / input.records.length;
-    const status = complianceRate >= 0.95 ? 'pass' : 'fail';
-
-    return {
-      status,
-      totalRecords: input.records.length,
-      onTimeRecords,
-      complianceRate,
-      maxAllowedLatencySeconds,
-    };
-  }
-
-  const cadenceSeconds = 60; // 60s cadence -> 2x cycle is 120s
-
-  // Case 1: Pass scenario (25 records, 24 visible in <= 120s = 96% >= 95%)
-  {
-    const records: Sc002RecordLog[] = [];
-    for (let i = 0; i < 25; i++) {
-      const t0 = new Date('2026-09-28T00:00:00Z').getTime() + i * 3600 * 1000;
-      // 24 on-time (latency 45s), 1 delayed (latency 150s)
-      const latency = i === 0 ? 150 : 45;
-      records.push({
-        recordId: `rec-${i}`,
-        firstAccessibleAt: new Date(t0).toISOString(),
-        queryVisibleAt: new Date(t0 + latency * 1000).toISOString(),
-      });
-    }
-
-    const evaluation = evaluateSc002Compliance({
-      cadenceSeconds,
-      observationWindowHours: 24,
-      upstreamAvailable: true,
-      records,
-    });
-    assert.equal(evaluation.status, 'pass');
-    assert.equal(evaluation.totalRecords, 25);
-    assert.equal(evaluation.onTimeRecords, 24);
-    assert.ok(evaluation.complianceRate !== null && evaluation.complianceRate >= 0.95);
-  }
-
-  // Case 2: Failure scenario due to excessive ingestion latency (25 records, only 20 on time = 80% < 95%)
-  {
-    const records: Sc002RecordLog[] = [];
-    for (let i = 0; i < 25; i++) {
-      const t0 = new Date('2026-09-28T00:00:00Z').getTime() + i * 3600 * 1000;
-      const latency = i < 5 ? 180 : 50; // 5 late records
-      records.push({
-        recordId: `rec-${i}`,
-        firstAccessibleAt: new Date(t0).toISOString(),
-        queryVisibleAt: new Date(t0 + latency * 1000).toISOString(),
-      });
-    }
-
-    const evaluation = evaluateSc002Compliance({
-      cadenceSeconds,
-      observationWindowHours: 24,
-      upstreamAvailable: true,
-      records,
-    });
-    assert.equal(evaluation.status, 'fail');
-    assert.ok(evaluation.complianceRate !== null && evaluation.complianceRate < 0.95);
-  }
-
-  // Case 3: Guard on sample size: fewer than 20 records cannot declare compliance
-  {
-    const sparseRecords: Sc002RecordLog[] = [
-      {
-        recordId: 'sparse-1',
-        firstAccessibleAt: '2026-09-28T00:00:00Z',
-        queryVisibleAt: '2026-09-28T00:01:00Z',
-      },
-    ];
-
-    const evaluation = evaluateSc002Compliance({
-      cadenceSeconds,
-      observationWindowHours: 24,
-      upstreamAvailable: true,
-      records: sparseRecords,
-    });
-    assert.equal(evaluation.status, 'sample_insufficient');
-    assert.notEqual(evaluation.status, 'pass');
-  }
-
-  // Case 4: Guard on upstream availability: source outage cannot declare compliance on zero records
-  {
-    const evaluation = evaluateSc002Compliance({
-      cadenceSeconds,
-      observationWindowHours: 24,
-      upstreamAvailable: false,
-      records: [],
-    });
-    assert.equal(evaluation.status, 'source_interrupted');
-    assert.notEqual(evaluation.status, 'pass');
   }
 });

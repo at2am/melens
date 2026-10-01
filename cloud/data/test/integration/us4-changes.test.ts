@@ -1447,13 +1447,15 @@ test('US4 Suite 2: Future roadworks have geoRecordStatus planned, assertion plan
   const fetchedAt = '2026-09-28T02:30:00.000Z' as UtcTimestamp;
 
   const page = await loadPlannedRoadFixture();
-  const unverified = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
-  assert.equal(unverified.geoRecords[0]?.valid_from, null, 'Offsetless wall clocks do not prove an absolute start');
-  assert.equal(unverified.geoRecords[0]?.valid_to, null, 'Offsetless wall clocks do not prove an absolute end');
-  assert.equal(unverified.geoRecords[0]?.source_updated_at, null, 'Offsetless update time cannot establish version order');
+  const documented = normalizePlannedRoadSnapshot(page.data.features, input, fetchedAt);
+  assert.equal(documented.geoRecords[0]?.valid_from, '2026-10-01T10:00:00.000Z',
+    'The planned-road dictionary specifies Victorian local time');
+  assert.equal(documented.geoRecords[0]?.valid_to, '2026-10-09T18:00:00.000Z',
+    'The end falls after the Melbourne daylight time change');
+  assert.equal(documented.geoRecords[0]?.source_updated_at, '2026-09-28T02:00:00.000Z');
 
-  // Explicit offsets below are synthetic contract inputs. They do not establish
-  // the timezone of the real Transport Victoria offsetless fields.
+  // Explicit offsets below are synthetic contract inputs. The independent
+  // dictionary evidence above establishes this endpoint's offsetless clock.
   const futureFeature = page.data.features[0];
   assert.ok(futureFeature);
   const verifiedFeatures = [{
@@ -1470,7 +1472,7 @@ test('US4 Suite 2: Future roadworks have geoRecordStatus planned, assertion plan
   }, ...page.data.features.slice(1)];
   const normalized = normalizePlannedRoadSnapshot(verifiedFeatures, input, fetchedAt);
 
-  assert.equal(normalized.sourceRecords.length, 2);
+  assert.equal(normalized.sourceRecords.length, 3); // Two events and one complete snapshot proof.
   assert.equal(normalized.geoRecords.length, 3); // Feature 1 GeometryCollection has 2 parts; Feature 2 has 1
 
   // 1. Future roadworks feature (PRD:OneView:123)
@@ -1935,12 +1937,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   assert.equal(imp1V2.record_status, 'resolved');
   assert.equal(imp1V2.valid_to, '2026-09-28T00:20:00.000Z');
 
-  // Verify version ordering and hash independence for clearance (G22):
-  // This synthetic clearance has a smaller content hash than the active version.
-  assert.ok(
-    imp1V2.version_id.localeCompare(imp1.version_id) < 0,
-    'Cleared version hash MUST be lexicographically smaller than active version to prove non-hash ordering',
-  );
+  assert.notEqual(imp1V2.version_id, imp1.version_id, 'Clearance creates a new business version');
   assert.ok(
     imp1V2.source_updated_at! > imp1.source_updated_at!,
     'Cleared version has more recent source_updated_at than initial active version',
@@ -1963,7 +1960,11 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   // Late-arriving older active version replay:
   // Replaying older active version imp1 after imp1V2 must NOT revive the incident in current views,
   // despite imp1 having a larger content hash.
-  const delayedHistoryClearance = queryViewHistory([imp1V2, imp1]);
+  // Force opposite hash ordering as a synthetic comparator control. A content
+  // hash's natural lexicographic order changes when normalization fields change.
+  const delayedHistoryClearance = queryViewHistory([
+    { ...imp1V2, version_id: 'aaa-clearance' }, { ...imp1, version_id: 'zzz-active' },
+  ]);
   const currentAfterDelayedClearance = queryViewCurrent(delayedHistoryClearance);
   assert.equal(
     currentAfterDelayedClearance.some((r) => r.geo_record_id === imp1.geo_record_id),
@@ -1992,7 +1993,9 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   // Local comparator controls for the incident-clearance fixture. Suite 0
   // checks shipped SQL structure; Suite 7 is the real execution gate.
   // --------------------------------------------------------------------------
-  const clearanceRecords = [imp1, imp1V2];
+  const clearanceRecords = [
+    { ...imp1, version_id: 'zzz-active' }, { ...imp1V2, version_id: 'aaa-clearance' },
+  ];
 
   // 1. Local contract ordering: imp1V2 has newer source_updated_at ('2026-09-28T00:22:00Z' > '2026-09-28T00:01:00Z'),
   // wins ROW_NUMBER() = 1, then lifecycle filter exits it from current view -> result is null (cleared).
@@ -2011,7 +2014,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   assert.ok(mutatedClearanceByHash, 'Mutation sensitivity: broken hash sorting incorrectly yields an active record');
   assert.equal(
     mutatedClearanceByHash?.version_id,
-    imp1.version_id,
+    'zzz-active',
     'Mutation sensitivity: broken hash sorting selects imp1 because its hash is larger',
   );
   assert.equal(

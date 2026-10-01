@@ -98,3 +98,13 @@ Scheduler-triggered execution also succeeded. Query ceilings correctly rejected
 several replay validations; deployed limits were adjusted with explicit bounds.
 Rents full-history execution succeeded: 58,618 inputs and indicators, zero rejected; both daily schedules are enabled. All six selected Jobs now use bounded 500 MB validation queries to accommodate shared-table growth. The task checklist is now 62/77, with T070 completed for the selected six. The source count remains six,
 category acceptance remains 1/8, and T069/T077 remain open.
+
+## 2026-10-01 five-task parallel delivery
+
+T031, T061, T035, T037 and T039 each had an independent implementation worker. Their engineering changes, new real Transport reads and production SQL verification are recorded in [five-task evidence](../../cloud/data/docs/validation/five-task-parallel-2026-10-01.md). Unplanned roads returned 305 incident-impact features and planned roads returned 9,603 events, both complete with zero rejects and no raw retention or publication. Planned source time now uses that endpoint's official Victorian-local dictionary evidence; unplanned offsetless times remain null.
+
+Real BigQuery checks passed road/GTFS/development snapshot SQL 3/3 and parking SQL 1/1. The refreshed development views retain exact source proofs, permission withdrawal and conservative parking conclusions. Twelve tables, twenty-two views and eleven view grants were applied. Readback preserved six dedicated source writer accounts plus the existing shared ingestion writer account (seven dataset writer entries total). The earlier reference to six writer ACL entries described the dedicated identities only.
+
+Parking sensor metadata specifies 120-second updates, public-holiday non-operation and construction-blocked false vacancies. The candidate settings and parking behavior now retain those limitations. Required real parking crosswalk/rule samples and SC-002 continuous observation remain outstanding; no checkbox, admitted source count or source schedule was advanced by this wave.
+
+Final Node.js 24.21.0 verification: 671 tests, 659 passed, twelve opt-in checks skipped, zero failed. Python infrastructure tests: 20/20. The skipped cloud SQL cases were executed separately as described above. The final parking regression tests reject invalid calendar dates, date-only and unzoned clocks as permission evidence.
