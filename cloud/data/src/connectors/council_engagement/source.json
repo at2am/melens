@@ -1,0 +1,50 @@
+{
+  "source_id": "victoria.council.engagement",
+  "legacy_ids": [],
+  "provider": "Greater Melbourne councils (Social Pinpoint engagement sites)",
+  "dataset_title": "Council community engagement projects",
+  "landing_url": "https://yoursay.darebin.vic.gov.au/projects",
+  "topic": "planning",
+  "scope": "greater_melbourne",
+  "coverage_area_refs": [
+    "ASGS_LGA:24600:2025", "ASGS_LGA:20660:2025", "ASGS_LGA:20910:2025", "ASGS_LGA:21110:2025",
+    "ASGS_LGA:21180:2025", "ASGS_LGA:21450:2025", "ASGS_LGA:21610:2025", "ASGS_LGA:21890:2025",
+    "ASGS_LGA:22170:2025", "ASGS_LGA:22670:2025", "ASGS_LGA:22830:2025", "ASGS_LGA:23110:2025",
+    "ASGS_LGA:23270:2025", "ASGS_LGA:23670:2025", "ASGS_LGA:24330:2025", "ASGS_LGA:24410:2025",
+    "ASGS_LGA:24650:2025", "ASGS_LGA:25250:2025", "ASGS_LGA:25340:2025", "ASGS_LGA:25060:2025",
+    "ASGS_LGA:25310:2025", "ASGS_LGA:25900:2025", "ASGS_LGA:26350:2025", "ASGS_LGA:26980:2025",
+    "ASGS_LGA:27070:2025", "ASGS_LGA:27260:2025", "ASGS_LGA:27350:2025", "ASGS_LGA:27450:2025"
+  ],
+  "coverage_from": "2026-10-04T00:00:00Z",
+  "coverage_to": null,
+  "cadence_seconds": null,
+  "check_interval_seconds": 86400,
+  "requires_monitoring": true,
+  "license_status": "restricted",
+  "access_status": "candidate",
+  "record_granularity": "council_engagement_project_version",
+  "connector_owner": "melens integration",
+  "admission_evidence": {
+    "dataset_url": "https://yoursay.darebin.vic.gov.au/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/234",
+    "native_record_key": "council slug + projectID",
+    "completeness_rule": "For each of 28 councils, discover every same-host project-list block on its listing pages and page each until moreToLoad=false; any council with no list or no project fails the snapshot",
+    "quota_requests_per_day": 600,
+    "secret_names": [],
+    "allowed_fields": [
+      "projectID",
+      "projectName",
+      "projectStatus",
+      "projectPath",
+      "projectDateNum",
+      "projectLocationArray",
+      "projectCategoryArray",
+      "title",
+      "summary"
+    ],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://yoursay.darebin.vic.gov.au/terms-use",
+    "reviewed_at": "2026-10-04T00:00:00Z"
+  },
+  "notes": "Facts and links only. Each council owns its project content and its terms do not grant reuse, so Melens stores the project title, status, date, listed suburbs, categories and link, and writes its own summary from those facts. The council's project description, images and comments are never stored. robots.txt on every site allows all agents with a one-second crawl delay; the connector identifies itself and waits one second between requests. Daily complete snapshots; a project absent from the newest published snapshot leaves the current view without an asserted cancellation. Manningham and Kingston (EngagementHQ) and Nillumbik (custom site) are not covered."
+}

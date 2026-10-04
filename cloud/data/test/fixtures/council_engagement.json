@@ -1,0 +1,63 @@
+{
+  "listingHtml": "<html><body><section id=\"hive-block-12\" class=\"hive-block projects-list\" aria-live=\"polite\" data-bID=\"12\" data-route=\"https://yoursay.example.vic.gov.au/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/12\" data-page=\"1\"></section><section class=\"hive-block projects-list\" data-route=\"https://yoursay.example.vic.gov.au/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/13\"></section><section class=\"hive-block projects-list\" data-route=\"https://elsewhere.example.com/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/99\"></section><section class=\"hive-block projects-map\" data-route=\"https://yoursay.example.vic.gov.au/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/14\"></section><section class=\"hive-block projects-list\" data-route=\"https://yoursay.example.vic.gov.au/ccm/system/tools/other/15\"></section></body></html>",
+  "pages": {
+    "12:0": {
+      "result": [
+        {
+          "projectID": 1204,
+          "projectName": "Northern Reservoir Truck Management Plan",
+          "projectDescription": "Council-written description text that must never be stored.",
+          "projectStatus": "Open",
+          "projectPath": "https://yoursay.example.vic.gov.au/NRTMP",
+          "projectImageSrc": "https://files.example.com/card.jpg",
+          "projectDateNum": "2026-10-02",
+          "projectDateStr": "2 Oct 2026",
+          "projectLocation": "Reservoir",
+          "projectLocationArray": ["Reservoir"],
+          "projectCategory": "Transport & Parking",
+          "projectCategoryArray": ["Transport & Parking"]
+        }
+      ],
+      "moreToLoad": true
+    },
+    "12:1": {
+      "result": [
+        {
+          "projectID": 1100,
+          "projectName": "Annual Budget 2027-28",
+          "projectDescription": "Another council description.",
+          "projectStatus": "Active",
+          "projectPath": "https://yoursay.example.vic.gov.au/budget",
+          "projectDateNum": "2026-07-01",
+          "projectLocationArray": ["Altona", "Altona Meadows", "Altona North", "Brooklyn", "Laverton", "Newport", "Seabrook"],
+          "projectCategoryArray": ["Budget", "Strategy"]
+        }
+      ],
+      "moreToLoad": false
+    },
+    "13:0": {
+      "result": [
+        {
+          "projectID": 900,
+          "projectName": "Albert Park play space",
+          "projectDescription": "Closed project description.",
+          "projectStatus": "Closed",
+          "projectPath": "https://yoursay.example.vic.gov.au/play-space",
+          "projectDateNum": "2025-03-14",
+          "projectLocationArray": ["Albert Park/ Middle Park"],
+          "projectCategoryArray": null
+        },
+        {
+          "projectID": 1204,
+          "projectName": "Northern Reservoir Truck Management Plan",
+          "projectStatus": "Open",
+          "projectPath": "https://yoursay.example.vic.gov.au/NRTMP",
+          "projectDateNum": "2026-10-02",
+          "projectLocationArray": ["Reservoir"],
+          "projectCategoryArray": ["Transport & Parking"]
+        }
+      ],
+      "moreToLoad": false
+    }
+  }
+}

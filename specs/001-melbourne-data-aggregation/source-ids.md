@@ -28,6 +28,7 @@
 | 22 | Vicmap Planning | `victoria.vicmap.planning` | `vicmap_planning` | — |
 | 23 | Development Activity Monitor | `melbourne.development_monitor` | `com_development_monitor` | — |
 | 24 | 历史每小时行人计数 | `melbourne.pedestrian.hourly` | `com_pedestrian_hourly` | `pedestrian-history` |
+| 25 | Council 社区咨询项目（Social Pinpoint，28 个 council） | `victoria.council.engagement` | `council_engagement` | 见 [准入记录](../../cloud/data/docs/source-policies/council-engagement-admission.md) |
 | 配套 | CLUE 街区边界 | `melbourne.clue.blocks` | `com_clue_blocks` | 与 #14 不共用 `source_id` |
 | 配套 | 静态 GTFS | `victoria.transport.gtfs_static` | `tv_gtfs_static` | 与 #16 不共用 `source_id` |
 

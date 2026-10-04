@@ -47,6 +47,10 @@ const TABLE_KEYS: Record<FactTable, readonly string[]> = {
 const utc = z.iso.datetime({ offset: false });
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const auditFields = new Set(['batch_id', 'fetched_at', 'raw_uri', 'first_accessible_at', 'freshness_state']);
+/** Each batch is the whole current state; version checks apply within the batch only. */
+const COMPLETE_SNAPSHOT_SOURCES: ReadonlySet<string> = new Set([
+  'ticketmaster.events', 'victoria.council.engagement',
+]);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -360,7 +364,7 @@ export class BigQueryPublisher {
       const contentFields = fields.map(field => field.name).filter(name => !auditFields.has(name));
       const logicalKeys = keys.filter(key => key !== 'version_id');
       const snapshotScope = table.name === 'parking_sensor_memberships'
-        || source.source_id === 'ticketmaster.events' ? 'AND t.batch_id = @batchId' : '';
+        || COMPLETE_SNAPSHOT_SOURCES.has(source.source_id) ? 'AND t.batch_id = @batchId' : '';
       const invalid = [
         't.source_id IS DISTINCT FROM @sourceId', 't.schema_version IS DISTINCT FROM 1', 't.fetched_at IS NULL',
         ...keys.map(key => `t.${key} IS NULL${key === 'observed_at' ? '' : ` OR TRIM(t.${key}) = ''`}`),
@@ -624,7 +628,7 @@ export class BigQueryPublisher {
       const base: SyncBatch = {
         batch_id: batchId, source_id: source.source_id, schema_version: 1,
         window_from: input.windowFrom, window_to: input.windowTo, source_revision: effectiveRevision,
-        started_at: ['ticketmaster.events', 'melbourne.parking.sensors'].includes(source.source_id)
+        started_at: COMPLETE_SNAPSHOT_SOURCES.has(source.source_id) || source.source_id === 'melbourne.parking.sensors'
           ? result.fetchedAt : now, finished_at: null, state: 'running', state_updated_at: now,
         raw_uri: previous?.raw_uri ?? null, staging_uris: previous?.staging_uris ?? [], published_at: null,
         input_count: result.inputCount, output_count: result.outputCount,

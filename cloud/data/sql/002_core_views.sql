@@ -189,6 +189,11 @@ current_ticketmaster_snapshot AS (
   WHERE source_id = 'ticketmaster.events' AND state = 'published' AND published_at IS NOT NULL
   QUALIFY ROW_NUMBER() OVER (ORDER BY started_at DESC, published_at DESC, batch_id DESC) = 1
 ),
+current_council_engagement_snapshot AS (
+  SELECT batch_id FROM batch_states
+  WHERE source_id = 'victoria.council.engagement' AND state = 'published' AND published_at IS NOT NULL
+  QUALIFY ROW_NUMBER() OVER (ORDER BY started_at DESC, published_at DESC, batch_id DESC) = 1
+),
 current_parking_sensor_snapshot AS (
   SELECT batch_id FROM batch_states
   WHERE source_id = 'melbourne.parking.sensors' AND state = 'published' AND published_at IS NOT NULL
@@ -227,6 +232,13 @@ WHERE (g.source_id != 'melbourne.development_monitor'
   AND (g.source_id != 'ticketmaster.events' OR EXISTS (
     SELECT 1 FROM `melens_ingest.geo_records` member
     JOIN current_ticketmaster_snapshot snapshot USING (batch_id)
+    WHERE member.source_id = g.source_id AND member.geo_record_id = g.geo_record_id
+      AND member.version_id = g.version_id))
+  -- Engagement projects are a complete daily snapshot. A project missing from
+  -- the newest snapshot leaves current results without an asserted closure.
+  AND (g.source_id != 'victoria.council.engagement' OR EXISTS (
+    SELECT 1 FROM `melens_ingest.geo_records` member
+    JOIN current_council_engagement_snapshot snapshot USING (batch_id)
     WHERE member.source_id = g.source_id AND member.geo_record_id = g.geo_record_id
       AND member.version_id = g.version_id))
   AND (g.source_id != 'melbourne.parking.sensors' OR EXISTS (
