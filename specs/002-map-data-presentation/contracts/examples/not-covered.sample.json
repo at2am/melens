@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "requestId": "not-covered.sample.json",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "layers": [
+    {
+      "layerId": "pedestrian",
+      "state": "notCovered",
+      "freshness": "unknown",
+      "completeness": "complete",
+      "sourceIds": [
+        "sample.pedestrian"
+      ],
+      "coverage": {
+        "state": "notCovered",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "observedWindow": null,
+      "updatedAt": null,
+      "items": [],
+      "unresolvedCount": 0,
+      "nextCursor": null,
+      "totalMatching": null
+    }
+  ]
+}

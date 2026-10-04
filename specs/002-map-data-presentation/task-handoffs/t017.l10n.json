@@ -1,0 +1,102 @@
+{
+  "mapScreenTitle": "Melens map",
+  "@mapScreenTitle": {
+    "description": "Map screen title."
+  },
+  "mapScreenStatuses": "Layer statuses",
+  "@mapScreenStatuses": {
+    "description": "Opens selected layer status and coverage information."
+  },
+  "mapScreenUnlocated": "Records without map locations",
+  "@mapScreenUnlocated": {
+    "description": "Opens independently scoped records without drawable geometry."
+  },
+  "mapScreenCatalogLoading": "Loading layer catalog\u2026",
+  "@mapScreenCatalogLoading": {
+    "description": "Catalog request is in progress."
+  },
+  "mapScreenCatalogError": "Layer catalog could not load.",
+  "@mapScreenCatalogError": {
+    "description": "Safe catalog failure text."
+  },
+  "mapScreenRetryCatalog": "Retry layer catalog",
+  "@mapScreenRetryCatalog": {
+    "description": "Manual catalog retry while query bounds are unavailable."
+  },
+  "mapScreenOutsideService": "This view is outside the query service area.",
+  "@mapScreenOutsideService": {
+    "description": "Outside operational envelope, with no claim about coverage."
+  },
+  "mapScreenWaitingArea": "Waiting for the map area or query service bounds.",
+  "@mapScreenWaitingArea": {
+    "description": "No bounded query area supplied."
+  },
+  "mapScreenServiceArea": "Results use the query service area until a map view is available.",
+  "@mapScreenServiceArea": {
+    "description": "Explicit catalog-bounds fallback list scope."
+  },
+  "mapScreenFilterRequired": "Boundary or area layers need a published version and filter before querying.",
+  "@mapScreenFilterRequired": {
+    "description": "Layers lacking required approved filters are blocked."
+  },
+  "mapScreenRegionError": "The visible map area could not be read.",
+  "@mapScreenRegionError": {
+    "description": "Safe visible-region failure."
+  },
+  "mapScreenPreviousWindow": "Displayed records keep their previous query window.",
+  "@mapScreenPreviousWindow": {
+    "description": "Retained response belongs to an earlier time window."
+  },
+  "mapScreenCurrent": "Current \u00b7 last 15 minutes",
+  "@mapScreenCurrent": {
+    "description": "Current mode with bounded recent fifteen-minute window."
+  },
+  "mapScreenHistorical": "Historical",
+  "@mapScreenHistorical": {
+    "description": "Historical mode for bounded past windows."
+  },
+  "mapScreenHistoryRange": "History range",
+  "@mapScreenHistoryRange": {
+    "description": "Historical duration menu."
+  },
+  "mapScreenOneHour": "1 hour",
+  "@mapScreenOneHour": {
+    "description": "Historical duration."
+  },
+  "mapScreenOneDay": "24 hours",
+  "@mapScreenOneDay": {
+    "description": "Historical duration."
+  },
+  "mapScreenSevenDays": "7 days",
+  "@mapScreenSevenDays": {
+    "description": "Historical duration."
+  },
+  "mapScreenThirtyOneDays": "31 days",
+  "@mapScreenThirtyOneDays": {
+    "description": "Maximum dynamic query duration."
+  },
+  "mapScreenPrevious": "Previous time window",
+  "@mapScreenPrevious": {
+    "description": "Move historical window back by its duration."
+  },
+  "mapScreenNext": "Next time window",
+  "@mapScreenNext": {
+    "description": "Move historical window forward up to now."
+  },
+  "mapScreenRefresh": "Refresh records",
+  "@mapScreenRefresh": {
+    "description": "Manual viewport refresh."
+  },
+  "mapScreenWindow": "Melbourne time: {from} to {to} (end excluded)",
+  "@mapScreenWindow": {
+    "description": "Half-open query interval in Australia/Melbourne.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  }
+}

@@ -21,8 +21,8 @@ Every dataset reaches the user as a layer, and every other feature hangs off a l
 
 ## Behaviour
 
-1. The map shows a layer panel. Each layer groups the MapFeatures of one topic (`MapFeature.layer`).
-2. Toggling a layer shows or hides its features at once; the app listens to Firestore.
+1. The map shows topic views and a layer panel. A topic groups one or more registered layer ids; each typed map item identifies its layer with `layerId`.
+2. Toggling a layer updates existing results at once. The app requests bounded viewport/time results from the read-only Cloud Run map service using [map contract v1](../../specs/002-map-data-presentation/contracts/map-api.md); the service reads admitted, published BigQuery views. No Firestore map listener is required.
 3. The enabled layers are sent to the agent with every question, so answers focus on what the user is looking at.
 4. In the chat, the agent can turn layers on or off with `show_layers` (UC-13).
 
@@ -35,8 +35,10 @@ Every dataset reaches the user as a layer, and every other feature hangs off a l
 
 ## Notes
 
-- Heatmaps: the Maps JavaScript API removed the heatmap layer in version 3.65. On Flutter Web, pin version 3.64 or draw pedestrian counts as circles scaled by volume.
+- First delivery draws pedestrian count circles with area proportional to same-window sensor passages. Missing observations remain unknown, and a measured zero remains zero. Later H3 coverage/anomaly views and the count-driven 3D pilot have separate delivery gates; neither blocks P0.
+- V1 registers pedestrian, anomaly, disruption, event, planning, boundary, news, rent and census. Registration does not imply published coverage or source admission. P0 display, source publication and full P0 product acceptance are separate gates in [the map plan](../../specs/002-map-data-presentation/plan.md).
+- The first topic views are City activity, Nearby news and Area comparison. Session toggles are preserved within each topic; only one area metric is filled at once. Persistent named views remain outside the first delivery.
 
 ## Open questions
 
-- Does the MVP need saved "views" (named combinations of layers), or only per-layer toggles?
+- Saved named views can be considered after the P0 map; v1 requires topic-session state and per-layer toggles only.

@@ -15,5 +15,1006 @@
   "notFoundBackToMap": "Back to the map",
   "@notFoundBackToMap": {
     "description": "Button on the not-found screen that opens the map."
+  },
+  "mapLayerPedestrian": "Pedestrian counts",
+  "@mapLayerPedestrian": {
+    "description": "Layer title for measured sensor passages."
+  },
+  "mapLayerAnomaly": "Pedestrian anomalies",
+  "@mapLayerAnomaly": {
+    "description": "Layer title for verified anomaly results."
+  },
+  "mapLayerDisruption": "Transport disruptions",
+  "@mapLayerDisruption": {
+    "description": "Layer title for road and public transport impacts."
+  },
+  "mapLayerEvent": "Events",
+  "@mapLayerEvent": {
+    "description": "Layer title for admitted public events."
+  },
+  "mapLayerPlanning": "Development projects",
+  "@mapLayerPlanning": {
+    "description": "Layer title for development monitor records."
+  },
+  "mapLayerBoundary": "Area boundaries",
+  "@mapLayerBoundary": {
+    "description": "Layer title for geographic context polygons."
+  },
+  "mapLayerNews": "Nearby news",
+  "@mapLayerNews": {
+    "description": "Layer title for nearby public news reports."
+  },
+  "mapLayerRent": "Rental statistics",
+  "@mapLayerRent": {
+    "description": "Layer title for historical official rental indicators."
+  },
+  "mapLayerCensus": "Census statistics",
+  "@mapLayerCensus": {
+    "description": "Layer title for census period indicators."
+  },
+  "mapStatusAvailable": "Data available",
+  "@mapStatusAvailable": {
+    "description": "Successful layer result without a coverage or empty-result inference."
+  },
+  "mapStatusNoMatching": "No matching data in the covered area and time",
+  "@mapStatusNoMatching": {
+    "description": "Empty-result label only for a complete query with verified geographic and temporal coverage."
+  },
+  "mapStatusNotCovered": "This area or time is not covered",
+  "@mapStatusNotCovered": {
+    "description": "The selected scope is outside verified observation coverage."
+  },
+  "mapStatusUnavailable": "Source data unavailable",
+  "@mapStatusUnavailable": {
+    "description": "The source is currently unavailable; does not imply a measured zero."
+  },
+  "mapStatusUnknown": "Coverage or result unknown",
+  "@mapStatusUnknown": {
+    "description": "The service has insufficient evidence to describe the selected scope."
+  },
+  "mapStatusLoading": "Loading map data",
+  "@mapStatusLoading": {
+    "description": "Initial client request before any result is available."
+  },
+  "mapStatusRefreshing": "Refreshing map data",
+  "@mapStatusRefreshing": {
+    "description": "A client request is in progress while an earlier result remains visible."
+  },
+  "mapStatusClientError": "Could not retrieve map data",
+  "@mapStatusClientError": {
+    "description": "Safe client request error; raw server or transport errors are never exposed."
+  },
+  "mapRetainedData": "Showing the previous result with its original time",
+  "@mapRetainedData": {
+    "description": "Previous data remains visible after a refresh failure without a fabricated new timestamp."
+  },
+  "mapRetry": "Retry map data",
+  "@mapRetry": {
+    "description": "Accessible action for a retryable client request failure."
+  },
+  "mapFreshnessCurrent": "Source update is current",
+  "@mapFreshnessCurrent": {
+    "description": "Source freshness label; this does not make an older observation or statistical period current."
+  },
+  "mapFreshnessLate": "Source update is late",
+  "@mapFreshnessLate": {
+    "description": "Source has missed its expected refresh cadence."
+  },
+  "mapFreshnessStale": "Source data is stale",
+  "@mapFreshnessStale": {
+    "description": "Source observations have exceeded the producer-defined freshness threshold."
+  },
+  "mapFreshnessVersioned": "Published data version",
+  "@mapFreshnessVersioned": {
+    "description": "A static or statistical published vintage whose age alone is not a stale-live-data claim."
+  },
+  "mapFreshnessUnknown": "Source freshness unknown",
+  "@mapFreshnessUnknown": {
+    "description": "No reliable source freshness classification is supplied."
+  },
+  "mapPartialScope": "Partial result — more data may exist",
+  "@mapPartialScope": {
+    "description": "Incomplete result warning; the displayed rows do not imply the complete population."
+  },
+  "mapExactTotal": "Exact matching total: {count}",
+  "@mapExactTotal": {
+    "description": "Full-query total only when an exact total is supplied.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapTotalUnknown": "Full matching total unknown",
+  "@mapTotalUnknown": {
+    "description": "The current page length cannot be substituted for an exact total."
+  },
+  "mapUpdatedUnknown": "Update time unknown",
+  "@mapUpdatedUnknown": {
+    "description": "No reliable source update instant is supplied."
+  },
+  "mapUpdatedAt": "Updated: {time}",
+  "@mapUpdatedAt": {
+    "description": "Source update instant formatted in Melbourne local time with its timezone.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapObservedWindow": "Observation window: {from} to {to} (end excluded)",
+  "@mapObservedWindow": {
+    "description": "Half-open observation interval in Melbourne time.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "mapObservedWindowUnknown": "Observation window unknown",
+  "@mapObservedWindowUnknown": {
+    "description": "No reliable observation interval is supplied."
+  },
+  "mapUnlocatedCount": "Records without a usable map location: {count}",
+  "@mapUnlocatedCount": {
+    "description": "Records excluded from geographic totals because a trustworthy map location is missing.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSampleData": "Sample data — illustrative only",
+  "@mapSampleData": {
+    "description": "Mandatory visible label for every explicit development sample surface."
+  },
+  "mapHistoricalData": "Historical data",
+  "@mapHistoricalData": {
+    "description": "The selected view represents a historical period rather than a current fact."
+  },
+  "mapPrediction": "Prediction",
+  "@mapPrediction": {
+    "description": "Required text label for a prediction; independent of colour."
+  },
+  "mapCountUnknown": "Passage count unknown",
+  "@mapCountUnknown": {
+    "description": "Missing sensor counts stay unknown rather than becoming zero."
+  },
+  "mapSensorPassages": "Sensor passages: {count}",
+  "@mapSensorPassages": {
+    "description": "Exact measured count; passages are not unique people.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapStatisticalPeriod": "Statistical period: {period}",
+  "@mapStatisticalPeriod": {
+    "description": "Original statistical period label preserved without inventing an observation instant.",
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "mapObservedAt": "Observed: {time}",
+  "@mapObservedAt": {
+    "description": "Observation instant in Melbourne time with its timezone.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapReportedAt": "Reported: {time}",
+  "@mapReportedAt": {
+    "description": "Report publication instant in Melbourne time with its timezone.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapObservationTimeUnknown": "Observation or report time unknown",
+  "@mapObservationTimeUnknown": {
+    "description": "No observation, report, validity-start or statistical-period time is available."
+  },
+  "mapValidFrom": "Effective from: {time}",
+  "@mapValidFrom": {
+    "description": "Start of the source-provided validity interval in Melbourne time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapValidTo": "Effective until: {time} (end excluded)",
+  "@mapValidTo": {
+    "description": "Exclusive end of the source-provided validity interval in Melbourne time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSourceTimeUnknownZone": "Source time: {value} (timezone unknown)",
+  "@mapSourceTimeUnknownZone": {
+    "description": "Unresolved source clock text retained verbatim without conversion to UTC.",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSourceTime": "Source time: {value} ({zone})",
+  "@mapSourceTime": {
+    "description": "Original source clock text and source timezone retained without inference.",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      },
+      "zone": {
+        "type": "String"
+      }
+    }
+  },
+  "mapRetrievedUnknown": "Retrieved time unknown",
+  "@mapRetrievedUnknown": {
+    "description": "No reliable source fetch instant is available."
+  },
+  "mapRetrievedAt": "Retrieved: {time}",
+  "@mapRetrievedAt": {
+    "description": "Source fetch instant in Melbourne time; independent of observation age.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSourceUnknown": "Source unknown",
+  "@mapSourceUnknown": {
+    "description": "No public source provenance is available."
+  },
+  "mapSourceVersion": "Source version: {version}",
+  "@mapSourceVersion": {
+    "description": "Public source version reference; does not expose private ingestion evidence.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSourceAttribution": "Source: {attribution}",
+  "@mapSourceAttribution": {
+    "description": "Readable public source attribution.",
+    "placeholders": {
+      "attribution": {
+        "type": "String"
+      }
+    }
+  },
+  "mapOpenSource": "Open source: {attribution}",
+  "@mapOpenSource": {
+    "description": "Accessible source action label naming the public source.",
+    "placeholders": {
+      "attribution": {
+        "type": "String"
+      }
+    }
+  },
+  "mapSourceLinkUnknown": "Public source link unavailable",
+  "@mapSourceLinkUnknown": {
+    "description": "No safe public HTTP or HTTPS source URL is available."
+  },
+  "mapLayerPanelTitle": "Topics and layers",
+  "@mapLayerPanelTitle": {
+    "description": "Heading for the topic selection and per-layer visibility controls."
+  },
+  "mapTopicCityActivity": "City activity",
+  "@mapTopicCityActivity": {
+    "description": "Topic for pedestrian observations, anomalies and transport disruptions with optional events and development."
+  },
+  "mapTopicNearbyNews": "Nearby news",
+  "@mapTopicNearbyNews": {
+    "description": "Topic for news associated with the selected region; selection is gated until later delivery."
+  },
+  "mapTopicAreaComparison": "Area comparison",
+  "@mapTopicAreaComparison": {
+    "description": "Topic for comparing published statistical periods at their original geographic scale."
+  },
+  "mapLaterTopicsUnavailable": "Nearby news and Area comparison will be available after the core map features are ready.",
+  "@mapLaterTopicsUnavailable": {
+    "description": "Explains disabled later-topic controls in the P0 map shell without claiming source failure or starting later workflows."
+  },
+  "mapOneAreaMetric": "One filled area metric at a time. Point and line layers can be shown alongside it.",
+  "@mapOneAreaMetric": {
+    "description": "Explains that selecting rent or Census replaces the other filled metric while auxiliary layers remain independent."
+  },
+  "mapNoLayersSelected": "No layers selected. Turn on a layer to show map data.",
+  "@mapNoLayersSelected": {
+    "description": "User-selected empty layer state, distinct from no matching records or missing coverage."
+  },
+  "mapSurfaceGeometryLegend": "Points keep reported locations; lines and areas keep reported extents.",
+  "@mapSurfaceGeometryLegend": {
+    "description": "2D map legend explaining that rendered geometry retains source precision."
+  },
+  "mapSurfaceCountLegend": "Circle area represents sensor passages: {area} m² per passage. Compare only the same observation window. This display scale does not represent population density.",
+  "@mapSurfaceCountLegend": {
+    "description": "Fixed circle-area scale and same-window comparison limitation. A zero or missing count never receives a positive-sized circle.",
+    "placeholders": {
+      "area": {
+        "type": "String",
+        "example": "16"
+      }
+    }
+  },
+  "mapSurfaceMissingKey": "Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.",
+  "@mapSurfaceMissingKey": {
+    "description": "Missing Web key state; sample data must not imply a working base map."
+  },
+  "mapSurfaceNativeUnavailable": "The base map is not configured on this platform. Data remains available in the object list.",
+  "@mapSurfaceNativeUnavailable": {
+    "description": "Native SDK setup has not been accepted; Web readiness does not certify native rendering."
+  },
+  "mapSurfaceLoading": "Loading base map…",
+  "@mapSurfaceLoading": {
+    "description": "Google Maps SDK readiness is pending."
+  },
+  "mapSurfaceLoadError": "Base map could not load. Data remains available in the object list.",
+  "@mapSurfaceLoadError": {
+    "description": "SDK readiness failed without exposing keys or raw provider error text."
+  },
+  "mapSurfaceRetry": "Retry base map",
+  "@mapSurfaceRetry": {
+    "description": "Explicit SDK retry after a readiness failure."
+  },
+  "mapSurfaceLocationUnavailable": "Location unavailable; not drawn on map",
+  "@mapSurfaceLocationUnavailable": {
+    "description": "Missing, ambiguous, inactive, contradictory or invalid geometry remains accessible without an invented marker."
+  },
+  "mapSurfacePointLocation": "Reported point location",
+  "@mapSurfacePointLocation": {
+    "description": "Accessible object-list location precision for a supplied point."
+  },
+  "mapSurfaceLineLocation": "Reported line extent",
+  "@mapSurfaceLineLocation": {
+    "description": "Accessible object-list location precision for a supplied line."
+  },
+  "mapSurfaceAreaLocation": "Reported area extent",
+  "@mapSurfaceAreaLocation": {
+    "description": "Accessible object-list location precision for a supplied area."
+  },
+  "mapSurfaceObjectList": "Map objects — keyboard accessible",
+  "@mapSurfaceObjectList": {
+    "description": "Object list provides exact counts and keyboard selection independently of platform-map interaction."
+  },
+  "mapAggregateLoadedRecords": "Group: {count} loaded records",
+  "@mapAggregateLoadedRecords": {
+    "description": "Count of actual records represented by this supplied aggregate, not unique people or the entire source population.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateBadgeRecords": "records",
+  "@mapAggregateBadgeRecords": {
+    "description": "Unit shown below a cluster bitmap's actual loaded member-record count."
+  },
+  "mapAggregateLoadedOnly": "Loaded scope only (*) — the complete matching population may be larger",
+  "@mapAggregateLoadedOnly": {
+    "description": "Explains the asterisk on incomplete or unknown-total cluster symbols without inventing a full total."
+  },
+  "mapAggregateMetric": "{label}: {value} {unit}",
+  "@mapAggregateMetric": {
+    "description": "Producer-defined aggregate measure, value and unit, distinct from its loaded member-record count.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateMetricUnknown": "{label}: value unknown ({unit})",
+  "@mapAggregateMetricUnknown": {
+    "description": "Unknown aggregate metric remains unknown rather than zero; preserves the supplied measure and unit.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateScopeExplanation": "This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.",
+  "@mapAggregateScopeExplanation": {
+    "description": "Explains the scope and count semantics of an aggregate independently of colour or map zoom."
+  },
+  "mapAggregateGroupTotal": "Exact matching records in this group: {count}",
+  "@mapAggregateGroupTotal": {
+    "description": "An explicit exact group/member-query total from the server, never derived from a partial list or inferred as a viewport-wide total.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateSameLocation": "Several records share this location. Open a member below to view its own details.",
+  "@mapAggregateSameLocation": {
+    "description": "Explains why an exact colocated MultiPoint can remain grouped even at a close zoom."
+  },
+  "mapAggregateZoom": "Zoom to group bounds",
+  "@mapAggregateZoom": {
+    "description": "Accessible action forwarding the group's supplied navigation bounds without inventing a geometry extent."
+  },
+  "mapAggregateMembersTitle": "Group members",
+  "@mapAggregateMembersTitle": {
+    "description": "Heading for the bounded, snapshot-bound member records list."
+  },
+  "mapAggregateMembersLoaded": "Member records retrieved: {count}",
+  "@mapAggregateMembersLoaded": {
+    "description": "Number of unique member records currently retrieved by the client; this is never substituted for the full-query total.",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateMemberUnit": "Member scope unit: {unit}",
+  "@mapAggregateMemberUnit": {
+    "description": "Preserves the member-page producer's supplied unit, separately from the client record count.",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAggregateMembersLoading": "Retrieving group members",
+  "@mapAggregateMembersLoading": {
+    "description": "Readable and accessible progress label for a bounded member-page request."
+  },
+  "mapAggregateSnapshotExpired": "This group snapshot has expired. Refresh the map and select the group again.",
+  "@mapAggregateSnapshotExpired": {
+    "description": "An expired group cannot be resumed using stale cursors; a new viewport snapshot is required."
+  },
+  "mapAggregateRefreshSnapshot": "Refresh map snapshot",
+  "@mapAggregateRefreshSnapshot": {
+    "description": "Action requesting a new viewport snapshot after the member snapshot expires."
+  },
+  "mapAggregateMembersRetry": "Retry group members",
+  "@mapAggregateMembersRetry": {
+    "description": "Manual action for retryable member requests; retained members keep their original source time."
+  },
+  "mapAggregateMembersEmpty": "No member records were returned for this group.",
+  "@mapAggregateMembersEmpty": {
+    "description": "Describes an empty successful member page without asserting a measured zero or verified source-wide no-match coverage."
+  },
+  "mapAggregateMembersBounded": "This list has reached its display limit. More records may exist; zoom to the group for a narrower view.",
+  "@mapAggregateMembersBounded": {
+    "description": "The client stops after its bounded row/page limit while preserving unknown or partial totals."
+  },
+  "mapAggregateMembersMore": "Retrieve more group members",
+  "@mapAggregateMembersMore": {
+    "description": "Keyboard-accessible manual action fetching the next bounded snapshot-bound member page."
+  },
+  "mapDetailsTitle": "Selected record",
+  "@mapDetailsTitle": {
+    "description": "Heading of the persistent selected-object details panel."
+  },
+  "mapDetailsClose": "Close selected record details",
+  "@mapDetailsClose": {
+    "description": "Accessible close action; Escape also closes focused details."
+  },
+  "mapDetailsOffscreen": "This record is outside the current view. Its original details are retained.",
+  "@mapDetailsOffscreen": {
+    "description": "Camera movement retains the selected original snapshot; absence is not removal."
+  },
+  "mapDetailsFilterExcluded": "This record no longer matches the selected layers or filters. Its map highlight is cleared.",
+  "@mapDetailsFilterExcluded": {
+    "description": "Filter exclusion keeps original detail and explicitly clears the geographic highlight."
+  },
+  "mapDetailsRemoved": "This record is no longer available. Its details and map highlight are cleared.",
+  "@mapDetailsRemoved": {
+    "description": "Confirmed missing or no-longer-public selected record without implying an empty viewport."
+  },
+  "mapDetailsWithdrawn": "This record has been withdrawn. Its details and map highlight are cleared.",
+  "@mapDetailsWithdrawn": {
+    "description": "Explicit retraction removes public content and selection highlight."
+  },
+  "mapDetailsInAggregate": "The selected record belongs to the highlighted aggregate. These are its original details.",
+  "@mapDetailsInAggregate": {
+    "description": "Evidence-based aggregate linkage preserves the selected individual record."
+  },
+  "mapDetailsLoading": "Loading selected record details",
+  "@mapDetailsLoading": {
+    "description": "A snapshot-bound detail request is in progress."
+  },
+  "mapDetailsError": "Could not retrieve selected record details",
+  "@mapDetailsError": {
+    "description": "Safe detail request failure; raw errors are not displayed."
+  },
+  "mapDetailsSnapshotExpired": "The selected data snapshot has expired. Select a record from a refreshed map to request new details.",
+  "@mapDetailsSnapshotExpired": {
+    "description": "Expired detail snapshot retains original facts and never silently queries a newer publication."
+  },
+  "mapDetailFact": "{label}: {value}",
+  "@mapDetailFact": {
+    "description": "Typed fact label and value; null is explicitly unknown.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "mapDetailUnknown": "Unknown",
+  "@mapDetailUnknown": {
+    "description": "Unknown nullable fact value; never a measured zero."
+  },
+  "mapDetailPlan": "Plan",
+  "@mapDetailPlan": {
+    "description": "Explicit planned assertion label independent of colour."
+  },
+  "mapDetailDirectionsUncalibrated": "Directions A and B are source channels; geographic headings are not known.",
+  "@mapDetailDirectionsUncalibrated": {
+    "description": "Direction counters do not imply geographic movement or headings."
+  },
+  "mapDetailMinuteGranularity": "Observation granularity: minute",
+  "@mapDetailMinuteGranularity": {
+    "description": "Source measurement interval is minute-based."
+  },
+  "mapDetailHourGranularity": "Observation granularity: hour",
+  "@mapDetailHourGranularity": {
+    "description": "Source measurement interval is hourly, never presented as minute data."
+  },
+  "mapDetailSimplified": "Simplified display geometry; the source location precision is retained.",
+  "@mapDetailSimplified": {
+    "description": "Geometry simplification does not improve or enlarge source precision."
+  },
+  "mapDetailPointPrecision": "Location precision: point",
+  "@mapDetailPointPrecision": {
+    "description": "Original sourced point precision."
+  },
+  "mapDetailLinePrecision": "Location precision: line",
+  "@mapDetailLinePrecision": {
+    "description": "Original sourced line precision."
+  },
+  "mapDetailAreaPrecision": "Location precision: area",
+  "@mapDetailAreaPrecision": {
+    "description": "Area precision must remain area-level when zooming in."
+  },
+  "mapDetailUnlocatedPrecision": "Location precision: unlocated",
+  "@mapDetailUnlocatedPrecision": {
+    "description": "No trustworthy drawable location is available."
+  },
+  "mapDetailRoleEventSite": "Location role: evidenced event site",
+  "@mapDetailRoleEventSite": {
+    "description": "Event-site role from the typed location contract."
+  },
+  "mapDetailRoleSensor": "Location role: sensor",
+  "@mapDetailRoleSensor": {
+    "description": "Sensor location role from the typed contract."
+  },
+  "mapDetailRoleAffectedExtent": "Location role: affected extent",
+  "@mapDetailRoleAffectedExtent": {
+    "description": "Source-evidenced affected geography rather than a guessed site."
+  },
+  "mapDetailRoleStatisticalArea": "Location role: statistical area",
+  "@mapDetailRoleStatisticalArea": {
+    "description": "Original statistical geography remains visible."
+  },
+  "mapDetailRoleAreaAssociation": "Location role: area association",
+  "@mapDetailRoleAreaAssociation": {
+    "description": "Area association is not an exact event-site location."
+  },
+  "mapDetailRoleMention": "Location role: mentioned place",
+  "@mapDetailRoleMention": {
+    "description": "A mentioned place is not an evidenced event location."
+  },
+  "mapDetailRoleUnknown": "Location role: unknown",
+  "@mapDetailRoleUnknown": {
+    "description": "No reliable geographic role is supplied."
+  },
+  "mapDetailActive": "Status: active",
+  "@mapDetailActive": {
+    "description": "Record active lifecycle or event status."
+  },
+  "mapDetailPlanned": "Status: planned",
+  "@mapDetailPlanned": {
+    "description": "Planned lifecycle or event status is not presented as active."
+  },
+  "mapDetailCancelled": "Status: cancelled",
+  "@mapDetailCancelled": {
+    "description": "Cancelled lifecycle or event status is explicit."
+  },
+  "mapDetailResolved": "Status: resolved",
+  "@mapDetailResolved": {
+    "description": "Resolved lifecycle or event status is explicit."
+  },
+  "mapDetailStatusUnknown": "Status: unknown",
+  "@mapDetailStatusUnknown": {
+    "description": "Source event status is unknown."
+  },
+  "mapDetailExtentRoad": "Affected extent: road segment",
+  "@mapDetailExtentRoad": {
+    "description": "Transport disruption affects an evidenced road segment."
+  },
+  "mapDetailExtentRoute": "Affected extent: route",
+  "@mapDetailExtentRoute": {
+    "description": "Transport disruption affects a route."
+  },
+  "mapDetailExtentStop": "Affected extent: stop",
+  "@mapDetailExtentStop": {
+    "description": "Transport disruption affects a stop."
+  },
+  "mapDetailExtentArea": "Affected extent: area",
+  "@mapDetailExtentArea": {
+    "description": "Transport disruption affects an area."
+  },
+  "mapDetailExtentUnknown": "Affected extent: unknown",
+  "@mapDetailExtentUnknown": {
+    "description": "Transport disruption extent is unknown."
+  },
+  "mapDetailLocationLocated": "Sensor location status: located",
+  "@mapDetailLocationLocated": {
+    "description": "A sensor location is valid for the observation."
+  },
+  "mapDetailLocationUnlocated": "Sensor location status: unlocated",
+  "@mapDetailLocationUnlocated": {
+    "description": "A sensor lacks a reliable drawable location."
+  },
+  "mapDetailLocationAmbiguous": "Sensor location status: ambiguous",
+  "@mapDetailLocationAmbiguous": {
+    "description": "Ambiguous sensor location must not be guessed."
+  },
+  "mapDetailLocationInactive": "Sensor location status: inactive",
+  "@mapDetailLocationInactive": {
+    "description": "Inactive sensor location does not establish observation coverage."
+  },
+  "mapDetailValueMissing": "Value missing",
+  "@mapDetailValueMissing": {
+    "description": "An indicator is missing rather than measured zero."
+  },
+  "mapDetailValueSuppressed": "Value suppressed",
+  "@mapDetailValueSuppressed": {
+    "description": "A statistical value is withheld and must not be inferred."
+  },
+  "mapUnlocatedTitle": "Records without map locations",
+  "@mapUnlocatedTitle": {
+    "description": "Scoped unlocated-list heading, distinct from viewport results."
+  },
+  "mapUnlocatedClose": "Close records without map locations",
+  "@mapUnlocatedClose": {
+    "description": "Accessible close action for the unlocated list."
+  },
+  "mapUnlocatedAreaScope": "Associated area references: {scope}",
+  "@mapUnlocatedAreaScope": {
+    "description": "Shows the exact caller-approved area association identifiers.",
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUnlocatedJurisdictionScope": "Source jurisdiction: {scope}",
+  "@mapUnlocatedJurisdictionScope": {
+    "description": "Shows the exact approved source jurisdiction supplied by the caller.",
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUnlocatedScopeExplanation": "These records have no usable map geometry. Association with this scope does not establish membership in the current map view.",
+  "@mapUnlocatedScopeExplanation": {
+    "description": "Unlocated facts never inherit guessed centroids or viewport membership."
+  },
+  "mapUnlocatedLoading": "Loading records without map locations",
+  "@mapUnlocatedLoading": {
+    "description": "Scoped unlocated request loading status."
+  },
+  "mapUnlocatedSnapshotExpired": "This list snapshot has expired. Restart the list to use a new snapshot.",
+  "@mapUnlocatedSnapshotExpired": {
+    "description": "Expired pagination cannot mix old and new publication pages."
+  },
+  "mapUnlocatedRestart": "Restart scoped list",
+  "@mapUnlocatedRestart": {
+    "description": "Explicitly clears the old page before creating a new list snapshot."
+  },
+  "mapUnlocatedEmptyPage": "No records returned on this page",
+  "@mapUnlocatedEmptyPage": {
+    "description": "Empty page only; does not claim verified absence or source coverage."
+  },
+  "mapUnlocatedNextPage": "Show next page",
+  "@mapUnlocatedNextPage": {
+    "description": "Replaces the current bounded page using its snapshot-bound cursor."
+  },
+  "mapDetailIdentifier": "Record id",
+  "@mapDetailIdentifier": {
+    "description": "Label for the typed record id detail field; null values are unknown."
+  },
+  "mapDetailVersion": "Record version",
+  "@mapDetailVersion": {
+    "description": "Label for the typed record version detail field; null values are unknown."
+  },
+  "mapDetailLocationEvidence": "Location evidence",
+  "@mapDetailLocationEvidence": {
+    "description": "Label for the typed location evidence detail field; null values are unknown."
+  },
+  "mapDetailSensor": "Sensor id",
+  "@mapDetailSensor": {
+    "description": "Label for the typed sensor id detail field; null values are unknown."
+  },
+  "mapDetailDirectionA": "Direction A passages",
+  "@mapDetailDirectionA": {
+    "description": "Label for the typed direction a passages detail field; null values are unknown."
+  },
+  "mapDetailDirectionB": "Direction B passages",
+  "@mapDetailDirectionB": {
+    "description": "Label for the typed direction b passages detail field; null values are unknown."
+  },
+  "mapDetailLocationValidFrom": "Location valid from",
+  "@mapDetailLocationValidFrom": {
+    "description": "Label for the typed location valid from detail field; null values are unknown."
+  },
+  "mapDetailLocationValidTo": "Location valid until (end excluded)",
+  "@mapDetailLocationValidTo": {
+    "description": "Label for the typed location valid until (end excluded) detail field; null values are unknown."
+  },
+  "mapDetailResult": "Result id",
+  "@mapDetailResult": {
+    "description": "Label for the typed result id detail field; null values are unknown."
+  },
+  "mapDetailObservation": "Observation id",
+  "@mapDetailObservation": {
+    "description": "Label for the typed observation id detail field; null values are unknown."
+  },
+  "mapDetailBaselineDefinition": "Baseline definition id",
+  "@mapDetailBaselineDefinition": {
+    "description": "Label for the typed baseline definition id detail field; null values are unknown."
+  },
+  "mapDetailBaselineValue": "Baseline value",
+  "@mapDetailBaselineValue": {
+    "description": "Label for the typed baseline value detail field; null values are unknown."
+  },
+  "mapDetailObservedValue": "Observed value",
+  "@mapDetailObservedValue": {
+    "description": "Label for the typed observed value detail field; null values are unknown."
+  },
+  "mapDetailDelta": "Difference from baseline",
+  "@mapDetailDelta": {
+    "description": "Label for the typed difference from baseline detail field; null values are unknown."
+  },
+  "mapDetailSummary": "Summary",
+  "@mapDetailSummary": {
+    "description": "Label for the typed summary detail field; null values are unknown."
+  },
+  "mapDetailImpact": "Impact",
+  "@mapDetailImpact": {
+    "description": "Label for the typed impact detail field; null values are unknown."
+  },
+  "mapDetailServices": "Affected services",
+  "@mapDetailServices": {
+    "description": "Label for the typed affected services detail field; null values are unknown."
+  },
+  "mapDetailVenue": "Venue",
+  "@mapDetailVenue": {
+    "description": "Label for the typed venue detail field; null values are unknown."
+  },
+  "mapDetailCategory": "Category",
+  "@mapDetailCategory": {
+    "description": "Label for the typed category detail field; null values are unknown."
+  },
+  "mapDetailStarts": "Starts",
+  "@mapDetailStarts": {
+    "description": "Label for the typed starts detail field; null values are unknown."
+  },
+  "mapDetailEnds": "Ends",
+  "@mapDetailEnds": {
+    "description": "Label for the typed ends detail field; null values are unknown."
+  },
+  "mapDetailProjectStatus": "Project status",
+  "@mapDetailProjectStatus": {
+    "description": "Label for the typed project status detail field; null values are unknown."
+  },
+  "mapDetailPermit": "Permit id",
+  "@mapDetailPermit": {
+    "description": "Label for the typed permit id detail field; null values are unknown."
+  },
+  "mapDetailBoundary": "Boundary id",
+  "@mapDetailBoundary": {
+    "description": "Label for the typed boundary id detail field; null values are unknown."
+  },
+  "mapDetailBoundaryLevel": "Boundary level",
+  "@mapDetailBoundaryLevel": {
+    "description": "Label for the typed boundary level detail field; null values are unknown."
+  },
+  "mapDetailBoundaryVintage": "Boundary vintage",
+  "@mapDetailBoundaryVintage": {
+    "description": "Label for the typed boundary vintage detail field; null values are unknown."
+  },
+  "mapDetailBoundaryName": "Boundary name",
+  "@mapDetailBoundaryName": {
+    "description": "Label for the typed boundary name detail field; null values are unknown."
+  },
+  "mapDetailIndicator": "Indicator id",
+  "@mapDetailIndicator": {
+    "description": "Label for the typed indicator id detail field; null values are unknown."
+  },
+  "mapDetailValue": "Value",
+  "@mapDetailValue": {
+    "description": "Label for the typed value detail field; null values are unknown."
+  },
+  "mapDetailUnit": "Unit",
+  "@mapDetailUnit": {
+    "description": "Label for the typed unit detail field; null values are unknown."
+  },
+  "mapDetailPropertyType": "Property type",
+  "@mapDetailPropertyType": {
+    "description": "Label for the typed property type detail field; null values are unknown."
+  },
+  "mapDetailDefinition": "Definition",
+  "@mapDetailDefinition": {
+    "description": "Label for the typed definition detail field; null values are unknown."
+  },
+  "mapDetailMetric": "Metric",
+  "@mapDetailMetric": {
+    "description": "Label for the typed metric detail field; null values are unknown."
+  },
+  "mapScreenTitle": "Melens map",
+  "@mapScreenTitle": {
+    "description": "Map screen title."
+  },
+  "mapScreenStatuses": "Layer statuses",
+  "@mapScreenStatuses": {
+    "description": "Opens selected layer status and coverage information."
+  },
+  "mapScreenUnlocated": "Records without map locations",
+  "@mapScreenUnlocated": {
+    "description": "Opens independently scoped records without drawable geometry."
+  },
+  "mapScreenCatalogLoading": "Loading layer catalog…",
+  "@mapScreenCatalogLoading": {
+    "description": "Catalog request is in progress."
+  },
+  "mapScreenCatalogError": "Layer catalog could not load.",
+  "@mapScreenCatalogError": {
+    "description": "Safe catalog failure text."
+  },
+  "mapScreenRetryCatalog": "Retry layer catalog",
+  "@mapScreenRetryCatalog": {
+    "description": "Manual catalog retry while query bounds are unavailable."
+  },
+  "mapScreenOutsideService": "This view is outside the query service area.",
+  "@mapScreenOutsideService": {
+    "description": "Outside operational envelope, with no claim about coverage."
+  },
+  "mapScreenWaitingArea": "Waiting for the map area or query service bounds.",
+  "@mapScreenWaitingArea": {
+    "description": "No bounded query area supplied."
+  },
+  "mapScreenServiceArea": "Results use the query service area until a map view is available.",
+  "@mapScreenServiceArea": {
+    "description": "Explicit catalog-bounds fallback list scope."
+  },
+  "mapScreenFilterRequired": "Boundary or area layers need a published version and filter before querying.",
+  "@mapScreenFilterRequired": {
+    "description": "Layers lacking required approved filters are blocked."
+  },
+  "mapScreenRegionError": "The visible map area could not be read.",
+  "@mapScreenRegionError": {
+    "description": "Safe visible-region failure."
+  },
+  "mapScreenPreviousWindow": "Displayed records keep their previous query window.",
+  "@mapScreenPreviousWindow": {
+    "description": "Retained response belongs to an earlier time window."
+  },
+  "mapScreenCurrent": "Current · last 15 minutes",
+  "@mapScreenCurrent": {
+    "description": "Current mode with bounded recent fifteen-minute window."
+  },
+  "mapScreenHistorical": "Historical",
+  "@mapScreenHistorical": {
+    "description": "Historical mode for bounded past windows."
+  },
+  "mapScreenHistoryRange": "History range",
+  "@mapScreenHistoryRange": {
+    "description": "Historical duration menu."
+  },
+  "mapScreenOneHour": "1 hour",
+  "@mapScreenOneHour": {
+    "description": "Historical duration."
+  },
+  "mapScreenOneDay": "24 hours",
+  "@mapScreenOneDay": {
+    "description": "Historical duration."
+  },
+  "mapScreenSevenDays": "7 days",
+  "@mapScreenSevenDays": {
+    "description": "Historical duration."
+  },
+  "mapScreenThirtyOneDays": "31 days",
+  "@mapScreenThirtyOneDays": {
+    "description": "Maximum dynamic query duration."
+  },
+  "mapScreenPrevious": "Previous time window",
+  "@mapScreenPrevious": {
+    "description": "Move historical window back by its duration."
+  },
+  "mapScreenNext": "Next time window",
+  "@mapScreenNext": {
+    "description": "Move historical window forward up to now."
+  },
+  "mapScreenRefresh": "Refresh records",
+  "@mapScreenRefresh": {
+    "description": "Manual viewport refresh."
+  },
+  "mapScreenWindow": "Melbourne time: {from} to {to} (end excluded)",
+  "@mapScreenWindow": {
+    "description": "Half-open query interval in Australia/Melbourne.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAnomalyDirectionHigher": "Direction: higher than the baseline",
+  "@mapAnomalyDirectionHigher": {
+    "description": "Direction supplied by the verified anomaly producer; no client threshold or sign inference."
+  },
+  "mapAnomalyDirectionLower": "Direction: lower than the baseline",
+  "@mapAnomalyDirectionLower": {
+    "description": "Lower direction supplied by the anomaly producer."
+  },
+  "mapAnomalyDirectionNone": "Direction: no change from the baseline",
+  "@mapAnomalyDirectionNone": {
+    "description": "Producer explicitly supplies no difference direction; never a substitute for unknown."
+  },
+  "mapAnomalyDirectionUnknown": "Direction: unknown",
+  "@mapAnomalyDirectionUnknown": {
+    "description": "Producer direction is unknown and must not be inferred from counts."
+  },
+  "mapAnomalyEligible": "Eligibility: eligible",
+  "@mapAnomalyEligible": {
+    "description": "Producer explicitly confirms eligibility for its own baseline definition."
+  },
+  "mapAnomalyIneligible": "Eligibility: ineligible",
+  "@mapAnomalyIneligible": {
+    "description": "Producer has excluded this observation from classification."
+  },
+  "mapAnomalyEligibilityUnknown": "Eligibility: unknown",
+  "@mapAnomalyEligibilityUnknown": {
+    "description": "No producer eligibility conclusion is available."
+  },
+  "mapAnomalyClassified": "Classification: anomalous",
+  "@mapAnomalyClassified": {
+    "description": "Anomalous classification supplied by the producer, independent of display colour."
+  },
+  "mapAnomalyNotAnomalous": "Classification: not anomalous",
+  "@mapAnomalyNotAnomalous": {
+    "description": "Explicit producer classification; an unclassified observation never receives this text."
+  },
+  "mapAnomalyUnclassified": "Classification: unclassified",
+  "@mapAnomalyUnclassified": {
+    "description": "Producer supplied no classification; absence of a baseline is not normal activity."
+  },
+  "mapAnomalyCauseUnestablished": "A difference from the baseline does not establish a cause.",
+  "@mapAnomalyCauseUnestablished": {
+    "description": "Anomaly comparison is not a causal explanation. This view does not invent possible causes or call AI."
   }
 }

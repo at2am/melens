@@ -1,0 +1,43 @@
+{
+  "mapSurfaceGeometryLegend": "Points keep reported locations; lines and areas keep reported extents.",
+  "@mapSurfaceGeometryLegend": {
+    "description": "2D map legend explaining that rendered geometry retains source precision."
+  },
+  "mapSurfaceCountLegend": "Circle area represents sensor passages: {area} m² per passage. Compare only the same observation window. This display scale does not represent population density.",
+  "@mapSurfaceCountLegend": {
+    "description": "Fixed circle-area scale and same-window comparison limitation. A zero or missing count never receives a positive-sized circle.",
+    "placeholders": {
+      "area": { "type": "String", "example": "16" }
+    }
+  },
+  "mapSurfaceMissingKey": "Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.",
+  "@mapSurfaceMissingKey": {
+    "description": "Missing Web key state; sample data must not imply a working base map."
+  },
+  "mapSurfaceNativeUnavailable": "The base map is not configured on this platform. Data remains available in the object list.",
+  "@mapSurfaceNativeUnavailable": {
+    "description": "Native SDK setup has not been accepted; Web readiness does not certify native rendering."
+  },
+  "mapSurfaceLoading": "Loading base map…",
+  "@mapSurfaceLoading": { "description": "Google Maps SDK readiness is pending." },
+  "mapSurfaceLoadError": "Base map could not load. Data remains available in the object list.",
+  "@mapSurfaceLoadError": {
+    "description": "SDK readiness failed without exposing keys or raw provider error text."
+  },
+  "mapSurfaceRetry": "Retry base map",
+  "@mapSurfaceRetry": { "description": "Explicit SDK retry after a readiness failure." },
+  "mapSurfaceLocationUnavailable": "Location unavailable; not drawn on map",
+  "@mapSurfaceLocationUnavailable": {
+    "description": "Missing, ambiguous, inactive, contradictory or invalid geometry remains accessible without an invented marker."
+  },
+  "mapSurfacePointLocation": "Reported point location",
+  "@mapSurfacePointLocation": { "description": "Accessible object-list location precision for a supplied point." },
+  "mapSurfaceLineLocation": "Reported line extent",
+  "@mapSurfaceLineLocation": { "description": "Accessible object-list location precision for a supplied line." },
+  "mapSurfaceAreaLocation": "Reported area extent",
+  "@mapSurfaceAreaLocation": { "description": "Accessible object-list location precision for a supplied area." },
+  "mapSurfaceObjectList": "Map objects — keyboard accessible",
+  "@mapSurfaceObjectList": {
+    "description": "Object list provides exact counts and keyboard selection independently of platform-map interaction."
+  }
+}

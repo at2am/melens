@@ -1,4 +1,8 @@
 {
   "MELENS_ENV": "dev",
-  "AGENT_BASE_URL": "http://localhost:8080"
+  "AGENT_BASE_URL": "http://localhost:8080",
+  "MAP_BASE_URL": "http://localhost:8081",
+  "MAP_DATA_MODE": "sample",
+  "GOOGLE_MAPS_WEB_API_KEY": "",
+  "GOOGLE_MAPS_MAP_ID": ""
 }

@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "requestId": "sample-request",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "items": [
+    {
+      "id": "sample.sensor.A",
+      "versionId": "sample-v1",
+      "layerId": "pedestrian",
+      "kind": "pedestrian",
+      "title": "Sample sensor A",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          144.967,
+          -37.818
+        ]
+      },
+      "location": {
+        "precision": "point",
+        "role": "sensor",
+        "evidence": "Synthetic development fixture"
+      },
+      "assertionKind": "observation",
+      "lifecycle": "active",
+      "time": {
+        "observedAt": "2026-10-01T00:59:00Z",
+        "reportedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "periodLabel": null,
+        "fetchedAt": "2026-10-01T01:00:00Z",
+        "sourceTimeText": null,
+        "sourceTimezone": null
+      },
+      "sources": [
+        {
+          "sourceId": "sample.pedestrian",
+          "url": null,
+          "attribution": "Illustrative sample data",
+          "versionRef": "sample-v1"
+        }
+      ],
+      "details": {
+        "sensorId": "sample.A",
+        "totalCount": 12,
+        "directionACount": null,
+        "directionBCount": null,
+        "granularity": "minute",
+        "window": {
+          "from": "2026-10-01T00:59:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "locationValidFrom": "2026-09-30T00:00:00Z",
+        "locationValidTo": null,
+        "locationStatus": "located"
+      }
+    },
+    {
+      "id": "sample.sensor.B",
+      "versionId": "sample-v1",
+      "layerId": "pedestrian",
+      "kind": "pedestrian",
+      "title": "Sample sensor B",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          144.965,
+          -37.817
+        ]
+      },
+      "location": {
+        "precision": "point",
+        "role": "sensor",
+        "evidence": "Synthetic development fixture"
+      },
+      "assertionKind": "observation",
+      "lifecycle": "active",
+      "time": {
+        "observedAt": "2026-10-01T00:59:00Z",
+        "reportedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "periodLabel": null,
+        "fetchedAt": "2026-10-01T01:00:00Z",
+        "sourceTimeText": null,
+        "sourceTimezone": null
+      },
+      "sources": [
+        {
+          "sourceId": "sample.pedestrian",
+          "url": null,
+          "attribution": "Illustrative sample data",
+          "versionRef": "sample-v1"
+        }
+      ],
+      "details": {
+        "sensorId": "sample.B",
+        "totalCount": 0,
+        "directionACount": null,
+        "directionBCount": null,
+        "granularity": "minute",
+        "window": {
+          "from": "2026-10-01T00:59:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "locationValidFrom": "2026-09-30T00:00:00Z",
+        "locationValidTo": null,
+        "locationStatus": "located"
+      }
+    }
+  ],
+  "completeness": "complete",
+  "nextCursor": null,
+  "totalMatching": 2,
+  "scope": {
+    "kind": "aggregateMembers",
+    "aggregateId": "sample.aggregate",
+    "bounds": [
+      144.965,
+      -37.819,
+      144.968,
+      -37.817
+    ],
+    "window": {
+      "from": "2026-10-01T00:59:00Z",
+      "to": "2026-10-01T01:00:00Z"
+    },
+    "unit": "sensor passages"
+  }
+}

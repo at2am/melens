@@ -1,0 +1,58 @@
+{
+  "mapAggregateLoadedRecords": "Group: {count} loaded records",
+  "@mapAggregateLoadedRecords": {
+    "description": "Count of actual records represented by this supplied aggregate, not unique people or the entire source population.",
+    "placeholders": {"count": {"type": "String"}}
+  },
+  "mapAggregateBadgeRecords": "records",
+  "@mapAggregateBadgeRecords": {"description": "Unit shown below a cluster bitmap's actual loaded member-record count."},
+  "mapAggregateLoadedOnly": "Loaded scope only (*) — the complete matching population may be larger",
+  "@mapAggregateLoadedOnly": {"description": "Explains the asterisk on incomplete or unknown-total cluster symbols without inventing a full total."},
+  "mapAggregateMetric": "{label}: {value} {unit}",
+  "@mapAggregateMetric": {
+    "description": "Producer-defined aggregate measure, value and unit, distinct from its loaded member-record count.",
+    "placeholders": {"label": {"type": "String"}, "value": {"type": "String"}, "unit": {"type": "String"}}
+  },
+  "mapAggregateMetricUnknown": "{label}: value unknown ({unit})",
+  "@mapAggregateMetricUnknown": {
+    "description": "Unknown aggregate metric remains unknown rather than zero; preserves the supplied measure and unit.",
+    "placeholders": {"label": {"type": "String"}, "unit": {"type": "String"}}
+  },
+  "mapAggregateScopeExplanation": "This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.",
+  "@mapAggregateScopeExplanation": {"description": "Explains the scope and count semantics of an aggregate independently of colour or map zoom."},
+  "mapAggregateGroupTotal": "Exact matching records in this group: {count}",
+  "@mapAggregateGroupTotal": {
+    "description": "An explicit exact group/member-query total from the server, never derived from a partial list or inferred as a viewport-wide total.",
+    "placeholders": {"count": {"type": "String"}}
+  },
+  "mapAggregateSameLocation": "Several records share this location. Open a member below to view its own details.",
+  "@mapAggregateSameLocation": {"description": "Explains why an exact colocated MultiPoint can remain grouped even at a close zoom."},
+  "mapAggregateZoom": "Zoom to group bounds",
+  "@mapAggregateZoom": {"description": "Accessible action forwarding the group's supplied navigation bounds without inventing a geometry extent."},
+  "mapAggregateMembersTitle": "Group members",
+  "@mapAggregateMembersTitle": {"description": "Heading for the bounded, snapshot-bound member records list."},
+  "mapAggregateMembersLoaded": "Member records retrieved: {count}",
+  "@mapAggregateMembersLoaded": {
+    "description": "Number of unique member records currently retrieved by the client; this is never substituted for the full-query total.",
+    "placeholders": {"count": {"type": "String"}}
+  },
+  "mapAggregateMemberUnit": "Member scope unit: {unit}",
+  "@mapAggregateMemberUnit": {
+    "description": "Preserves the member-page producer's supplied unit, separately from the client record count.",
+    "placeholders": {"unit": {"type": "String"}}
+  },
+  "mapAggregateMembersLoading": "Retrieving group members",
+  "@mapAggregateMembersLoading": {"description": "Readable and accessible progress label for a bounded member-page request."},
+  "mapAggregateSnapshotExpired": "This group snapshot has expired. Refresh the map and select the group again.",
+  "@mapAggregateSnapshotExpired": {"description": "An expired group cannot be resumed using stale cursors; a new viewport snapshot is required."},
+  "mapAggregateRefreshSnapshot": "Refresh map snapshot",
+  "@mapAggregateRefreshSnapshot": {"description": "Action requesting a new viewport snapshot after the member snapshot expires."},
+  "mapAggregateMembersRetry": "Retry group members",
+  "@mapAggregateMembersRetry": {"description": "Manual action for retryable member requests; retained members keep their original source time."},
+  "mapAggregateMembersEmpty": "No member records were returned for this group.",
+  "@mapAggregateMembersEmpty": {"description": "Describes an empty successful member page without asserting a measured zero or verified source-wide no-match coverage."},
+  "mapAggregateMembersBounded": "This list has reached its display limit. More records may exist; zoom to the group for a narrower view.",
+  "@mapAggregateMembersBounded": {"description": "The client stops after its bounded row/page limit while preserving unknown or partial totals."},
+  "mapAggregateMembersMore": "Retrieve more group members",
+  "@mapAggregateMembersMore": {"description": "Keyboard-accessible manual action fetching the next bounded snapshot-bound member page."}
+}

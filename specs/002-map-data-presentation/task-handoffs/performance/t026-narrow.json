@@ -1,0 +1,44 @@
+{
+  "reference": "narrow",
+  "expectedViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "actualViewport": {
+    "width": 390,
+    "height": 844
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "hardwareConcurrency": 10,
+  "devicePixelRatio": 1,
+  "mapSurfacePresent": false,
+  "mapProviderErrorVisible": false,
+  "missingMapsKeyVisible": true,
+  "mapLoadFailureVisible": false,
+  "sampleDataVisible": false,
+  "loadingOnlyVisible": false,
+  "browserVersion": "154.0.8037.59",
+  "host": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "arch": "arm64",
+    "cpuModel": "Apple M5",
+    "logicalCpus": 10,
+    "memoryGiB": 32
+  },
+  "mode": "Chrome headless, no artificial network throttle, actual viewport checked",
+  "generatedAt": "2026-10-01T10:45:10.145Z",
+  "viewportResponses": [],
+  "failedMapRequests": 0,
+  "prerequisiteStatus": "blocked",
+  "missing": [
+    "Authorized Maps Web key is missing",
+    "No confirmed completed live viewport response"
+  ],
+  "sc002": {
+    "status": "open",
+    "toggleP95Ms": null,
+    "completedViewportP95Ms": null,
+    "reason": "Required rendering/live-response evidence absent; no latency claim"
+  }
+}

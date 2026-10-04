@@ -1,0 +1,115 @@
+import { createHash } from 'node:crypto';
+import { MAX_PAGE_ITEMS, SERVICE_BBOX, normalizedViewportIdentity, parseMapItemPage, parseUnlocatedQuery,
+  parseViewportQuery, type LayerId, type MapItem, type MapItemPage, type UnlocatedQuery, type ViewportQuery }
+  from '../contracts/map-contract.js';
+import { findPublicSource, sourceBelongsToLayer, type SourceCoverageSnapshot } from '../query/source-coverage.js';
+import { assertSnapshotPublic, sourceWatermarks, type SnapshotAccess } from './viewport.js';
+import { MapServiceError, type StoredSnapshot } from './snapshot-store.js';
+
+export type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
+import type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
+export function unlocatedCoverageRequest(query: UnlocatedQuery): ViewportQuery {
+  const { scope: _scope, cursor: _cursor, snapshotId: _snapshotId, ...context } = query;
+  return parseViewportQuery({ ...context, bbox: [...SERVICE_BBOX], zoom: 0 });
+}
+export function normalizedUnlocatedIdentity(query: UnlocatedQuery): string {
+  const scope = 'areaRefs' in query.scope ? { areaRefs: [...query.scope.areaRefs].sort() }
+    : { sourceJurisdiction: query.scope.sourceJurisdiction };
+  return createHash('sha256').update(`unlocated:v1:${normalizedViewportIdentity(unlocatedCoverageRequest(query))}:${JSON.stringify(scope)}`).digest('hex');
+}
+/** Scope labels are only accepted from current admitted published source evidence. */
+export function approveUnlocatedScope(query: UnlocatedQuery, layerId: LayerId,
+  coverage: SourceCoverageSnapshot): ApprovedUnlocatedScope {
+  if (coverage.completeness !== 'complete') throw new MapServiceError('serviceUnavailable');
+  const candidates = coverage.sources.filter((source) => sourceBelongsToLayer(source, layerId)
+    && findPublicSource(coverage, source.sourceId) !== null && source.evidenceState === 'verified');
+  if ('areaRefs' in query.scope) {
+    const refs = [...query.scope.areaRefs].sort();
+    if (!refs.every((ref) => candidates.some((source) => source.coverageAreaRefs.includes(ref)))) throw new MapServiceError('notAvailable');
+    const sourceIds = candidates.filter((source) => source.coverageAreaRefs.some((ref) => refs.includes(ref))).map((source) => source.sourceId).sort();
+    return { sourceIds, areaRefs: refs, sourceJurisdiction: null };
+  }
+  const jurisdiction = query.scope.sourceJurisdiction;
+  const sourceIds = candidates.filter((source) => source.scope === jurisdiction).map((source) => source.sourceId).sort();
+  if (sourceIds.length === 0) throw new MapServiceError('notAvailable');
+  return { sourceIds, areaRefs: [], sourceJurisdiction: jurisdiction };
+}
+export interface LoadedUnlocatedLayer {
+  readonly items: readonly MapItem[]; readonly completeness: 'complete' | 'partial'; readonly totalMatching: number | null;
+}
+export type UnlocatedLayerLoader = (query: UnlocatedQuery, layerId: LayerId,
+  coverage: SourceCoverageSnapshot, scope: ApprovedUnlocatedScope, execution: {
+    readonly signal?: AbortSignal; readonly rowLimit: number; readonly resultBudgetBytes: number;
+  }) => Promise<LoadedUnlocatedLayer>;
+
+export function createUnlocatedService(options: SnapshotAccess & {
+  readonly loadLayer: UnlocatedLayerLoader; readonly maxResponseBytes?: number;
+  readonly resultEnvelopeReserveBytes?: number;
+}) {
+  const maxBytes = options.maxResponseBytes ?? 2 * 1024 * 1024;
+  function page(snapshot: StoredSnapshot, query: UnlocatedQuery, offset = 0): MapItemPage {
+    const layer = query.cursor === undefined ? null : query.layers[0]!;
+    const items = layer === null ? snapshot.listItems : snapshot.listItems.filter((item) => item.layerId === layer);
+    let count = Math.min(items.length - offset, query.pageSize ?? MAX_PAGE_ITEMS);
+    while (true) {
+      const selected = items.slice(offset, offset + count);
+      const more = offset + count < items.length;
+      const draft = { schemaVersion: 1, requestId: query.requestId, snapshotId: snapshot.id,
+        mode: snapshot.request.mode, generatedAt: (options.clock?.() ?? new Date()).toISOString(), dataMode: 'live',
+        items: selected, scope: snapshot.listScope, completeness: more ? 'partial' : snapshot.listCompleteness,
+        totalMatching: snapshot.listTotal, nextCursor: more ? 'x'.repeat(32) : null };
+      if (Buffer.byteLength(JSON.stringify(draft), 'utf8') <= maxBytes) {
+        if (count === 0 && more) throw new MapServiceError('budgetExceeded');
+        // Contract continuations select exactly one layer; cross-layer first pages need
+        // no ambiguous cursor. Loaded rows remain accessible through snapshot details.
+        const nextCursor = more && snapshot.selectedLayers.length === 1 ? options.store.cursor({
+          snapshotId: snapshot.id, family: 'unlocated', identity: snapshot.identity,
+          layerId: snapshot.selectedLayers[0]!, aggregateId: null, offset: offset + count,
+          pageSize: query.pageSize ?? MAX_PAGE_ITEMS }) : null;
+        return parseMapItemPage({ ...draft, nextCursor }, { production: true });
+      }
+      if (count === 0) throw new MapServiceError('budgetExceeded');
+      count -= 1;
+    }
+  }
+  return {
+    async query(value: unknown, execution: { readonly signal?: AbortSignal } = {}): Promise<MapItemPage> {
+      let query: UnlocatedQuery;
+      try { query = parseUnlocatedQuery(value); } catch { throw new MapServiceError('invalidRequest'); }
+      if (query.cursor !== undefined && query.snapshotId !== undefined) {
+        const snapshot = options.store.read(query.snapshotId);
+        const cursor = options.store.readCursor(query.cursor);
+        if (snapshot.family !== 'unlocated' || cursor.family !== 'unlocated'
+          || cursor.snapshotId !== snapshot.id || snapshot.identity !== normalizedUnlocatedIdentity(query)
+          || cursor.identity !== snapshot.identity || cursor.layerId !== query.layers[0]
+          || !snapshot.selectedLayers.includes(query.layers[0]!)) throw new MapServiceError('cursorMismatch');
+        await assertSnapshotPublic(snapshot, options, execution);
+        return page(snapshot, query, cursor.offset);
+      }
+      const coverage = await options.readCoverage(unlocatedCoverageRequest(query), execution);
+      const loaded: LoadedUnlocatedLayer[] = [];
+      const approvedSourceIds: string[] = [];
+      const rowLimit = Math.max(1, Math.floor(MAX_PAGE_ITEMS / query.layers.length));
+      const resultBudgetBytes = Math.max(2, Math.floor((maxBytes - (options.resultEnvelopeReserveBytes ?? 64 * 1024)) / query.layers.length));
+      for (const layerId of query.layers) {
+        const approved = approveUnlocatedScope(query, layerId, coverage);
+        approvedSourceIds.push(...approved.sourceIds);
+        loaded.push(await options.loadLayer(query, layerId, coverage, approved,
+          { ...execution, rowLimit, resultBudgetBytes }));
+      }
+      const items = loaded.flatMap((entry) => [...entry.items]).sort((a, b) => a.layerId < b.layerId ? -1 : a.layerId > b.layerId ? 1
+        : a.id < b.id ? -1 : a.id > b.id ? 1 : a.versionId < b.versionId ? -1 : a.versionId > b.versionId ? 1 : 0);
+      const scope: MapItemPage['scope'] = 'areaRefs' in query.scope
+        ? { kind: 'unlocated', areaRefs: [...query.scope.areaRefs].sort(), sourceJurisdiction: null }
+        : { kind: 'unlocated', areaRefs: [], sourceJurisdiction: query.scope.sourceJurisdiction };
+      const allComplete = loaded.every((entry) => entry.completeness === 'complete' && entry.totalMatching !== null);
+      const snapshot = options.store.create({ family: 'unlocated', identity: normalizedUnlocatedIdentity(query), request: query,
+        selectedLayers: query.layers, sourceWatermarks: sourceWatermarks(coverage,
+          [...approvedSourceIds, ...items.flatMap((item) => item.sources.map((source) => source.sourceId))]), layers: [], listItems: items,
+        listCompleteness: allComplete ? 'complete' : 'partial', listTotal: allComplete ? loaded.reduce((n, entry) => n + entry.totalMatching!, 0) : null,
+        listScope: scope, groups: [] });
+      try { await assertSnapshotPublic(snapshot, options, execution); return page(snapshot, query); }
+      catch (error) { options.store.discard(snapshot.id); throw error; }
+    },
+  };
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "requestId": "sample-request",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "items": [
+    {
+      "id": "sample.sensor.C",
+      "versionId": "sample-v1",
+      "layerId": "pedestrian",
+      "kind": "pedestrian",
+      "title": "Sample unlocated sensor",
+      "geometry": null,
+      "location": {
+        "precision": "unlocated",
+        "role": "unknown",
+        "evidence": "Synthetic development fixture"
+      },
+      "assertionKind": "observation",
+      "lifecycle": "active",
+      "time": {
+        "observedAt": "2026-10-01T00:59:00Z",
+        "reportedAt": null,
+        "validFrom": null,
+        "validTo": null,
+        "periodLabel": null,
+        "fetchedAt": "2026-10-01T01:00:00Z",
+        "sourceTimeText": null,
+        "sourceTimezone": null
+      },
+      "sources": [
+        {
+          "sourceId": "sample.pedestrian",
+          "url": null,
+          "attribution": "Illustrative sample data",
+          "versionRef": "sample-v1"
+        }
+      ],
+      "details": {
+        "sensorId": "sample.C",
+        "totalCount": null,
+        "directionACount": null,
+        "directionBCount": null,
+        "granularity": "minute",
+        "window": {
+          "from": "2026-10-01T00:59:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "locationValidFrom": null,
+        "locationValidTo": null,
+        "locationStatus": "unlocated"
+      }
+    }
+  ],
+  "completeness": "complete",
+  "nextCursor": null,
+  "totalMatching": 1,
+  "scope": {
+    "kind": "unlocated",
+    "areaRefs": [],
+    "sourceJurisdiction": "Sample Melbourne source jurisdiction"
+  }
+}

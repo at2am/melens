@@ -20,4 +20,724 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notFoundBackToMap => 'Back to the map';
+
+  @override
+  String get mapLayerPedestrian => 'Pedestrian counts';
+
+  @override
+  String get mapLayerAnomaly => 'Pedestrian anomalies';
+
+  @override
+  String get mapLayerDisruption => 'Transport disruptions';
+
+  @override
+  String get mapLayerEvent => 'Events';
+
+  @override
+  String get mapLayerPlanning => 'Development projects';
+
+  @override
+  String get mapLayerBoundary => 'Area boundaries';
+
+  @override
+  String get mapLayerNews => 'Nearby news';
+
+  @override
+  String get mapLayerRent => 'Rental statistics';
+
+  @override
+  String get mapLayerCensus => 'Census statistics';
+
+  @override
+  String get mapStatusAvailable => 'Data available';
+
+  @override
+  String get mapStatusNoMatching =>
+      'No matching data in the covered area and time';
+
+  @override
+  String get mapStatusNotCovered => 'This area or time is not covered';
+
+  @override
+  String get mapStatusUnavailable => 'Source data unavailable';
+
+  @override
+  String get mapStatusUnknown => 'Coverage or result unknown';
+
+  @override
+  String get mapStatusLoading => 'Loading map data';
+
+  @override
+  String get mapStatusRefreshing => 'Refreshing map data';
+
+  @override
+  String get mapStatusClientError => 'Could not retrieve map data';
+
+  @override
+  String get mapRetainedData =>
+      'Showing the previous result with its original time';
+
+  @override
+  String get mapRetry => 'Retry map data';
+
+  @override
+  String get mapFreshnessCurrent => 'Source update is current';
+
+  @override
+  String get mapFreshnessLate => 'Source update is late';
+
+  @override
+  String get mapFreshnessStale => 'Source data is stale';
+
+  @override
+  String get mapFreshnessVersioned => 'Published data version';
+
+  @override
+  String get mapFreshnessUnknown => 'Source freshness unknown';
+
+  @override
+  String get mapPartialScope => 'Partial result — more data may exist';
+
+  @override
+  String mapExactTotal(String count) {
+    return 'Exact matching total: $count';
+  }
+
+  @override
+  String get mapTotalUnknown => 'Full matching total unknown';
+
+  @override
+  String get mapUpdatedUnknown => 'Update time unknown';
+
+  @override
+  String mapUpdatedAt(String time) {
+    return 'Updated: $time';
+  }
+
+  @override
+  String mapObservedWindow(String from, String to) {
+    return 'Observation window: $from to $to (end excluded)';
+  }
+
+  @override
+  String get mapObservedWindowUnknown => 'Observation window unknown';
+
+  @override
+  String mapUnlocatedCount(String count) {
+    return 'Records without a usable map location: $count';
+  }
+
+  @override
+  String get mapSampleData => 'Sample data — illustrative only';
+
+  @override
+  String get mapHistoricalData => 'Historical data';
+
+  @override
+  String get mapPrediction => 'Prediction';
+
+  @override
+  String get mapCountUnknown => 'Passage count unknown';
+
+  @override
+  String mapSensorPassages(String count) {
+    return 'Sensor passages: $count';
+  }
+
+  @override
+  String mapStatisticalPeriod(String period) {
+    return 'Statistical period: $period';
+  }
+
+  @override
+  String mapObservedAt(String time) {
+    return 'Observed: $time';
+  }
+
+  @override
+  String mapReportedAt(String time) {
+    return 'Reported: $time';
+  }
+
+  @override
+  String get mapObservationTimeUnknown => 'Observation or report time unknown';
+
+  @override
+  String mapValidFrom(String time) {
+    return 'Effective from: $time';
+  }
+
+  @override
+  String mapValidTo(String time) {
+    return 'Effective until: $time (end excluded)';
+  }
+
+  @override
+  String mapSourceTimeUnknownZone(String value) {
+    return 'Source time: $value (timezone unknown)';
+  }
+
+  @override
+  String mapSourceTime(String value, String zone) {
+    return 'Source time: $value ($zone)';
+  }
+
+  @override
+  String get mapRetrievedUnknown => 'Retrieved time unknown';
+
+  @override
+  String mapRetrievedAt(String time) {
+    return 'Retrieved: $time';
+  }
+
+  @override
+  String get mapSourceUnknown => 'Source unknown';
+
+  @override
+  String mapSourceVersion(String version) {
+    return 'Source version: $version';
+  }
+
+  @override
+  String mapSourceAttribution(String attribution) {
+    return 'Source: $attribution';
+  }
+
+  @override
+  String mapOpenSource(String attribution) {
+    return 'Open source: $attribution';
+  }
+
+  @override
+  String get mapSourceLinkUnknown => 'Public source link unavailable';
+
+  @override
+  String get mapLayerPanelTitle => 'Topics and layers';
+
+  @override
+  String get mapTopicCityActivity => 'City activity';
+
+  @override
+  String get mapTopicNearbyNews => 'Nearby news';
+
+  @override
+  String get mapTopicAreaComparison => 'Area comparison';
+
+  @override
+  String get mapLaterTopicsUnavailable =>
+      'Nearby news and Area comparison will be available after the core map features are ready.';
+
+  @override
+  String get mapOneAreaMetric =>
+      'One filled area metric at a time. Point and line layers can be shown alongside it.';
+
+  @override
+  String get mapNoLayersSelected =>
+      'No layers selected. Turn on a layer to show map data.';
+
+  @override
+  String get mapSurfaceGeometryLegend =>
+      'Points keep reported locations; lines and areas keep reported extents.';
+
+  @override
+  String mapSurfaceCountLegend(String area) {
+    return 'Circle area represents sensor passages: $area m² per passage. Compare only the same observation window. This display scale does not represent population density.';
+  }
+
+  @override
+  String get mapSurfaceMissingKey =>
+      'Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.';
+
+  @override
+  String get mapSurfaceNativeUnavailable =>
+      'The base map is not configured on this platform. Data remains available in the object list.';
+
+  @override
+  String get mapSurfaceLoading => 'Loading base map…';
+
+  @override
+  String get mapSurfaceLoadError =>
+      'Base map could not load. Data remains available in the object list.';
+
+  @override
+  String get mapSurfaceRetry => 'Retry base map';
+
+  @override
+  String get mapSurfaceLocationUnavailable =>
+      'Location unavailable; not drawn on map';
+
+  @override
+  String get mapSurfacePointLocation => 'Reported point location';
+
+  @override
+  String get mapSurfaceLineLocation => 'Reported line extent';
+
+  @override
+  String get mapSurfaceAreaLocation => 'Reported area extent';
+
+  @override
+  String get mapSurfaceObjectList => 'Map objects — keyboard accessible';
+
+  @override
+  String mapAggregateLoadedRecords(String count) {
+    return 'Group: $count loaded records';
+  }
+
+  @override
+  String get mapAggregateBadgeRecords => 'records';
+
+  @override
+  String get mapAggregateLoadedOnly =>
+      'Loaded scope only (*) — the complete matching population may be larger';
+
+  @override
+  String mapAggregateMetric(String label, String value, String unit) {
+    return '$label: $value $unit';
+  }
+
+  @override
+  String mapAggregateMetricUnknown(String label, String unit) {
+    return '$label: value unknown ($unit)';
+  }
+
+  @override
+  String get mapAggregateScopeExplanation =>
+      'This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.';
+
+  @override
+  String mapAggregateGroupTotal(String count) {
+    return 'Exact matching records in this group: $count';
+  }
+
+  @override
+  String get mapAggregateSameLocation =>
+      'Several records share this location. Open a member below to view its own details.';
+
+  @override
+  String get mapAggregateZoom => 'Zoom to group bounds';
+
+  @override
+  String get mapAggregateMembersTitle => 'Group members';
+
+  @override
+  String mapAggregateMembersLoaded(String count) {
+    return 'Member records retrieved: $count';
+  }
+
+  @override
+  String mapAggregateMemberUnit(String unit) {
+    return 'Member scope unit: $unit';
+  }
+
+  @override
+  String get mapAggregateMembersLoading => 'Retrieving group members';
+
+  @override
+  String get mapAggregateSnapshotExpired =>
+      'This group snapshot has expired. Refresh the map and select the group again.';
+
+  @override
+  String get mapAggregateRefreshSnapshot => 'Refresh map snapshot';
+
+  @override
+  String get mapAggregateMembersRetry => 'Retry group members';
+
+  @override
+  String get mapAggregateMembersEmpty =>
+      'No member records were returned for this group.';
+
+  @override
+  String get mapAggregateMembersBounded =>
+      'This list has reached its display limit. More records may exist; zoom to the group for a narrower view.';
+
+  @override
+  String get mapAggregateMembersMore => 'Retrieve more group members';
+
+  @override
+  String get mapDetailsTitle => 'Selected record';
+
+  @override
+  String get mapDetailsClose => 'Close selected record details';
+
+  @override
+  String get mapDetailsOffscreen =>
+      'This record is outside the current view. Its original details are retained.';
+
+  @override
+  String get mapDetailsFilterExcluded =>
+      'This record no longer matches the selected layers or filters. Its map highlight is cleared.';
+
+  @override
+  String get mapDetailsRemoved =>
+      'This record is no longer available. Its details and map highlight are cleared.';
+
+  @override
+  String get mapDetailsWithdrawn =>
+      'This record has been withdrawn. Its details and map highlight are cleared.';
+
+  @override
+  String get mapDetailsInAggregate =>
+      'The selected record belongs to the highlighted aggregate. These are its original details.';
+
+  @override
+  String get mapDetailsLoading => 'Loading selected record details';
+
+  @override
+  String get mapDetailsError => 'Could not retrieve selected record details';
+
+  @override
+  String get mapDetailsSnapshotExpired =>
+      'The selected data snapshot has expired. Select a record from a refreshed map to request new details.';
+
+  @override
+  String mapDetailFact(String label, String value) {
+    return '$label: $value';
+  }
+
+  @override
+  String get mapDetailUnknown => 'Unknown';
+
+  @override
+  String get mapDetailPlan => 'Plan';
+
+  @override
+  String get mapDetailDirectionsUncalibrated =>
+      'Directions A and B are source channels; geographic headings are not known.';
+
+  @override
+  String get mapDetailMinuteGranularity => 'Observation granularity: minute';
+
+  @override
+  String get mapDetailHourGranularity => 'Observation granularity: hour';
+
+  @override
+  String get mapDetailSimplified =>
+      'Simplified display geometry; the source location precision is retained.';
+
+  @override
+  String get mapDetailPointPrecision => 'Location precision: point';
+
+  @override
+  String get mapDetailLinePrecision => 'Location precision: line';
+
+  @override
+  String get mapDetailAreaPrecision => 'Location precision: area';
+
+  @override
+  String get mapDetailUnlocatedPrecision => 'Location precision: unlocated';
+
+  @override
+  String get mapDetailRoleEventSite => 'Location role: evidenced event site';
+
+  @override
+  String get mapDetailRoleSensor => 'Location role: sensor';
+
+  @override
+  String get mapDetailRoleAffectedExtent => 'Location role: affected extent';
+
+  @override
+  String get mapDetailRoleStatisticalArea => 'Location role: statistical area';
+
+  @override
+  String get mapDetailRoleAreaAssociation => 'Location role: area association';
+
+  @override
+  String get mapDetailRoleMention => 'Location role: mentioned place';
+
+  @override
+  String get mapDetailRoleUnknown => 'Location role: unknown';
+
+  @override
+  String get mapDetailActive => 'Status: active';
+
+  @override
+  String get mapDetailPlanned => 'Status: planned';
+
+  @override
+  String get mapDetailCancelled => 'Status: cancelled';
+
+  @override
+  String get mapDetailResolved => 'Status: resolved';
+
+  @override
+  String get mapDetailStatusUnknown => 'Status: unknown';
+
+  @override
+  String get mapDetailExtentRoad => 'Affected extent: road segment';
+
+  @override
+  String get mapDetailExtentRoute => 'Affected extent: route';
+
+  @override
+  String get mapDetailExtentStop => 'Affected extent: stop';
+
+  @override
+  String get mapDetailExtentArea => 'Affected extent: area';
+
+  @override
+  String get mapDetailExtentUnknown => 'Affected extent: unknown';
+
+  @override
+  String get mapDetailLocationLocated => 'Sensor location status: located';
+
+  @override
+  String get mapDetailLocationUnlocated => 'Sensor location status: unlocated';
+
+  @override
+  String get mapDetailLocationAmbiguous => 'Sensor location status: ambiguous';
+
+  @override
+  String get mapDetailLocationInactive => 'Sensor location status: inactive';
+
+  @override
+  String get mapDetailValueMissing => 'Value missing';
+
+  @override
+  String get mapDetailValueSuppressed => 'Value suppressed';
+
+  @override
+  String get mapUnlocatedTitle => 'Records without map locations';
+
+  @override
+  String get mapUnlocatedClose => 'Close records without map locations';
+
+  @override
+  String mapUnlocatedAreaScope(String scope) {
+    return 'Associated area references: $scope';
+  }
+
+  @override
+  String mapUnlocatedJurisdictionScope(String scope) {
+    return 'Source jurisdiction: $scope';
+  }
+
+  @override
+  String get mapUnlocatedScopeExplanation =>
+      'These records have no usable map geometry. Association with this scope does not establish membership in the current map view.';
+
+  @override
+  String get mapUnlocatedLoading => 'Loading records without map locations';
+
+  @override
+  String get mapUnlocatedSnapshotExpired =>
+      'This list snapshot has expired. Restart the list to use a new snapshot.';
+
+  @override
+  String get mapUnlocatedRestart => 'Restart scoped list';
+
+  @override
+  String get mapUnlocatedEmptyPage => 'No records returned on this page';
+
+  @override
+  String get mapUnlocatedNextPage => 'Show next page';
+
+  @override
+  String get mapDetailIdentifier => 'Record id';
+
+  @override
+  String get mapDetailVersion => 'Record version';
+
+  @override
+  String get mapDetailLocationEvidence => 'Location evidence';
+
+  @override
+  String get mapDetailSensor => 'Sensor id';
+
+  @override
+  String get mapDetailDirectionA => 'Direction A passages';
+
+  @override
+  String get mapDetailDirectionB => 'Direction B passages';
+
+  @override
+  String get mapDetailLocationValidFrom => 'Location valid from';
+
+  @override
+  String get mapDetailLocationValidTo => 'Location valid until (end excluded)';
+
+  @override
+  String get mapDetailResult => 'Result id';
+
+  @override
+  String get mapDetailObservation => 'Observation id';
+
+  @override
+  String get mapDetailBaselineDefinition => 'Baseline definition id';
+
+  @override
+  String get mapDetailBaselineValue => 'Baseline value';
+
+  @override
+  String get mapDetailObservedValue => 'Observed value';
+
+  @override
+  String get mapDetailDelta => 'Difference from baseline';
+
+  @override
+  String get mapDetailSummary => 'Summary';
+
+  @override
+  String get mapDetailImpact => 'Impact';
+
+  @override
+  String get mapDetailServices => 'Affected services';
+
+  @override
+  String get mapDetailVenue => 'Venue';
+
+  @override
+  String get mapDetailCategory => 'Category';
+
+  @override
+  String get mapDetailStarts => 'Starts';
+
+  @override
+  String get mapDetailEnds => 'Ends';
+
+  @override
+  String get mapDetailProjectStatus => 'Project status';
+
+  @override
+  String get mapDetailPermit => 'Permit id';
+
+  @override
+  String get mapDetailBoundary => 'Boundary id';
+
+  @override
+  String get mapDetailBoundaryLevel => 'Boundary level';
+
+  @override
+  String get mapDetailBoundaryVintage => 'Boundary vintage';
+
+  @override
+  String get mapDetailBoundaryName => 'Boundary name';
+
+  @override
+  String get mapDetailIndicator => 'Indicator id';
+
+  @override
+  String get mapDetailValue => 'Value';
+
+  @override
+  String get mapDetailUnit => 'Unit';
+
+  @override
+  String get mapDetailPropertyType => 'Property type';
+
+  @override
+  String get mapDetailDefinition => 'Definition';
+
+  @override
+  String get mapDetailMetric => 'Metric';
+
+  @override
+  String get mapScreenTitle => 'Melens map';
+
+  @override
+  String get mapScreenStatuses => 'Layer statuses';
+
+  @override
+  String get mapScreenUnlocated => 'Records without map locations';
+
+  @override
+  String get mapScreenCatalogLoading => 'Loading layer catalog…';
+
+  @override
+  String get mapScreenCatalogError => 'Layer catalog could not load.';
+
+  @override
+  String get mapScreenRetryCatalog => 'Retry layer catalog';
+
+  @override
+  String get mapScreenOutsideService =>
+      'This view is outside the query service area.';
+
+  @override
+  String get mapScreenWaitingArea =>
+      'Waiting for the map area or query service bounds.';
+
+  @override
+  String get mapScreenServiceArea =>
+      'Results use the query service area until a map view is available.';
+
+  @override
+  String get mapScreenFilterRequired =>
+      'Boundary or area layers need a published version and filter before querying.';
+
+  @override
+  String get mapScreenRegionError => 'The visible map area could not be read.';
+
+  @override
+  String get mapScreenPreviousWindow =>
+      'Displayed records keep their previous query window.';
+
+  @override
+  String get mapScreenCurrent => 'Current · last 15 minutes';
+
+  @override
+  String get mapScreenHistorical => 'Historical';
+
+  @override
+  String get mapScreenHistoryRange => 'History range';
+
+  @override
+  String get mapScreenOneHour => '1 hour';
+
+  @override
+  String get mapScreenOneDay => '24 hours';
+
+  @override
+  String get mapScreenSevenDays => '7 days';
+
+  @override
+  String get mapScreenThirtyOneDays => '31 days';
+
+  @override
+  String get mapScreenPrevious => 'Previous time window';
+
+  @override
+  String get mapScreenNext => 'Next time window';
+
+  @override
+  String get mapScreenRefresh => 'Refresh records';
+
+  @override
+  String mapScreenWindow(String from, String to) {
+    return 'Melbourne time: $from to $to (end excluded)';
+  }
+
+  @override
+  String get mapAnomalyDirectionHigher => 'Direction: higher than the baseline';
+
+  @override
+  String get mapAnomalyDirectionLower => 'Direction: lower than the baseline';
+
+  @override
+  String get mapAnomalyDirectionNone =>
+      'Direction: no change from the baseline';
+
+  @override
+  String get mapAnomalyDirectionUnknown => 'Direction: unknown';
+
+  @override
+  String get mapAnomalyEligible => 'Eligibility: eligible';
+
+  @override
+  String get mapAnomalyIneligible => 'Eligibility: ineligible';
+
+  @override
+  String get mapAnomalyEligibilityUnknown => 'Eligibility: unknown';
+
+  @override
+  String get mapAnomalyClassified => 'Classification: anomalous';
+
+  @override
+  String get mapAnomalyNotAnomalous => 'Classification: not anomalous';
+
+  @override
+  String get mapAnomalyUnclassified => 'Classification: unclassified';
+
+  @override
+  String get mapAnomalyCauseUnestablished =>
+      'A difference from the baseline does not establish a cause.';
 }

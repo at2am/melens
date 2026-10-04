@@ -1,0 +1,197 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import test from 'node:test';
+
+import { mapItemSchema, type Bbox, type LayerResult, type MapItem } from '../src/contracts/map-contract.js';
+import { adaptPedestrianRow } from '../src/query/pedestrian.js';
+import { aggregateLayer } from '../src/services/aggregation.js';
+
+const BOUNDS: Bbox = [144.9, -37.9, 145.1, -37.7];
+const ZOOMS = [10, 12, 15, 18] as const;
+const WINDOW = { from: '2026-10-01T00:59:00Z', to: '2026-10-01T01:00:00Z' };
+const REQUEST_WINDOW = { from: '2026-10-01T00:00:00Z', to: '2026-10-01T01:01:00Z' };
+
+function repositoryPath(path: string): string {
+  let directory = process.cwd();
+  while (!existsSync(join(directory, 'specs/002-map-data-presentation/spec.md'))) {
+    const parent = dirname(directory);
+    if (parent === directory) throw new Error('Run T026 acceptance from the Melens repository');
+    directory = parent;
+  }
+  return join(directory, path);
+}
+
+function variants(): MapItem[] {
+  const value: unknown = JSON.parse(readFileSync(repositoryPath(
+    'specs/002-map-data-presentation/contracts/examples/item-variants.sample.json'), 'utf8'));
+  assert.ok(Array.isArray(value));
+  return value.map((item: unknown) => mapItemSchema.parse(item));
+}
+
+function sensor(id: string, options: {
+  longitude?: number; observedAt?: string; count?: number | null; hour?: boolean; locationTo?: string;
+} = {}) {
+  const source = { sourceId: options.hour === true ? 'sample.hourly' : 'sample.minute',
+    url: null, attribution: 'Synthetic T026 acceptance observations', versionRef: null };
+  const locationSource = { sourceId: 'sample.locations', url: null,
+    attribution: 'Synthetic T026 acceptance locations', versionRef: null };
+  return adaptPedestrianRow({
+    source_id: source.sourceId, batch_id: 't026-synthetic-v1', sensor_id: id,
+    observed_at: options.observedAt ?? WINDOW.from,
+    total_count: options.count === undefined ? 12 : options.count,
+    direction_a_count: null, direction_b_count: null,
+    record_granularity: options.hour === true ? 'sensor_hour' : 'sensor_minute',
+    fetched_at: '2026-10-01T01:02:00Z', location_source_id: locationSource.sourceId,
+    location_valid_from: '2026-09-30T00:00:00Z',
+    location_valid_to: options.locationTo ?? null, location_status: 'located',
+    geometry_geojson: JSON.stringify({ type: 'Point', coordinates: [options.longitude ?? 144.967, -37.818] }),
+  }, { source, locationSource });
+}
+
+function fixedItems(): MapItem[] {
+  const input = variants();
+  const boundary = input.find((item) => item.kind === 'boundary');
+  const rent = input.find((item) => item.kind === 'areaIndicator');
+  const news = input.find((item) => item.kind === 'news');
+  const road = input.find((item) => item.kind === 'disruption');
+  assert.ok(boundary && rent && news && road);
+  const geographic = [
+    mapItemSchema.parse({ ...rent, geometry: boundary.geometry,
+      location: { precision: 'area', role: 'statisticalArea', evidence: 'Synthetic matched original statistical boundary' },
+      details: { ...rent.details, value: 500, valueState: 'observed', mappingState: 'matched',
+        boundaryId: 'sample.lga', boundaryVintage: 'sample-2021' } }),
+    mapItemSchema.parse({ ...news, geometry: boundary.geometry,
+      location: { precision: 'area', role: 'areaAssociation', evidence: 'Synthetic area association; no event site' } }),
+    mapItemSchema.parse({ ...news, id: 'sample.news.unknown', location: { ...news.location, role: 'mention' } }),
+    road,
+  ];
+  return [
+    sensor('A', { locationTo: WINDOW.to }), sensor('B', { count: 0 }),
+    sensor('C', { longitude: 144.968, count: null }),
+    sensor('D', { observedAt: WINDOW.to }), sensor('E', { observedAt: WINDOW.to }),
+    sensor('F', { hour: true, observedAt: '2026-10-01T00:00:00Z' }),
+    sensor('G', { hour: true, observedAt: '2026-10-01T00:00:00Z' }),
+    ...geographic,
+  ];
+}
+
+function layer(items: MapItem[]): LayerResult {
+  assert.ok(items[0]);
+  const sourceIds = [...new Set(items.flatMap((item) => item.sources.map((source) => source.sourceId)))].sort();
+  return {
+    layerId: items[0].layerId, state: 'available', freshness: 'current', completeness: 'partial',
+    sourceIds,
+    coverage: { state: 'verified', areaRefs: ['sample.melbourne'], window: REQUEST_WINDOW, evidenceSourceIds: sourceIds },
+    observedWindow: items[0].layerId === 'pedestrian' ? REQUEST_WINDOW : null,
+    updatedAt: '2026-10-01T01:02:00Z', items,
+    unresolvedCount: null, nextCursor: null, totalMatching: null,
+  };
+}
+
+function fixedPresentation() {
+  const originals = fixedItems();
+  const groupedLayers = [...new Set(originals.map((item) => item.layerId))].map((id) =>
+    layer(originals.filter((item) => item.layerId === id)));
+  return {
+    provenance: 'Synthetic contract samples; generated by production adaptPedestrianRow and aggregateLayer. Not live data or SC-002 performance evidence.',
+    bounds: BOUNDS, originals,
+    bands: ZOOMS.map((zoom) => ({ zoom, layers: groupedLayers.map((sourceLayer) => {
+      const result = aggregateLayer(sourceLayer, { zoom, bounds: BOUNDS });
+      return { layerId: sourceLayer.layerId, band: result.band, items: result.items, excludedIds: result.excludedIds,
+        groups: [...result.groups.values()].map((group) => ({ aggregateId: group.aggregate.id, members: group.members })) };
+    }) })),
+  };
+}
+
+test('T026 fixed four-band production outputs are the exact Flutter acceptance inputs', () => {
+  const sample = fixedPresentation();
+  const actual = { ...sample, bands: sample.bands.map((band) => ({ ...band,
+    layers: band.layers.map((result) => ({ ...result, groups: result.groups.map((group) => ({
+      aggregateId: group.aggregateId,
+      memberReferences: group.members.map((member) => ({ id: member.id, versionId: member.versionId })),
+    })) })),
+  })) };
+  const path = repositoryPath('specs/002-map-data-presentation/task-handoffs/performance/t026-fixed-sample.json');
+  if (process.env.T026_WRITE_FIXTURE === '1') writeFileSync(path, `${JSON.stringify(actual, null, 2)}\n`);
+  assert.deepEqual(actual, JSON.parse(readFileSync(path, 'utf8')));
+});
+
+test('T026 four bands conserve actual loaded ids, versions, same-window sensor units and partial scope', () => {
+  const sample = fixedPresentation();
+  const expected = sample.originals.filter((item) => item.kind === 'pedestrian');
+  const expectedReferences = expected.map((item) => [item.id, item.versionId]).sort();
+  for (const band of sample.bands) {
+    const result = band.layers.find((candidate) => candidate.layerId === 'pedestrian');
+    assert.ok(result);
+    const members = result.items.flatMap((item) => item.kind === 'aggregate'
+      ? result.groups.find((group) => group.aggregateId === item.id)!.members : [item]);
+    assert.deepEqual(members.map((item) => [item.id, item.versionId]).sort(), expectedReferences);
+    assert.equal(new Set(members.map((item) => item.id)).size, expected.length);
+    for (const group of result.groups) {
+      const aggregate: MapItem | undefined = result.items.find((item) => item.id === group.aggregateId);
+      assert.ok(aggregate?.kind === 'aggregate');
+      assert.deepEqual(aggregate.details.memberIds, group.members.map((member) => member.id));
+      assert.deepEqual(aggregate.details.resultRange, { scope: 'viewport', returnedCount: group.members.length, totalMatching: null });
+      assert.equal(aggregate.details.metric.unit, 'sensors');
+      const sensors: string[] = group.members.map((member): string => {
+        assert.ok(member.kind === 'pedestrian');
+        assert.deepEqual(member.details.window, aggregate.details.window);
+        return JSON.stringify([member.sources.map((source) => source.sourceId).sort(), member.details.sensorId]);
+      });
+      assert.equal(aggregate.details.metric.value, new Set(sensors).size);
+      assert.match(aggregate.details.metric.definition, /passages.*not summed/);
+      for (const member of group.members) {
+        assert.deepEqual(member, expected.find((original) => original.id === member.id));
+      }
+    }
+    const selected = expected.find((item) => item.kind === 'pedestrian' && item.details.sensorId === 'A')!;
+    assert.ok(result.groups.some((group) => group.members.some((member) => member.id === selected.id)));
+    const zero = members.find((item) => item.kind === 'pedestrian' && item.details.sensorId === 'B');
+    const missing = members.find((item) => item.kind === 'pedestrian' && item.details.sensorId === 'C');
+    assert.equal(zero?.kind === 'pedestrian' ? zero.details.totalCount : undefined, 0);
+    assert.equal(missing?.kind === 'pedestrian' ? missing.details.totalCount : undefined, null);
+  }
+  const distant = sample.bands[0]!.layers.find((candidate) => candidate.layerId === 'pedestrian')!;
+  const close = sample.bands[3]!.layers.find((candidate) => candidate.layerId === 'pedestrian')!;
+  assert.ok(distant.items.length < close.items.length);
+});
+
+test('T026 area news, rent polygon and affected road keep original geometry and precision in every band', () => {
+  const sample = fixedPresentation();
+  for (const band of sample.bands) for (const kind of ['news', 'areaIndicator', 'disruption']) {
+    const original = sample.originals.find((item) => item.kind === kind && item.geometry !== null)!;
+    const result = band.layers.find((candidate) => candidate.layerId === original.layerId)!;
+    const presented = result.items.find((item) => item.id === original.id);
+    assert.deepEqual(presented, original);
+    assert.equal(presented?.geometryPresentation, undefined);
+  }
+  for (const band of sample.bands) {
+    const news = band.layers.find((candidate) => candidate.layerId === 'news')!;
+    assert.deepEqual(news.excludedIds, ['sample.news.unknown']);
+    assert.ok(news.items.every((item) => item.location.precision === 'area' && item.geometry?.type === 'Polygon'));
+  }
+});
+
+test('T026 adjacent half-open minute windows and hour definitions never collapse into one group', () => {
+  const sample = fixedPresentation();
+  const sensors = sample.originals.filter((item) => item.kind === 'pedestrian');
+  const first = sensors.find((item) => item.details.sensorId === 'A')!;
+  const next = sensors.find((item) => item.details.sensorId === 'D')!;
+  assert.deepEqual(first.details.window, WINDOW);
+  assert.equal(first.details.locationValidTo, first.details.window.to);
+  assert.equal(first.geometry?.type, 'Point');
+  assert.equal(next.details.window.from, first.details.window.to);
+  for (const band of sample.bands) {
+    const result = band.layers.find((candidate) => candidate.layerId === 'pedestrian')!;
+    for (const group of result.groups) {
+      const definitions = group.members.map((item) => {
+        assert.ok(item.kind === 'pedestrian');
+        return JSON.stringify([item.details.granularity, item.details.window]);
+      });
+      assert.equal(new Set(definitions).size, 1);
+    }
+    assert.ok(!result.groups.some((group) => group.members.some((item) => item.id === first.id)
+      && group.members.some((item) => item.id === next.id)));
+  }
+});

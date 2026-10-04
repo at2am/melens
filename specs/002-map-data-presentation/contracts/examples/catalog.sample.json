@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "dataMode": "sample",
+  "serviceBounds": [
+    144,
+    -39,
+    146.5,
+    -37
+  ],
+  "layers": [
+    {
+      "id": "pedestrian",
+      "titleKey": "mapLayerPedestrian",
+      "topic": "cityActivity",
+      "defaultEnabled": true,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.pedestrian"
+      ],
+      "availability": "available",
+      "freshness": "current",
+      "coverage": {
+        "state": "verified",
+        "areaRefs": [
+          "sample.melbourne"
+        ],
+        "window": {
+          "from": "2026-10-01T00:45:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "evidenceSourceIds": [
+          "sample.pedestrian"
+        ]
+      },
+      "timeSemantics": "observationWindow",
+      "updatedAt": "2026-10-01T01:00:00Z"
+    },
+    {
+      "id": "anomaly",
+      "titleKey": "mapLayerAnomaly",
+      "topic": "cityActivity",
+      "defaultEnabled": true,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.anomaly"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "observationWindow",
+      "updatedAt": null
+    },
+    {
+      "id": "disruption",
+      "titleKey": "mapLayerDisruption",
+      "topic": "cityActivity",
+      "defaultEnabled": true,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.disruption"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "effectiveInterval",
+      "updatedAt": null
+    },
+    {
+      "id": "event",
+      "titleKey": "mapLayerEvent",
+      "topic": "cityActivity",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.event"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "effectiveInterval",
+      "updatedAt": null
+    },
+    {
+      "id": "planning",
+      "titleKey": "mapLayerPlanning",
+      "topic": "cityActivity",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.planning"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "effectiveInterval",
+      "updatedAt": null
+    },
+    {
+      "id": "boundary",
+      "titleKey": "mapLayerBoundary",
+      "topic": "context",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.boundary"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "boundaryVintage",
+      "updatedAt": null
+    },
+    {
+      "id": "news",
+      "titleKey": "mapLayerNews",
+      "topic": "nearbyNews",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.news"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "reportedAt",
+      "updatedAt": null
+    },
+    {
+      "id": "rent",
+      "titleKey": "mapLayerRent",
+      "topic": "areaComparison",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.rent"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "statisticalPeriod",
+      "updatedAt": null
+    },
+    {
+      "id": "census",
+      "titleKey": "mapLayerCensus",
+      "topic": "areaComparison",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current",
+        "historical"
+      ],
+      "sourceIds": [
+        "sample.census"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "statisticalPeriod",
+      "updatedAt": null
+    }
+  ]
+}

@@ -31,6 +31,74 @@
 
   <title>Melens</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    (() => {
+      let pending;
+      let configuration;
+      window.melensLoadGoogleMapsApi = (apiKey, mapId) => {
+        if (!apiKey || !apiKey.trim()) {
+          return Promise.reject(new Error('GOOGLE_MAPS_WEB_API_KEY is required.'));
+        }
+        if (pending) {
+          if (configuration.apiKey !== apiKey || configuration.mapId !== mapId) {
+            return Promise.reject(new Error('Maps configuration cannot change within a page.'));
+          }
+          return pending;
+        }
+        configuration = { apiKey, mapId };
+        pending = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          let finished = false;
+          const previousAuthFailure = window.gm_authFailure;
+          const cleanup = () => {
+            clearTimeout(timeout);
+            delete window.melensGoogleMapsApiReady;
+            window.gm_authFailure = previousAuthFailure;
+          };
+          const fail = (message) => {
+            if (finished) return;
+            finished = true;
+            cleanup();
+            script.remove();
+            pending = undefined;
+            configuration = undefined;
+            reject(new Error(message));
+          };
+          const timeout = setTimeout(
+            () => fail('Google Maps JavaScript API did not become ready within 15 seconds.'),
+            15000,
+          );
+          window.melensGoogleMapsApiReady = () => {
+            if (finished) return;
+            finished = true;
+            cleanup();
+            resolve();
+          };
+          window.gm_authFailure = () => {
+            fail('Google Maps authorization failed. Review the Web key restrictions and API setup.');
+            if (previousAuthFailure) previousAuthFailure();
+          };
+          const parameters = new URLSearchParams({
+            key: apiKey,
+            loading: 'async',
+            callback: 'melensGoogleMapsApiReady',
+            v: 'weekly',
+            libraries: 'marker',
+            language: 'en',
+            region: 'AU',
+          });
+          if (mapId) parameters.set('map_ids', mapId);
+          script.src = `https://maps.googleapis.com/maps/api/js?${parameters}`;
+          script.async = true;
+          script.onerror = () => fail('Google Maps JavaScript API could not be reached.');
+          const nonce = document.querySelector('script[nonce]')?.nonce;
+          if (nonce) script.nonce = nonce;
+          document.head.append(script);
+        });
+        return pending;
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--

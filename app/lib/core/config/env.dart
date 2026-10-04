@@ -1,5 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'map_data_mode.dart';
+
+export 'map_data_mode.dart';
+
 part 'env.g.dart';
 
 enum AppEnvironment { dev, prod }
@@ -11,11 +15,43 @@ enum AppEnvironment { dev, prod }
 /// may hold keys (AGENTS.md, hard rule 5). Add a key here, to
 /// `config/example.json` and to the app README in the same commit.
 final class Env {
-  const Env({required this.environment, required this.agentBaseUrl});
+  factory Env({
+    required AppEnvironment environment,
+    required Uri agentBaseUrl,
+    required Uri mapBaseUrl,
+    MapDataMode mapDataMode = MapDataMode.live,
+    String? googleMapsWebApiKey,
+    String? googleMapsMapId,
+  }) {
+    _requireServiceUrl(agentBaseUrl, 'AGENT_BASE_URL');
+    _requireServiceUrl(mapBaseUrl, 'MAP_BASE_URL');
+    if (environment == AppEnvironment.prod &&
+        mapDataMode == MapDataMode.sample) {
+      throw ArgumentError('MAP_DATA_MODE=sample is development-only.');
+    }
+    return Env._(
+      environment: environment,
+      agentBaseUrl: agentBaseUrl,
+      mapBaseUrl: mapBaseUrl,
+      mapDataMode: mapDataMode,
+      googleMapsWebApiKey: (googleMapsWebApiKey ?? '').trim(),
+      googleMapsMapId: (googleMapsMapId ?? '').trim(),
+    );
+  }
+
+  const Env._({
+    required this.environment,
+    required this.agentBaseUrl,
+    required this.mapBaseUrl,
+    required this.mapDataMode,
+    required this.googleMapsWebApiKey,
+    required this.googleMapsMapId,
+  });
 
   /// The values this build was compiled with, with local-dev defaults.
   ///
-  /// Throws at startup if `MELENS_ENV` is not a known environment.
+  /// Invalid service URLs, unknown modes and production sample mode fail at
+  /// startup. A missing Maps key leaves map setup unavailable until configured.
   static final fromDefines = Env(
     environment: AppEnvironment.values.byName(
       const String.fromEnvironment('MELENS_ENV', defaultValue: 'dev'),
@@ -26,6 +62,19 @@ final class Env {
         defaultValue: 'http://localhost:8080',
       ),
     ),
+    mapBaseUrl: Uri.parse(
+      const String.fromEnvironment(
+        'MAP_BASE_URL',
+        defaultValue: 'http://localhost:8081',
+      ),
+    ),
+    mapDataMode: MapDataMode.values.byName(
+      const String.fromEnvironment('MAP_DATA_MODE', defaultValue: 'live'),
+    ),
+    googleMapsWebApiKey: const String.fromEnvironment(
+      'GOOGLE_MAPS_WEB_API_KEY',
+    ),
+    googleMapsMapId: const String.fromEnvironment('GOOGLE_MAPS_MAP_ID'),
   );
 
   final AppEnvironment environment;
@@ -35,9 +84,39 @@ final class Env {
   /// (architecture.md, Deployment constraints).
   final Uri agentBaseUrl;
 
+  /// Read-only map query service. Live failures never select sample data.
+  final Uri mapBaseUrl;
+
+  /// Sample data is selected explicitly and is permitted only in development.
+  final MapDataMode mapDataMode;
+
+  /// A browser-restricted Maps JavaScript API key. Never log this value.
+  final String googleMapsWebApiKey;
+
+  /// Optional for the base 2D map. Required for advanced markers and 3D.
+  final String googleMapsMapId;
+
   bool get isDev => environment == AppEnvironment.dev;
 
+  bool get usesSampleMapData => mapDataMode == MapDataMode.sample;
+
+  bool get hasGoogleMapsWebApiKey => googleMapsWebApiKey.isNotEmpty;
+
   String get name => environment.name;
+
+  static void _requireServiceUrl(Uri uri, String key) {
+    if (!uri.hasAuthority ||
+        uri.host.isEmpty ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment) {
+      throw ArgumentError(
+        '$key must be an HTTP(S) URL without credentials, '
+        'a query or a fragment.',
+      );
+    }
+  }
 }
 
 /// The build's [Env]. Tests override it with `envProvider.overrideWithValue`.

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "error": {
+    "code": "snapshotExpired",
+    "messageKey": "mapSnapshotExpired",
+    "requestId": "sample-request",
+    "retryable": true
+  }
+}

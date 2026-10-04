@@ -1,0 +1,21 @@
+{
+  "requestId": "sample-request",
+  "bbox": [
+    144.95,
+    -37.83,
+    144.98,
+    -37.8
+  ],
+  "zoom": 14,
+  "layers": [
+    "pedestrian"
+  ],
+  "mode": "current",
+  "window": {
+    "from": "2026-10-01T00:59:00Z",
+    "to": "2026-10-01T01:00:00Z"
+  },
+  "areaFilter": null,
+  "boundaryFilter": null,
+  "pageSize": 1000
+}

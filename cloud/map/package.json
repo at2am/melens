@@ -1,0 +1,23 @@
+{
+  "name": "@melens/map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "npm run build && cd dist && node --test",
+    "dev": "node --watch src/dev-server.ts"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "9.1.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "typescript": "5.9.3"
+  }
+}

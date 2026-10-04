@@ -1,0 +1,368 @@
+{
+  "mapDetailsTitle": "Selected record",
+  "@mapDetailsTitle": {
+    "description": "Heading of the persistent selected-object details panel."
+  },
+  "mapDetailsClose": "Close selected record details",
+  "@mapDetailsClose": {
+    "description": "Accessible close action; Escape also closes focused details."
+  },
+  "mapDetailsOffscreen": "This record is outside the current view. Its original details are retained.",
+  "@mapDetailsOffscreen": {
+    "description": "Camera movement retains the selected original snapshot; absence is not removal."
+  },
+  "mapDetailsFilterExcluded": "This record no longer matches the selected layers or filters. Its map highlight is cleared.",
+  "@mapDetailsFilterExcluded": {
+    "description": "Filter exclusion keeps original detail and explicitly clears the geographic highlight."
+  },
+  "mapDetailsRemoved": "This record is no longer available. Its details and map highlight are cleared.",
+  "@mapDetailsRemoved": {
+    "description": "Confirmed missing or no-longer-public selected record without implying an empty viewport."
+  },
+  "mapDetailsWithdrawn": "This record has been withdrawn. Its details and map highlight are cleared.",
+  "@mapDetailsWithdrawn": {
+    "description": "Explicit retraction removes public content and selection highlight."
+  },
+  "mapDetailsInAggregate": "The selected record belongs to the highlighted aggregate. These are its original details.",
+  "@mapDetailsInAggregate": {
+    "description": "Evidence-based aggregate linkage preserves the selected individual record."
+  },
+  "mapDetailsLoading": "Loading selected record details",
+  "@mapDetailsLoading": {
+    "description": "A snapshot-bound detail request is in progress."
+  },
+  "mapDetailsError": "Could not retrieve selected record details",
+  "@mapDetailsError": {
+    "description": "Safe detail request failure; raw errors are not displayed."
+  },
+  "mapDetailsSnapshotExpired": "The selected data snapshot has expired. Select a record from a refreshed map to request new details.",
+  "@mapDetailsSnapshotExpired": {
+    "description": "Expired detail snapshot retains original facts and never silently queries a newer publication."
+  },
+  "mapDetailFact": "{label}: {value}",
+  "@mapDetailFact": {
+    "description": "Typed fact label and value; null is explicitly unknown.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "mapDetailUnknown": "Unknown",
+  "@mapDetailUnknown": {
+    "description": "Unknown nullable fact value; never a measured zero."
+  },
+  "mapDetailPlan": "Plan",
+  "@mapDetailPlan": {
+    "description": "Explicit planned assertion label independent of colour."
+  },
+  "mapDetailDirectionsUncalibrated": "Directions A and B are source channels; geographic headings are not known.",
+  "@mapDetailDirectionsUncalibrated": {
+    "description": "Direction counters do not imply geographic movement or headings."
+  },
+  "mapDetailMinuteGranularity": "Observation granularity: minute",
+  "@mapDetailMinuteGranularity": {
+    "description": "Source measurement interval is minute-based."
+  },
+  "mapDetailHourGranularity": "Observation granularity: hour",
+  "@mapDetailHourGranularity": {
+    "description": "Source measurement interval is hourly, never presented as minute data."
+  },
+  "mapDetailSimplified": "Simplified display geometry; the source location precision is retained.",
+  "@mapDetailSimplified": {
+    "description": "Geometry simplification does not improve or enlarge source precision."
+  },
+  "mapDetailPointPrecision": "Location precision: point",
+  "@mapDetailPointPrecision": {
+    "description": "Original sourced point precision."
+  },
+  "mapDetailLinePrecision": "Location precision: line",
+  "@mapDetailLinePrecision": {
+    "description": "Original sourced line precision."
+  },
+  "mapDetailAreaPrecision": "Location precision: area",
+  "@mapDetailAreaPrecision": {
+    "description": "Area precision must remain area-level when zooming in."
+  },
+  "mapDetailUnlocatedPrecision": "Location precision: unlocated",
+  "@mapDetailUnlocatedPrecision": {
+    "description": "No trustworthy drawable location is available."
+  },
+  "mapDetailRoleEventSite": "Location role: evidenced event site",
+  "@mapDetailRoleEventSite": {
+    "description": "Event-site role from the typed location contract."
+  },
+  "mapDetailRoleSensor": "Location role: sensor",
+  "@mapDetailRoleSensor": {
+    "description": "Sensor location role from the typed contract."
+  },
+  "mapDetailRoleAffectedExtent": "Location role: affected extent",
+  "@mapDetailRoleAffectedExtent": {
+    "description": "Source-evidenced affected geography rather than a guessed site."
+  },
+  "mapDetailRoleStatisticalArea": "Location role: statistical area",
+  "@mapDetailRoleStatisticalArea": {
+    "description": "Original statistical geography remains visible."
+  },
+  "mapDetailRoleAreaAssociation": "Location role: area association",
+  "@mapDetailRoleAreaAssociation": {
+    "description": "Area association is not an exact event-site location."
+  },
+  "mapDetailRoleMention": "Location role: mentioned place",
+  "@mapDetailRoleMention": {
+    "description": "A mentioned place is not an evidenced event location."
+  },
+  "mapDetailRoleUnknown": "Location role: unknown",
+  "@mapDetailRoleUnknown": {
+    "description": "No reliable geographic role is supplied."
+  },
+  "mapDetailActive": "Status: active",
+  "@mapDetailActive": {
+    "description": "Record active lifecycle or event status."
+  },
+  "mapDetailPlanned": "Status: planned",
+  "@mapDetailPlanned": {
+    "description": "Planned lifecycle or event status is not presented as active."
+  },
+  "mapDetailCancelled": "Status: cancelled",
+  "@mapDetailCancelled": {
+    "description": "Cancelled lifecycle or event status is explicit."
+  },
+  "mapDetailResolved": "Status: resolved",
+  "@mapDetailResolved": {
+    "description": "Resolved lifecycle or event status is explicit."
+  },
+  "mapDetailStatusUnknown": "Status: unknown",
+  "@mapDetailStatusUnknown": {
+    "description": "Source event status is unknown."
+  },
+  "mapDetailExtentRoad": "Affected extent: road segment",
+  "@mapDetailExtentRoad": {
+    "description": "Transport disruption affects an evidenced road segment."
+  },
+  "mapDetailExtentRoute": "Affected extent: route",
+  "@mapDetailExtentRoute": {
+    "description": "Transport disruption affects a route."
+  },
+  "mapDetailExtentStop": "Affected extent: stop",
+  "@mapDetailExtentStop": {
+    "description": "Transport disruption affects a stop."
+  },
+  "mapDetailExtentArea": "Affected extent: area",
+  "@mapDetailExtentArea": {
+    "description": "Transport disruption affects an area."
+  },
+  "mapDetailExtentUnknown": "Affected extent: unknown",
+  "@mapDetailExtentUnknown": {
+    "description": "Transport disruption extent is unknown."
+  },
+  "mapDetailLocationLocated": "Sensor location status: located",
+  "@mapDetailLocationLocated": {
+    "description": "A sensor location is valid for the observation."
+  },
+  "mapDetailLocationUnlocated": "Sensor location status: unlocated",
+  "@mapDetailLocationUnlocated": {
+    "description": "A sensor lacks a reliable drawable location."
+  },
+  "mapDetailLocationAmbiguous": "Sensor location status: ambiguous",
+  "@mapDetailLocationAmbiguous": {
+    "description": "Ambiguous sensor location must not be guessed."
+  },
+  "mapDetailLocationInactive": "Sensor location status: inactive",
+  "@mapDetailLocationInactive": {
+    "description": "Inactive sensor location does not establish observation coverage."
+  },
+  "mapDetailValueMissing": "Value missing",
+  "@mapDetailValueMissing": {
+    "description": "An indicator is missing rather than measured zero."
+  },
+  "mapDetailValueSuppressed": "Value suppressed",
+  "@mapDetailValueSuppressed": {
+    "description": "A statistical value is withheld and must not be inferred."
+  },
+  "mapUnlocatedTitle": "Records without map locations",
+  "@mapUnlocatedTitle": {
+    "description": "Scoped unlocated-list heading, distinct from viewport results."
+  },
+  "mapUnlocatedClose": "Close records without map locations",
+  "@mapUnlocatedClose": {
+    "description": "Accessible close action for the unlocated list."
+  },
+  "mapUnlocatedAreaScope": "Associated area references: {scope}",
+  "@mapUnlocatedAreaScope": {
+    "description": "Shows the exact caller-approved area association identifiers.",
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUnlocatedJurisdictionScope": "Source jurisdiction: {scope}",
+  "@mapUnlocatedJurisdictionScope": {
+    "description": "Shows the exact approved source jurisdiction supplied by the caller.",
+    "placeholders": {
+      "scope": {
+        "type": "String"
+      }
+    }
+  },
+  "mapUnlocatedScopeExplanation": "These records have no usable map geometry. Association with this scope does not establish membership in the current map view.",
+  "@mapUnlocatedScopeExplanation": {
+    "description": "Unlocated facts never inherit guessed centroids or viewport membership."
+  },
+  "mapUnlocatedLoading": "Loading records without map locations",
+  "@mapUnlocatedLoading": {
+    "description": "Scoped unlocated request loading status."
+  },
+  "mapUnlocatedSnapshotExpired": "This list snapshot has expired. Restart the list to use a new snapshot.",
+  "@mapUnlocatedSnapshotExpired": {
+    "description": "Expired pagination cannot mix old and new publication pages."
+  },
+  "mapUnlocatedRestart": "Restart scoped list",
+  "@mapUnlocatedRestart": {
+    "description": "Explicitly clears the old page before creating a new list snapshot."
+  },
+  "mapUnlocatedEmptyPage": "No records returned on this page",
+  "@mapUnlocatedEmptyPage": {
+    "description": "Empty page only; does not claim verified absence or source coverage."
+  },
+  "mapUnlocatedNextPage": "Show next page",
+  "@mapUnlocatedNextPage": {
+    "description": "Replaces the current bounded page using its snapshot-bound cursor."
+  },
+  "mapDetailIdentifier": "Record id",
+  "@mapDetailIdentifier": {
+    "description": "Label for the typed record id detail field; null values are unknown."
+  },
+  "mapDetailVersion": "Record version",
+  "@mapDetailVersion": {
+    "description": "Label for the typed record version detail field; null values are unknown."
+  },
+  "mapDetailLocationEvidence": "Location evidence",
+  "@mapDetailLocationEvidence": {
+    "description": "Label for the typed location evidence detail field; null values are unknown."
+  },
+  "mapDetailSensor": "Sensor id",
+  "@mapDetailSensor": {
+    "description": "Label for the typed sensor id detail field; null values are unknown."
+  },
+  "mapDetailDirectionA": "Direction A passages",
+  "@mapDetailDirectionA": {
+    "description": "Label for the typed direction a passages detail field; null values are unknown."
+  },
+  "mapDetailDirectionB": "Direction B passages",
+  "@mapDetailDirectionB": {
+    "description": "Label for the typed direction b passages detail field; null values are unknown."
+  },
+  "mapDetailLocationValidFrom": "Location valid from",
+  "@mapDetailLocationValidFrom": {
+    "description": "Label for the typed location valid from detail field; null values are unknown."
+  },
+  "mapDetailLocationValidTo": "Location valid until (end excluded)",
+  "@mapDetailLocationValidTo": {
+    "description": "Label for the typed location valid until (end excluded) detail field; null values are unknown."
+  },
+  "mapDetailResult": "Result id",
+  "@mapDetailResult": {
+    "description": "Label for the typed result id detail field; null values are unknown."
+  },
+  "mapDetailObservation": "Observation id",
+  "@mapDetailObservation": {
+    "description": "Label for the typed observation id detail field; null values are unknown."
+  },
+  "mapDetailBaselineDefinition": "Baseline definition id",
+  "@mapDetailBaselineDefinition": {
+    "description": "Label for the typed baseline definition id detail field; null values are unknown."
+  },
+  "mapDetailBaselineValue": "Baseline value",
+  "@mapDetailBaselineValue": {
+    "description": "Label for the typed baseline value detail field; null values are unknown."
+  },
+  "mapDetailObservedValue": "Observed value",
+  "@mapDetailObservedValue": {
+    "description": "Label for the typed observed value detail field; null values are unknown."
+  },
+  "mapDetailDelta": "Difference from baseline",
+  "@mapDetailDelta": {
+    "description": "Label for the typed difference from baseline detail field; null values are unknown."
+  },
+  "mapDetailSummary": "Summary",
+  "@mapDetailSummary": {
+    "description": "Label for the typed summary detail field; null values are unknown."
+  },
+  "mapDetailImpact": "Impact",
+  "@mapDetailImpact": {
+    "description": "Label for the typed impact detail field; null values are unknown."
+  },
+  "mapDetailServices": "Affected services",
+  "@mapDetailServices": {
+    "description": "Label for the typed affected services detail field; null values are unknown."
+  },
+  "mapDetailVenue": "Venue",
+  "@mapDetailVenue": {
+    "description": "Label for the typed venue detail field; null values are unknown."
+  },
+  "mapDetailCategory": "Category",
+  "@mapDetailCategory": {
+    "description": "Label for the typed category detail field; null values are unknown."
+  },
+  "mapDetailStarts": "Starts",
+  "@mapDetailStarts": {
+    "description": "Label for the typed starts detail field; null values are unknown."
+  },
+  "mapDetailEnds": "Ends",
+  "@mapDetailEnds": {
+    "description": "Label for the typed ends detail field; null values are unknown."
+  },
+  "mapDetailProjectStatus": "Project status",
+  "@mapDetailProjectStatus": {
+    "description": "Label for the typed project status detail field; null values are unknown."
+  },
+  "mapDetailPermit": "Permit id",
+  "@mapDetailPermit": {
+    "description": "Label for the typed permit id detail field; null values are unknown."
+  },
+  "mapDetailBoundary": "Boundary id",
+  "@mapDetailBoundary": {
+    "description": "Label for the typed boundary id detail field; null values are unknown."
+  },
+  "mapDetailBoundaryLevel": "Boundary level",
+  "@mapDetailBoundaryLevel": {
+    "description": "Label for the typed boundary level detail field; null values are unknown."
+  },
+  "mapDetailBoundaryVintage": "Boundary vintage",
+  "@mapDetailBoundaryVintage": {
+    "description": "Label for the typed boundary vintage detail field; null values are unknown."
+  },
+  "mapDetailBoundaryName": "Boundary name",
+  "@mapDetailBoundaryName": {
+    "description": "Label for the typed boundary name detail field; null values are unknown."
+  },
+  "mapDetailIndicator": "Indicator id",
+  "@mapDetailIndicator": {
+    "description": "Label for the typed indicator id detail field; null values are unknown."
+  },
+  "mapDetailValue": "Value",
+  "@mapDetailValue": {
+    "description": "Label for the typed value detail field; null values are unknown."
+  },
+  "mapDetailUnit": "Unit",
+  "@mapDetailUnit": {
+    "description": "Label for the typed unit detail field; null values are unknown."
+  },
+  "mapDetailPropertyType": "Property type",
+  "@mapDetailPropertyType": {
+    "description": "Label for the typed property type detail field; null values are unknown."
+  },
+  "mapDetailDefinition": "Definition",
+  "@mapDetailDefinition": {
+    "description": "Label for the typed definition detail field; null values are unknown."
+  },
+  "mapDetailMetric": "Metric",
+  "@mapDetailMetric": {
+    "description": "Label for the typed metric detail field; null values are unknown."
+  }
+}

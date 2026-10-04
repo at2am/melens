@@ -1,0 +1,46 @@
+{
+  "mapAnomalyDirectionHigher": "Direction: higher than the baseline",
+  "@mapAnomalyDirectionHigher": {
+    "description": "Direction supplied by the verified anomaly producer; no client threshold or sign inference."
+  },
+  "mapAnomalyDirectionLower": "Direction: lower than the baseline",
+  "@mapAnomalyDirectionLower": {
+    "description": "Lower direction supplied by the anomaly producer."
+  },
+  "mapAnomalyDirectionNone": "Direction: no change from the baseline",
+  "@mapAnomalyDirectionNone": {
+    "description": "Producer explicitly supplies no difference direction; never a substitute for unknown."
+  },
+  "mapAnomalyDirectionUnknown": "Direction: unknown",
+  "@mapAnomalyDirectionUnknown": {
+    "description": "Producer direction is unknown and must not be inferred from counts."
+  },
+  "mapAnomalyEligible": "Eligibility: eligible",
+  "@mapAnomalyEligible": {
+    "description": "Producer explicitly confirms eligibility for its own baseline definition."
+  },
+  "mapAnomalyIneligible": "Eligibility: ineligible",
+  "@mapAnomalyIneligible": {
+    "description": "Producer has excluded this observation from classification."
+  },
+  "mapAnomalyEligibilityUnknown": "Eligibility: unknown",
+  "@mapAnomalyEligibilityUnknown": {
+    "description": "No producer eligibility conclusion is available."
+  },
+  "mapAnomalyClassified": "Classification: anomalous",
+  "@mapAnomalyClassified": {
+    "description": "Anomalous classification supplied by the producer, independent of display colour."
+  },
+  "mapAnomalyNotAnomalous": "Classification: not anomalous",
+  "@mapAnomalyNotAnomalous": {
+    "description": "Explicit producer classification; an unclassified observation never receives this text."
+  },
+  "mapAnomalyUnclassified": "Classification: unclassified",
+  "@mapAnomalyUnclassified": {
+    "description": "Producer supplied no classification; absence of a baseline is not normal activity."
+  },
+  "mapAnomalyCauseUnestablished": "A difference from the baseline does not establish a cause.",
+  "@mapAnomalyCauseUnestablished": {
+    "description": "Anomaly comparison is not a causal explanation. This view does not invent possible causes or call AI."
+  }
+}

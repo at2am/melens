@@ -1,0 +1,30 @@
+{
+  "mapLayerPanelTitle": "Topics and layers",
+  "@mapLayerPanelTitle": {
+    "description": "Heading for the topic selection and per-layer visibility controls."
+  },
+  "mapTopicCityActivity": "City activity",
+  "@mapTopicCityActivity": {
+    "description": "Topic for pedestrian observations, anomalies and transport disruptions with optional events and development."
+  },
+  "mapTopicNearbyNews": "Nearby news",
+  "@mapTopicNearbyNews": {
+    "description": "Topic for news associated with the selected region; selection is gated until later delivery."
+  },
+  "mapTopicAreaComparison": "Area comparison",
+  "@mapTopicAreaComparison": {
+    "description": "Topic for comparing published statistical periods at their original geographic scale."
+  },
+  "mapLaterTopicsUnavailable": "Nearby news and Area comparison will be available after the core map features are ready.",
+  "@mapLaterTopicsUnavailable": {
+    "description": "Explains disabled later-topic controls in the P0 map shell without claiming source failure or starting later workflows."
+  },
+  "mapOneAreaMetric": "One filled area metric at a time. Point and line layers can be shown alongside it.",
+  "@mapOneAreaMetric": {
+    "description": "Explains that selecting rent or Census replaces the other filled metric while auxiliary layers remain independent."
+  },
+  "mapNoLayersSelected": "No layers selected. Turn on a layer to show map data.",
+  "@mapNoLayersSelected": {
+    "description": "User-selected empty layer state, distinct from no matching records or missing coverage."
+  }
+}

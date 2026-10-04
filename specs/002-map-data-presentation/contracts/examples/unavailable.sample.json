@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "requestId": "unavailable.sample.json",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "layers": [
+    {
+      "layerId": "pedestrian",
+      "state": "unavailable",
+      "freshness": "unknown",
+      "completeness": "partial",
+      "sourceIds": [
+        "sample.pedestrian"
+      ],
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "observedWindow": null,
+      "updatedAt": null,
+      "items": [],
+      "unresolvedCount": 0,
+      "nextCursor": null,
+      "totalMatching": null
+    }
+  ]
+}

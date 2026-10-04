@@ -1,0 +1,14 @@
+[
+  {
+    "sourceId": "melbourne.municipal_boundary",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/municipal-boundary/",
+    "attribution": "City of Melbourne — Municipal boundary",
+    "versionRef": null
+  },
+  {
+    "sourceId": "melbourne.development_monitor",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/development-activity-monitor/",
+    "attribution": "City of Melbourne — Development Activity Monitor",
+    "versionRef": null
+  }
+]

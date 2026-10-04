@@ -1,0 +1,107 @@
+# Development map preview
+
+T019 deploys the read-only query service in `melens-510012`, Melbourne
+(`australia-southeast2`). The Flutter Web preview runs locally at
+`http://localhost:8000`. Firebase Hosting release is T054; this script does not
+enable Firebase APIs or create a Hosting site.
+
+The integrator runs final server/client checks before building and applying the
+deployment. Use Node.js 24; the Docker image pins 24.21.0 and runs the T014
+`dist/src/server.js` entrypoint as an unprivileged user. Build this package as the
+container context. It contains only the reviewed public registry; credentials
+come from the dedicated Cloud Run runtime identity.
+
+The package `.gcloudignore` uploads only the Dockerfile, Docker ignore rules,
+locked package files, TypeScript configuration, source and public registry.
+Tests, dependencies, compiled output and credential/config files are excluded.
+
+```sh
+gcloud builds submit cloud/map --project=melens-510012 \
+  --region=australia-southeast2 --timeout=600s \
+  --gcs-source-staging-dir=gs://melens-510012_cloudbuild/map-preview/source \
+  --gcs-log-dir=gs://melens-510012_cloudbuild/map-preview/logs \
+  --tag=australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map:dev-preview-20261001
+gcloud artifacts docker images describe \
+  australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map:dev-preview-20261001 \
+  --project=melens-510012 --format='value(image_summary.digest)'
+```
+
+Record the returned digest; use the immutable image for the plan and apply.
+
+```sh
+cloud/map/infra/deploy.sh \
+  --image australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map@sha256:DIGEST \
+  --allowed-origin http://localhost:8000 --dynamic-scan-bytes 400000000 --verify
+```
+
+The script plans by default. `--verify` reads identity, project/dataset/bucket/
+secret policies, query view metadata and the two public source publications. It
+does not read secret values. The publication query uses the existing CLI user;
+it does not prove execution under the query identity. A real deployed request is
+required for that acceptance. Current user impersonation of `melens-dev-query`
+is denied, so no local impersonation proof is claimed and no extra IAM role is
+granted to obtain one.
+
+After the integrator's validated handoff, rerun that exact command with
+`--apply --confirm-project melens-510012`. The apply creates or updates only
+`melens-dev-map` and its service-level public invocation binding. It changes no
+project/data/secret IAM permissions. The service uses
+`melens-dev-query@melens-510012.iam.gserviceaccount.com`, project
+`bigquery.jobUser` and `READER` access to the reviewed query-view dataset. The
+audit aborts on other query-identity project roles, ingestion dataset access,
+secret/bucket grants or an unreviewed query-dataset resource.
+
+Runtime bounds are one instance at both service and revision levels, concurrency
+8, one CPU, 512 MiB, a 30-second HTTP
+deadline, 10-second queries, 5-second dry runs, 1-second cancellation, 1,000 items
+and a 2 MiB response. Scale-to-zero is enabled. The in-memory snapshot store
+requires one instance; restarts/revisions can expire existing snapshots. This is
+a development deployment, not a durable pagination store or a global monetary
+cap. Public invocation makes these approved reads reachable; CORS allows only
+the explicitly listed app origins and does not authenticate nonbrowser callers.
+
+The explicitly reviewed 400,000,000-byte dynamic ceiling accommodates the
+383,847,461-byte current-geo estimate observed on 2026-10-01. Fresh dry runs must
+still confirm the estimate before apply. The library's dynamic default remains
+100,000,000 bytes; static/historical queries remain at 500,000,000 bytes.
+
+`dev-public-sources.json` contains only municipal boundary and development
+monitor references from their verified-open, active official manifests and
+published source metadata. Runtime coverage checks must recheck admission and
+publication on each request. An absent reference stays unavailable. No
+pedestrian, roads, transit, events, anomalies or candidate source is admitted by
+this registry. Each item adapter supplies its actual version reference rather
+than using a guessed dataset version.
+
+The current boundary/pedestrian views do not prove latest record rights after
+withdrawal, so production composition rejects those record families without a
+trusted supplemental checker. A published source reference does not unlock
+them. Planning is the positive live preview; the view owner must fix the record
+rights boundary before boundary/pedestrian acceptance.
+
+After deployment, record the Cloud Run URL, revision, immutable digest, service
+identity, runtime limits, allowed origin and actual JSON/CORS checks. The
+integrator writes an ignored `app/config/dev-preview.json` with `MELENS_ENV=dev`,
+`MAP_DATA_MODE=live` and that `MAP_BASE_URL`. A missing Maps key remains empty and
+the app must surface unavailable base-map setup. Only the integrator handles an
+explicitly authorized Maps key delivery in the ignored, permission-restricted
+configuration. Never print or commit keys, read other secret values or download
+a service account key. Run the built app at the exact allowed origin and record real API behavior
+separately from labelled sample behavior and real map rendering.
+
+The 2026-10-01 preview is deployed at
+`https://melens-dev-map-saepk4k6hq-km.a.run.app`, revision
+`melens-dev-map-00001-kq4`, image digest
+`sha256:31d7dd01f7d84d1ac15eae48c1d97fb05694bf1f1a51c30454d9ce9db123ded9`.
+Real catalog, planning viewport, aggregate members, original detail and CORS
+checks passed under the query identity. Boundary records remain unavailable.
+`/healthz` returns Google frontend HTML 404 while `/v1` routes work and container
+startup is verified; treat that as a separate health-path limitation. The exact
+platform cause is unconfirmed. Do not infer application or BigQuery health from
+this intercepted path, or change working IAM/ingress to repair it.
+
+Rollback uses the previously recorded Cloud Run revision and
+`gcloud run services update-traffic melens-dev-map --project=melens-510012
+--region=australia-southeast2 --to-revisions=PREVIOUS_REVISION=100`. For the first
+development deployment, remove `melens-dev-map` only when the integrator approves
+that cleanup; the data resources remain separately owned.

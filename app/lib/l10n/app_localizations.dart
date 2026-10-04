@@ -117,6 +117,1272 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to the map'**
   String get notFoundBackToMap;
+
+  /// Layer title for measured sensor passages.
+  ///
+  /// In en, this message translates to:
+  /// **'Pedestrian counts'**
+  String get mapLayerPedestrian;
+
+  /// Layer title for verified anomaly results.
+  ///
+  /// In en, this message translates to:
+  /// **'Pedestrian anomalies'**
+  String get mapLayerAnomaly;
+
+  /// Layer title for road and public transport impacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Transport disruptions'**
+  String get mapLayerDisruption;
+
+  /// Layer title for admitted public events.
+  ///
+  /// In en, this message translates to:
+  /// **'Events'**
+  String get mapLayerEvent;
+
+  /// Layer title for development monitor records.
+  ///
+  /// In en, this message translates to:
+  /// **'Development projects'**
+  String get mapLayerPlanning;
+
+  /// Layer title for geographic context polygons.
+  ///
+  /// In en, this message translates to:
+  /// **'Area boundaries'**
+  String get mapLayerBoundary;
+
+  /// Layer title for nearby public news reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby news'**
+  String get mapLayerNews;
+
+  /// Layer title for historical official rental indicators.
+  ///
+  /// In en, this message translates to:
+  /// **'Rental statistics'**
+  String get mapLayerRent;
+
+  /// Layer title for census period indicators.
+  ///
+  /// In en, this message translates to:
+  /// **'Census statistics'**
+  String get mapLayerCensus;
+
+  /// Successful layer result without a coverage or empty-result inference.
+  ///
+  /// In en, this message translates to:
+  /// **'Data available'**
+  String get mapStatusAvailable;
+
+  /// Empty-result label only for a complete query with verified geographic and temporal coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching data in the covered area and time'**
+  String get mapStatusNoMatching;
+
+  /// The selected scope is outside verified observation coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'This area or time is not covered'**
+  String get mapStatusNotCovered;
+
+  /// The source is currently unavailable; does not imply a measured zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Source data unavailable'**
+  String get mapStatusUnavailable;
+
+  /// The service has insufficient evidence to describe the selected scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage or result unknown'**
+  String get mapStatusUnknown;
+
+  /// Initial client request before any result is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading map data'**
+  String get mapStatusLoading;
+
+  /// A client request is in progress while an earlier result remains visible.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing map data'**
+  String get mapStatusRefreshing;
+
+  /// Safe client request error; raw server or transport errors are never exposed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not retrieve map data'**
+  String get mapStatusClientError;
+
+  /// Previous data remains visible after a refresh failure without a fabricated new timestamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the previous result with its original time'**
+  String get mapRetainedData;
+
+  /// Accessible action for a retryable client request failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry map data'**
+  String get mapRetry;
+
+  /// Source freshness label; this does not make an older observation or statistical period current.
+  ///
+  /// In en, this message translates to:
+  /// **'Source update is current'**
+  String get mapFreshnessCurrent;
+
+  /// Source has missed its expected refresh cadence.
+  ///
+  /// In en, this message translates to:
+  /// **'Source update is late'**
+  String get mapFreshnessLate;
+
+  /// Source observations have exceeded the producer-defined freshness threshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Source data is stale'**
+  String get mapFreshnessStale;
+
+  /// A static or statistical published vintage whose age alone is not a stale-live-data claim.
+  ///
+  /// In en, this message translates to:
+  /// **'Published data version'**
+  String get mapFreshnessVersioned;
+
+  /// No reliable source freshness classification is supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Source freshness unknown'**
+  String get mapFreshnessUnknown;
+
+  /// Incomplete result warning; the displayed rows do not imply the complete population.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial result — more data may exist'**
+  String get mapPartialScope;
+
+  /// Full-query total only when an exact total is supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact matching total: {count}'**
+  String mapExactTotal(String count);
+
+  /// The current page length cannot be substituted for an exact total.
+  ///
+  /// In en, this message translates to:
+  /// **'Full matching total unknown'**
+  String get mapTotalUnknown;
+
+  /// No reliable source update instant is supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Update time unknown'**
+  String get mapUpdatedUnknown;
+
+  /// Source update instant formatted in Melbourne local time with its timezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated: {time}'**
+  String mapUpdatedAt(String time);
+
+  /// Half-open observation interval in Melbourne time.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation window: {from} to {to} (end excluded)'**
+  String mapObservedWindow(String from, String to);
+
+  /// No reliable observation interval is supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation window unknown'**
+  String get mapObservedWindowUnknown;
+
+  /// Records excluded from geographic totals because a trustworthy map location is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Records without a usable map location: {count}'**
+  String mapUnlocatedCount(String count);
+
+  /// Mandatory visible label for every explicit development sample surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample data — illustrative only'**
+  String get mapSampleData;
+
+  /// The selected view represents a historical period rather than a current fact.
+  ///
+  /// In en, this message translates to:
+  /// **'Historical data'**
+  String get mapHistoricalData;
+
+  /// Required text label for a prediction; independent of colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Prediction'**
+  String get mapPrediction;
+
+  /// Missing sensor counts stay unknown rather than becoming zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Passage count unknown'**
+  String get mapCountUnknown;
+
+  /// Exact measured count; passages are not unique people.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor passages: {count}'**
+  String mapSensorPassages(String count);
+
+  /// Original statistical period label preserved without inventing an observation instant.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistical period: {period}'**
+  String mapStatisticalPeriod(String period);
+
+  /// Observation instant in Melbourne time with its timezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Observed: {time}'**
+  String mapObservedAt(String time);
+
+  /// Report publication instant in Melbourne time with its timezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported: {time}'**
+  String mapReportedAt(String time);
+
+  /// No observation, report, validity-start or statistical-period time is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation or report time unknown'**
+  String get mapObservationTimeUnknown;
+
+  /// Start of the source-provided validity interval in Melbourne time.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective from: {time}'**
+  String mapValidFrom(String time);
+
+  /// Exclusive end of the source-provided validity interval in Melbourne time.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective until: {time} (end excluded)'**
+  String mapValidTo(String time);
+
+  /// Unresolved source clock text retained verbatim without conversion to UTC.
+  ///
+  /// In en, this message translates to:
+  /// **'Source time: {value} (timezone unknown)'**
+  String mapSourceTimeUnknownZone(String value);
+
+  /// Original source clock text and source timezone retained without inference.
+  ///
+  /// In en, this message translates to:
+  /// **'Source time: {value} ({zone})'**
+  String mapSourceTime(String value, String zone);
+
+  /// No reliable source fetch instant is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrieved time unknown'**
+  String get mapRetrievedUnknown;
+
+  /// Source fetch instant in Melbourne time; independent of observation age.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrieved: {time}'**
+  String mapRetrievedAt(String time);
+
+  /// No public source provenance is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Source unknown'**
+  String get mapSourceUnknown;
+
+  /// Public source version reference; does not expose private ingestion evidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Source version: {version}'**
+  String mapSourceVersion(String version);
+
+  /// Readable public source attribution.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {attribution}'**
+  String mapSourceAttribution(String attribution);
+
+  /// Accessible source action label naming the public source.
+  ///
+  /// In en, this message translates to:
+  /// **'Open source: {attribution}'**
+  String mapOpenSource(String attribution);
+
+  /// No safe public HTTP or HTTPS source URL is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Public source link unavailable'**
+  String get mapSourceLinkUnknown;
+
+  /// Heading for the topic selection and per-layer visibility controls.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics and layers'**
+  String get mapLayerPanelTitle;
+
+  /// Topic for pedestrian observations, anomalies and transport disruptions with optional events and development.
+  ///
+  /// In en, this message translates to:
+  /// **'City activity'**
+  String get mapTopicCityActivity;
+
+  /// Topic for news associated with the selected region; selection is gated until later delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby news'**
+  String get mapTopicNearbyNews;
+
+  /// Topic for comparing published statistical periods at their original geographic scale.
+  ///
+  /// In en, this message translates to:
+  /// **'Area comparison'**
+  String get mapTopicAreaComparison;
+
+  /// Explains disabled later-topic controls in the P0 map shell without claiming source failure or starting later workflows.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby news and Area comparison will be available after the core map features are ready.'**
+  String get mapLaterTopicsUnavailable;
+
+  /// Explains that selecting rent or Census replaces the other filled metric while auxiliary layers remain independent.
+  ///
+  /// In en, this message translates to:
+  /// **'One filled area metric at a time. Point and line layers can be shown alongside it.'**
+  String get mapOneAreaMetric;
+
+  /// User-selected empty layer state, distinct from no matching records or missing coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'No layers selected. Turn on a layer to show map data.'**
+  String get mapNoLayersSelected;
+
+  /// 2D map legend explaining that rendered geometry retains source precision.
+  ///
+  /// In en, this message translates to:
+  /// **'Points keep reported locations; lines and areas keep reported extents.'**
+  String get mapSurfaceGeometryLegend;
+
+  /// Fixed circle-area scale and same-window comparison limitation. A zero or missing count never receives a positive-sized circle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circle area represents sensor passages: {area} m² per passage. Compare only the same observation window. This display scale does not represent population density.'**
+  String mapSurfaceCountLegend(String area);
+
+  /// Missing Web key state; sample data must not imply a working base map.
+  ///
+  /// In en, this message translates to:
+  /// **'Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.'**
+  String get mapSurfaceMissingKey;
+
+  /// Native SDK setup has not been accepted; Web readiness does not certify native rendering.
+  ///
+  /// In en, this message translates to:
+  /// **'The base map is not configured on this platform. Data remains available in the object list.'**
+  String get mapSurfaceNativeUnavailable;
+
+  /// Google Maps SDK readiness is pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading base map…'**
+  String get mapSurfaceLoading;
+
+  /// SDK readiness failed without exposing keys or raw provider error text.
+  ///
+  /// In en, this message translates to:
+  /// **'Base map could not load. Data remains available in the object list.'**
+  String get mapSurfaceLoadError;
+
+  /// Explicit SDK retry after a readiness failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry base map'**
+  String get mapSurfaceRetry;
+
+  /// Missing, ambiguous, inactive, contradictory or invalid geometry remains accessible without an invented marker.
+  ///
+  /// In en, this message translates to:
+  /// **'Location unavailable; not drawn on map'**
+  String get mapSurfaceLocationUnavailable;
+
+  /// Accessible object-list location precision for a supplied point.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported point location'**
+  String get mapSurfacePointLocation;
+
+  /// Accessible object-list location precision for a supplied line.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported line extent'**
+  String get mapSurfaceLineLocation;
+
+  /// Accessible object-list location precision for a supplied area.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported area extent'**
+  String get mapSurfaceAreaLocation;
+
+  /// Object list provides exact counts and keyboard selection independently of platform-map interaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Map objects — keyboard accessible'**
+  String get mapSurfaceObjectList;
+
+  /// Count of actual records represented by this supplied aggregate, not unique people or the entire source population.
+  ///
+  /// In en, this message translates to:
+  /// **'Group: {count} loaded records'**
+  String mapAggregateLoadedRecords(String count);
+
+  /// Unit shown below a cluster bitmap's actual loaded member-record count.
+  ///
+  /// In en, this message translates to:
+  /// **'records'**
+  String get mapAggregateBadgeRecords;
+
+  /// Explains the asterisk on incomplete or unknown-total cluster symbols without inventing a full total.
+  ///
+  /// In en, this message translates to:
+  /// **'Loaded scope only (*) — the complete matching population may be larger'**
+  String get mapAggregateLoadedOnly;
+
+  /// Producer-defined aggregate measure, value and unit, distinct from its loaded member-record count.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value} {unit}'**
+  String mapAggregateMetric(String label, String value, String unit);
+
+  /// Unknown aggregate metric remains unknown rather than zero; preserves the supplied measure and unit.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: value unknown ({unit})'**
+  String mapAggregateMetricUnknown(String label, String unit);
+
+  /// Explains the scope and count semantics of an aggregate independently of colour or map zoom.
+  ///
+  /// In en, this message translates to:
+  /// **'This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.'**
+  String get mapAggregateScopeExplanation;
+
+  /// An explicit exact group/member-query total from the server, never derived from a partial list or inferred as a viewport-wide total.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact matching records in this group: {count}'**
+  String mapAggregateGroupTotal(String count);
+
+  /// Explains why an exact colocated MultiPoint can remain grouped even at a close zoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Several records share this location. Open a member below to view its own details.'**
+  String get mapAggregateSameLocation;
+
+  /// Accessible action forwarding the group's supplied navigation bounds without inventing a geometry extent.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom to group bounds'**
+  String get mapAggregateZoom;
+
+  /// Heading for the bounded, snapshot-bound member records list.
+  ///
+  /// In en, this message translates to:
+  /// **'Group members'**
+  String get mapAggregateMembersTitle;
+
+  /// Number of unique member records currently retrieved by the client; this is never substituted for the full-query total.
+  ///
+  /// In en, this message translates to:
+  /// **'Member records retrieved: {count}'**
+  String mapAggregateMembersLoaded(String count);
+
+  /// Preserves the member-page producer's supplied unit, separately from the client record count.
+  ///
+  /// In en, this message translates to:
+  /// **'Member scope unit: {unit}'**
+  String mapAggregateMemberUnit(String unit);
+
+  /// Readable and accessible progress label for a bounded member-page request.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrieving group members'**
+  String get mapAggregateMembersLoading;
+
+  /// An expired group cannot be resumed using stale cursors; a new viewport snapshot is required.
+  ///
+  /// In en, this message translates to:
+  /// **'This group snapshot has expired. Refresh the map and select the group again.'**
+  String get mapAggregateSnapshotExpired;
+
+  /// Action requesting a new viewport snapshot after the member snapshot expires.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh map snapshot'**
+  String get mapAggregateRefreshSnapshot;
+
+  /// Manual action for retryable member requests; retained members keep their original source time.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry group members'**
+  String get mapAggregateMembersRetry;
+
+  /// Describes an empty successful member page without asserting a measured zero or verified source-wide no-match coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'No member records were returned for this group.'**
+  String get mapAggregateMembersEmpty;
+
+  /// The client stops after its bounded row/page limit while preserving unknown or partial totals.
+  ///
+  /// In en, this message translates to:
+  /// **'This list has reached its display limit. More records may exist; zoom to the group for a narrower view.'**
+  String get mapAggregateMembersBounded;
+
+  /// Keyboard-accessible manual action fetching the next bounded snapshot-bound member page.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrieve more group members'**
+  String get mapAggregateMembersMore;
+
+  /// Heading of the persistent selected-object details panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected record'**
+  String get mapDetailsTitle;
+
+  /// Accessible close action; Escape also closes focused details.
+  ///
+  /// In en, this message translates to:
+  /// **'Close selected record details'**
+  String get mapDetailsClose;
+
+  /// Camera movement retains the selected original snapshot; absence is not removal.
+  ///
+  /// In en, this message translates to:
+  /// **'This record is outside the current view. Its original details are retained.'**
+  String get mapDetailsOffscreen;
+
+  /// Filter exclusion keeps original detail and explicitly clears the geographic highlight.
+  ///
+  /// In en, this message translates to:
+  /// **'This record no longer matches the selected layers or filters. Its map highlight is cleared.'**
+  String get mapDetailsFilterExcluded;
+
+  /// Confirmed missing or no-longer-public selected record without implying an empty viewport.
+  ///
+  /// In en, this message translates to:
+  /// **'This record is no longer available. Its details and map highlight are cleared.'**
+  String get mapDetailsRemoved;
+
+  /// Explicit retraction removes public content and selection highlight.
+  ///
+  /// In en, this message translates to:
+  /// **'This record has been withdrawn. Its details and map highlight are cleared.'**
+  String get mapDetailsWithdrawn;
+
+  /// Evidence-based aggregate linkage preserves the selected individual record.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected record belongs to the highlighted aggregate. These are its original details.'**
+  String get mapDetailsInAggregate;
+
+  /// A snapshot-bound detail request is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading selected record details'**
+  String get mapDetailsLoading;
+
+  /// Safe detail request failure; raw errors are not displayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not retrieve selected record details'**
+  String get mapDetailsError;
+
+  /// Expired detail snapshot retains original facts and never silently queries a newer publication.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected data snapshot has expired. Select a record from a refreshed map to request new details.'**
+  String get mapDetailsSnapshotExpired;
+
+  /// Typed fact label and value; null is explicitly unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value}'**
+  String mapDetailFact(String label, String value);
+
+  /// Unknown nullable fact value; never a measured zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get mapDetailUnknown;
+
+  /// Explicit planned assertion label independent of colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get mapDetailPlan;
+
+  /// Direction counters do not imply geographic movement or headings.
+  ///
+  /// In en, this message translates to:
+  /// **'Directions A and B are source channels; geographic headings are not known.'**
+  String get mapDetailDirectionsUncalibrated;
+
+  /// Source measurement interval is minute-based.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation granularity: minute'**
+  String get mapDetailMinuteGranularity;
+
+  /// Source measurement interval is hourly, never presented as minute data.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation granularity: hour'**
+  String get mapDetailHourGranularity;
+
+  /// Geometry simplification does not improve or enlarge source precision.
+  ///
+  /// In en, this message translates to:
+  /// **'Simplified display geometry; the source location precision is retained.'**
+  String get mapDetailSimplified;
+
+  /// Original sourced point precision.
+  ///
+  /// In en, this message translates to:
+  /// **'Location precision: point'**
+  String get mapDetailPointPrecision;
+
+  /// Original sourced line precision.
+  ///
+  /// In en, this message translates to:
+  /// **'Location precision: line'**
+  String get mapDetailLinePrecision;
+
+  /// Area precision must remain area-level when zooming in.
+  ///
+  /// In en, this message translates to:
+  /// **'Location precision: area'**
+  String get mapDetailAreaPrecision;
+
+  /// No trustworthy drawable location is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Location precision: unlocated'**
+  String get mapDetailUnlocatedPrecision;
+
+  /// Event-site role from the typed location contract.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: evidenced event site'**
+  String get mapDetailRoleEventSite;
+
+  /// Sensor location role from the typed contract.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: sensor'**
+  String get mapDetailRoleSensor;
+
+  /// Source-evidenced affected geography rather than a guessed site.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: affected extent'**
+  String get mapDetailRoleAffectedExtent;
+
+  /// Original statistical geography remains visible.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: statistical area'**
+  String get mapDetailRoleStatisticalArea;
+
+  /// Area association is not an exact event-site location.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: area association'**
+  String get mapDetailRoleAreaAssociation;
+
+  /// A mentioned place is not an evidenced event location.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: mentioned place'**
+  String get mapDetailRoleMention;
+
+  /// No reliable geographic role is supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Location role: unknown'**
+  String get mapDetailRoleUnknown;
+
+  /// Record active lifecycle or event status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: active'**
+  String get mapDetailActive;
+
+  /// Planned lifecycle or event status is not presented as active.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: planned'**
+  String get mapDetailPlanned;
+
+  /// Cancelled lifecycle or event status is explicit.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: cancelled'**
+  String get mapDetailCancelled;
+
+  /// Resolved lifecycle or event status is explicit.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: resolved'**
+  String get mapDetailResolved;
+
+  /// Source event status is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: unknown'**
+  String get mapDetailStatusUnknown;
+
+  /// Transport disruption affects an evidenced road segment.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected extent: road segment'**
+  String get mapDetailExtentRoad;
+
+  /// Transport disruption affects a route.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected extent: route'**
+  String get mapDetailExtentRoute;
+
+  /// Transport disruption affects a stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected extent: stop'**
+  String get mapDetailExtentStop;
+
+  /// Transport disruption affects an area.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected extent: area'**
+  String get mapDetailExtentArea;
+
+  /// Transport disruption extent is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected extent: unknown'**
+  String get mapDetailExtentUnknown;
+
+  /// A sensor location is valid for the observation.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor location status: located'**
+  String get mapDetailLocationLocated;
+
+  /// A sensor lacks a reliable drawable location.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor location status: unlocated'**
+  String get mapDetailLocationUnlocated;
+
+  /// Ambiguous sensor location must not be guessed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor location status: ambiguous'**
+  String get mapDetailLocationAmbiguous;
+
+  /// Inactive sensor location does not establish observation coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor location status: inactive'**
+  String get mapDetailLocationInactive;
+
+  /// An indicator is missing rather than measured zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Value missing'**
+  String get mapDetailValueMissing;
+
+  /// A statistical value is withheld and must not be inferred.
+  ///
+  /// In en, this message translates to:
+  /// **'Value suppressed'**
+  String get mapDetailValueSuppressed;
+
+  /// Scoped unlocated-list heading, distinct from viewport results.
+  ///
+  /// In en, this message translates to:
+  /// **'Records without map locations'**
+  String get mapUnlocatedTitle;
+
+  /// Accessible close action for the unlocated list.
+  ///
+  /// In en, this message translates to:
+  /// **'Close records without map locations'**
+  String get mapUnlocatedClose;
+
+  /// Shows the exact caller-approved area association identifiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Associated area references: {scope}'**
+  String mapUnlocatedAreaScope(String scope);
+
+  /// Shows the exact approved source jurisdiction supplied by the caller.
+  ///
+  /// In en, this message translates to:
+  /// **'Source jurisdiction: {scope}'**
+  String mapUnlocatedJurisdictionScope(String scope);
+
+  /// Unlocated facts never inherit guessed centroids or viewport membership.
+  ///
+  /// In en, this message translates to:
+  /// **'These records have no usable map geometry. Association with this scope does not establish membership in the current map view.'**
+  String get mapUnlocatedScopeExplanation;
+
+  /// Scoped unlocated request loading status.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading records without map locations'**
+  String get mapUnlocatedLoading;
+
+  /// Expired pagination cannot mix old and new publication pages.
+  ///
+  /// In en, this message translates to:
+  /// **'This list snapshot has expired. Restart the list to use a new snapshot.'**
+  String get mapUnlocatedSnapshotExpired;
+
+  /// Explicitly clears the old page before creating a new list snapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart scoped list'**
+  String get mapUnlocatedRestart;
+
+  /// Empty page only; does not claim verified absence or source coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'No records returned on this page'**
+  String get mapUnlocatedEmptyPage;
+
+  /// Replaces the current bounded page using its snapshot-bound cursor.
+  ///
+  /// In en, this message translates to:
+  /// **'Show next page'**
+  String get mapUnlocatedNextPage;
+
+  /// Label for the typed record id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Record id'**
+  String get mapDetailIdentifier;
+
+  /// Label for the typed record version detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Record version'**
+  String get mapDetailVersion;
+
+  /// Label for the typed location evidence detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Location evidence'**
+  String get mapDetailLocationEvidence;
+
+  /// Label for the typed sensor id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor id'**
+  String get mapDetailSensor;
+
+  /// Label for the typed direction a passages detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction A passages'**
+  String get mapDetailDirectionA;
+
+  /// Label for the typed direction b passages detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction B passages'**
+  String get mapDetailDirectionB;
+
+  /// Label for the typed location valid from detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Location valid from'**
+  String get mapDetailLocationValidFrom;
+
+  /// Label for the typed location valid until (end excluded) detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Location valid until (end excluded)'**
+  String get mapDetailLocationValidTo;
+
+  /// Label for the typed result id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Result id'**
+  String get mapDetailResult;
+
+  /// Label for the typed observation id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Observation id'**
+  String get mapDetailObservation;
+
+  /// Label for the typed baseline definition id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Baseline definition id'**
+  String get mapDetailBaselineDefinition;
+
+  /// Label for the typed baseline value detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Baseline value'**
+  String get mapDetailBaselineValue;
+
+  /// Label for the typed observed value detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Observed value'**
+  String get mapDetailObservedValue;
+
+  /// Label for the typed difference from baseline detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Difference from baseline'**
+  String get mapDetailDelta;
+
+  /// Label for the typed summary detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get mapDetailSummary;
+
+  /// Label for the typed impact detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Impact'**
+  String get mapDetailImpact;
+
+  /// Label for the typed affected services detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected services'**
+  String get mapDetailServices;
+
+  /// Label for the typed venue detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Venue'**
+  String get mapDetailVenue;
+
+  /// Label for the typed category detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get mapDetailCategory;
+
+  /// Label for the typed starts detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts'**
+  String get mapDetailStarts;
+
+  /// Label for the typed ends detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends'**
+  String get mapDetailEnds;
+
+  /// Label for the typed project status detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Project status'**
+  String get mapDetailProjectStatus;
+
+  /// Label for the typed permit id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Permit id'**
+  String get mapDetailPermit;
+
+  /// Label for the typed boundary id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary id'**
+  String get mapDetailBoundary;
+
+  /// Label for the typed boundary level detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary level'**
+  String get mapDetailBoundaryLevel;
+
+  /// Label for the typed boundary vintage detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary vintage'**
+  String get mapDetailBoundaryVintage;
+
+  /// Label for the typed boundary name detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary name'**
+  String get mapDetailBoundaryName;
+
+  /// Label for the typed indicator id detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Indicator id'**
+  String get mapDetailIndicator;
+
+  /// Label for the typed value detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get mapDetailValue;
+
+  /// Label for the typed unit detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get mapDetailUnit;
+
+  /// Label for the typed property type detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Property type'**
+  String get mapDetailPropertyType;
+
+  /// Label for the typed definition detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Definition'**
+  String get mapDetailDefinition;
+
+  /// Label for the typed metric detail field; null values are unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get mapDetailMetric;
+
+  /// Map screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Melens map'**
+  String get mapScreenTitle;
+
+  /// Opens selected layer status and coverage information.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer statuses'**
+  String get mapScreenStatuses;
+
+  /// Opens independently scoped records without drawable geometry.
+  ///
+  /// In en, this message translates to:
+  /// **'Records without map locations'**
+  String get mapScreenUnlocated;
+
+  /// Catalog request is in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading layer catalog…'**
+  String get mapScreenCatalogLoading;
+
+  /// Safe catalog failure text.
+  ///
+  /// In en, this message translates to:
+  /// **'Layer catalog could not load.'**
+  String get mapScreenCatalogError;
+
+  /// Manual catalog retry while query bounds are unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry layer catalog'**
+  String get mapScreenRetryCatalog;
+
+  /// Outside operational envelope, with no claim about coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'This view is outside the query service area.'**
+  String get mapScreenOutsideService;
+
+  /// No bounded query area supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the map area or query service bounds.'**
+  String get mapScreenWaitingArea;
+
+  /// Explicit catalog-bounds fallback list scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Results use the query service area until a map view is available.'**
+  String get mapScreenServiceArea;
+
+  /// Layers lacking required approved filters are blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Boundary or area layers need a published version and filter before querying.'**
+  String get mapScreenFilterRequired;
+
+  /// Safe visible-region failure.
+  ///
+  /// In en, this message translates to:
+  /// **'The visible map area could not be read.'**
+  String get mapScreenRegionError;
+
+  /// Retained response belongs to an earlier time window.
+  ///
+  /// In en, this message translates to:
+  /// **'Displayed records keep their previous query window.'**
+  String get mapScreenPreviousWindow;
+
+  /// Current mode with bounded recent fifteen-minute window.
+  ///
+  /// In en, this message translates to:
+  /// **'Current · last 15 minutes'**
+  String get mapScreenCurrent;
+
+  /// Historical mode for bounded past windows.
+  ///
+  /// In en, this message translates to:
+  /// **'Historical'**
+  String get mapScreenHistorical;
+
+  /// Historical duration menu.
+  ///
+  /// In en, this message translates to:
+  /// **'History range'**
+  String get mapScreenHistoryRange;
+
+  /// Historical duration.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get mapScreenOneHour;
+
+  /// Historical duration.
+  ///
+  /// In en, this message translates to:
+  /// **'24 hours'**
+  String get mapScreenOneDay;
+
+  /// Historical duration.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get mapScreenSevenDays;
+
+  /// Maximum dynamic query duration.
+  ///
+  /// In en, this message translates to:
+  /// **'31 days'**
+  String get mapScreenThirtyOneDays;
+
+  /// Move historical window back by its duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous time window'**
+  String get mapScreenPrevious;
+
+  /// Move historical window forward up to now.
+  ///
+  /// In en, this message translates to:
+  /// **'Next time window'**
+  String get mapScreenNext;
+
+  /// Manual viewport refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh records'**
+  String get mapScreenRefresh;
+
+  /// Half-open query interval in Australia/Melbourne.
+  ///
+  /// In en, this message translates to:
+  /// **'Melbourne time: {from} to {to} (end excluded)'**
+  String mapScreenWindow(String from, String to);
+
+  /// Direction supplied by the verified anomaly producer; no client threshold or sign inference.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction: higher than the baseline'**
+  String get mapAnomalyDirectionHigher;
+
+  /// Lower direction supplied by the anomaly producer.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction: lower than the baseline'**
+  String get mapAnomalyDirectionLower;
+
+  /// Producer explicitly supplies no difference direction; never a substitute for unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction: no change from the baseline'**
+  String get mapAnomalyDirectionNone;
+
+  /// Producer direction is unknown and must not be inferred from counts.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction: unknown'**
+  String get mapAnomalyDirectionUnknown;
+
+  /// Producer explicitly confirms eligibility for its own baseline definition.
+  ///
+  /// In en, this message translates to:
+  /// **'Eligibility: eligible'**
+  String get mapAnomalyEligible;
+
+  /// Producer has excluded this observation from classification.
+  ///
+  /// In en, this message translates to:
+  /// **'Eligibility: ineligible'**
+  String get mapAnomalyIneligible;
+
+  /// No producer eligibility conclusion is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Eligibility: unknown'**
+  String get mapAnomalyEligibilityUnknown;
+
+  /// Anomalous classification supplied by the producer, independent of display colour.
+  ///
+  /// In en, this message translates to:
+  /// **'Classification: anomalous'**
+  String get mapAnomalyClassified;
+
+  /// Explicit producer classification; an unclassified observation never receives this text.
+  ///
+  /// In en, this message translates to:
+  /// **'Classification: not anomalous'**
+  String get mapAnomalyNotAnomalous;
+
+  /// Producer supplied no classification; absence of a baseline is not normal activity.
+  ///
+  /// In en, this message translates to:
+  /// **'Classification: unclassified'**
+  String get mapAnomalyUnclassified;
+
+  /// Anomaly comparison is not a causal explanation. This view does not invent possible causes or call AI.
+  ///
+  /// In en, this message translates to:
+  /// **'A difference from the baseline does not establish a cause.'**
+  String get mapAnomalyCauseUnestablished;
 }
 
 class _AppLocalizationsDelegate

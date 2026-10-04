@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "requestId": "sample-partial",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "layers": [
+    {
+      "layerId": "pedestrian",
+      "state": "available",
+      "freshness": "current",
+      "completeness": "partial",
+      "sourceIds": [
+        "sample.pedestrian"
+      ],
+      "coverage": {
+        "state": "verified",
+        "areaRefs": [
+          "sample.melbourne"
+        ],
+        "window": {
+          "from": "2026-10-01T00:45:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "evidenceSourceIds": [
+          "sample.pedestrian"
+        ]
+      },
+      "observedWindow": {
+        "from": "2026-10-01T00:59:00Z",
+        "to": "2026-10-01T01:00:00Z"
+      },
+      "updatedAt": "2026-10-01T01:00:00Z",
+      "items": [
+        {
+          "id": "sample.sensor.A",
+          "versionId": "sample-v1",
+          "layerId": "pedestrian",
+          "kind": "pedestrian",
+          "title": "Sample sensor A",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              144.967,
+              -37.818
+            ]
+          },
+          "location": {
+            "precision": "point",
+            "role": "sensor",
+            "evidence": "Synthetic development fixture"
+          },
+          "assertionKind": "observation",
+          "lifecycle": "active",
+          "time": {
+            "observedAt": "2026-10-01T00:59:00Z",
+            "reportedAt": null,
+            "validFrom": null,
+            "validTo": null,
+            "periodLabel": null,
+            "fetchedAt": "2026-10-01T01:00:00Z",
+            "sourceTimeText": null,
+            "sourceTimezone": null
+          },
+          "sources": [
+            {
+              "sourceId": "sample.pedestrian",
+              "url": null,
+              "attribution": "Illustrative sample data",
+              "versionRef": "sample-v1"
+            }
+          ],
+          "details": {
+            "sensorId": "sample.A",
+            "totalCount": 12,
+            "directionACount": null,
+            "directionBCount": null,
+            "granularity": "minute",
+            "window": {
+              "from": "2026-10-01T00:59:00Z",
+              "to": "2026-10-01T01:00:00Z"
+            },
+            "locationValidFrom": "2026-09-30T00:00:00Z",
+            "locationValidTo": null,
+            "locationStatus": "located"
+          }
+        },
+        {
+          "id": "sample.sensor.B",
+          "versionId": "sample-v1",
+          "layerId": "pedestrian",
+          "kind": "pedestrian",
+          "title": "Sample sensor B",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              144.965,
+              -37.817
+            ]
+          },
+          "location": {
+            "precision": "point",
+            "role": "sensor",
+            "evidence": "Synthetic development fixture"
+          },
+          "assertionKind": "observation",
+          "lifecycle": "active",
+          "time": {
+            "observedAt": "2026-10-01T00:59:00Z",
+            "reportedAt": null,
+            "validFrom": null,
+            "validTo": null,
+            "periodLabel": null,
+            "fetchedAt": "2026-10-01T01:00:00Z",
+            "sourceTimeText": null,
+            "sourceTimezone": null
+          },
+          "sources": [
+            {
+              "sourceId": "sample.pedestrian",
+              "url": null,
+              "attribution": "Illustrative sample data",
+              "versionRef": "sample-v1"
+            }
+          ],
+          "details": {
+            "sensorId": "sample.B",
+            "totalCount": 0,
+            "directionACount": null,
+            "directionBCount": null,
+            "granularity": "minute",
+            "window": {
+              "from": "2026-10-01T00:59:00Z",
+              "to": "2026-10-01T01:00:00Z"
+            },
+            "locationValidFrom": "2026-09-30T00:00:00Z",
+            "locationValidTo": null,
+            "locationStatus": "located"
+          }
+        }
+      ],
+      "unresolvedCount": 1,
+      "nextCursor": "sample-continuation",
+      "totalMatching": null
+    }
+  ]
+}

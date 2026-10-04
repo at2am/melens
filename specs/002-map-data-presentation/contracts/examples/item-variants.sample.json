@@ -1,0 +1,496 @@
+[
+  {
+    "id": "sample.sensor.A",
+    "versionId": "sample-v1",
+    "layerId": "pedestrian",
+    "kind": "pedestrian",
+    "title": "Sample sensor A",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "sensor",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "sensorId": "sample.A",
+      "totalCount": 12,
+      "directionACount": null,
+      "directionBCount": null,
+      "granularity": "minute",
+      "window": {
+        "from": "2026-10-01T00:59:00Z",
+        "to": "2026-10-01T01:00:00Z"
+      },
+      "locationValidFrom": "2026-09-30T00:00:00Z",
+      "locationValidTo": null,
+      "locationStatus": "located"
+    }
+  },
+  {
+    "id": "sample.anomaly",
+    "versionId": "sample-v1",
+    "layerId": "anomaly",
+    "kind": "anomaly",
+    "title": "Sample anomaly",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "sensor",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "resultId": "sample.anomaly.A",
+      "sensorId": "sample.A",
+      "observationId": "sample.sensor.A",
+      "window": {
+        "from": "2026-10-01T00:59:00Z",
+        "to": "2026-10-01T01:00:00Z"
+      },
+      "baselineDefinitionId": "sample.baseline",
+      "baselineValue": 6,
+      "observedValue": 12,
+      "delta": 6,
+      "direction": "higher",
+      "eligibility": "eligible",
+      "classification": "anomalous"
+    }
+  },
+  {
+    "id": "sample.disruption",
+    "versionId": "sample-v1",
+    "layerId": "disruption",
+    "kind": "disruption",
+    "title": "Sample disruption",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          144.966,
+          -37.818
+        ],
+        [
+          144.968,
+          -37.819
+        ]
+      ]
+    },
+    "location": {
+      "precision": "line",
+      "role": "affectedExtent",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "plan",
+    "lifecycle": "planned",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "summary": "Illustrative planned closure",
+      "impact": "Illustrative detour",
+      "serviceNames": [
+        "Sample road"
+      ],
+      "status": "planned",
+      "extentKind": "roadSegment"
+    }
+  },
+  {
+    "id": "sample.event",
+    "versionId": "sample-v1",
+    "layerId": "event",
+    "kind": "event",
+    "title": "Sample event",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "eventSite",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "plan",
+    "lifecycle": "planned",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "summary": "Illustrative event",
+      "venueName": "Sample venue",
+      "category": "Music",
+      "startAt": null,
+      "endAt": null,
+      "status": "planned"
+    }
+  },
+  {
+    "id": "sample.planning",
+    "versionId": "sample-v1",
+    "layerId": "planning",
+    "kind": "planning",
+    "title": "Sample planning",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "unknown",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "plan",
+    "lifecycle": "planned",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "summary": "Illustrative development",
+      "projectStatus": "Planned",
+      "permitId": null
+    }
+  },
+  {
+    "id": "sample.boundary",
+    "versionId": "sample-v1",
+    "layerId": "boundary",
+    "kind": "boundary",
+    "title": "Sample boundary",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            144.96,
+            -37.82
+          ],
+          [
+            144.97,
+            -37.82
+          ],
+          [
+            144.97,
+            -37.81
+          ],
+          [
+            144.96,
+            -37.81
+          ],
+          [
+            144.96,
+            -37.82
+          ]
+        ]
+      ]
+    },
+    "location": {
+      "precision": "area",
+      "role": "statisticalArea",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": null,
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": "2021",
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "boundaryId": "sample.lga",
+      "boundaryLevel": "LGA",
+      "vintage": "sample-2021",
+      "name": "Sample statistical area"
+    }
+  },
+  {
+    "id": "sample.news",
+    "versionId": "sample-v1",
+    "layerId": "news",
+    "kind": "news",
+    "title": "Sample news",
+    "geometry": null,
+    "location": {
+      "precision": "unlocated",
+      "role": "areaAssociation",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "report",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": null,
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "eventId": "sample.news",
+      "summary": "Illustrative area-associated report",
+      "articleRefs": [
+        {
+          "articleId": "sample.article",
+          "url": null,
+          "title": "Sample article",
+          "reportedAt": null
+        }
+      ],
+      "localizationEvidence": "Area association only; no event-site evidence",
+      "dedupStatus": "unconfirmed"
+    }
+  },
+  {
+    "id": "sample.areaIndicator",
+    "versionId": "sample-v1",
+    "layerId": "rent",
+    "kind": "areaIndicator",
+    "title": "Sample areaIndicator",
+    "geometry": null,
+    "location": {
+      "precision": "unlocated",
+      "role": "statisticalArea",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": null,
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": "Quarter 3 2025",
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "indicatorId": "sample.weeklyRent",
+      "value": null,
+      "valueState": "suppressed",
+      "unit": "AUD/week",
+      "periodId": "2025-Q3",
+      "periodLabel": "Quarter 3 2025",
+      "propertyType": "all",
+      "boundaryId": null,
+      "boundaryVintage": null,
+      "mappingState": "missing",
+      "definition": "Illustrative historical median weekly rent"
+    }
+  },
+  {
+    "id": "sample.aggregate",
+    "versionId": "sample-v1",
+    "layerId": "pedestrian",
+    "kind": "aggregate",
+    "title": "Sample aggregate",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "unknown",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": "2026-10-01T00:59:00Z",
+      "reportedAt": null,
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.pedestrian",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "representation": "cluster",
+      "memberIds": [
+        "sample.sensor.A",
+        "sample.sensor.B"
+      ],
+      "memberCursor": null,
+      "resultRange": {
+        "scope": "viewport",
+        "returnedCount": 2,
+        "totalMatching": 2
+      },
+      "metric": {
+        "id": "sample.passages",
+        "label": "Sensor passage counts",
+        "unit": "sensor passages",
+        "value": 12,
+        "definition": "Sample readings; repeated passage is possible"
+      },
+      "window": {
+        "from": "2026-10-01T00:59:00Z",
+        "to": "2026-10-01T01:00:00Z"
+      },
+      "coverage": {
+        "state": "verified",
+        "areaRefs": [
+          "sample.melbourne"
+        ],
+        "window": {
+          "from": "2026-10-01T00:45:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "evidenceSourceIds": [
+          "sample.pedestrian"
+        ]
+      },
+      "bounds": [
+        144.965,
+        -37.819,
+        144.968,
+        -37.817
+      ],
+      "grid": null
+    }
+  }
+]

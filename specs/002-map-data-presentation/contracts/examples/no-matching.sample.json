@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "requestId": "no-matching.sample.json",
+  "snapshotId": "sample-snapshot",
+  "generatedAt": "2026-10-01T01:00:00Z",
+  "mode": "current",
+  "dataMode": "sample",
+  "layers": [
+    {
+      "layerId": "pedestrian",
+      "state": "noMatching",
+      "freshness": "current",
+      "completeness": "complete",
+      "sourceIds": [
+        "sample.pedestrian"
+      ],
+      "coverage": {
+        "state": "verified",
+        "areaRefs": [
+          "sample.melbourne"
+        ],
+        "window": {
+          "from": "2026-10-01T00:45:00Z",
+          "to": "2026-10-01T01:00:00Z"
+        },
+        "evidenceSourceIds": [
+          "sample.pedestrian"
+        ]
+      },
+      "observedWindow": null,
+      "updatedAt": "2026-10-01T01:00:00Z",
+      "items": [],
+      "unresolvedCount": 0,
+      "nextCursor": null,
+      "totalMatching": 0
+    }
+  ]
+}
