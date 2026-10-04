@@ -175,7 +175,7 @@ export class CouncilEngagementNewsConnector implements Connector {
     await this.pause();
     const sitemap = await this.client.getText({ url: `https://${council.host}/sitemap.xml`,
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/xml' },
-      timeoutMs: 60_000, maxAttempts: 3, redirect: 'error' });
+      timeoutMs: 60_000, maxAttempts: 3, redirect: 'manual' });
     this.#pages += 1;
     const candidates = parseSitemap(sitemap.body, council.host, since);
     const found: { page: SitemapPage; news: NewsPage }[] = [];
@@ -186,11 +186,13 @@ export class CouncilEngagementNewsConnector implements Connector {
       try {
         html = (await this.client.getText({ url: page.url,
           headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
-          timeoutMs: 30_000, maxAttempts: 2, redirect: 'error' })).body;
+          timeoutMs: 30_000, maxAttempts: 2, redirect: 'manual' })).body;
         this.#pages += 1;
       } catch (error) {
         if (!(error instanceof HttpFailure)) throw error;
-        failedPages += 1;
+        this.#pages += 1;
+        // A redirect leads to the login page of a private project; it is not public news.
+        if (error.status === null || error.status < 300 || error.status >= 400) failedPages += 1;
         continue;
       }
       const news = parseNewsPage(html);

@@ -230,7 +230,9 @@ export class CouncilEngagementConnector implements Connector {
         const response = await this.client.getJson({ url,
           headers: { 'User-Agent': USER_AGENT, Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest' },
-          timeoutMs: 30_000, maxAttempts: 3, redirect: 'error' });
+          // 'manual' turns a redirect into an HTTP failure whose body is
+          // released; 'error' rejects inside fetch and leaves the socket open.
+          timeoutMs: 30_000, maxAttempts: 3, redirect: 'manual' });
         this.#pages += 1;
         const body = pageSchema.parse(response.body);
         for (const card of body.result) {

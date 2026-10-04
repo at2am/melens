@@ -38,6 +38,7 @@ class SiteClient extends HttpClient {
     const url = String(request.url);
     this.requested.push(url);
     const body = this.text[url];
+    if (url.endsWith('/private')) throw new HttpFailure('validation_failed', 302, 1);
     if (body === undefined || this.failing.has(url)) throw new HttpFailure('upstream_unavailable', 503, 1);
     return response(body);
   }
@@ -143,6 +144,19 @@ test('an unreadable page is skipped and counted; an unreadable sitemap fails the
   const time = await connector(await siteClient()).collect(parseConnectorInput({ sourceId: SOURCE_ID,
     checkpoint: null, runId: 't', window: { kind: 'time', from: '2026-10-01T00:00:00Z', to: '2026-10-02T00:00:00Z' } }));
   assert.equal(time.kind === 'failure' && time.code, 'validation_failed');
+});
+
+test('a page redirecting to a project login is private, not a failure', async () => {
+  const data = await fixture();
+  const sitemap = data.sitemap.replace('</urlset>',
+    `<url><loc>https://${HOST}/lfp/private</loc><lastmod>2026-10-02T10:00:00+10:00</lastmod></url></urlset>`);
+  const client = new SiteClient({ [`https://${HOST}/sitemap.xml`]: sitemap,
+    [`https://${HOST}/projects`]: data.projectListing, ...data.pages }, data.projects);
+  const result = await connector(client).collect(input) as ConnectorSuccess;
+  assert.equal(result.kind, 'success');
+  assert.equal(result.rejectedCount, 0);
+  assert.equal(result.geoRecords.length, 2);
+  assert.ok(client.requested.includes(`https://${HOST}/lfp/private`));
 });
 
 test('the manifest admits a restricted news source', async () => {
