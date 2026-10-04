@@ -97,21 +97,28 @@ export function melbourneDateStart(date: string): string {
   return new Date(utcMidnight - minutes * 60_000).toISOString();
 }
 
+/** LGA reference plus listed suburbs, or the LGA alone for council-wide projects. */
+export function projectArea(council: EngagementCouncil, project: EngagementProject):
+  { suburbs: string[]; councilWide: boolean; areaRefs: string[] } {
+  const suburbs = listedSuburbs(project);
+  const councilWide = suburbs.length === 0 || suburbs.length > MAX_LOCAL_SUBURBS;
+  return { suburbs, councilWide, areaRefs: [`ASGS_LGA:${council.lgaCode}:${LGA_VINTAGE}`,
+    ...(councilWide ? [] : suburbs.map(name => `suburb:${slugify(name)}`))] };
+}
+
 export function normalizeProjects(council: EngagementCouncil, projects: readonly EngagementProject[],
   input: ConnectorInput, fetchedAt: string): { sourceRecords: SourceRecord[]; geoRecords: GeoRecord[];
     geoRecordSources: GeoRecordSource[] } {
   const sourceRecords: SourceRecord[] = [];
   const geoRecords: GeoRecord[] = [];
   const geoRecordSources: GeoRecordSource[] = [];
-  const lgaRef = `ASGS_LGA:${council.lgaCode}:${LGA_VINTAGE}`;
   for (const project of projects) {
     const url = new URL(project.projectPath);
     if (url.protocol !== 'https:' || url.host !== council.host) {
       throw new EngagementSourceError('schema_changed', `Project link left the ${council.id} site`);
     }
     const originalUrl = url.toString();
-    const suburbs = listedSuburbs(project);
-    const councilWide = suburbs.length === 0 || suburbs.length > MAX_LOCAL_SUBURBS;
+    const { suburbs, councilWide, areaRefs } = projectArea(council, project);
     const categories = [...new Set((project.projectCategoryArray ?? [])
       .map(entry => entry.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
     const publishedAt = project.projectDateNum === null ? null : melbourneDateStart(project.projectDateNum);
@@ -145,7 +152,7 @@ export function normalizeProjects(council: EngagementCouncil, projects: readonly
       topic: 'planning', assertion_kind: 'plan', title: project.projectName, summary,
       original_url: originalUrl, geometry_geojson: null, centroid_lat: null, centroid_lon: null,
       location_role: 'area_only', location_confidence: 'resolved_area',
-      area_refs: [lgaRef, ...(councilWide ? [] : suburbs.map(name => `suburb:${slugify(name)}`))],
+      area_refs: areaRefs,
       published_at: publishedAt, observed_at: null, valid_from: null, valid_to: null,
       source_updated_at: null, source_version_ordinal: null, freshness_state: 'unknown',
       record_status: closed ? 'resolved' : 'active', rights_status: 'restricted',
@@ -180,8 +187,11 @@ export class CouncilEngagementConnector implements Connector {
     if (this.gapMs > 0) await new Promise(resolve => setTimeout(resolve, this.gapMs));
   }
 
-  /** Only HTTP failures are retried; a changed page format fails at once. */
-  private async councilWithRetry(council: EngagementCouncil):
+  /**
+   * All listed projects of one council. Only HTTP failures are retried; a
+   * changed page format fails at once. The news connector reuses this.
+   */
+  async listProjects(council: EngagementCouncil):
     Promise<{ projects: EngagementProject[]; rejected: number }> {
     for (let attempt = 0; ; attempt += 1) {
       try { return await this.councilProjects(council); }
@@ -275,7 +285,7 @@ export class CouncilEngagementConnector implements Connector {
         while (failed === null && next < this.councils.length) {
           const index = next++;
           const council = this.councils[index] as EngagementCouncil;
-          try { listed[index] = await this.councilWithRetry(council); }
+          try { listed[index] = await this.listProjects(council); }
           catch (error) {
             if (failed === null) { failed = error; current = council.id; }
           }

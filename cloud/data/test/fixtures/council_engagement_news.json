@@ -1,0 +1,27 @@
+{
+  "sitemap": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n  <url><loc>https://yoursay.example.vic.gov.au/</loc><lastmod>2026-10-02T10:00:00+10:00</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/NRTMP</loc><lastmod>2026-10-02T10:00:00+10:00</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/NRTMP/council-adopts-truck-routes</loc><lastmod>2026-10-02T10:19:14+10:00</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/NRTMP/project-overview</loc><lastmod>2026-10-01T09:00:00+10:00</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/other-news-and-updates/library-reopens</loc><lastmod>2026-09-30</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/old-project/what-we-heard</loc><lastmod>2026-06-01T09:00:00+10:00</lastmod></url>\n  <url><loc>https://elsewhere.example.com/x/y</loc><lastmod>2026-10-02T10:00:00+10:00</lastmod></url>\n  <url><loc>https://yoursay.example.vic.gov.au/a/b/c</loc><lastmod>2026-10-02T10:00:00+10:00</lastmod></url>\n</urlset>",
+  "pages": {
+    "https://yoursay.example.vic.gov.au/NRTMP/council-adopts-truck-routes": "<html><head><meta property=\"og:title\" content=\"Council adopts truck routes &amp; signage | Northern Reservoir Truck Management Plan\" /><meta name=\"description\" content=\"At the Council Meeting on Tuesday 11 August 2026 council adopted the plan.\" /></head><body class=\"the_hive_dare_yoursay_v2\"><h1 class=\"modal-title\">Welcome back</h1><div class=\"ccm-page page-type-news-full page-template-news-full\"><b>News</b><h1 class=\"text-center ljs\">Council adopts truck routes &amp; signage</h1><p><i>2 October 2026</i></p><p>Council-written article text that must never be stored.</p></div></body></html>",
+    "https://yoursay.example.vic.gov.au/NRTMP/project-overview": "<html><head><meta property=\"og:title\" content=\"Overview | Northern Reservoir Truck Management Plan\" /></head><body><div class=\"ccm-page page-type-projectsubpage page-template-full\"><p>Updated 1 October 2026</p></div></body></html>",
+    "https://yoursay.example.vic.gov.au/other-news-and-updates/library-reopens": "<html><head><meta property=\"og:title\" content=\"Library reopens\" /></head><body><div class=\"ccm-page page-type-news-full\"><span class=\"text-muted\">No date shown</span></div></body></html>"
+  },
+  "projects": {
+    "result": [
+      {
+        "projectID": 1204,
+        "projectName": "Northern Reservoir Truck Management Plan",
+        "projectStatus": "Open",
+        "projectPath": "https://yoursay.example.vic.gov.au/NRTMP",
+        "projectDateNum": "2026-10-02",
+        "projectLocationArray": [
+          "Reservoir"
+        ],
+        "projectCategoryArray": [
+          "Transport & Parking"
+        ]
+      }
+    ],
+    "moreToLoad": false
+  },
+  "projectListing": "<section class=\"hive-block projects-list\" data-route=\"https://yoursay.example.vic.gov.au/ccm/the_hive_projects/tools/the_hive_projects_list/load_more/7\"></section>"
+}

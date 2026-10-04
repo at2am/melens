@@ -553,6 +553,27 @@
       "service_account_email": null,
       "memory_mib": 1024,
       "dedicated_identity_permissions_verified": false
+    },
+    {
+      "source_id": "victoria.council.engagement_news",
+      "priority": "B",
+      "enabled": false,
+      "mode": "snapshot",
+      "cadence_seconds": null,
+      "check_interval_seconds": 86400,
+      "cron_utc": "20 20 * * *",
+      "interval_seconds": null,
+      "overlap_seconds": null,
+      "snapshot_revision": "latest",
+      "backfill_strategy": "manual_versioned_snapshot",
+      "request_cap_per_day": 600,
+      "maximum_bytes_billed": 500000000,
+      "secret_names": [],
+      "task_timeout_seconds": 1800,
+      "max_requests_per_execution": 500,
+      "service_account_email": null,
+      "memory_mib": 1024,
+      "dedicated_identity_permissions_verified": false
     }
   ],
   "notes": [
