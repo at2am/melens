@@ -1,0 +1,581 @@
+{
+  "parking_sensors": {
+    "kerbsideid": 9344,
+    "lastupdated": "2024-12-30T00:44:37+00:00",
+    "status_timestamp": "2024-08-18T08:23:46+00:00",
+    "status_description": "Unoccupied",
+    "zone_number": 7394,
+    "location": {
+      "lon": 144.95916129121264,
+      "lat": -37.80494402936792
+    }
+  },
+  "parking_bays": {
+    "roadsegmentid": 23259,
+    "kerbsideid": null,
+    "roadsegmentdescription": "South Wharf Drive between Foundry Way and Riggers Place",
+    "latitude": -37.8224529,
+    "longitude": 144.9374727,
+    "lastupdated": "2025-09-03"
+  },
+  "parking_restrictions": {
+    "bayid": 2313,
+    "deviceid": 25054,
+    "description1": "1P MTR M-F 9:30-18:30",
+    "fromday1": 1,
+    "today1": 5,
+    "starttime1": "0001-01-01T09:30:00+00:00",
+    "endtime1": "0001-01-01T18:30:00+00:00",
+    "typedesc1": "1P Meter",
+    "duration1": 60,
+    "effectiveonph1": 0,
+    "exemption1": null,
+    "description2": "2P MTR M-SAT 6:30PM-8:30PM",
+    "fromday2": 1,
+    "today2": 6,
+    "starttime2": "0001-01-01T18:30:00+00:00",
+    "endtime2": "0001-01-01T20:30:00+00:00",
+    "typedesc2": "2P Meter",
+    "duration2": 120,
+    "effectiveonph2": 0,
+    "exemption2": null
+  },
+  "offstreet_parks": {
+    "census_year": "2024",
+    "block_id": 6,
+    "property_id": "578328",
+    "base_property_id": "573333",
+    "building_address": "Carpark Federation Square 2 Swanston Street MELBOURNE VIC 3000",
+    "clue_small_area": "Melbourne (CBD)",
+    "parking_type": "Commercial",
+    "parking_spaces": 450,
+    "longitude": 144.969917465,
+    "latitude": -37.81784465,
+    "location": {
+      "lon": 144.969917465,
+      "lat": -37.81784465
+    }
+  },
+  "pedestrian_minute": {
+    "location_id": 3,
+    "sensing_datetime": "2026-09-28T13:59:00+00:00",
+    "direction_1": 4,
+    "direction_2": 0,
+    "total_of_directions": 4
+  },
+  "pedestrian_locations": {
+    "location_id": 3,
+    "sensor_description": "Melbourne Central",
+    "sensor_name": "Swa295_T",
+    "installation_date": "2009-03-25",
+    "note": null,
+    "location_type": "Outdoor",
+    "status": "A",
+    "direction_1": "North",
+    "direction_2": "South",
+    "latitude": -37.81101524,
+    "longitude": 144.96429485,
+    "location": {
+      "lon": 144.96429485,
+      "lat": -37.81101524
+    }
+  },
+  "pedestrian_hourly": {
+    "id": 1671020241030,
+    "location_id": 167,
+    "sensing_date": "2024-10-30",
+    "hourday": 10,
+    "direction_1": 17,
+    "direction_2": 77,
+    "pedestriancount": 94,
+    "sensor_name": "Lat526_T",
+    "location": {
+      "lon": 144.95155955,
+      "lat": -37.81304149
+    }
+  },
+  "transport_activity_counts": {
+    "sensor_id": "TAC_001",
+    "site_id": 101,
+    "sensor_name": "Swanston St (Bourke - Lt Collins)",
+    "road_name": "Swanston Street",
+    "road_segment": "Bourke St to Little Collins St",
+    "direction": "Northbound",
+    "time": "2026-09-28T10:00:00Z",
+    "interval_minutes": 5,
+    "vehicle_count": 12,
+    "bicycle_count": 34,
+    "pedestrian_count": 142,
+    "total_count": 188,
+    "longitude": 144.9652,
+    "latitude": -37.8136,
+    "location": {
+      "lon": 144.9652,
+      "lat": -37.8136
+    },
+    "clue_small_area": "Melbourne (CBD)",
+    "status": "observed"
+  },
+  "road_planned": {
+    "type": "Feature",
+    "geometry": {
+      "type": "GeometryCollection",
+      "geometries": [
+        {
+          "type": "LineString",
+          "coordinates": [
+            [
+              144.96,
+              -37.81
+            ],
+            [
+              144.97,
+              -37.82
+            ]
+          ]
+        },
+        {
+          "type": "Point",
+          "coordinates": [
+            144.98,
+            -37.83
+          ]
+        }
+      ]
+    },
+    "properties": {
+      "id": "PRD:OneView:123",
+      "status": "Pending",
+      "closedRoadName": "Example Road",
+      "startIntersectionRoadName": "First Street",
+      "endIntersectionRoadName": "Second Street",
+      "localGovernmentArea": "Melbourne",
+      "eventType": "Roadworks",
+      "eventDueTo": "Road construction",
+      "description": "Overnight resurfacing",
+      "impact": {
+        "direction": "Northbound",
+        "impactType": "Lanes affected",
+        "numberLanesImpacted": "1"
+      },
+      "duration": {
+        "start": "2026-10-01T20:00:00",
+        "end": "2026-10-10T05:00:00",
+        "recurrences": [
+          {
+            "startDay": "Thursday",
+            "daysDuration": 1,
+            "startTime": "20:00",
+            "duration": "PT9H",
+            "allDay": false
+          }
+        ]
+      },
+      "lastUpdated": "2026-09-28T12:00:00"
+    }
+  },
+  "road_unplanned": {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          144.96,
+          -37.81
+        ],
+        [
+          144.97,
+          -37.82
+        ]
+      ]
+    },
+    "properties": {
+      "id": "RUD-INC001",
+      "impactId": "IMP-1",
+      "status": "Active",
+      "eventLocationStatus": "Active",
+      "eventType": "Crash",
+      "description": "Lane blocked",
+      "created": "2026-09-28T00:00:00Z",
+      "lastUpdated": "2026-09-28T00:05:00Z",
+      "lastClosed": "2026-09-28T00:04:00Z",
+      "endTime": "2026-09-28T03:00:00Z",
+      "reference": {
+        "localRoadName": "Example Road",
+        "localGovernmentArea": "Melbourne"
+      },
+      "impact": {
+        "impactType": "Lanes closed"
+      }
+    }
+  },
+  "gtfs_static": {
+    "route": {
+      "route_id": "3-96",
+      "agency_id": "3",
+      "route_short_name": "96",
+      "route_long_name": "East Brunswick - St Kilda Beach",
+      "route_type": 0,
+      "route_color": "78BE20",
+      "route_text_color": "FFFFFF"
+    },
+    "stop": {
+      "stop_id": "19499",
+      "stop_name": "Flinders Street Railway Station",
+      "stop_lat": -37.8183,
+      "stop_lon": 144.9671,
+      "location_type": 1,
+      "parent_station": null,
+      "wheelchair_boarding": 1
+    }
+  },
+  "gtfs_realtime": {
+    "metro_sample": "Ch4KAzIuMBAAGKze5tUGIg9zdGF0aWMtMjAyNjA5MjUS0gEKBE0tMTcqyQEKDAiA3ObVBhCQ+ObVBhoM...",
+    "feed_type": "GTFS-R ProtocolBuffer (Service Alerts)"
+  },
+  "gdelt_news": {
+    "gkg_record_id": "20260928184500-101",
+    "document_identifier": "https://example.org/melbourne-story?utm_source=feed",
+    "v2_locations": "4#Melbourne, Victoria, Australia#AS#AS07#5430#-37.8167#144.967#-1586844#120;4#Melbourne, Florida, United States#US#USFL##28.0836#-80.6081#12345#215"
+  },
+  "csa_offences": [
+    "Year",
+    "Year ending",
+    "Police Region",
+    "Local Government Area",
+    "Offence Count",
+    "Rate per 100,000 population"
+  ],
+  "ticketmaster": {
+    "id": "EV-1",
+    "name": "Example Melbourne Concert",
+    "url": "https://www.ticketmaster.com.au/event/EV-1",
+    "dates": {
+      "start": {
+        "dateTime": "2026-10-01T09:00:00Z",
+        "localDate": "2026-10-01",
+        "localTime": "19:00:00"
+      },
+      "timezone": "Australia/Melbourne",
+      "status": {
+        "code": "onsale"
+      }
+    },
+    "_embedded": {
+      "venues": [
+        {
+          "id": "VEN-1",
+          "name": "Example Venue",
+          "location": {
+            "longitude": "144.96",
+            "latitude": "-37.81"
+          },
+          "country": {
+            "countryCode": "AU"
+          },
+          "state": {
+            "stateCode": "VIC"
+          }
+        }
+      ]
+    }
+  },
+  "development_monitor": {
+    "data_format": "Post May 16",
+    "development_key": "X0010400",
+    "status": "APPLIED",
+    "year_completed": null,
+    "clue_small_area": "North Melbourne",
+    "clue_block": 309,
+    "street_address": "287-313 Macaulay Road, North Melbourne, 3051",
+    "property_id": "106303",
+    "property_id_2": null,
+    "property_id_3": null,
+    "property_id_4": null,
+    "property_id_5": null,
+    "floors_above": 12,
+    "resi_dwellings": 120,
+    "studio_dwe": 0,
+    "one_bdrm_dwe": 12,
+    "two_bdrm_dwe": 78,
+    "three_bdrm_dwe": 30,
+    "student_apartments": 0,
+    "student_beds": 0,
+    "student_accommodation_units": 0,
+    "institutional_accom_beds": 0,
+    "hotel_rooms": 0,
+    "serviced_apartments": 0,
+    "hotels_serviced_apartments": 0,
+    "hostel_beds": 0,
+    "childcare_places": 0,
+    "office_flr": 0,
+    "retail_flr": 2048,
+    "industrial_flr": 0,
+    "storage_flr": 0,
+    "education_flr": 0,
+    "hospital_flr": 0,
+    "recreation_flr": 0,
+    "publicdispaly_flr": 0,
+    "community_flr": 0,
+    "car_spaces": 101,
+    "bike_spaces": 103,
+    "town_planning_application": "TP-2021-53",
+    "longitude": 144.9371088,
+    "latitude": -37.79545188,
+    "geopoint": {
+      "lon": 144.9371088,
+      "lat": -37.79545188
+    }
+  },
+  "vicmap_planning": {
+    "overlay": {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 201,
+        "ufi": 200101,
+        "scheme_code": "PO",
+        "lga_code": "343",
+        "lga": "MELBOURNE",
+        "zone_num": 1,
+        "zone_status": null,
+        "zone_code": "DDO1",
+        "zone_description": "DESIGN AND DEVELOPMENT OVERLAY - SCHEDULE 1",
+        "gaz_begin_date": 946684800000
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                144.95,
+                -37.81
+              ],
+              [
+                144.96,
+                -37.81
+              ],
+              [
+                144.96,
+                -37.82
+              ],
+              [
+                144.95,
+                -37.82
+              ],
+              [
+                144.95,
+                -37.81
+              ]
+            ]
+          ],
+          [
+            [
+              [
+                144.97,
+                -37.81
+              ],
+              [
+                144.98,
+                -37.81
+              ],
+              [
+                144.98,
+                -37.82
+              ],
+              [
+                144.97,
+                -37.82
+              ],
+              [
+                144.97,
+                -37.81
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "abs_census": {
+    "census_year": 2021,
+    "region": "LGA24600 (Melbourne)",
+    "table": "G01",
+    "selected_metrics": {
+      "tot_p_p": 149615,
+      "age_0_4_yr_p": 4721,
+      "median_age_persons": 31,
+      "median_tot_prsnl_inc_weekly": 905
+    }
+  },
+  "homes_victoria_rents": {
+    "quarter": "Dec 2024",
+    "quarter_code": "2024-Q4",
+    "period_start": "2024-10-01T00:00:00Z",
+    "period_end": "2025-01-01T00:00:00Z",
+    "lga_name": "Melbourne",
+    "region_group": "Metropolitan",
+    "suburb": null,
+    "property_type": "All Properties",
+    "raw_count": "5609",
+    "raw_median": "615",
+    "count": 5609,
+    "median_rent": 615.0,
+    "measure": "median_weekly_rent",
+    "currency": "AUD",
+    "status": "observed"
+  },
+  "clue_employment": {
+    "census_year": "2024",
+    "block_id": 17,
+    "clue_small_area": "Melbourne (CBD)",
+    "accommodation": null,
+    "admin_and_support_services": null,
+    "agriculture_and_mining": 0,
+    "arts_and_recreation_services": null,
+    "business_services": 510,
+    "construction": 0,
+    "education_and_training": 0,
+    "electricity_gas_water_and_waste_services": 0,
+    "finance_and_insurance": 946,
+    "food_and_beverage_services": 743,
+    "health_care_and_social_assistance": null,
+    "information_media_and_telecommunications": 123,
+    "manufacturing": 28,
+    "other_services": 7,
+    "public_administration_and_safety": null,
+    "real_estate_services": null,
+    "rental_and_hiring_services": 0,
+    "retail_trade": 67,
+    "transport_postal_and_storage": 0,
+    "wholesale_trade": null,
+    "total_jobs_in_block": 2865
+  },
+  "microclimate": {
+    "device_id": "ICTMicroclimate-08",
+    "received_at": "2026-04-28T15:25:15+00:00",
+    "sensorlocation": "Swanston St - Tram Stop 13 adjacent Federation Sq & Flinders St Station",
+    "latlong": {
+      "lon": 144.9678474,
+      "lat": -37.8184515
+    },
+    "airtemperature": 16.7,
+    "relativehumidity": 79.9,
+    "atmosphericpressure": 1026.1,
+    "minimumwindspeed": 0.0,
+    "averagewindspeed": 0.5,
+    "gustwindspeed": 2.5,
+    "minimumwinddirection": 0.0,
+    "averagewinddirection": 220.0,
+    "maximumwinddirection": 314.0,
+    "pm25": 10.0,
+    "pm10": 12.0,
+    "noise": 58.7
+  },
+  "municipal_boundary": {
+    "mccid_gis": 1,
+    "name": "City of Melbourne",
+    "xdate": "2008-07-01",
+    "geo_shape": {
+      "type": "Feature",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                144.94,
+                -37.82
+              ],
+              [
+                144.96,
+                -37.82
+              ],
+              [
+                144.96,
+                -37.8
+              ],
+              [
+                144.94,
+                -37.82
+              ]
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "asgs_boundaries": {
+    "type": "Feature",
+    "properties": {
+      "objectid": 1,
+      "gccsa_code_2021": "2GMEL",
+      "gccsa_name_2021": "Greater Melbourne"
+    },
+    "geometry": {
+      "type": "MultiPolygon",
+      "coordinates": [
+        [
+          [
+            [
+              144.8,
+              -37.9
+            ],
+            [
+              145.0,
+              -37.9
+            ],
+            [
+              145.0,
+              -37.7
+            ],
+            [
+              144.8,
+              -37.9
+            ]
+          ]
+        ]
+      ]
+    }
+  },
+  "clue_blocks": {
+    "geo_point_2d": {
+      "lon": 144.97091886490836,
+      "lat": -37.815883246626996
+    },
+    "geo_shape": {
+      "type": "Feature",
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              144.9694557371322,
+              -37.81576066226922
+            ],
+            [
+              144.9699102081003,
+              -37.81674238469351
+            ],
+            [
+              144.9723816229156,
+              -37.81600833093523
+            ],
+            [
+              144.9719242159026,
+              -37.81502256310665
+            ],
+            [
+              144.9694557371322,
+              -37.81576066226922
+            ]
+          ]
+        ],
+        "type": "Polygon"
+      },
+      "properties": {}
+    },
+    "block_id": 17,
+    "region_name": "Melbourne (CBD)",
+    "area_name": "CBD East"
+  }
+}

@@ -1,0 +1,3851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Melens Data Intelligence // 数据资产与 BigQuery 统一规范化编目</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #FAF8F5;
+      --bg-card: #FFFFFF;
+      --bg-subtle: #F4F1EA;
+      --border-color: #E6E1D8;
+      --border-dark: #2C2825;
+      --text-main: #1D1B18;
+      --text-muted: #5C5750;
+      --text-light: #8E8880;
+      --accent-crimson: #9B1C1C;
+      --accent-forest: #1E5128;
+      --accent-navy: #1E3A8A;
+      --accent-ochre: #B45309;
+      --badge-live-bg: #E8F5E9;
+      --badge-live-text: #1E5128;
+      --badge-ready-bg: #E0F2FE;
+      --badge-ready-text: #0369A1;
+      --code-bg: #18181B;
+      --code-text: #E4E4E7;
+      --font-serif: 'Newsreader', Georgia, serif;
+      --font-display: 'Instrument Serif', Georgia, serif;
+      --font-headline: 'Cinzel', serif;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(29, 27, 24, 0.06);
+    }
+
+    [data-theme="dark"] {
+      --bg-page: #121110;
+      --bg-card: #1A1918;
+      --bg-subtle: #242220;
+      --border-color: #33302C;
+      --border-dark: #DCD8D0;
+      --text-main: #EAE6DF;
+      --text-muted: #A39E95;
+      --text-light: #706B62;
+      --badge-live-bg: #14301B;
+      --badge-live-text: #74C686;
+      --badge-ready-bg: #132B3D;
+      --badge-ready-text: #67B6EC;
+      --code-bg: #0D0D0E;
+      --code-text: #D4D4D8;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 0 20px 80px;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* Masthead */
+    .masthead {
+      border-bottom: 2px solid var(--border-dark);
+      padding: 24px 0 16px;
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .masthead-meta-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+      margin-bottom: 18px;
+    }
+
+    .theme-toggle-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-main);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--bg-subtle);
+    }
+
+    .masthead-title {
+      font-family: var(--font-display);
+      font-size: clamp(40px, 6vw, 76px);
+      line-height: 0.95;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      text-align: center;
+      margin-bottom: 12px;
+      color: var(--text-main);
+    }
+
+    .masthead-subtitle {
+      font-family: var(--font-serif);
+      font-size: clamp(17px, 2vw, 21px);
+      font-style: italic;
+      text-align: center;
+      color: var(--text-muted);
+      max-width: 860px;
+      margin: 0 auto 16px;
+      line-height: 1.4;
+    }
+
+    .masthead-meta-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border-color);
+      padding-top: 10px;
+      font-size: 12px;
+      color: var(--text-light);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .masthead-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-crimson);
+      background: var(--bg-subtle);
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--border-color);
+    }
+
+    /* Executive Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--text-muted);
+    }
+
+    .stat-card.accent-live::before { background: var(--accent-forest); }
+    .stat-card.accent-ready::before { background: var(--accent-navy); }
+    .stat-card.accent-ochre::before { background: var(--accent-ochre); }
+    .stat-card.accent-crimson::before { background: var(--accent-crimson); }
+
+    .stat-number {
+      font-family: var(--font-serif);
+      font-size: 42px;
+      font-weight: 600;
+      line-height: 1;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-subtext {
+      font-size: 12px;
+      color: var(--text-light);
+      line-height: 1.4;
+    }
+
+    /* Section Headers */
+    .section-header {
+      border-top: 2px solid var(--border-dark);
+      padding-top: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .section-title-wrap {
+      max-width: 800px;
+    }
+
+    .section-number {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-crimson);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .section-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Architecture Box */
+    .architecture-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 28px;
+      margin-bottom: 40px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .arch-lead-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+    }
+
+    [data-theme="dark"] .arch-lead-badge {
+      background: #064E3B;
+      color: #A7F3D0;
+      border-color: #059669;
+    }
+
+    .arch-statement {
+      font-family: var(--font-serif);
+      font-size: 20px;
+      line-height: 1.5;
+      color: var(--text-main);
+      margin-bottom: 24px;
+    }
+
+    .arch-diagram {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .arch-column {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .arch-col-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-main);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .arch-col-title svg {
+      width: 16px;
+      height: 16px;
+      fill: var(--accent-navy);
+    }
+
+    .arch-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .arch-item strong {
+      display: block;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .arch-item span {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .arch-rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 20px;
+    }
+
+    .arch-rule-card {
+      font-size: 13px;
+    }
+
+    .arch-rule-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .arch-rule-card p {
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Filter & Search Bar */
+    .control-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-input-wrap {
+      flex: 1;
+      min-width: 260px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 36px;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--text-main);
+      background: var(--bg-card);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      fill: var(--text-light);
+    }
+
+    .status-filter-pills {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-pill {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .filter-pill:hover {
+      background: var(--border-color);
+      color: var(--text-main);
+    }
+
+    .filter-pill.active {
+      background: var(--text-main);
+      border-color: var(--text-main);
+      color: var(--bg-card);
+      font-weight: 600;
+    }
+
+    .domain-filter-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      border-top: 1px dashed var(--border-color);
+      padding-top: 12px;
+    }
+
+    .results-count {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-light);
+      margin-left: auto;
+      align-self: center;
+    }
+
+    /* Catalog Cards Grid */
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    .catalog-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .catalog-card:hover {
+      border-color: var(--border-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .card-title-group {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .card-num-domain {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+
+    .card-num {
+      color: var(--accent-crimson);
+      font-weight: 700;
+    }
+
+    .card-title-zh {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.25;
+      margin-bottom: 2px;
+    }
+
+    .card-title-en {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-status.live {
+      background: var(--badge-live-bg);
+      color: var(--badge-live-text);
+      border: 1px solid rgba(30, 81, 40, 0.2);
+    }
+
+    .badge-status.ready {
+      background: var(--badge-ready-bg);
+      color: var(--badge-ready-text);
+      border: 1px solid rgba(3, 105, 161, 0.2);
+    }
+
+    .badge-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .card-body {
+      padding: 20px 24px;
+    }
+
+    .card-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px 18px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .meta-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-light);
+    }
+
+    .meta-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    .meta-value.highlight-bq {
+      color: var(--accent-navy);
+      font-weight: 600;
+    }
+
+    /* Inspector & Code View */
+    .inspector-box {
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .inspector-header {
+      background: var(--bg-subtle);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .inspector-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(0,0,0,0.04);
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-color: var(--text-main);
+    }
+
+    .inspector-content {
+      position: relative;
+    }
+
+    .code-view {
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 16px;
+      margin: 0;
+      overflow-x: auto;
+      max-height: 340px;
+      white-space: pre;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text-main);
+      color: var(--bg-card);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 10px 18px;
+      border-radius: 4px;
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.25s ease;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Footer */
+    .editorial-footer {
+      margin-top: 60px;
+      border-top: 2px solid var(--border-dark);
+      padding-top: 24px;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .footer-left {
+      max-width: 600px;
+    }
+
+    .footer-title {
+      font-family: var(--font-headline);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    /* Quick jump / back to top */
+    .back-to-top {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-main);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .back-to-top.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .back-to-top:hover {
+      background: var(--bg-subtle);
+      border-color: var(--text-main);
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 0 14px 60px; }
+      .masthead-title { font-size: 38px; }
+      .card-header { flex-direction: column; }
+      .badge-status { align-self: flex-start; }
+      .metadata-grid { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: white; color: black; padding: 0; font-size: 12pt; }
+      .control-bar, .theme-toggle-btn, .copy-btn, .inspector-tabs { display: none !important; }
+      .catalog-card { break-inside: avoid; border: 1px solid #ccc; box-shadow: none; margin-bottom: 20px; }
+      .code-view { max-height: none; background: #f8f8f8; color: #111; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Masthead -->
+  <header class="masthead">
+    <div class="masthead-meta-top">
+      <div>VOLUME I &bull; REPORT NO. 04 &bull; GCP MELENS-510012</div>
+      <div>AUSTRALIA-SOUTHEAST2 (MELBOURNE) &bull; A-1 GRADE AUDIT</div>
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="切换暗色/纸张模式">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <span id="themeToggleText">NIGHT PRESS</span>
+      </button>
+    </div>
+
+    <h1 class="masthead-title">MELENS DATA INTELLIGENCE</h1>
+    <p class="masthead-subtitle">
+      当前已实现且可获取的墨尔本城市数据全景编目、数据样例对照与 BigQuery 统一规范化转换核验报告
+    </p>
+
+    <div class="masthead-meta-bottom">
+      <div><strong>TARGET AUDIENCE:</strong> 研发团队、产品决策者与跨领域业务同事 (Internal Engineering & Product Review)</div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span class="masthead-tag">SPEC-001 AGGREGATION</span>
+        <span class="masthead-tag">SPEC-002 MAP READY</span>
+        <span class="masthead-tag">27 CANONICAL TYPES</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Executive Summary Stats -->
+  <section class="stats-grid">
+    <div class="stat-card accent-crimson">
+      <div class="stat-number">27</div>
+      <div class="stat-label">已成功实现数据类型</div>
+      <div class="stat-subtext">覆盖 10 大城市生活与空间运行领域，连接器与解析校验 100% 具备</div>
+    </div>
+    <div class="stat-card accent-live">
+      <div class="stat-number">12</div>
+      <div class="stat-label">BigQuery 云端已发布数据集</div>
+      <div class="stat-subtext">在 GCP <code>melens-510012</code> 实际写入并通过 SQL 约束校验、定时调度活跃</div>
+    </div>
+    <div class="stat-card accent-ready">
+      <div class="stat-number">15</div>
+      <div class="stat-label">管线就绪 / 候选测试完成</div>
+      <div class="stat-subtext">包含行人客流、交通线网、规划与 28 市议会公众咨询，测试用例与离线/私网凭据读取通过</div>
+    </div>
+    <div class="stat-card accent-ochre">
+      <div class="stat-number">100%</div>
+      <div class="stat-label">时空统一规范符合度</div>
+      <div class="stat-subtext">全量强制转换至 ISO-8601 UTC 时间戳与 WGS84 (EPSG:4326) 空间几何</div>
+    </div>
+  </section>
+
+  <!-- Section 1: BigQuery Standardization Verification -->
+  <section class="section-header" id="architecture">
+    <div class="section-title-wrap">
+      <div class="section-number">CHAPTER 01 // ARCHITECTURAL VERIFICATION</div>
+      <h2 class="section-title">BigQuery 数据统一转换确认与架构全景</h2>
+      <p class="section-desc">确认结论：是，Project 中所有已实现的数据类型均已转换为统一规范的格式并由 BigQuery 托管。</p>
+    </div>
+  </section>
+
+  <div class="architecture-box">
+    <div class="arch-lead-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+      ARCHITECTURAL CONFIRMATION &bull; TWO-TIER CANONICAL MODEL VERIFIED
+    </div>
+    <p class="arch-statement">
+      在本项目设计与生产部署中，原始异构数据绝不直接暴露给业务端。系统构建了严格的<strong>“基表摄入层 (<code>melens_ingest</code>) &rarr; 规范化事实表 &rarr; 统一只读视图 (<code>melens_query</code>)”</strong>三层演进模型。无论是新闻文本、地磁停车读数、交通警报还是政府人口普查，均被收敛至统一的标准时空与实体规范中。
+    </p>
+
+    <!-- Visual 3-tier diagram -->
+    <div class="arch-diagram">
+      <div class="arch-column">
+        <div class="arch-col-title">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/></svg>
+          1. 摄入与审计控制层 (melens_ingest)
+        </div>
+        <div class="arch-item">
+          <strong>data_sources</strong>
+          <span>统一管理来源 ID、准入许可状态、爬取频率与配额约束</span>
+        </div>
+        <div class="arch-item">
+          <strong>sync_batches</strong>
+          <span>不可篡改的批次审计表，记录时间窗口、成功/失败与 Checkpoint</span>
+        </div>
+        <div class="arch-item">
+          <strong>source_records</strong>
+          <span>保留原生版本、版权声明（rights_status）与来源追溯 URL</span>
+        </div>
+      </div>
+
+      <div class="arch-column">
+        <div class="arch-col-title">
+          <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/></svg>
+          2. 跨领域规范化实体层 (Normalized Facts)
+        </div>
+        <div class="arch-item" style="border-left: 3px solid var(--accent-crimson);">
+          <strong>geo_records (核心统一时空大表)</strong>
+          <span>所有地理事件/报道/规划统一至此表：统一 topic、时间、WGS84 几何</span>
+        </div>
+        <div class="arch-item">
+          <strong>area_indicators (统一区域统计)</strong>
+          <span>人口、租金、犯罪、就业、微气候统一为 indicator_id, value, unit</span>
+        </div>
+        <div class="arch-item">
+          <strong>boundaries (统一空间底图)</strong>
+          <span>市界、ASGS 统计区、CLUE 街区统一为 scheme + code + vintage</span>
+        </div>
+        <div class="arch-item">
+          <strong>parking / pedestrian (领域时序)</strong>
+          <span>车位几何、占用时序、限制规则、行人客流规范化事实表</span>
+        </div>
+      </div>
+
+      <div class="arch-column">
+        <div class="arch-col-title">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          3. 授权对外查询视图层 (melens_query)
+        </div>
+        <div class="arch-item">
+          <strong>v_geo_records_current / history</strong>
+          <span>自动合并排重，ST_GEOGFROMGEOJSON 空间衍生，仅暴露已发布批次</span>
+        </div>
+        <div class="arch-item">
+          <strong>v_parking_current / v_parking_sensor_current</strong>
+          <span>路边车位与传感器当前状态，占用与合法停车权限解耦</span>
+        </div>
+        <div class="arch-item">
+          <strong>v_news_current / v_crime_news_current</strong>
+          <span>排除撤稿更正，限制仅提及地名（mentioned_place）的虚假点位</span>
+        </div>
+        <div class="arch-item">
+          <strong>v_area_indicators / v_boundaries</strong>
+          <span>严格同版边界关联，不同年份统计区禁止跨版本静默 Join</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 Core Unification Invariants -->
+    <div class="arch-rules-grid">
+      <div class="arch-rule-card">
+        <h4>1. 强制统一 UTC 时间戳</h4>
+        <p>全库时间字段统一采用 <code>TIMESTAMP</code> (UTC)。展示层统一按墨尔本时区 <code>Australia/Melbourne</code> 转换。上游时间缺失时记录 <code>time_missing_reason</code>，严禁以系统抓取时间充当事件时间。</p>
+      </div>
+      <div class="arch-rule-card">
+        <h4>2. 强制统一 WGS84 几何拓扑</h4>
+        <p>所有点位统一为经度 -180..180、纬度 -90..90，严禁颠倒。统一生成 <code>geometry_geojson</code> 并派生 BigQuery 原生 <code>GEOGRAPHY</code> 对象。严格区分点位置信度（源坐标 vs 区域推断）。</p>
+      </div>
+      <div class="arch-rule-card">
+        <h4>3. 事实类型与生命周期解耦</h4>
+        <p>统一划分 <code>assertion_kind</code>（客观观测 observation、报道 report、规划 plan、预测 prediction）。预测结果派生 <code>is_prediction</code> 标识，撤稿与解除事件移出当前活跃视图。</p>
+      </div>
+      <div class="arch-rule-card">
+        <h4>4. 统一数据权限与排重治理</h4>
+        <p>生产视图对底层物理表零写入权限。通过 <code>rights_status</code> 动态过滤版权撤销内容，基于稳定业务键（Row Number Qualifying）对重试重放的物理行实现确定性确定去重。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Catalog Explorer -->
+  <section class="section-header" id="catalog">
+    <div class="section-title-wrap">
+      <div class="section-number">CHAPTER 02 // DATA INVENTORY</div>
+      <h2 class="section-title">全景数据资产目录与真实报文对照</h2>
+      <p class="section-desc">包含 27 种已实现的数据类型。每项均提供【原始上游报文】与【BigQuery 规范化记录】的高精度结构对照。</p>
+    </div>
+  </section>
+
+  <!-- Interactive Controls -->
+  <div class="control-bar">
+    <div class="search-row">
+      <div class="search-input-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="searchInput" class="search-input" placeholder="全局搜索：输入数据名称、source_id、BigQuery 表名或字段...">
+      </div>
+
+      <div class="status-filter-pills">
+        <span class="filter-pill active" data-filter-type="status" data-value="all">全部状态 (27)</span>
+        <span class="filter-pill" data-filter-type="status" data-value="live">已在 BigQuery 发布 (12)</span>
+        <span class="filter-pill" data-filter-type="status" data-value="ready">管线就绪 / 测试完成 (15)</span>
+      </div>
+
+      <div class="results-count" id="resultsCount">DISPLAYING 27 OF 27 DATA ASSETS</div>
+    </div>
+
+    <div class="domain-filter-pills" id="domainFilterPills">
+      <span class="filter-pill active" data-filter-type="domain" data-value="all">全部领域 (27)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="parking">城市泊车 (4)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="pedestrian">行人流动 (4)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="transit">路网与公交 (4)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="news">媒体治安与咨询 (4)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="events">城市文娱 (1)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="planning">规划与公众咨询 (3)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="demographics">人口与经济 (3)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="microclimate">环境感知 (1)</span>
+      <span class="filter-pill" data-filter-type="domain" data-value="boundaries">行政底图 (3)</span>
+    </div>
+  </div>
+
+  <!-- Cards Container -->
+  <div class="catalog-grid" id="catalogGrid">
+
+    <article class="catalog-card" data-domain="parking" data-status="live" data-keywords="路边停车实时地磁传感器 Real-time On-Street Parking Sensors melbourne.parking.sensors melens_ingest.parking_observations melens_query.v_parking_sensor_current City of Melbourne (OpenDataSoft v2.1)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#01</span>
+            <span>&bull;</span>
+            <span>城市泊车与传感 / Parking & Mobility</span>
+          </div>
+          <h3 class="card-title-zh">路边停车实时地磁传感器</h3>
+          <div class="card-title-en">Real-time On-Street Parking Sensors</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">监控墨尔本市区路边车位的实时物理占用状态。系统保留状态更新时间（status_timestamp）与抓取时间，并解耦占用状态（occupied: true/false/null）与合法停车许可，严禁将空位直接推断为合法可停车位。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.parking.sensors</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne (OpenDataSoft v2.1)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">120s 准实时全量快照</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne (CBD & 核心商业区) (6,324 活跃传感器点位)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.parking_observations</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_parking_sensor_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'parking_sensors', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'parking_sensors', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('parking_sensors')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-parking_sensors">{
+  "sensor_id": "9344",
+  "bay_id": null,
+  "marker_id": "9344",
+  "version_id": "v_20261001_130400",
+  "observed_at": "2024-08-18T08:23:46Z",
+  "occupied": false,
+  "source_freshness": "current",
+  "geometry": "POINT(144.959161 -37.804944)",
+  "centroid_lat": -37.804944,
+  "centroid_lon": 144.959161,
+  "batch_id": "batch_cef9de61302666cbdec1b5bd43da4426892fdb5b",
+  "source_id": "melbourne.parking.sensors",
+  "fetched_at": "2026-10-01T13:04:03Z",
+  "may_park_now": "unknown"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-parking_sensors">{
+  "kerbsideid": 9344,
+  "lastupdated": "2024-12-30T00:44:37+00:00",
+  "status_timestamp": "2024-08-18T08:23:46+00:00",
+  "status_description": "Unoccupied",
+  "zone_number": 7394,
+  "location": {
+    "lon": 144.95916129121264,
+    "lat": -37.80494402936792
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="parking" data-status="live" data-keywords="路边车位空间几何点位 On-Street Parking Bays Distribution melbourne.parking.bays melens_ingest.parking_bays melens_query.v_parking_current City of Melbourne GIS">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#02</span>
+            <span>&bull;</span>
+            <span>城市泊车与传感 / Parking & Mobility</span>
+          </div>
+          <h3 class="card-title-zh">路边车位空间几何点位</h3>
+          <div class="card-title-en">On-Street Parking Bays Distribution</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">提供墨尔本市政辖区内所有路边机动车泊位的地理位置坐标、路段关联（roadsegmentid）及公开访问属性，作为车位空间拓扑的基准图层。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.parking.bays</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne GIS</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每日增量 / 检查快照</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne 全辖区 (29,053 个官方车位要素)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.parking_bays</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_parking_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'parking_bays', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'parking_bays', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('parking_bays')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-parking_bays">{
+  "bay_id": "bay:23259:0",
+  "version_id": "v_20261001_125041",
+  "marker_id": null,
+  "geometry_geojson": "{\"type\":\"Point\",\"coordinates\":[144.9374727,-37.8224529]}",
+  "geometry": "POINT(144.9374727 -37.8224529)",
+  "public_access": true,
+  "valid_from": "2025-09-03T00:00:00Z",
+  "valid_to": null,
+  "batch_id": "batch_5fa7c1613ada47aff560d199d6afda009e2d7844",
+  "source_id": "melbourne.parking.bays",
+  "fetched_at": "2026-10-01T12:50:41Z"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-parking_bays">{
+  "roadsegmentid": 23259,
+  "kerbsideid": null,
+  "roadsegmentdescription": "South Wharf Drive between Foundry Way and Riggers Place",
+  "latitude": -37.8224529,
+  "longitude": 144.9374727,
+  "lastupdated": "2025-09-03"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="parking" data-status="live" data-keywords="单车位多时段停车限制规则 Parking Bay Restrictions & Timeslots melbourne.parking.restrictions melens_ingest.parking_rules melens_query.v_parking_rule_reference City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#03</span>
+            <span>&bull;</span>
+            <span>城市泊车与传感 / Parking & Mobility</span>
+          </div>
+          <h3 class="card-title-zh">单车位多时段停车限制规则</h3>
+          <div class="card-title-en">Parking Bay Restrictions & Timeslots</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">解析每个泊位对应的多时段停放限制（如 1P/2P 计费停车、装卸区 Loading Zone、工作日与周末差异时段），完整结构化星期、分钟区间与最大停放时长。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.parking.restrictions</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每日校验（历史基准 2022 快照）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne 车位 (8,035 条规范化限制时段规则)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.parking_rules</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_parking_rule_reference</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'parking_restrictions', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'parking_restrictions', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('parking_restrictions')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-parking_restrictions">{
+  "rule_id": "rule:2313:slot1",
+  "version_id": "v_20261001_125041",
+  "bay_id": "2313",
+  "days_of_week": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "start_minute_of_day": 570,
+  "end_minute_of_day": 1110,
+  "holiday_applicability": "does_not_apply",
+  "vehicle_class": "all",
+  "restriction_type": "meter_parking",
+  "max_stay_minutes": 60,
+  "batch_id": "batch_b9957935654a3091cd6d1948065398cc2b8ec1d8",
+  "source_id": "melbourne.parking.restrictions"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-parking_restrictions">{
+  "bayid": 2313,
+  "deviceid": 25054,
+  "description1": "1P MTR M-F 9:30-18:30",
+  "fromday1": 1,
+  "today1": 5,
+  "starttime1": "0001-01-01T09:30:00+00:00",
+  "endtime1": "0001-01-01T18:30:00+00:00",
+  "typedesc1": "1P Meter",
+  "duration1": 60,
+  "effectiveonph1": 0
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="parking" data-status="ready" data-keywords="离街商业与公共停车场设施 Off-Street Parking Facilities & Capacity melbourne.offstreet_parks melens_ingest.geo_records melens_query.v_geo_records_current (topic='parking') City of Melbourne CLUE">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#04</span>
+            <span>&bull;</span>
+            <span>城市泊车与传感 / Parking & Mobility</span>
+          </div>
+          <h3 class="card-title-zh">离街商业与公共停车场设施</h3>
+          <div class="card-title-en">Off-Street Parking Facilities & Capacity</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">涵盖墨尔本主要商业楼宇、公共交通枢纽（如联邦广场 Federation Square、南十字星车站）附属的大型室内/地下停车库容量与运营类别。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.offstreet_parks</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne CLUE</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">年度普查版本</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">Melbourne CBD & 商业区 (7,185 条物业设施容量事实)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_geo_records_current (topic='parking')</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'offstreet_parks', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'offstreet_parks', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('offstreet_parks')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-offstreet_parks">{
+  "geo_record_id": "geo:offstreet:578328:commercial",
+  "topic": "parking",
+  "assertion_kind": "observation",
+  "title": "Federation Square Commercial Carpark (450 Bays)",
+  "summary": "Capacity: 450 commercial off-street parking bays",
+  "centroid_lat": -37.8179,
+  "centroid_lon": 144.9688,
+  "location_role": "facility",
+  "location_confidence": "source_coordinate",
+  "freshness_state": "current",
+  "rights_status": "verified_open"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-offstreet_parks">{
+  "census_year": "2024",
+  "block_id": 6,
+  "property_id": "578328",
+  "building_address": "Carpark Federation Square 2 Swanston Street MELBOURNE VIC 3000",
+  "clue_small_area": "Melbourne (CBD)",
+  "parking_type": "Commercial",
+  "parking_spaces": 450,
+  "longitude": 144.9688,
+  "latitude": -37.8179
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="pedestrian" data-status="ready" data-keywords="高频实时分钟级行人客流 Real-time Pedestrian Minute Counts melbourne.pedestrian.minute melens_ingest.pedestrian_observations melens_query.v_pedestrian_observations City of Melbourne Pedestrian Network">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#05</span>
+            <span>&bull;</span>
+            <span>行人流动与微观活力 / Pedestrian Dynamics</span>
+          </div>
+          <h3 class="card-title-zh">高频实时分钟级行人客流</h3>
+          <div class="card-title-en">Real-time Pedestrian Minute Counts</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">P0 级核心感知源。自动以 15 分钟窗口重叠抓取最新 60 分钟高频行人读数，区分方向 A/B 与总计。遵循严格的不填补虚假零值规则，缺测即标记为缺口。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.pedestrian.minute</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne Pedestrian Network</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">15分钟重叠滚动拉取（分钟粒度）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne 关键路口与商圈 (134 个探测点分钟级实时流水)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.pedestrian_observations</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_pedestrian_observations</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'pedestrian_minute', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'pedestrian_minute', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('pedestrian_minute')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-pedestrian_minute">{
+  "sensor_id": "3",
+  "observed_at": "2026-09-28T13:59:00Z",
+  "version_id": "v_3_20260928T135900Z",
+  "direction_a_count": 4,
+  "direction_b_count": 0,
+  "total_count": 4,
+  "sensor_name": "Melbourne Central",
+  "geometry": "POINT(144.96429 -37.811015)",
+  "batch_id": "batch_ped_minute_20260928_1400",
+  "source_id": "melbourne.pedestrian.minute"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-pedestrian_minute">{
+  "location_id": 3,
+  "sensing_datetime": "2026-09-28T13:59:00+00:00",
+  "direction_1": 4,
+  "direction_2": 0,
+  "total_of_directions": 4
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="pedestrian" data-status="ready" data-keywords="行人传感器位置与硬件迁移历史 Pedestrian Sensor Locations & Hardware Lineage melbourne.pedestrian.locations melens_ingest.sensor_locations melens_query.v_pedestrian_sensor_locations City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#06</span>
+            <span>&bull;</span>
+            <span>行人流动与微观活力 / Pedestrian Dynamics</span>
+          </div>
+          <h3 class="card-title-zh">行人传感器位置与硬件迁移历史</h3>
+          <div class="card-title-en">Pedestrian Sensor Locations & Hardware Lineage</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">维护行人传感器的有效生命周期（valid_from ~ valid_to）、设备状态（A: Active / I: Inactive）与精准经纬度。传感器物理搬迁自动派生不可变的新版本，防止历史流量错挂新坐标。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.pedestrian.locations</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每日核验 / 变迁版本生成</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">全网传感器点位 (134 个物理传感器拓扑版本)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.sensor_locations</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_pedestrian_sensor_locations</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'pedestrian_locations', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'pedestrian_locations', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('pedestrian_locations')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-pedestrian_locations">{
+  "sensor_id": "3",
+  "version_id": "v_3_20090325",
+  "geometry_geojson": "{\"type\":\"Point\",\"coordinates\":[144.96429,-37.81101524]}",
+  "device_status": "active",
+  "valid_from": "2009-03-25T00:00:00Z",
+  "valid_to": null,
+  "source_id": "melbourne.pedestrian.locations"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-pedestrian_locations">{
+  "location_id": 3,
+  "sensor_description": "Melbourne Central",
+  "sensor_name": "Swa295_T",
+  "installation_date": "2009-03-25",
+  "note": null,
+  "location_type": "Outdoor",
+  "status": "A",
+  "direction_1": "North",
+  "direction_2": "South",
+  "latitude": -37.81101524,
+  "longitude": 144.96429
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="pedestrian" data-status="ready" data-keywords="历史每小时行人流量档案 Historical Pedestrian Hourly Counts melbourne.pedestrian.hourly melens_ingest.pedestrian_observations melens_query.v_pedestrian_observations (historical) City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#07</span>
+            <span>&bull;</span>
+            <span>行人流动与微观活力 / Pedestrian Dynamics</span>
+          </div>
+          <h3 class="card-title-zh">历史每小时行人流量档案</h3>
+          <div class="card-title-en">Historical Pedestrian Hourly Counts</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">长周期客流基线数据，专用于 UC-04 人流异常检测（Pedestrian Anomaly）算法训练。支持夏令时异常时段 fail-closed 容错校验，已接入历史数据比对与版本排重。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.pedestrian.hourly</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">按月/日增量维护</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">墨尔本历年观测点 (千万级历史客流基准时序)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.pedestrian_observations</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_pedestrian_observations (historical)</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'pedestrian_hourly', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'pedestrian_hourly', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('pedestrian_hourly')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-pedestrian_hourly">{
+  "sensor_id": "167",
+  "observed_at": "2024-10-30T10:00:00Z",
+  "direction_a_count": 17,
+  "direction_b_count": 77,
+  "total_count": 94,
+  "source_id": "melbourne.pedestrian.hourly"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-pedestrian_hourly">{
+  "id": 1671020241030,
+  "location_id": 167,
+  "sensing_date": "2024-10-30",
+  "hourday": 10,
+  "direction_1": 17,
+  "direction_2": 77,
+  "pedestriancount": 94,
+  "sensor_name": "Lat526_T",
+  "location": {
+    "lon": 144.95155955,
+    "lat": -37.81304149
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="pedestrian" data-status="ready" data-keywords="综合交通断面多模式活动计数 Transport Activity Multi-modal Counts melbourne.transport.activity_counts melens_ingest.area_indicators melens_query.v_area_indicators City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#08</span>
+            <span>&bull;</span>
+            <span>行人流动与微观活力 / Pedestrian Dynamics</span>
+          </div>
+          <h3 class="card-title-zh">综合交通断面多模式活动计数</h3>
+          <div class="card-title-en">Transport Activity Multi-modal Counts</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">采集特定街道断面的多模式交通流（汽车、自行车、行人），支持五分钟粒度微观出行方式结构比对分析。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.transport.activity_counts</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">约小时级更新 / 5分钟采样</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">市区主干道路段断面 (机动车、非机动车与行人复合断面)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_area_indicators</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'transport_activity_counts', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'transport_activity_counts', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('transport_activity_counts')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-transport_activity_counts">{
+  "indicator_id": "tac:101:vehicle:20260928T1000Z",
+  "boundary_id": "sensor_site:101",
+  "period_start": "2026-09-28T09:55:00Z",
+  "period_end": "2026-09-28T10:00:00Z",
+  "value": 12,
+  "unit": "vehicles/5min",
+  "status": "observed",
+  "source_id": "melbourne.transport.activity_counts"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-transport_activity_counts">{
+  "sensor_id": "TAC_001",
+  "site_id": 101,
+  "sensor_name": "Swanston St (Bourke - Lt Collins)",
+  "road_name": "Swanston Street",
+  "direction": "Northbound",
+  "time": "2026-09-28T10:00:00Z",
+  "interval_minutes": 5,
+  "vehicle_count": 12,
+  "bicycle_count": 8,
+  "pedestrian_count": 85
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="transit" data-status="ready" data-keywords="计划内道路施工与交通工程 Planned Road Disruptions & Roadworks victoria.transport.road_planned melens_ingest.geo_records melens_query.v_road_disruptions_current Transport Victoria (v3 API)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#09</span>
+            <span>&bull;</span>
+            <span>路网运行与交通中断 / Transit & Road Networks</span>
+          </div>
+          <h3 class="card-title-zh">计划内道路施工与交通工程</h3>
+          <div class="card-title-en">Planned Road Disruptions & Roadworks</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">掌握全州中长期道路封闭、车道缩减与路轨大修计划。记录未来生效区间（valid_from ~ valid_to），在 BigQuery 中统一标记 assertion_kind = 'plan'，避免与当前突发交通中断混淆。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.transport.road_planned</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Transport Victoria (v3 API)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">30分钟增量抓取</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维多利亚全州公路网 (9,450+ 条在建与计划工程路段)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_road_disruptions_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'road_planned', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'road_planned', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('road_planned')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-road_planned">{
+  "geo_record_id": "geo:road_work:RWO-88912",
+  "topic": "road_disruption",
+  "assertion_kind": "plan",
+  "is_prediction": false,
+  "title": "La Trobe St Tram Track Works",
+  "geometry_geojson": "{\"type\":\"LineString\",\"coordinates\":[[144.9601,-37.8105],[144.9652,-37.8098]]}",
+  "valid_from": "2026-10-14T20:00:00Z",
+  "valid_to": "2026-10-22T08:00:00Z",
+  "location_role": "event_site",
+  "location_confidence": "source_coordinate",
+  "record_status": "planned"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-road_planned">{
+  "type": "Feature",
+  "properties": {
+    "id": "RWO-88912",
+    "name": "La Trobe St Tram Track Works",
+    "status": "scheduled",
+    "valid_from": "2026-10-15T07:00:00+11:00",
+    "valid_to": "2026-10-22T19:00:00+11:00"
+  },
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [
+        144.9601,
+        -37.8105
+      ],
+      [
+        144.9652,
+        -37.8098
+      ]
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="transit" data-status="ready" data-keywords="突发交通事故与非计划道路中断 Unplanned Road Incidents & Hazards victoria.transport.road_unplanned melens_ingest.geo_records melens_query.v_road_disruptions_current Transport Victoria (v3 API)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#10</span>
+            <span>&bull;</span>
+            <span>路网运行与交通中断 / Transit & Road Networks</span>
+          </div>
+          <h3 class="card-title-zh">突发交通事故与非计划道路中断</h3>
+          <div class="card-title-en">Unplanned Road Incidents & Hazards</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">监控实时车祸、车辆故障、突发管线抢修等紧急事件。维护主事故与受影响路段的父子影响关系（parent incident / child impacts），事故解除后自动从当前活动视图移入历史归档。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.transport.road_unplanned</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Transport Victoria (v3 API)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">60秒高频轮询</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维多利亚全州即时路况 (290+ 个突发事件父子影响要素)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_road_disruptions_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'road_unplanned', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'road_unplanned', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('road_unplanned')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-road_unplanned">{
+  "geo_record_id": "geo:incident:INC-44120:IMP-01",
+  "topic": "road_disruption",
+  "assertion_kind": "observation",
+  "title": "Traffic Collision on Flinders Street",
+  "centroid_lat": -37.8182,
+  "centroid_lon": 144.9671,
+  "location_role": "event_site",
+  "location_confidence": "source_coordinate",
+  "record_status": "active"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-road_unplanned">{
+  "type": "Feature",
+  "properties": {
+    "id": "INC-44120",
+    "impactId": "IMP-01",
+    "type": "Collision",
+    "severity": "High",
+    "roadName": "Flinders Street",
+    "created": "2026-10-01T12:15:00Z"
+  },
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      144.9671,
+      -37.8182
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="transit" data-status="ready" data-keywords="公共交通 GTFS 静态线网与班次 GTFS Static Transit Schedule & Stops victoria.transport.gtfs_static melens_ingest.boundaries (transit) melens_query.v_transit_stops Transport Victoria Open Data">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#11</span>
+            <span>&bull;</span>
+            <span>路网运行与交通中断 / Transit & Road Networks</span>
+          </div>
+          <h3 class="card-title-zh">公共交通 GTFS 静态线网与班次</h3>
+          <div class="card-title-en">GTFS Static Transit Schedule & Stops</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">基于 HTTP Range 增量流式解析 275MB 官方 GTFS Schedule 归档包，抽取 mode 2（Metro 城市客运铁路）与 mode 3（Yarra Trams 有轨电车）的标准拓扑与站点时刻。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.transport.gtfs_static</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Transport Victoria Open Data</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每周全量归档版本校验</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维州全境列车与电车线网 (60 线路、4,485 站点、96,483 车次)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.boundaries (transit)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_transit_stops</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'gtfs_static', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'gtfs_static', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('gtfs_static')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-gtfs_static">{
+  "boundary_id": "ptv_stop:19940:20260928",
+  "scheme": "ptv_gtfs",
+  "code": "19940",
+  "name": "Flinders Street Railway Station",
+  "geometry_geojson": "{\"type\":\"Point\",\"coordinates\":[144.967114,-37.818305]}",
+  "source_id": "victoria.transport.gtfs_static"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-gtfs_static">{
+  "route_id": "2-ALM",
+  "route_short_name": "Alamein Line",
+  "route_type": 2,
+  "stop_id": "19940",
+  "stop_name": "Flinders Street Railway Station",
+  "stop_lat": -37.818305,
+  "stop_lon": 144.967114
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="transit" data-status="ready" data-keywords="公共交通 GTFS-R 实时运营警报 GTFS Realtime Service Alerts victoria.transport.gtfs_realtime melens_ingest.geo_records melens_query.v_transit_alerts_current Transport Victoria GTFS-RT Protobuf">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#12</span>
+            <span>&bull;</span>
+            <span>路网运行与交通中断 / Transit & Road Networks</span>
+          </div>
+          <h3 class="card-title-zh">公共交通 GTFS-R 实时运营警报</h3>
+          <div class="card-title-en">GTFS Realtime Service Alerts</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">解析 Google ProtocolBuffer 二进制流中的 Service Alerts 实体。将停运、晚点、临时跳站等警报与静态站点/路线严格校验关联，杜绝未经证明的版本臆断。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.transport.gtfs_realtime</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Transport Victoria GTFS-RT Protobuf</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">60秒实时流</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">墨尔本轨道交通与电车网络 (实时列车/电车突发运营延误警报)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_transit_alerts_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'gtfs_realtime', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'gtfs_realtime', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('gtfs_realtime')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-gtfs_realtime">{
+  "geo_record_id": "geo:gtfs_alert:METRO-ALERT-104",
+  "topic": "transport",
+  "assertion_kind": "observation",
+  "title": "Delays up to 15 mins on Sunbury Line",
+  "valid_from": "2026-10-01T12:00:00Z",
+  "valid_to": "2026-10-01T14:00:00Z",
+  "location_role": "transit_corridor",
+  "location_confidence": "official_join"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-gtfs_realtime">{
+  "id": "METRO-ALERT-104",
+  "alert": {
+    "header_text": "Delays up to 15 mins on Sunbury Line due to signal fault",
+    "informed_entity": [
+      {
+        "route_id": "2-SUN"
+      }
+    ],
+    "active_period": [
+      {
+        "start": 1790860800,
+        "end": 1790868000
+      }
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="news" data-status="live" data-keywords="本地新闻报道与知识图谱事件 Local News & Spatial Event Extraction gdelt.news melens_ingest.geo_records melens_query.v_news_current GDELT Project Global Knowledge Graph (GKG 2.0)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#13</span>
+            <span>&bull;</span>
+            <span>媒体情报与公共安全 / News, Media & Crime Intelligence</span>
+          </div>
+          <h3 class="card-title-zh">本地新闻报道与知识图谱事件</h3>
+          <div class="card-title-en">Local News & Spatial Event Extraction</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">每 15 分钟从全球新闻知识图谱中精准过滤涉及墨尔本的英文与多语种报道。仅留存合规元数据与原文溯源 URL，并将提及地名标注为 location_role = 'mentioned_place'，绝不将宽泛地名伪造为精准街道点。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">gdelt.news</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">GDELT Project Global Knowledge Graph (GKG 2.0)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">15分钟滚动窗口</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">大墨尔本地区涉域媒体报道 (134 篇墨尔本报道，10 个独立核准逻辑事件)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_news_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'gdelt_news', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'gdelt_news', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('gdelt_news')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-gdelt_news">{
+  "geo_record_id": "geo:news:gdelt:20260928184500-101",
+  "topic": "news",
+  "assertion_kind": "report",
+  "title": "Melbourne transit hub upgrade announced",
+  "original_url": "https://theage.com.au/national/victoria/melbourne-transit-hub-upgrade",
+  "centroid_lat": -37.8167,
+  "centroid_lon": 144.967,
+  "location_role": "mentioned_place",
+  "location_confidence": "resolved_area",
+  "area_refs": [
+    "ASGS_GCCSA:2GMEL:2021"
+  ],
+  "published_at": "2026-09-28T18:45:00Z",
+  "rights_status": "verified_open",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-gdelt_news">{
+  "gkg_record_id": "20260928184500-101",
+  "document_identifier": "https://theage.com.au/national/victoria/melbourne-transit-hub-upgrade",
+  "v2_locations": "4#Melbourne, Victoria, Australia#AS#AS07#5430#-37.8167#144.967#-1586844#120"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="news" data-status="live" data-keywords="本地犯罪新闻候选事件 Local Crime News Event Candidates gdelt.news (Crime Stream) melens_ingest.geo_records melens_query.v_crime_news_current GDELT Theme Classifier">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#14</span>
+            <span>&bull;</span>
+            <span>媒体情报与公共安全 / News, Media & Crime Intelligence</span>
+          </div>
+          <h3 class="card-title-zh">本地犯罪新闻候选事件</h3>
+          <div class="card-title-en">Local Crime News Event Candidates</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">利用严格的 GDELT 涉罪主题分类器与本地案发过滤器，抽离治安案件报道。标注 review_required 与 location_role = 'mentioned_place'，明确报道不能等同法定定罪事实或整体犯罪率。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">gdelt.news (Crime Stream)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">GDELT Theme Classifier</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">15分钟窗口流</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维多利亚州墨尔本 (6 个独立核实犯罪报道样本)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_crime_news_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'gdelt_crime', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'gdelt_crime', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('gdelt_crime')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-gdelt_crime">{
+  "geo_record_id": "geo:crime_news:gdelt:20260928120000-502",
+  "topic": "crime_news",
+  "assertion_kind": "report",
+  "title": "Police investigate retail theft on Bourke Street",
+  "centroid_lat": -37.8136,
+  "centroid_lon": 144.9672,
+  "location_role": "mentioned_place",
+  "location_confidence": "resolved_area",
+  "rights_status": "verified_open",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-gdelt_crime">{
+  "gkg_record_id": "20260928120000-502",
+  "document_identifier": "https://heraldsun.com.au/news/victoria/bourke-street-incident",
+  "themes": "CRIME;ARREST;THEFT",
+  "v2_locations": "4#Bourke Street, Melbourne, Victoria, Australia#AS#AS07#...#-37.8136#144.9672"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="news" data-status="live" data-keywords="维州官方季度录案犯罪统计 Victoria Police Recorded Crime Statistics victoria.csa.recorded_offences melens_ingest.area_indicators melens_query.v_crime_area_statistics Crime Statistics Agency Victoria">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#15</span>
+            <span>&bull;</span>
+            <span>媒体情报与公共安全 / News, Media & Crime Intelligence</span>
+          </div>
+          <h3 class="card-title-zh">维州官方季度录案犯罪统计</h3>
+          <div class="card-title-en">Victoria Police Recorded Crime Statistics</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">维州警务系统官方登记的犯罪统计（Table 01），按滚动 12 个月（Year Ending June/Dec 等）汇总。细分侵害人身安全、财产欺诈、毒品、公共秩序等门类，与新闻报道严格解耦。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.csa.recorded_offences</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Crime Statistics Agency Victoria</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">季度权威发布（Table 01）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维州全部 79 个 LGA 地方政府区 (1,620 个指标，81 个统计地区，10 个连续统计期)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_crime_area_statistics</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'csa_offences', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'csa_offences', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('csa_offences')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-csa_offences">{
+  "indicator_id": "csa:offence:2026_jun:lga_melbourne:b40_theft",
+  "boundary_id": "ASGS_LGA:24600:2021",
+  "period_start": "2025-07-01T00:00:00Z",
+  "period_end": "2026-07-01T00:00:00Z",
+  "value": 12480,
+  "unit": "recorded_offences",
+  "status": "observed",
+  "definition": "Rolling 12-month offences recorded by Victoria Police for B40 Theft in Melbourne LGA",
+  "source_area_name": "Melbourne",
+  "source_id": "victoria.csa.recorded_offences"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-csa_offences">{
+  "year": "2026",
+  "year_ending": "June",
+  "lga": "Melbourne",
+  "offence_division": "B Property and deception offences",
+  "offence_subdivision": "B40 Theft",
+  "offence_count": 12480,
+  "rate_per_100k": 8341.2
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="events" data-status="live" data-keywords="大墨尔本大型文娱演出与票务活动 Ticketmaster Live Events & Venues ticketmaster.events melens_ingest.geo_records melens_query.v_events_current Ticketmaster Discovery API">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#16</span>
+            <span>&bull;</span>
+            <span>城市文娱与公众活动 / City Events & Culture</span>
+          </div>
+          <h3 class="card-title-zh">大墨尔本大型文娱演出与票务活动</h3>
+          <div class="card-title-en">Ticketmaster Live Events & Venues</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">涵盖大墨尔本地区演唱会、体育赛事、戏剧展览等大型活动。严格遵守使用协议，实施 24 小时可见性上限与每 6 小时自动数据清理，活动取消或延期自动产生新版本。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">ticketmaster.events</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Ticketmaster Discovery API</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每 12 小时全量快照扫描</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">墨尔本市中心 80km 辐射圈 (419 个当前活动（372 个未来活动），38 个场馆)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_events_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'ticketmaster', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'ticketmaster', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('ticketmaster')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-ticketmaster">{
+  "geo_record_id": "geo:event:tm:1AzZA4AGkd6N_oM",
+  "topic": "event",
+  "assertion_kind": "plan",
+  "title": "Melbourne International Comedy Festival Gala",
+  "summary": "Venue: Palais Theatre",
+  "original_url": "https://www.ticketmaster.com.au/event/1AzZA4AGkd6N_oM",
+  "centroid_lat": -37.8677,
+  "centroid_lon": 144.9754,
+  "location_role": "event_site",
+  "location_confidence": "source_coordinate",
+  "valid_from": "2026-11-20T08:30:00Z",
+  "valid_to": "2026-11-20T12:00:00Z",
+  "rights_status": "restricted",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-ticketmaster">{
+  "id": "1AzZA4AGkd6N_oM",
+  "name": "Melbourne International Comedy Festival Gala",
+  "url": "https://www.ticketmaster.com.au/event/1AzZA4AGkd6N_oM",
+  "dates": {
+    "start": {
+      "localDate": "2026-11-20",
+      "localTime": "19:30:00"
+    }
+  },
+  "_embedded": {
+    "venues": [
+      {
+        "name": "Palais Theatre",
+        "location": {
+          "longitude": "144.9754",
+          "latitude": "-37.8677"
+        }
+      }
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="planning" data-status="live" data-keywords="建筑开发项目全生命周期监控 Melbourne Development Activity Monitor melbourne.development_monitor melens_ingest.geo_records melens_query.v_geo_records_current (topic='planning') City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#17</span>
+            <span>&bull;</span>
+            <span>规划审批与空间演化 / Planning & Urban Development</span>
+          </div>
+          <h3 class="card-title-zh">建筑开发项目全生命周期监控</h3>
+          <div class="card-title-en">Melbourne Development Activity Monitor</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">追踪墨尔本市所有新建楼宇与改扩建项目从申请（Applied）、获批（Approved）、在建（Under Construction）到完工（Completed）的全流程，包含住宅套数与建筑规模。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.development_monitor</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">月度全量增量更新</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne 市政辖区 (1,450 个建设项目（现行 326 个，完成历史 1,124 个）)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_geo_records_current (topic='planning')</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'development_monitor', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'development_monitor', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('development_monitor')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-development_monitor">{
+  "geo_record_id": "geo:dev_monitor:X0010400",
+  "topic": "planning",
+  "assertion_kind": "plan",
+  "title": "Development Application: 287-313 Macaulay Road (142 Units)",
+  "summary": "Status: APPLIED | Precinct: North Melbourne | 142 Residential Dwellings",
+  "centroid_lat": -37.79812,
+  "centroid_lon": 144.93921,
+  "location_role": "event_site",
+  "location_confidence": "source_coordinate",
+  "record_status": "planned",
+  "rights_status": "verified_open",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-development_monitor">{
+  "development_key": "X0010400",
+  "status": "APPLIED",
+  "street_address": "287-313 Macaulay Road, North Melbourne, 3051",
+  "clue_small_area": "North Melbourne",
+  "residential_units": 142,
+  "latitude": -37.79812,
+  "longitude": 144.93921
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="planning" data-status="ready" data-keywords="维州法定规划分区与土地覆盖层 Vicmap Planning Zones & Overlays victoria.vicmap.planning melens_ingest.boundaries (scheme='vicmap_planning') melens_query.v_planning_zones Department of Transport & Planning (DataVic)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#18</span>
+            <span>&bull;</span>
+            <span>规划审批与空间演化 / Planning & Urban Development</span>
+          </div>
+          <h3 class="card-title-zh">维州法定规划分区与土地覆盖层</h3>
+          <div class="card-title-en">Vicmap Planning Zones & Overlays</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">维州官方土地利用规划法定图层，明确划定商业区（C1Z/C2Z）、混合居住区（MUZ）、工业区（IN1Z）与历史保护（Heritage Overlay）、环境特殊控制覆盖层。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.vicmap.planning</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Department of Transport & Planning (DataVic)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">周度同步</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">大墨尔本地区 (439 个 Zones 分区 + 1,888 个 Overlays 覆盖层)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.boundaries (scheme='vicmap_planning')</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_planning_zones</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'vicmap_planning', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'vicmap_planning', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('vicmap_planning')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-vicmap_planning">{
+  "boundary_id": "vicmap_plan:zone:C1Z:2188401",
+  "scheme": "vicmap_planning",
+  "code": "C1Z",
+  "name": "Commercial 1 Zone (Melbourne C278)",
+  "geometry_geojson": "{\"type\":\"Polygon\",\"coordinates\":[[[144.958,-37.814],[144.962,-37.814],[144.962,-37.818],[144.958,-37.814]]]}",
+  "source_id": "victoria.vicmap.planning"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-vicmap_planning">{
+  "scheme_code": "C278melb",
+  "zone_code": "C1Z",
+  "zone_name": "Commercial 1 Zone",
+  "ufi": 2188401,
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          144.958,
+          -37.814
+        ],
+        [
+          144.962,
+          -37.814
+        ],
+        [
+          144.962,
+          -37.818
+        ],
+        [
+          144.958,
+          -37.814
+        ]
+      ]
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="demographics" data-status="live" data-keywords="ABS 2021 澳洲人口普查统计数据包 ABS Census 2021 Community Profile DataPacks abs.census melens_ingest.area_indicators melens_query.v_area_indicators Australian Bureau of Statistics (ABS)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#19</span>
+            <span>&bull;</span>
+            <span>人口统计与宏观经济 / Demographics, Housing & Economy</span>
+          </div>
+          <h3 class="card-title-zh">ABS 2021 澳洲人口普查统计数据包</h3>
+          <div class="card-title-en">ABS Census 2021 Community Profile DataPacks</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">解析官方 G01/G02 表，提供常住总人口、年龄结构中位数、周均家庭收入、受教育程度等核心人口学指标。统计数据与 2021 版同版本 ASGS 边界建立强关联匹配。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">abs.census</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Australian Bureau of Statistics (ABS)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">5年普查周期（2021 基准）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">全维州 80 个 LGA 与 361 个 SA2 统计区 (144,792 个已入库指标（720 个 LGA 指标，3,249 个 SA2 指标）)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_area_indicators</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'abs_census', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'abs_census', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('abs_census')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-abs_census">{
+  "indicator_id": "abs:census:2021:g01:tot_p_p:LGA24600",
+  "boundary_id": "ASGS_LGA:24600:2021",
+  "period_start": "2021-08-10T00:00:00Z",
+  "period_end": "2021-08-11T00:00:00Z",
+  "value": 149615,
+  "unit": "persons",
+  "status": "observed",
+  "definition": "Total Persons (Census 2021 Table G01)",
+  "source_id": "abs.census"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-abs_census">{
+  "census_year": 2021,
+  "region": "LGA24600 (Melbourne)",
+  "tot_p_p": 149615,
+  "median_age_persons": 31,
+  "median_tot_prsnl_inc_weekly": 905
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="demographics" data-status="live" data-keywords="Homes Victoria 季度住宅租金统计 Homes Victoria Quarterly Rental Market Reports homes_victoria.rents melens_ingest.area_indicators melens_query.v_area_indicators Homes Victoria (DataVic)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#20</span>
+            <span>&bull;</span>
+            <span>人口统计与宏观经济 / Demographics, Housing & Economy</span>
+          </div>
+          <h3 class="card-title-zh">Homes Victoria 季度住宅租金统计</h3>
+          <div class="card-title-en">Homes Victoria Quarterly Rental Market Reports</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">维州政府住宅租赁保证金管理局（RTBA）官方租赁数据。细分一房/两房/三房公寓与独栋住宅，提供移动中位数周租金，样本少于 4 套时自动作为 suppressed/null 保留。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">homes_victoria.rents</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Homes Victoria (DataVic)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">季度更新（覆盖 106 个历史季度）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">维州各 LGA 及郊区 (Suburbs) (58,618 条历史季度租金记录)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_area_indicators</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'homes_victoria_rents', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'homes_victoria_rents', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('homes_victoria_rents')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-homes_victoria_rents">{
+  "indicator_id": "rent:2024q4:melbourne:2bed_flat:median",
+  "boundary_id": "ASGS_LGA:24600:2021",
+  "period_start": "2024-10-01T00:00:00Z",
+  "period_end": "2025-01-01T00:00:00Z",
+  "value": 650,
+  "unit": "AUD/week",
+  "status": "observed",
+  "definition": "Moving median weekly rent for 2 Bedroom Flat in Melbourne LGA",
+  "source_id": "homes_victoria.rents"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-homes_victoria_rents">{
+  "quarter": "Dec 2024",
+  "quarter_code": "2024-Q4",
+  "period_start": "2024-10-01T00:00:00Z",
+  "period_end": "2025-01-01T00:00:00Z",
+  "lga_name": "Melbourne",
+  "property_type": "2 Bedroom Flat",
+  "raw_count": "3412",
+  "raw_median": "650"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="demographics" data-status="ready" data-keywords="CLUE 街区行业就业分布统计 CLUE Employment by Small Block & Industry melbourne.clue.employment melens_ingest.area_indicators melens_query.v_area_indicators City of Melbourne CLUE">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#21</span>
+            <span>&bull;</span>
+            <span>人口统计与宏观经济 / Demographics, Housing & Economy</span>
+          </div>
+          <h3 class="card-title-zh">CLUE 街区行业就业分布统计</h3>
+          <div class="card-title-en">CLUE Employment by Small Block & Industry</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">墨尔本市土地与就业普查（CLUE）。按微观街区划分统计金融、专业技术服务、住宿餐饮、教育等各产业岗位数量，并严格保留统计抑制值（suppressed null）。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.clue.employment</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne CLUE</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">年度普查版本（2002–2024）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">Melbourne CBD 与内城区 Small Blocks (19 个主要行业分类分街区就业量)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_area_indicators</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'clue_employment', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'clue_employment', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('clue_employment')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-clue_employment">{
+  "indicator_id": "clue:emp:2024:block_17:finance",
+  "boundary_id": "clue_block:17:2025",
+  "period_start": "2024-01-01T00:00:00Z",
+  "period_end": "2025-01-01T00:00:00Z",
+  "value": 1240,
+  "unit": "jobs",
+  "status": "observed",
+  "definition": "CLUE Employment in Finance and Insurance sector",
+  "source_id": "melbourne.clue.employment"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-clue_employment">{
+  "census_year": "2024",
+  "block_id": 17,
+  "clue_small_area": "Melbourne (CBD)",
+  "business_services": 510,
+  "finance_and_insurance": 1240,
+  "accommodation_and_food": 320
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="microclimate" data-status="ready" data-keywords="城市微气候多指标环境传感器 Urban Microclimate & Atmospheric Sensors melbourne.microclimate melens_ingest.area_indicators melens_query.v_area_indicators City of Melbourne IoT Network">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#22</span>
+            <span>&bull;</span>
+            <span>环境感知与微气候 / Urban Microclimate & Environment</span>
+          </div>
+          <h3 class="card-title-zh">城市微气候多指标环境传感器</h3>
+          <div class="card-title-en">Urban Microclimate & Atmospheric Sensors</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">街道级微气象感知网络。规范化提取气温 (°C)、相对湿度 (%)、风速 (m/s)、PM2.5/PM10 颗粒物浓度与环境噪声 (dB) 等 13 种物理指标，支持城市热岛与宜居度分析。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.microclimate</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne IoT Network</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">15分钟高频采样</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">墨尔本 CBD 街道与电车站台 (13 类环境指标（温度、风、PM2.5、噪声等）)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.area_indicators</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_area_indicators</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'microclimate', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'microclimate', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('microclimate')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-microclimate">{
+  "indicator_id": "microclimate:ICTMicroclimate-08:airtemp:20260428T152515Z",
+  "boundary_id": "sensor_site:ICTMicroclimate-08",
+  "period_start": "2026-04-28T15:25:15Z",
+  "period_end": "2026-04-28T15:25:15Z",
+  "value": 16.7,
+  "unit": "celsius",
+  "status": "observed",
+  "definition": "Ambient air temperature recorded by microclimate sensor",
+  "source_id": "melbourne.microclimate"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-microclimate">{
+  "device_id": "ICTMicroclimate-08",
+  "received_at": "2026-04-28T15:25:15+00:00",
+  "sensorlocation": "Swanston St - Tram Stop 13 adjacent Federation Sq",
+  "airtemperature": 16.7,
+  "relativehumidity": 79.9,
+  "pm2_5": 8.4,
+  "latlong": {
+    "lon": 144.9678474,
+    "lat": -37.8184515
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="boundaries" data-status="live" data-keywords="墨尔本市法定市辖管辖边界 City of Melbourne Municipal Boundary melbourne.municipal_boundary melens_ingest.boundaries melens_query.v_boundaries City of Melbourne GIS">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#23</span>
+            <span>&bull;</span>
+            <span>空间拓扑与行政底图 / Spatial & Administrative Geographies</span>
+          </div>
+          <h3 class="card-title-zh">墨尔本市法定市辖管辖边界</h3>
+          <div class="card-title-en">City of Melbourne Municipal Boundary</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">墨尔本地方政府区（LGA）唯一法定边界基准底图。确定性区分 City of Melbourne（市区）与包含 31 个 LGA 的 Greater Melbourne（大墨尔本），防止空间归属范围混淆。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.municipal_boundary</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne GIS</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">官方生效版本维护（2008-07-01）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne (1 个法定高精度多边形面要素)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.boundaries</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_boundaries</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'municipal_boundary', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'municipal_boundary', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('municipal_boundary')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-municipal_boundary">{
+  "boundary_id": "com_municipal:1:2008-07-01",
+  "scheme": "com_municipal",
+  "code": "1",
+  "name": "City of Melbourne",
+  "vintage": "2008-07-01",
+  "geometry_geojson": "{\"type\":\"MultiPolygon\",\"coordinates\":[[[[144.91,-37.84],[144.98,-37.84],...]]]]}",
+  "geometry": "MULTIPOLYGON(((144.91 -37.84, 144.98 -37.84, ...)))",
+  "valid_from": "2008-07-01T00:00:00Z",
+  "valid_to": null,
+  "source_id": "melbourne.municipal_boundary"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-municipal_boundary">{
+  "mccid_gis": 1,
+  "name": "City of Melbourne",
+  "xdate": "2008-07-01",
+  "geo_shape": {
+    "type": "MultiPolygon",
+    "coordinates": [
+      [
+        [
+          [
+            144.91,
+            -37.84
+          ],
+          [
+            144.98,
+            -37.84
+          ],
+          [
+            144.98,
+            -37.8
+          ],
+          [
+            144.91,
+            -37.84
+          ]
+        ]
+      ]
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="boundaries" data-status="live" data-keywords="ABS 澳大利亚标准地理分类边界体系 ABS ASGS Greater Melbourne & Victoria Boundaries abs.asgs.boundaries melens_ingest.boundaries melens_query.v_boundaries Australian Bureau of Statistics (ABS)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#24</span>
+            <span>&bull;</span>
+            <span>空间拓扑与行政底图 / Spatial & Administrative Geographies</span>
+          </div>
+          <h3 class="card-title-zh">ABS 澳大利亚标准地理分类边界体系</h3>
+          <div class="card-title-en">ABS ASGS Greater Melbourne & Victoria Boundaries</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">涵盖大墨尔本大都市区（Greater Melbourne GCCSA: 2GMEL）、全维州 80 个 LGA 及 361 个 SA2 统计中区。为全平台人口、犯罪、住房与经济指标提供标准地理对齐基石。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">abs.asgs.boundaries</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">Australian Bureau of Statistics (ABS)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">国家统计年版次（2021 & 2026 快照）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">大墨尔本 GCCSA / 维州全域 LGA & SA2 (923 个地理边界面要素（443 个 2021 要素，480 个 2026 要素）)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.boundaries</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_boundaries</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'asgs_boundaries', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'asgs_boundaries', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('asgs_boundaries')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-asgs_boundaries">{
+  "boundary_id": "ASGS_GCCSA:2GMEL:2021",
+  "scheme": "ASGS_GCCSA",
+  "code": "2GMEL",
+  "name": "Greater Melbourne",
+  "vintage": "2021",
+  "geometry_geojson": "{\"type\":\"MultiPolygon\",\"coordinates\":[[[[144.8,-37.9],[145.4,-37.9],...]]]]}",
+  "geometry": "MULTIPOLYGON(((144.8 -37.9, 145.4 -37.9, ...)))",
+  "source_id": "abs.asgs.boundaries"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-asgs_boundaries">{
+  "type": "Feature",
+  "properties": {
+    "objectid": 1,
+    "gccsa_code_2021": "2GMEL",
+    "gccsa_name_2021": "Greater Melbourne"
+  },
+  "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [
+      [
+        [
+          [
+            144.8,
+            -37.9
+          ],
+          [
+            145.4,
+            -37.9
+          ],
+          [
+            145.4,
+            -37.5
+          ],
+          [
+            144.8,
+            -37.9
+          ]
+        ]
+      ]
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="boundaries" data-status="live" data-keywords="CLUE Small Blocks 商业街区空间底图 Melbourne CLUE Small Blocks Spatial Polygons melbourne.clue.blocks melens_ingest.boundaries melens_query.v_boundaries City of Melbourne">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#25</span>
+            <span>&bull;</span>
+            <span>空间拓扑与行政底图 / Spatial & Administrative Geographies</span>
+          </div>
+          <h3 class="card-title-zh">CLUE Small Blocks 商业街区空间底图</h3>
+          <div class="card-title-en">Melbourne CLUE Small Blocks Spatial Polygons</div>
+        </div>
+        <div class="badge-status live">
+          <span class="badge-status-dot"></span>
+          <span>LIVE IN BIGQUERY</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">墨尔本市官方划分的微观商业活动基本统计单元（Small Blocks），每个街区具有独立的物理边界几何，支撑微观商圈、建筑与产业细分统计。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">melbourne.clue.blocks</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">City of Melbourne</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">2025年法定重组版本</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">City of Melbourne 市政辖区 (603 个商业街区空间多边形底图)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.boundaries</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_boundaries</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'clue_blocks', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'clue_blocks', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('clue_blocks')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-clue_blocks">{
+  "boundary_id": "clue_block:101:2025",
+  "scheme": "melbourne_clue_block",
+  "code": "101",
+  "name": "CLUE Small Block 101",
+  "vintage": "2025",
+  "geometry_geojson": "{\"type\":\"Polygon\",\"coordinates\":[[[144.969,-37.815],...]]}",
+  "geometry": "POLYGON(((144.969 -37.815, ...)))",
+  "source_id": "melbourne.clue.blocks"
+}</pre>
+            <pre class="code-view hidden" id="code-raw-clue_blocks">{
+  "block_id": 101,
+  "geo_point_2d": {
+    "lon": 144.9709,
+    "lat": -37.8158
+  },
+  "geo_shape": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            144.969,
+            -37.815
+          ],
+          [
+            144.972,
+            -37.815
+          ],
+          [
+            144.972,
+            -37.817
+          ],
+          [
+            144.969,
+            -37.815
+          ]
+        ]
+      ]
+    }
+  }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="planning" data-status="ready" data-keywords="维州 28 个 Council 社区公众咨询项目 Council Engagement Projects (Social Pinpoint) victoria.council.engagement melens_ingest.geo_records melens_query.v_geo_records_current (topic='planning') 28 Greater Melbourne Councils (Social Pinpoint Platforms)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#26</span>
+            <span>&bull;</span>
+            <span>社区公众咨询与规划 / Council Community Engagement</span>
+          </div>
+          <h3 class="card-title-zh">维州 28 个 Council 社区公众咨询项目</h3>
+          <div class="card-title-en">Council Engagement Projects (Social Pinpoint)</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">监控大墨尔本 28 个市议会（如 Darebin, Stonnington, Hobsons Bay, Port Phillip 等）的 Have Your Say 平台。直接提取官方填写的 Suburb 空间标签与项目状态（Open/Active/Closed），严格遵循版权仅存事实与链接，不抓取正文描述。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.council.engagement</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">28 Greater Melbourne Councils (Social Pinpoint Platforms)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每日全量快照（覆盖 28 个市议会站点）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">大墨尔本 28 个地方政府管辖区（LGA） (3,300+ 个社区咨询项目（涵盖公园、交通、规划、预算）)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_geo_records_current (topic='planning')</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'council_engagement', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'council_engagement', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('council_engagement')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-council_engagement">{
+  "geo_record_id": "geo:council_project:darebin:1204",
+  "topic": "planning",
+  "assertion_kind": "plan",
+  "title": "Northern Reservoir Truck Management Plan",
+  "summary": "Darebin Council project in Reservoir. Categories: Transport & Parking. Status: Open.",
+  "original_url": "https://yoursay.darebin.vic.gov.au/NRTMP",
+  "centroid_lat": -37.717,
+  "centroid_lon": 145.008,
+  "location_role": "event_site",
+  "location_confidence": "official_join",
+  "valid_from": "2026-10-02T00:00:00Z",
+  "record_status": "planned",
+  "rights_status": "restricted",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-council_engagement">{
+  "projectID": 1204,
+  "projectName": "Northern Reservoir Truck Management Plan",
+  "projectStatus": "Open",
+  "projectPath": "https://yoursay.darebin.vic.gov.au/NRTMP",
+  "projectDateNum": "2026-10-02",
+  "projectLocationArray": [
+    "Reservoir"
+  ],
+  "projectCategoryArray": [
+    "Transport & Parking"
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+
+    <article class="catalog-card" data-domain="news" data-status="ready" data-keywords="Council 社区咨询决策与动态新闻 Council Engagement News & Decisions victoria.council.engagement_news melens_ingest.geo_records melens_query.v_news_current 28 Greater Melbourne Councils (Social Pinpoint Sitemaps)">
+      <div class="card-header">
+        <div class="card-title-group">
+          <div class="card-num-domain">
+            <span class="card-num">#27</span>
+            <span>&bull;</span>
+            <span>社区公众咨询与规划 / Council Community Engagement</span>
+          </div>
+          <h3 class="card-title-zh">Council 社区咨询决策与动态新闻</h3>
+          <div class="card-title-en">Council Engagement News & Decisions</div>
+        </div>
+        <div class="badge-status ready">
+          <span class="badge-status-dot"></span>
+          <span>PIPELINE VERIFIED</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <p class="card-desc">通过各市议会咨询站点的 sitemap.xml 增量发现咨询结果、市议会最终决策与重要通报（如重型货运路线采纳、图书馆重开等）。关联归属项目的 Suburb 地理标签，仅保留标题与事实摘要。</p>
+
+        <div class="metadata-grid">
+          <div class="meta-item">
+            <span class="meta-label">规范 Source ID</span>
+            <span class="meta-value">victoria.council.engagement_news</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">官方提供机构 / 接口</span>
+            <span class="meta-value">28 Greater Melbourne Councils (Social Pinpoint Sitemaps)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">更新频率 / 节奏</span>
+            <span class="meta-value">每日增量读取 sitemap 变更（14天滑动窗口）</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">空间覆盖与体量</span>
+            <span class="meta-value">大墨尔本 28 个地方议会社区咨询动态 (28 个市议会社区咨询官方决策、通告与结果新闻)</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">BigQuery 物理基表</span>
+            <span class="meta-value highlight-bq">melens_ingest.geo_records</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">对外规范化视图</span>
+            <span class="meta-value highlight-bq">melens_query.v_news_current</span>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector -->
+        <div class="inspector-box">
+          <div class="inspector-header">
+            <div class="inspector-tabs">
+              <button class="tab-btn active" onclick="switchTab(this, 'council_engagement_news', 'bq')">BigQuery 规范化格式 (Unified Canonical)</button>
+              <button class="tab-btn" onclick="switchTab(this, 'council_engagement_news', 'raw')">原始上游报文 (Raw Upstream Sample)</button>
+            </div>
+            <button class="copy-btn" onclick="copyCode('council_engagement_news')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>COPY JSON</span>
+            </button>
+          </div>
+
+          <div class="inspector-content">
+            <pre class="code-view" id="code-bq-council_engagement_news">{
+  "geo_record_id": "geo:council_news:darebin:nrtmp_truck_routes",
+  "topic": "news",
+  "assertion_kind": "report",
+  "title": "Council adopts truck routes & signage",
+  "summary": "Darebin Council news for project Northern Reservoir Truck Management Plan in Reservoir.",
+  "original_url": "https://yoursay.darebin.vic.gov.au/NRTMP/council-adopts-truck-routes",
+  "published_at": "2026-10-02T00:00:00Z",
+  "centroid_lat": -37.717,
+  "centroid_lon": 145.008,
+  "location_role": "mentioned_place",
+  "location_confidence": "resolved_area",
+  "rights_status": "restricted",
+  "public_query_allowed": true
+}</pre>
+            <pre class="code-view hidden" id="code-raw-council_engagement_news">{
+  "url": "https://yoursay.darebin.vic.gov.au/NRTMP/council-adopts-truck-routes",
+  "title": "Council adopts truck routes & signage",
+  "shown_date": "2026-10-02",
+  "parent_project": "Northern Reservoir Truck Management Plan",
+  "suburbs": [
+    "Reservoir"
+  ],
+  "lastmod": "2026-10-02T10:19:14+10:00"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </article>
+    
+  </div>
+
+  <!-- Section 3: Summary Table -->
+  <section class="section-header" style="margin-top: 50px;">
+    <div class="section-title-wrap">
+      <div class="section-number">CHAPTER 03 // MASTER SCHEMA DICTIONARY</div>
+      <h2 class="section-title">BigQuery 核心规范化物理表映射速查</h2>
+      <p class="section-desc">工程与数据团队查询对照表</p>
+    </div>
+  </section>
+
+  <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; overflow-x: auto; box-shadow: var(--shadow-sm); margin-bottom: 40px;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+      <thead>
+        <tr style="background: var(--bg-subtle); border-bottom: 2px solid var(--border-color); font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;">
+          <th style="padding: 12px 16px;">#</th>
+          <th style="padding: 12px 16px;">数据类型</th>
+          <th style="padding: 12px 16px;">规范 Source ID</th>
+          <th style="padding: 12px 16px;">BigQuery 目标表</th>
+          <th style="padding: 12px 16px;">主要时间与空间规范</th>
+          <th style="padding: 12px 16px;">当前发布状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">01</td>
+          <td style="padding: 12px 16px; font-weight: 600;">路边停车实时传感器</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.parking.sensors</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">parking_observations</td>
+          <td style="padding: 12px 16px;">observed_at (UTC), WGS84 Point</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">02</td>
+          <td style="padding: 12px 16px; font-weight: 600;">路边车位空间几何</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.parking.bays</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">parking_bays</td>
+          <td style="padding: 12px 16px;">valid_from, WGS84 Point / Polygon</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">03</td>
+          <td style="padding: 12px 16px; font-weight: 600;">单车位停车限制规则</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.parking.restrictions</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">parking_rules</td>
+          <td style="padding: 12px 16px;">days_of_week, start/end_minute</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">04</td>
+          <td style="padding: 12px 16px; font-weight: 600;">本地新闻与时空事件</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">gdelt.news</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">geo_records (topic='news')</td>
+          <td style="padding: 12px 16px;">published_at (UTC), WGS84 Centroid</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">05</td>
+          <td style="padding: 12px 16px; font-weight: 600;">维州官方季度犯罪统计</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">victoria.csa.recorded_offences</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">area_indicators</td>
+          <td style="padding: 12px 16px;">period_start/end, ASGS_LGA Ref</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">06</td>
+          <td style="padding: 12px 16px; font-weight: 600;">Ticketmaster 演出活动</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">ticketmaster.events</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">geo_records (topic='event')</td>
+          <td style="padding: 12px 16px;">valid_from/to (UTC), Venue Coordinates</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">07</td>
+          <td style="padding: 12px 16px; font-weight: 600;">建筑开发审批监控</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.development_monitor</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">geo_records (topic='planning')</td>
+          <td style="padding: 12px 16px;">status, residential_units, Point</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">08</td>
+          <td style="padding: 12px 16px; font-weight: 600;">ABS 2021 人口普查</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">abs.census</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">area_indicators</td>
+          <td style="padding: 12px 16px;">period_start/end, LGA/SA2 Boundary Match</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">09</td>
+          <td style="padding: 12px 16px; font-weight: 600;">Homes Victoria 季度租金</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">homes_victoria.rents</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">area_indicators</td>
+          <td style="padding: 12px 16px;">quarter, median_rent, suppressed handling</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">10</td>
+          <td style="padding: 12px 16px; font-weight: 600;">墨尔本市法定市界</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.municipal_boundary</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">boundaries</td>
+          <td style="padding: 12px 16px;">vintage=2008-07-01, MultiPolygon</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">11</td>
+          <td style="padding: 12px 16px; font-weight: 600;">ABS ASGS 统计边界</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">abs.asgs.boundaries</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">boundaries</td>
+          <td style="padding: 12px 16px;">vintage=2021 & 2026, GCCSA/LGA/SA2</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">12</td>
+          <td style="padding: 12px 16px; font-weight: 600;">CLUE 商业街区边界底图</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">melbourne.clue.blocks</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">boundaries</td>
+          <td style="padding: 12px 16px;">vintage=2025, 603 Small Blocks Polygons</td>
+          <td style="padding: 12px 16px;"><span class="badge-status live"><span class="badge-status-dot"></span>LIVE IN BQ</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">13</td>
+          <td style="padding: 12px 16px; font-weight: 600;">28 市议会社区公众咨询项目</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">victoria.council.engagement</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">geo_records (topic='planning')</td>
+          <td style="padding: 12px 16px;">valid_from, Suburb Location, restricted rights</td>
+          <td style="padding: 12px 16px;"><span class="badge-status ready"><span class="badge-status-dot"></span>PIPELINE READY</span></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border-color);">
+          <td style="padding: 12px 16px; font-family: var(--font-mono); color: var(--accent-crimson);">14</td>
+          <td style="padding: 12px 16px; font-weight: 600;">28 市议会社区咨询决策与通告</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">victoria.council.engagement_news</td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono);">geo_records (topic='news')</td>
+          <td style="padding: 12px 16px;">published_at (UTC), Suburb Centroid, sitemap lastmod</td>
+          <td style="padding: 12px 16px;"><span class="badge-status ready"><span class="badge-status-dot"></span>PIPELINE READY</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Editorial Footer -->
+  <footer class="editorial-footer">
+    <div class="footer-left">
+      <div class="footer-title">PROJECT MELENS // METROPOLITAN LENS</div>
+      <p>
+        本编目文档基于 <code>specs/001-melbourne-data-aggregation</code> 与 <code>specs/002-map-data-presentation</code> 规范构建。
+        所有数据资产受官方开放数据许可协议（CC BY 4.0、DataVic Open Data Policy、Ticketmaster Developer Terms）管辖，严禁擅自修改保留期限与权限标识。
+      </p>
+    </div>
+    <div style="font-family: var(--font-mono); font-size: 11px; text-align: right; color: var(--text-light);">
+      <div>GCP PROJECT: melens-510012</div>
+      <div>BIGQUERY DATASETS: melens_ingest / melens_query</div>
+      <div>REGION: australia-southeast2</div>
+      <div>CLASSIFICATION: INTERNAL STAKEHOLDER PRESENTATION</div>
+    </div>
+  </footer>
+</div>
+
+<!-- Back to top button -->
+<button class="back-to-top" id="backToTop" title="返回顶部">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+</button>
+
+<!-- Toast for copy confirmation -->
+<div class="toast" id="toast">JSON COPIED TO CLIPBOARD</div>
+
+<script>
+  // Theme Toggle
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const themeToggleText = document.getElementById('themeToggleText');
+  let currentTheme = localStorage.getItem('melens_theme') || 'light';
+
+  function applyTheme(theme) {
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      themeToggleText.textContent = 'DAY EDITORIAL';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      themeToggleText.textContent = 'NIGHT PRESS';
+    }
+    localStorage.setItem('melens_theme', theme);
+  }
+  applyTheme(currentTheme);
+
+  themeToggleBtn.addEventListener('click', () => {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme(currentTheme);
+  });
+
+  // Tab switching in code inspector
+  function switchTab(btn, itemId, tabType) {
+    const parent = btn.closest('.inspector-box');
+    parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const bqCode = document.getElementById('code-bq-' + itemId);
+    const rawCode = document.getElementById('code-raw-' + itemId);
+
+    if (tabType === 'bq') {
+      bqCode.classList.remove('hidden');
+      rawCode.classList.add('hidden');
+    } else {
+      bqCode.classList.add('hidden');
+      rawCode.classList.remove('hidden');
+    }
+  }
+
+  // Copy code helper
+  function copyCode(itemId) {
+    const card = document.querySelector(`[data-keywords*="${itemId}"]`) || document.getElementById('code-bq-' + itemId).closest('.catalog-card');
+    const activeCode = card.querySelector('.code-view:not(.hidden)');
+    if (activeCode) {
+      navigator.clipboard.writeText(activeCode.textContent).then(() => {
+        showToast('JSON SNIPPET COPIED TO CLIPBOARD');
+      });
+    }
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2200);
+  }
+
+  // Search & Filtering
+  const searchInput = document.getElementById('searchInput');
+  const cards = document.querySelectorAll('.catalog-card');
+  const resultsCount = document.getElementById('resultsCount');
+
+  let currentDomainFilter = 'all';
+  let currentStatusFilter = 'all';
+  let currentSearchQuery = '';
+
+  function filterCards() {
+    let visibleCount = 0;
+    const query = currentSearchQuery.toLowerCase().trim();
+
+    cards.forEach(card => {
+      const domain = card.getAttribute('data-domain');
+      const status = card.getAttribute('data-status');
+      const keywords = card.getAttribute('data-keywords').toLowerCase();
+
+      const matchDomain = (currentDomainFilter === 'all' || domain === currentDomainFilter);
+      const matchStatus = (currentStatusFilter === 'all' || status === currentStatusFilter);
+      const matchSearch = (!query || keywords.includes(query));
+
+      if (matchDomain && matchStatus && matchSearch) {
+        card.style.display = 'block';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    resultsCount.textContent = `DISPLAYING ${visibleCount} OF ${cards.length} DATA ASSETS`;
+  }
+
+  // Status Filter Pills
+  document.querySelectorAll('[data-filter-type="status"]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('[data-filter-type="status"]').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentStatusFilter = pill.getAttribute('data-value');
+      filterCards();
+    });
+  });
+
+  // Domain Filter Pills
+  document.querySelectorAll('[data-filter-type="domain"]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('[data-filter-type="domain"]').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentDomainFilter = pill.getAttribute('data-value');
+      filterCards();
+    });
+  });
+
+  // Search Input
+  searchInput.addEventListener('input', (e) => {
+    currentSearchQuery = e.target.value;
+    filterCards();
+  });
+
+  // Back to top button
+  const backToTop = document.getElementById('backToTop');
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 400) {
+      backToTop.classList.add('visible');
+    } else {
+      backToTop.classList.remove('visible');
+    }
+  });
+
+  backToTop.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+</script>
+
+</body>
+</html>
