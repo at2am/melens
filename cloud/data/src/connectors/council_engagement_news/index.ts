@@ -272,7 +272,7 @@ export class CouncilEngagementNewsConnector implements Connector {
         sourceRevision: sourceVersionId(null, sourceRecords.map(row => [row.source_record_id, row.version_id])),
         sourceLatestUpdateAt: latest, checkpointAfter: null,
         completeness: { complete: true, method: 'feed_snapshot', expected_records: null,
-          fetched_records: sourceRecords.length, expected_pages: null, fetched_pages: this.#pages,
+          fetched_records: sourceRecords.length + rejected, expected_pages: null, fetched_pages: this.#pages,
           evidence: `${this.councils.length} council sitemaps; every two-level page changed since the lookback cutoff was classified` },
         inputCount: sourceRecords.length + rejected, outputCount: sourceRecords.length, rejectedCount: rejected,
         sourceRecords, geoRecords, geoRecordSources, boundaries: [], areaIndicators: [], parkingBays: [],

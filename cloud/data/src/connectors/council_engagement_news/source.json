@@ -42,7 +42,7 @@
   "check_interval_seconds": 86400,
   "requires_monitoring": true,
   "license_status": "restricted",
-  "access_status": "candidate",
+  "access_status": "active",
   "record_granularity": "council_engagement_news_version",
   "connector_owner": "melens integration",
   "admission_evidence": {
