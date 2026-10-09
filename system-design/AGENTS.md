@@ -17,7 +17,7 @@ Melens is a mobile and web app that shows City of Melbourne datasets as map laye
 Design docs, in reading order:
 
 1. `system-design/use-cases/README.md`: every feature with its priority and status. Start here.
-2. `system-design/architecture.md`: components, the `MapFeature` data model and the data flow.
+2. `system-design/architecture.md`: components, the map model boundary and the data flow.
 3. `system-design/agent-design.md`: product agents, tools, models and answer rules.
 4. `system-design/tools.md`: every agent tool with its arguments, returns, errors and owner.
 5. `system-design/agent-protocol.md`: how the app talks to the agent service.
@@ -35,7 +35,7 @@ Breaking one of these can disqualify the entry.
 
 ## Product rules
 
-- Specific facts and recommendations (places, events, times, crowds, disruptions) appear in cards, and every card item cites a `MapFeature` id or a web link returned in the same turn. General advice may be plain text but never presents live data without a tool result. Enforce this in code (see `agent-design.md`, Source rules).
+- Specific facts and recommendations (places, events, times, crowds, disruptions) appear in cards, and every card item cites a feature id (a map contract MapItem id) or a web link returned in the same turn. General advice may be plain text but never presents live data without a tool result. Enforce this in code (see `agent-design.md`, Source rules).
 - Agents act and state their assumptions rather than ask. They ask the user only when the context cannot resolve an ambiguity: one question per turn, with options.
 - The Flutter app never calls a language model. All agent logic runs in the agent service on Cloud Run.
 - Predictions are always labelled as predictions (`is_prediction`) and never styled as live data.
@@ -61,7 +61,7 @@ Breaking one of these can disqualify the entry.
 ## Working with use cases
 
 - Before implementing a feature, read its use-case file and meet its acceptance criteria.
-- Reference the use-case id in commit messages and PR titles, for example `UC-04: write anomaly markers to Firestore`.
+- Reference the use-case id in commit messages and PR titles, for example `UC-04: publish anomaly markers to BigQuery`.
 - When behaviour, priority or status changes, update the use-case frontmatter and the index table in `use-cases/README.md` in the same commit.
 - Example queries in use-case files are the seed evaluation set. Add new queries rather than rewriting old ones.
 - For a new use case, copy `use-cases/_template.md` and take the next unused id.
@@ -71,6 +71,15 @@ Breaking one of these can disqualify the entry.
 - Implement tools exactly as `tools.md` defines them: names, arguments, limits, returns and error codes.
 - Changing a tool's name, arguments, returns or model-facing description updates `tools.md` in the same commit. Once a tool exists in code, its code schema is the source of truth and `tools.md` keeps the description and rationale.
 - A new tool gets an entry in `tools.md` and in the registry summary in `agent-design.md`, and is listed in the `tools` field of the use cases that need it.
+
+## Cloud backend
+
+- Everything under `cloud/` is TypeScript on Node 24, with the TypeScript and Zod versions pinned in `cloud/data` and `cloud/map`. New services reuse those pins.
+- Product models are Gemini through Vertex AI. Do not add another model provider or a provider abstraction layer.
+- Services read BigQuery only through the published `melens_query` views, with fixed parameterized queries and `maximumBytesBilled`. No caller SQL and no raw-table access. That code lives in `@melens/shared` (`cloud/shared`): the contract, the query runner, the layer adapters and the layer loaders. A service imports it instead of copying query code.
+- HTTP servers use `node:http` directly, as `cloud/map` does; no web framework.
+- Firestore is reached only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid.
+- Deployment scripts plan by default, take an immutable image digest and audit the runtime identity, following `cloud/map/infra/deploy.sh`.
 
 ## Documentation conventions
 

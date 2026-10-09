@@ -1,6 +1,6 @@
 # Tools
 
-**Status:** Draft, 2026-09-28. This is the contract for plan task F3 until the tools exist in code. After that the code schemas (Pydantic or Zod, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
+**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. This is the contract for plan task F3 until the tools exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
 
 These are the tools of the chat agent `map_agent`. The two workflow tools run the same code as the app's map-tap and Analyse entry points. How the loop uses the tools is in [agent-design.md](agent-design.md); the events they send to the app are in [agent-protocol.md](agent-protocol.md).
 
@@ -29,6 +29,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 
 - **Names** are snake_case, for tools and arguments alike.
 - **Schemas are strict.** Enums are enums, required fields are required, and no extra fields are accepted. The server validates every call as well as the model provider.
+- **Data tools read BigQuery.** Every data tool runs a fixed parameterized query over the published `melens_query` views under the agent's read-only identity, with a dry run and `maximumBytesBilled`, the same rules as the map service's query runner. No caller SQL, no raw or staging tables, no Firestore map data and no HTTP calls to the map service.
 - **Times** are ISO 8601 with an offset, in Melbourne local time, for example `2026-10-10T19:00:00+11:00`.
 - **Lists** return at most 50 rows in compact form. The total always comes first, with `truncated: true` when rows were cut.
 - **Data, workflow and grounding calls send a `status` event** to the app with the tool's status line. This is the reasoning trace users and judges see. UI action and conversation tools send their own event instead.
@@ -43,7 +44,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | `Area` | `{ "center": LatLng, "radius_m": integer }` or `{ "bbox": { "north", "south", "east", "west" } }` | `radius_m` 50–5000; a bbox at most 10 km per side |
 | `TimeWindow` | `{ "from": time, "to": time }` | Either end may be omitted |
 | `LayerId` | `"pedestrian"`, `"anomaly"`, `"disruption"`, `"event"`, `"news"`, `"parking"`, or `"user:<source_id>"` | `parking` is P2; `user:` layers come from UC-07 |
-| `FeatureId` | string | Stable MapFeature id; format fixed in F3 |
+| `FeatureId` | string | A [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem `id`; the server resolves the current `versionId`. The example ids in this file are illustrative until F3 confirms them against the published views |
 | `CompactFeature` | See below | What list results contain |
 | `Source` | `{ "feature_id": FeatureId }` or `{ "url": string, "title"?: string }` | What a card item cites |
 
@@ -86,7 +87,7 @@ A failed call returns an error object to the model instead of raising, so the mo
 
 ### `search_features`
 
-Status line: "Searching the map". Cost: Firestore reads.
+Status line: "Searching the map". Cost: one BigQuery query per selected layer family.
 
 **Description for the model:** Find map features (events, transport disruptions, news, pedestrian sensors, anomalies, user layers) in an area, optionally filtered by layer, time window and keywords. Use it before recommending or describing anything on the map, and cite the ids it returns.
 
@@ -101,11 +102,11 @@ Status line: "Searching the map". Cost: Firestore reads.
 
 Returns `{ "total": 134, "truncated": true, "items": [CompactFeature, …] }`.
 
-Implementation note: geohash range queries in Firestore, then time and keyword filters in memory.
+Implementation note: a bounding-box query over the published current or history views for the selected layers, with the box as query parameters, then radius, time and keyword filters in memory.
 
 ### `get_feature`
 
-Status line: "Reading the details". Cost: one Firestore read.
+Status line: "Reading the details". Cost: one BigQuery query.
 
 **Description for the model:** Get the full record of one map feature: an event's full description, a disruption's affected segments, a news item's full summary. Use it when a search result is not enough to answer.
 
@@ -113,7 +114,7 @@ Status line: "Reading the details". Cost: one Firestore read.
 | --- | --- | --- |
 | `id` | `FeatureId` | Yes |
 
-Returns the full MapFeature ([architecture.md](architecture.md#data-model-mapfeature-draft)) plus the layer's own `properties`. Geometry is simplified to at most 200 points. Errors: `not_found`.
+Returns the full map item (map contract v1 MapItem: id, version, layer, geometry, time, sources and kind-specific details). Geometry is simplified to at most 200 points. Errors: `not_found`.
 
 ### `heritage_lookup`
 
@@ -137,11 +138,11 @@ Status line: "Checking heritage records". Cost: Victorian Heritage Database API 
 }
 ```
 
-Heritage records are not MapFeatures. Cards cite them by `url`.
+Heritage records are not map items. Cards cite them by `url`.
 
 ### `get_anomaly`
 
-Status line: "Reading the pedestrian anomaly". Cost: one Firestore read.
+Status line: "Reading the pedestrian anomaly". Cost: one BigQuery query over the published anomaly view (the detector's output, UC-04).
 
 **Description for the model:** Get the numbers behind a pedestrian anomaly marker: the observed count, the usual count and the size of the difference. Use it when the user asks about a specific "?" marker. To explain the anomaly, prefer `analyse_anomaly`.
 
@@ -193,7 +194,7 @@ With no sensors in the area it returns `"sensors": []` and a `message`, not an e
 
 ### `nearby_context`
 
-Status line: "Checking nearby news, events and disruptions". Cost: Firestore reads.
+Status line: "Checking nearby news, events and disruptions". Cost: three BigQuery queries (news, events, disruptions), run in parallel.
 
 **Description for the model:** What else is going on around a place: recent news, events and transport disruptions. Use it to explain crowds, or to check a plan against disruptions before recommending it.
 
@@ -330,7 +331,7 @@ The route is computed by the Routes API on the server, so the model never assemb
 
 Status line: none.
 
-**Description for the model:** Highlight features on the map, such as the places you are talking about. Pass MapFeature ids only; places from Google Maps appear as pins in their card instead.
+**Description for the model:** Highlight features on the map, such as the places you are talking about. Pass feature ids only; places from Google Maps appear as pins in their card instead.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -385,6 +386,6 @@ Sends a `question` event; the server then ends the turn with `done` and stop `as
 
 ## Open questions
 
-- The `FeatureId` format and the event category list (F3).
+- Confirming that MapItem ids from the published views work as `FeatureId` everywhere, and the event category list (F3).
 - The exact Maps and Search grounding metadata fields and display requirements (F3).
 - Whether `map_agent` should also get a `geocode(text)` tool for places the user names that are not on the map, or rely on `maps_grounding`.

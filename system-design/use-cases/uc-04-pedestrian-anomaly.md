@@ -25,7 +25,7 @@ Translated from the original Chinese in the Notion table:
 
 1. A scheduled job writes the latest pedestrian counts to BigQuery every hour.
 2. Anomaly detection compares each sensor with the same hour over the past 7 days (one SQL query). The upgrade is BigQuery `AI.DETECT_ANOMALIES` (TimesFM, no training).
-3. Sensors beyond the threshold become a "?" MapFeature in Firestore, and the app shows the marker in real time.
+3. Sensors beyond the threshold are published to the BigQuery anomaly view. The map query service serves them in the `anomaly` layer, and the app shows the "?" marker on its next bounded refresh; there is no Firestore listener.
 4. Tapping the marker opens a pop-up: higher or lower than usual, by how much, and an Analyse button.
 5. Analyse runs the `analyse_anomaly` workflow. It fetches the anomaly and its baseline, and nearby news, events and transport disruptions, in parallel; then one generation with Search grounding writes the answer. When the question comes from the chat, `map_agent` calls the same workflow.
 6. The `anomaly_analysis` card gives possible causes, a confidence level and source links. It never states a cause as fact.

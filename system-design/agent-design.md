@@ -1,10 +1,25 @@
 # Agent design
 
-**Status:** Draft. Revised 2026-09-28: one chat agent with the full tool registry replaces the earlier root agent that dispatched to separate discovery and insight agents. Tool names and arguments are working names until plan task F3 fixes the contract.
+**Status:** Draft. Revised 2026-10-09: the runtime is ADK for TypeScript on its own Cloud Run service, Gemini is called through Vertex AI only, data tools read the published BigQuery views, and chat sessions are persisted per user in Firestore. Revised 2026-09-28: one chat agent with the full tool registry replaces the earlier root agent that dispatched to separate discovery and insight agents. Tool names and arguments are working names until plan task F3 fixes the contract.
 
-This file describes the agents inside the product, which run on Cloud Run. The app talks to them through [agent-protocol.md](agent-protocol.md). Instructions for coding agents are in [AGENTS.md](AGENTS.md).
+This file describes the agents inside the product, which run in the agent service on Cloud Run (`cloud/agent`, planned). The app talks to them through [agent-protocol.md](agent-protocol.md). Instructions for coding agents are in [AGENTS.md](AGENTS.md).
 
 AI does three jobs: it turns messy data into map features (extraction), answers "where should I go and what should I do" (discovery), and explains "why" (insight). The goal is AI as an active part of the map, not a chat box in a corner.
+
+## Runtime
+
+| Item | Decision |
+| --- | --- |
+| Service | Cloud Run service `melens-ENV-agent`, separate from the map service ([architecture.md](architecture.md#key-decisions)) |
+| Language | TypeScript on Node 24 with ADK for TypeScript; the same TypeScript and Zod pins as cloud/data and cloud/map. Tool schemas are Zod, exported as JSON Schema |
+| HTTP layer | `node:http` directly, as in cloud/map: one SSE route plus health, hand-written CORS, body limits and error envelope shared with the map service. No web framework |
+| Models | Gemini only, through Vertex AI with the service identity. No Gemini API key, no other providers, no provider abstraction layer |
+| Data access | Fixed parameterized queries over the published `melens_query` views with a read-only identity and `maximumBytesBilled`, the same rules as the map service's query runner |
+| Sessions | Persisted per Firebase uid in Firestore through a Firestore-backed ADK session service ([agent-protocol.md](agent-protocol.md#sessions)). Instances hold no conversation state, so the service can scale out; min-instances=1 while judging |
+| Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
+| Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
+| Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls |
+| Region | Cloud Run in `australia-southeast2` with the data; the Vertex AI location follows model and grounding availability (open question) |
 
 ## Three execution modes
 
@@ -16,7 +31,7 @@ Not every AI feature is an agent loop. The split is by who decides the next step
 | Workflow | Code | `area_brief` (UC-02 first card), `analyse_anomaly` (UC-04) | Parallel data fetch, one generation, then code validation |
 | Loop | The model | Everything typed into the chat box (UC-13), including follow-ups for UC-02, UC-03, UC-08 | Up to 16 per turn |
 
-Workflows exist where the steps are known in advance: the user tapped a specific marker or point, so there is nothing for a model to decide. The loop exists for everything else.
+Workflows exist where the steps are known in advance: the user tapped a specific marker or point, so there is nothing for a model to decide. The loop exists for everything else. Extraction runs inside cloud/data jobs and calls Vertex AI with the job's own identity; it is not part of the agent service.
 
 ## Entry routing
 
@@ -71,7 +86,7 @@ flowchart TD
   Exec -- "ask_user ends the turn" --> Ask
 ```
 
-Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK docs for the chosen language).
+Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK for TypeScript docs; see Open questions for the fallback if they are missing).
 
 ## The chat agent (`map_agent`)
 
@@ -83,7 +98,7 @@ Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](to
 
 | Group | Tools | Purpose |
 | --- | --- | --- |
-| Data | `search_features`, `get_feature`, `heritage_lookup`, `get_anomaly`, `pedestrian_pattern`, `nearby_context` | Read our own data |
+| Data | `search_features`, `get_feature`, `heritage_lookup`, `get_anomaly`, `pedestrian_pattern`, `nearby_context` | Read our own data from the published BigQuery views (heritage from its public API) |
 | Workflow | `area_brief`, `analyse_anomaly` | Run a known multi-step procedure in one call |
 | Grounding | `maps_grounding`, `search_grounding` | Answer open questions beyond our data |
 | UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
@@ -113,12 +128,13 @@ The agent acts first and states its assumptions. It asks only when acting would 
 - Identical read-only calls within one turn return the earlier result instead of running again.
 - Long tool results are compacted: every row shortened, only the first N rows kept, and the total count stated first. A `search_features` call in the CBD can match hundreds of features.
 - Grounding results are cached in Firestore by tool, normalised question, place and date, so repeated questions from different users hit the cache. Grounding is billed per call.
+- The prompt carries the last 20 turns of the session: user input, answer text, card summaries and the pending question. Older turns stay in Firestore for the app's history view and are not sent to the model.
 
 ## Source rules
 
 Two tiers, enforced in code rather than only in the prompt:
 
-1. **Specific facts and recommendations** about places, events, times, crowds and disruptions go in a card. Every card item must cite a MapFeature id or a URL that a tool, grounding included, returned in this turn. `show_card` rejects items that fail this check and returns the error to the model; workflows drop them.
+1. **Specific facts and recommendations** about places, events, times, crowds and disruptions go in a card. Every card item must cite a feature id (a map contract v1 MapItem id) or a URL that a tool, grounding included, returned in this turn. `show_card` rejects items that fail this check and returns the error to the model; workflows drop them.
 2. **General knowledge, advice and conversation** may be plain text without a source. They must not present anything as live or current data unless a tool returned it in this turn.
 
 Streamed text carries explanations and transitions only; recommendations appear in cards. When explaining causes, answers give possible causes with a confidence level and never state a cause as fact.
@@ -127,7 +143,7 @@ Streamed text carries explanations and transitions only; recommendations appear 
 
 ### `analyse_anomaly` (UC-04)
 
-Detection runs before the workflow and involves no model: a scheduled job writes pedestrian counts to BigQuery every hour, compares each sensor with the same hour over the past 7 days (upgrade: BigQuery `AI.DETECT_ANOMALIES`), and writes sensors beyond the threshold to Firestore as "?" MapFeatures.
+Detection runs before the workflow and involves no model: a scheduled cloud/data job writes pedestrian counts to BigQuery every hour, compares each sensor with the same hour over the past 7 days (upgrade: BigQuery `AI.DETECT_ANOMALIES`), and publishes sensors beyond the threshold to the BigQuery anomaly view that the map service's `anomaly` layer serves. The detector does not exist yet and has its own owner.
 
 1. On Analyse, the workflow fetches in parallel: the anomaly and baseline, and nearby news, events and transport disruptions.
 2. One generation with Search grounding writes possible causes, a confidence level and sources.
@@ -143,11 +159,13 @@ Detection runs before the workflow and involves no model: a scheduled job writes
 
 ## Models
 
+Gemini is the only model family in the product, and every call goes through Vertex AI with the service identity. There is no provider abstraction and no fallback to another vendor; the competition requires Google models, and one provider keeps the code small.
+
 | Used by | Model | Notes |
 | --- | --- | --- |
 | `map_agent` | `gemini-3.8-flash` | Higher thinking setting than the workflows |
 | Workflows | `gemini-3.8-flash` | |
-| Extraction | `gemini-3.5-flash-lite` | Cheaper; structured output with a JSON schema |
+| Extraction | `gemini-3.5-flash-lite` | Cheaper; structured output with a JSON schema; runs in cloud/data jobs |
 
 There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the product must not depend on preview models. Pro preview may be tried in the eval for `map_agent`, and used only with automatic fallback to flash if it clearly wins.
 
@@ -155,7 +173,8 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 - **Grounding with function tools.** If ADK's built-in Search or Maps tools cannot be combined with custom function tools in one agent, wrap each as a sub-agent (`AgentTool`). Every such call is a separate model call, so run Maps and Search in parallel when a question needs both. Verify this early.
 - **English only.** Maps grounding supports English only, so the app, prompts and deck are in English.
-- **Sessions.** Conversation history lives in the ADK session on the server. On Cloud Run with several instances, in-memory sessions are lost; see Open questions.
+- **Sessions.** Conversation history lives in Firestore, keyed by the Firebase uid, behind a session service adapter. Instances hold no session state between requests, so the service can scale out and a new revision keeps every conversation. A turn holds a short lease on its session, so two concurrent turns on one session are rejected rather than interleaved.
+- **Vertex AI location.** Cloud Run and the data are in Melbourne, but the chosen Gemini model and grounding tools may only be served from `global` or another region. Confirm before coding and record the location in the deployment configuration.
 
 ## Evaluation
 
@@ -167,5 +186,6 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 ## Open questions
 
-- Session storage: max instances = 1 with in-memory sessions for the competition, or sessions persisted in Firestore.
 - Whether Gemini's built-in grounding tools can be combined with function tools in one agent.
+- Whether ADK for TypeScript exposes the callbacks the loop needs (argument validation, read memo, result compaction, wrap-up note, model-call limit) and a pluggable session service. If not, the fallback is a hand-written loop over the Vertex AI SDK with the same tool registry, events and Firestore session store.
+- The Vertex AI location for `gemini-3.8-flash` and the grounding tools.
