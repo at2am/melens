@@ -6,15 +6,9 @@ import type { TurnContext, TurnRunner } from '../server.js';
 import { TurnRegistry, buildTool } from '../tools/define.js';
 import { toolSpecs, type ToolDependencies } from '../tools/catalog.js';
 import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, turnMessage } from './prompts.js';
+import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
-
-/** A streamed chunk's usage block may exist with no counts; only the trailing aggregated response carries them. */
-function hasUsage(metadata: LlmResponse['usageMetadata']): boolean {
-  if (metadata === undefined) return false;
-  return [metadata.promptTokenCount, metadata.candidatesTokenCount, metadata.thoughtsTokenCount, metadata.totalTokenCount]
-    .some((value) => typeof value === 'number' && value > 0);
-}
 
 export interface MapAgentOptions {
   /** A Gemini instance for Vertex AI, or any BaseLlm (tests inject a scripted one). */

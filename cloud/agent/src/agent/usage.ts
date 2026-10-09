@@ -7,6 +7,13 @@ function count(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
 }
 
+/** A streamed chunk's usage block may exist with no counts; only the trailing aggregated response carries them. */
+export function hasUsage(metadata: GenerateContentResponseUsageMetadata | undefined): boolean {
+  if (metadata === undefined) return false;
+  return [metadata.promptTokenCount, metadata.candidatesTokenCount, metadata.thoughtsTokenCount, metadata.totalTokenCount]
+    .some((value) => typeof value === 'number' && value > 0);
+}
+
 /** Token accounting for one turn: every model call reported once, copied from Gemini, never estimated. */
 export class UsageLedger {
   readonly perCall: CallUsage[] = [];
