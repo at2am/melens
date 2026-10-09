@@ -1383,6 +1383,409 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A difference from the baseline does not establish a cause.'**
   String get mapAnomalyCauseUnestablished;
+
+  /// Title of the chat panel before a conversation has a title.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent chat'**
+  String get chatPanelTitle;
+
+  /// Tooltip of the map toolbar button that opens the chat panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the agent chat'**
+  String get chatOpen;
+
+  /// Tooltip of the chat panel's close button.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the agent chat'**
+  String get chatClose;
+
+  /// Title of the session list and tooltip of the button that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get chatSessions;
+
+  /// Button that starts a new conversation on the server.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation'**
+  String get chatNewSession;
+
+  /// Tooltip of the delete button on a session row.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation'**
+  String get chatDeleteSession;
+
+  /// Session row title before its first message.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled conversation'**
+  String get chatSessionUntitled;
+
+  /// Session row subtitle: the turn count and the last update time. {count} is a number, {updated} a formatted date and time.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} turns, updated {updated}'**
+  String chatSessionMeta(int count, String updated);
+
+  /// Shown while the session list loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading conversations…'**
+  String get chatSessionsLoading;
+
+  /// Shown when the user has no stored sessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations yet.'**
+  String get chatNoSessions;
+
+  /// Shown while a stored session is fetched.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring the conversation…'**
+  String get chatRestoring;
+
+  /// Body of an empty conversation, with example prompts.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about what is on the map, for example \"What\'s around here?\" or \"Only show live music tonight.\"'**
+  String get chatEmpty;
+
+  /// Placeholder of the chat input box.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about the map…'**
+  String get chatInputHint;
+
+  /// Tooltip of the send button.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get chatSend;
+
+  /// Tooltip of the button that cancels the turn in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop this turn'**
+  String get chatStop;
+
+  /// Button that sends the failed input or request again.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get chatRetry;
+
+  /// Shown while a turn runs before any status or text arrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get chatThinking;
+
+  /// Shown under a turn the user cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped.'**
+  String get chatTurnCancelled;
+
+  /// Shown when a turn ended because of the model call budget.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent reached its call budget and wrapped up.'**
+  String get chatStopBudget;
+
+  /// Shown under a question whose options are not exhaustive.
+  ///
+  /// In en, this message translates to:
+  /// **'Or type your own answer below.'**
+  String get chatQuestionFreeText;
+
+  /// User bubble for an area input. {lat} and {lng} are coordinates.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected the point {lat}, {lng}'**
+  String chatInputArea(String lat, String lng);
+
+  /// User bubble for an Analyse tap on a marker. {featureId} is the feature id.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse {featureId}'**
+  String chatInputAnalyse(String featureId);
+
+  /// User bubble for a tapped question option. {value} is the option text.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer: {value}'**
+  String chatInputAnswer(String value);
+
+  /// Chip that sends the selected anomaly marker to the agent for analysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyse this anomaly'**
+  String get chatAnalyseSelected;
+
+  /// Chip that asks the agent what is around the selected point.
+  ///
+  /// In en, this message translates to:
+  /// **'Brief this area'**
+  String get chatBriefSelected;
+
+  /// Token usage of a turn, from Gemini's own counts. All placeholders are formatted numbers.
+  ///
+  /// In en, this message translates to:
+  /// **'{calls} calls · {input} in ({cached} cached) · {output} out · {thoughts} thinking · {total} total'**
+  String chatUsage(
+    int calls,
+    String input,
+    String cached,
+    String output,
+    String thoughts,
+    String total,
+  );
+
+  /// Shown when the turn's usage totals miss a cancelled or failed model call.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage is incomplete: a model call was cut off.'**
+  String get chatUsageIncomplete;
+
+  /// Label of a show_layers UI action.
+  ///
+  /// In en, this message translates to:
+  /// **'Show layers'**
+  String get chatActionShowLayers;
+
+  /// Label of a focus_map UI action.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus map'**
+  String get chatActionFocusMap;
+
+  /// Label of a draw_route UI action.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw route'**
+  String get chatActionDrawRoute;
+
+  /// Label of a highlight_features UI action.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight features'**
+  String get chatActionHighlight;
+
+  /// Outcome of a UI action the map applied in full.
+  ///
+  /// In en, this message translates to:
+  /// **'applied'**
+  String get chatActionApplied;
+
+  /// Outcome of a UI action the map applied in part.
+  ///
+  /// In en, this message translates to:
+  /// **'partly applied'**
+  String get chatActionPartial;
+
+  /// Outcome of a UI action the map could not apply.
+  ///
+  /// In en, this message translates to:
+  /// **'ignored'**
+  String get chatActionIgnored;
+
+  /// Outcome of a UI action the app does not implement yet.
+  ///
+  /// In en, this message translates to:
+  /// **'not supported yet'**
+  String get chatActionUnsupported;
+
+  /// Outcome of a UI action read back from a stored turn; it is not applied again.
+  ///
+  /// In en, this message translates to:
+  /// **'from history'**
+  String get chatActionRestored;
+
+  /// Tooltip listing the layers or feature ids a UI action could not use. {items} is a comma-separated list.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applied: {items}'**
+  String chatActionSkipped(String items);
+
+  /// Shown when no agent token is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.'**
+  String get chatErrorSignIn;
+
+  /// Shown when the agent request failed before a response.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service could not be reached.'**
+  String get chatErrorNetwork;
+
+  /// Shown when the agent request or turn timed out.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service timed out.'**
+  String get chatErrorTimeout;
+
+  /// Shown on HTTP 401 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service rejected the sign-in token.'**
+  String get chatErrorUnauthorized;
+
+  /// Shown on HTTP 404 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation no longer exists on the server.'**
+  String get chatErrorNotFound;
+
+  /// Shown on HTTP 409 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'Another turn is still running in this conversation. Try again in a moment.'**
+  String get chatErrorTurnInProgress;
+
+  /// Shown on HTTP 429 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many turns in the last hour. Try again later.'**
+  String get chatErrorRateLimited;
+
+  /// Shown on HTTP 503 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service is unavailable right now.'**
+  String get chatErrorUnavailable;
+
+  /// Shown on HTTP 400 from the agent service.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service rejected the request.'**
+  String get chatErrorInvalidRequest;
+
+  /// Shown on an HTTP error without a known code.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service returned an unexpected error.'**
+  String get chatErrorHttp;
+
+  /// Shown when a response or event did not match the protocol.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent service sent something the app could not read.'**
+  String get chatErrorProtocol;
+
+  /// Shown when the event stream closed without a done or error event.
+  ///
+  /// In en, this message translates to:
+  /// **'The turn ended before the agent finished.'**
+  String get chatErrorStreamEnded;
+
+  /// An error event from the agent service. {message} is the server's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent error: {message}'**
+  String chatErrorServer(String message);
+
+  /// Label of an area_brief card.
+  ///
+  /// In en, this message translates to:
+  /// **'Area brief'**
+  String get cardTypeAreaBrief;
+
+  /// Label of an anomaly_analysis card.
+  ///
+  /// In en, this message translates to:
+  /// **'Anomaly analysis'**
+  String get cardTypeAnomalyAnalysis;
+
+  /// Label of a plan card; stops are numbered in visiting order.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get cardTypePlan;
+
+  /// Label of a history card.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get cardTypeHistory;
+
+  /// Label of a list card.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get cardTypeList;
+
+  /// A card item's time window. {time} is a formatted range.
+  ///
+  /// In en, this message translates to:
+  /// **'When: {time}'**
+  String cardItemTime(String time);
+
+  /// A time window with both ends. {from} and {to} are formatted local times.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to}'**
+  String cardTimeRange(String from, String to);
+
+  /// A time window with only a start. {from} is a formatted local time.
+  ///
+  /// In en, this message translates to:
+  /// **'from {from}'**
+  String cardTimeFrom(String from);
+
+  /// A time window with only an end. {to} is a formatted local time.
+  ///
+  /// In en, this message translates to:
+  /// **'until {to}'**
+  String cardTimeUntil(String to);
+
+  /// A card item's cost. {cost} is the server's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost: {cost}'**
+  String cardItemCost(String cost);
+
+  /// A card item's directions hint. {text} is the server's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting there: {text}'**
+  String cardItemGettingThere(String text);
+
+  /// A card item that cites a map feature. {id} is the feature id.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: map feature {id}'**
+  String cardSourceFeature(String id);
+
+  /// A card item that cites a web page. {title} is the page title or host.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: {title}'**
+  String cardSourceLink(String title);
+
+  /// Required attribution under a card that used Google Maps grounding.
+  ///
+  /// In en, this message translates to:
+  /// **'Place details from Google Maps'**
+  String get cardGoogleMapsAttribution;
+
+  /// Label of the chip row listing features the agent highlighted.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlighted by the agent'**
+  String get mapAgentHighlights;
+
+  /// Button that clears the agent's highlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear highlights'**
+  String get mapAgentHighlightsClear;
 }
 
 class _AppLocalizationsDelegate

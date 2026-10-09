@@ -2,7 +2,7 @@
 id: UC-13
 title: General chat assistant
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Haoyuan Tang
 trigger: query
 agents: [map_agent]
@@ -68,6 +68,7 @@ Multi-turn chain:
 ## Notes
 
 - The chat behaviour of UC-02, UC-03, UC-04 and UC-08 is this agent following those use cases' playbooks.
+- Status 2026-10-09: the agent service runs the loop with the first ten tools ([cloud/agent](../../cloud/agent/README.md)), and the app's chat panel ([app README](../../app/README.md#testing-the-agent-locally)) streams turns, applies `show_layers`, `focus_map` and `highlight_features`, renders cards and questions, shows token usage and manages sessions. Still open from this list: Firebase Anonymous Auth in the app (the panel uses a development token), `draw_route` drawing, and the eval over the example queries.
 
 ## Open questions
 

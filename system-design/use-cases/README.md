@@ -13,7 +13,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | [UC-03](uc-03-personalized-discovery.md) | Personalized discovery and planning | P0 | Wasabii | map_agent | planned |
 | [UC-04](uc-04-pedestrian-anomaly.md) | Pedestrian anomaly detection and analysis | P0 | Alex Gao | analyse_anomaly, map_agent | planned |
 | [UC-05](uc-05-transport-disruption.md) | Tram and traffic disruption | P0 | unassigned | none (connector) | planned |
-| [UC-13](uc-13-general-chat.md) | General chat assistant | P0 | Haoyuan Tang | map_agent | planned |
+| [UC-13](uc-13-general-chat.md) | General chat assistant | P0 | Haoyuan Tang | map_agent | in-progress |
 | [UC-06](uc-06-local-news.md) | Local news by area | P1 | Alex Gao | extraction | planned |
 | [UC-07](uc-07-byo-data-sources.md) | Bring your own data sources | P1 | Haoyuan Tang | extraction | planned |
 | [UC-08](uc-08-local-history.md) | Local history | P1 | Haoyuan Tang | map_agent | planned |

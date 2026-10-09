@@ -45,6 +45,27 @@ void main() {
     }
   });
 
+  test('the agent development token is trimmed and development-only', () {
+    expect(createEnv().hasAgentDevToken, isFalse);
+    final env = Env(
+      environment: AppEnvironment.dev,
+      agentBaseUrl: Uri.parse('http://localhost:8080'),
+      mapBaseUrl: Uri.parse('http://localhost:8081'),
+      agentDevToken: ' dev ',
+    );
+    expect(env.agentDevToken, 'dev');
+    expect(env.hasAgentDevToken, isTrue);
+    expect(
+      () => Env(
+        environment: AppEnvironment.prod,
+        agentBaseUrl: Uri.parse('https://agent.example'),
+        mapBaseUrl: Uri.parse('https://map.example'),
+        agentDevToken: 'dev',
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('key readiness ignores whitespace without exposing key contents', () {
     expect(createEnv(key: '   ').hasGoogleMapsWebApiKey, isFalse);
     expect(
