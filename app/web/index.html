@@ -98,6 +98,55 @@
         return pending;
       };
     })();
+    // Address search for user events (UC-09): the Places library of the Maps
+    // JavaScript API, loaded on demand once the map's script is in. Results
+    // cross to Dart as JSON strings. The project needs Places API (New)
+    // enabled and allowed on the browser key; otherwise the promise rejects
+    // and the form says search is unavailable.
+    (() => {
+      // A session ties the suggestions and the chosen place into one billing unit.
+      let session;
+      const bounds = { west: 144, south: -39, east: 146.5, north: -37 };
+      const placesLibrary = () => {
+        if (!window.google?.maps?.importLibrary) {
+          return Promise.reject(new Error('Google Maps is not loaded yet.'));
+        }
+        return google.maps.importLibrary('places');
+      };
+      window.melensSearchPlaces = async (query, lat, lng) => {
+        const { AutocompleteSuggestion, AutocompleteSessionToken } = await placesLibrary();
+        session ??= new AutocompleteSessionToken();
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          sessionToken: session,
+          includedRegionCodes: ['au'],
+          language: 'en-AU',
+          region: 'au',
+          locationRestriction: bounds,
+          origin: { lat, lng },
+        });
+        return JSON.stringify(suggestions
+          .filter((suggestion) => suggestion.placePrediction)
+          .map((suggestion) => ({
+            placeId: suggestion.placePrediction.placeId,
+            mainText: suggestion.placePrediction.mainText?.text ?? suggestion.placePrediction.text?.text ?? '',
+            secondaryText: suggestion.placePrediction.secondaryText?.text ?? '',
+          })));
+      };
+      window.melensResolvePlace = async (placeId) => {
+        const { Place } = await placesLibrary();
+        const place = new Place({ id: placeId });
+        await place.fetchFields({ fields: ['location', 'displayName', 'formattedAddress'] });
+        session = undefined;
+        if (!place.location) throw new Error('The place has no location.');
+        return JSON.stringify({
+          lat: place.location.lat(),
+          lng: place.location.lng(),
+          name: place.displayName ?? '',
+          address: place.formattedAddress ?? '',
+        });
+      };
+    })();
   </script>
 </head>
 <body>

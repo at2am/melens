@@ -23,6 +23,7 @@ class UserEventsPanel extends ConsumerStatefulWidget {
   const UserEventsPanel({
     required this.onShowOnMap,
     this.onClose,
+    this.onPickOnMap,
     this.initialEventId,
     super.key,
   });
@@ -31,6 +32,10 @@ class UserEventsPanel extends ConsumerStatefulWidget {
 
   /// Moves the map to a point; the host closes a covering sheet first.
   final ValueChanged<AgentLatLng> onShowOnMap;
+
+  /// The form started picking its pin on the map; a host whose sheet covers
+  /// the map closes it and reopens the panel after the tap.
+  final VoidCallback? onPickOnMap;
 
   /// An event to open at once, from a tapped marker.
   final String? initialEventId;
@@ -49,7 +54,13 @@ class _UserEventsPanelState extends ConsumerState<UserEventsPanel> {
   void initState() {
     super.initState();
     final initial = widget.initialEventId ?? ref.read(openUserEventProvider);
-    if (initial != null) {
+    // A form that closed to pick a pin on the map comes back first.
+    final draft = ref.read(userEventFormDraftProvider);
+    if (draft != null) {
+      _view = _View.form;
+      _editing = draft.editing;
+      _eventId = draft.editing?.id;
+    } else if (initial != null) {
       _view = _View.details;
       _eventId = initial;
     }
@@ -122,6 +133,7 @@ class _UserEventsPanelState extends ConsumerState<UserEventsPanel> {
         onCancel: _editing == null
             ? _backToList
             : () => setState(() => _view = _View.details),
+        onPickOnMap: widget.onPickOnMap,
       ),
       _View.list => _list(strings),
     };

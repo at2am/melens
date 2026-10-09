@@ -8,7 +8,10 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
+import '../../map/data/map_models.dart';
+import '../../map/state/selection_controller.dart';
 import '../../map/state/viewport_controller.dart';
+import '../data/place_search.dart';
 import '../data/user_event_models.dart';
 import '../state/user_events_providers.dart';
 import 'user_event_text.dart';
@@ -33,6 +36,7 @@ class UserEventForm extends ConsumerStatefulWidget {
     required this.onCancel,
     this.initial,
     this.initialPoint,
+    this.onPickOnMap,
     super.key,
   });
 
@@ -44,6 +48,10 @@ class UserEventForm extends ConsumerStatefulWidget {
 
   final ValueChanged<UserEvent> onSaved;
   final VoidCallback onCancel;
+
+  /// Picking a pin on the map started: a host whose sheet covers the map
+  /// closes it; the form has kept its fields in [UserEventFormDraft].
+  final VoidCallback? onPickOnMap;
 
   @override
   ConsumerState<UserEventForm> createState() => _UserEventFormState();
@@ -66,6 +74,15 @@ class _UserEventFormState extends ConsumerState<UserEventForm> {
   String? _locationError;
   String? _serverError;
 
+  /// Address search: the typed query, its suggestions and the chosen address.
+  final _search = TextEditingController();
+  Timer? _debounce;
+  List<PlaceSuggestion> _suggestions = const [];
+  bool _searching = false;
+  bool _searched = false;
+  String? _searchError;
+  String? _address;
+
   bool get _editing => widget.initial != null;
 
   @override
@@ -73,7 +90,19 @@ class _UserEventFormState extends ConsumerState<UserEventForm> {
     super.initState();
     final clock = ref.read(melbourneClockProvider);
     final initial = widget.initial;
-    if (initial != null) {
+    // A form that closed to pick a pin on the map comes back with its fields.
+    final snapshot = ref.read(userEventFormDraftProvider);
+    final restored = snapshot != null && snapshot.editing?.id == initial?.id;
+    if (restored) {
+      _title.text = snapshot.title;
+      _description.text = snapshot.description;
+      _placeName.text = snapshot.placeName;
+      _capacity.text = snapshot.capacity;
+      _start = clock.toMelbourne(snapshot.start);
+      _end = snapshot.end == null ? null : clock.toMelbourne(snapshot.end!);
+      _anonymous = snapshot.anonymous;
+      _point = snapshot.point;
+    } else if (initial != null) {
       _title.text = initial.title;
       _description.text = initial.description;
       _placeName.text = initial.placeName ?? '';
@@ -95,14 +124,36 @@ class _UserEventFormState extends ConsumerState<UserEventForm> {
           widget.initialPoint ??
           mapCentreOf(ref.read(viewportControllerProvider));
     }
+    final picked = ref.read(userEventPinPickerProvider).picked;
+    if (picked != null) _point = picked;
+    // The providers are cleared once the tree is built; a build must not
+    // modify them.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(userEventFormDraftProvider.notifier).take();
+      ref.read(userEventPinPickerProvider.notifier).take();
+    });
+    // Beside the map the form stays open while the user taps the map.
+    ref.listenManual(userEventPinPickerProvider, (previous, next) {
+      final point = next.picked;
+      if (point == null) return;
+      setState(() {
+        _point = point;
+        _locationError = null;
+        _address = null;
+      });
+      ref.read(userEventPinPickerProvider.notifier).take();
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _title.dispose();
     _description.dispose();
     _placeName.dispose();
     _capacity.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -280,7 +331,232 @@ class _UserEventFormState extends ConsumerState<UserEventForm> {
     setState(() {
       _point = mapCentreOf(ref.read(viewportControllerProvider));
       _locationError = null;
+      _address = null;
     });
+  }
+
+  UserEventFormSnapshot _snapshot() => UserEventFormSnapshot(
+    editing: widget.initial,
+    title: _title.text,
+    description: _description.text,
+    placeName: _placeName.text,
+    start: _start,
+    end: _end,
+    anonymous: _anonymous,
+    capacity: _capacity.text,
+    point: _point,
+  );
+
+  /// The next tap on the map becomes the pin. The fields are kept first, so
+  /// a host that closes its sheet to show the map can reopen the form.
+  void _pickOnMap() {
+    ref.read(userEventFormDraftProvider.notifier).keep(_snapshot());
+    ref.read(userEventPinPickerProvider.notifier).start();
+    widget.onPickOnMap?.call();
+  }
+
+  /// The map record the user selected becomes the pin and, unless a place
+  /// name was typed, the place.
+  void _useSelected(MapItem item) {
+    final geometry = item.geometry;
+    if (geometry is! GeoJsonPoint) return;
+    setState(() {
+      _point = AgentLatLng(
+        lat: geometry.coordinates[1],
+        lng: geometry.coordinates[0],
+      );
+      if (_placeName.text.trim().isEmpty) _placeName.text = item.title;
+      _locationError = null;
+      _address = null;
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    setState(() {
+      _searchError = null;
+      if (query.length < 3) {
+        _suggestions = const [];
+        _searched = false;
+      }
+    });
+    if (query.length < 3) return;
+    _debounce = Timer(
+      const Duration(milliseconds: 400),
+      () => unawaited(_runSearch(query)),
+    );
+  }
+
+  Future<void> _runSearch(String query) async {
+    final search = ref.read(placeSearchProvider);
+    setState(() => _searching = true);
+    try {
+      final results = await search.suggest(query, near: _point);
+      // A newer query is on its way; its own results follow.
+      if (!mounted || _search.text.trim() != query) return;
+      setState(() {
+        _suggestions = results.take(5).toList(growable: false);
+        _searching = false;
+        _searched = true;
+      });
+    } on PlaceSearchUnavailableException catch (error) {
+      _log.warning('Place search failed: ${error.message}');
+      if (!mounted) return;
+      setState(() {
+        _suggestions = const [];
+        _searching = false;
+        _searched = true;
+        _searchError = error.message;
+      });
+    }
+  }
+
+  Future<void> _choose(PlaceSuggestion suggestion) async {
+    final search = ref.read(placeSearchProvider);
+    _debounce?.cancel();
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
+    try {
+      final location = await search.resolve(suggestion.placeId);
+      if (!mounted) return;
+      setState(() {
+        _point = location.point;
+        _address = location.address.isEmpty
+            ? suggestion.secondaryText
+            : location.address;
+        if (_placeName.text.trim().isEmpty) {
+          _placeName.text = location.name.isEmpty
+              ? suggestion.mainText
+              : location.name;
+        }
+        _search.text = suggestion.mainText;
+        _suggestions = const [];
+        _searching = false;
+        _locationError = null;
+      });
+    } on PlaceSearchUnavailableException catch (error) {
+      _log.warning('Resolving a place failed: ${error.message}');
+      if (!mounted) return;
+      setState(() {
+        _searching = false;
+        _searchError = error.message;
+      });
+    }
+  }
+
+  Widget _locationSection(AppLocalizations strings, ThemeData theme) {
+    final colors = theme.colorScheme;
+    final search = ref.watch(placeSearchProvider);
+    final selected = ref.watch(
+      selectionControllerProvider.select((state) => state.item),
+    );
+    final selectable = selected != null && selected.geometry is GeoJsonPoint;
+    final query = _search.text.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(strings.eventsFormLocation, style: theme.textTheme.labelLarge),
+        Text(
+          formatEventPin(strings, _point),
+          key: const ValueKey('event-form-location'),
+        ),
+        if (_address != null)
+          Text(
+            _address!,
+            key: const ValueKey('event-form-address'),
+            style: theme.textTheme.bodySmall,
+          ),
+        Text(strings.eventsFormLocationHint, style: theme.textTheme.bodySmall),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              key: const ValueKey('event-form-pick-on-map'),
+              onPressed: _submitting ? null : _pickOnMap,
+              icon: const Icon(Icons.add_location_alt_outlined),
+              label: Text(strings.eventsFormPickOnMap),
+            ),
+            TextButton.icon(
+              key: const ValueKey('event-form-use-centre'),
+              onPressed: _submitting ? null : _useMapCentre,
+              icon: const Icon(Icons.center_focus_strong_outlined),
+              label: Text(strings.eventsFormUseMapCentre),
+            ),
+            if (selectable)
+              TextButton.icon(
+                key: const ValueKey('event-form-use-selected'),
+                onPressed: _submitting ? null : () => _useSelected(selected),
+                icon: const Icon(Icons.place_outlined),
+                label: Text(strings.eventsFormUseSelected(selected.title)),
+              ),
+          ],
+        ),
+        if (search.isAvailable) ...[
+          TextField(
+            key: const ValueKey('event-form-search'),
+            controller: _search,
+            enabled: !_submitting,
+            decoration: InputDecoration(
+              labelText: strings.eventsFormSearchPlace,
+              helperText: strings.eventsFormSearchHint,
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searching
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : query.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _search.clear();
+                        _onSearchChanged('');
+                      },
+                    ),
+            ),
+            textInputAction: TextInputAction.search,
+            onChanged: _onSearchChanged,
+          ),
+          for (final suggestion in _suggestions)
+            ListTile(
+              key: ValueKey('event-form-suggestion-${suggestion.placeId}'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.place_outlined),
+              title: Text(suggestion.mainText),
+              subtitle: suggestion.secondaryText.isEmpty
+                  ? null
+                  : Text(suggestion.secondaryText),
+              onTap: _submitting ? null : () => unawaited(_choose(suggestion)),
+            ),
+          if (_searchError != null)
+            Text(
+              strings.eventsFormSearchUnavailable(_searchError!),
+              key: const ValueKey('event-form-search-error'),
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
+            )
+          else if (_searched && !_searching && _suggestions.isEmpty)
+            Text(
+              strings.eventsFormSearchNoResults,
+              key: const ValueKey('event-form-search-empty'),
+              style: theme.textTheme.bodySmall,
+            ),
+        ],
+        if (_locationError != null)
+          Text(
+            _locationError!,
+            key: const ValueKey('event-form-location-error'),
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
+          ),
+      ],
+    );
   }
 
   Widget _timeRow(
@@ -424,30 +700,7 @@ class _UserEventFormState extends ConsumerState<UserEventForm> {
                 ),
               ),
             const SizedBox(height: 12),
-            Text(strings.eventsFormLocation, style: theme.textTheme.labelLarge),
-            Text(
-              formatEventPin(strings, _point),
-              key: const ValueKey('event-form-location'),
-            ),
-            Text(
-              strings.eventsFormLocationHint,
-              style: theme.textTheme.bodySmall,
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                key: const ValueKey('event-form-use-centre'),
-                onPressed: _submitting ? null : _useMapCentre,
-                icon: const Icon(Icons.center_focus_strong_outlined),
-                label: Text(strings.eventsFormUseMapCentre),
-              ),
-            ),
-            if (_locationError != null)
-              Text(
-                _locationError!,
-                key: const ValueKey('event-form-location-error'),
-                style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
-              ),
+            _locationSection(strings, theme),
             const SizedBox(height: 8),
             SwitchListTile(
               key: const ValueKey('event-form-anonymous'),

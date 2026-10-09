@@ -1551,6 +1551,50 @@
   "@eventsPublish": {
     "description": "Button that opens the form to publish a new event."
   },
+  "eventsFormPickOnMap": "Pick on the map",
+  "@eventsFormPickOnMap": {
+    "description": "Button in the event form: the next tap on the map places the event pin."
+  },
+  "eventsFormPickBanner": "Tap the map to place the event pin",
+  "@eventsFormPickBanner": {
+    "description": "Banner above the map while the user picks the event pin."
+  },
+  "eventsFormPickStop": "Stop picking",
+  "@eventsFormPickStop": {
+    "description": "Button on the pin-picking banner that returns to the form without a new pin."
+  },
+  "eventsFormUseSelected": "Use {title}",
+  "@eventsFormUseSelected": {
+    "description": "Button in the event form that pins the event at the map record the user selected.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Hamer Hall"
+      }
+    }
+  },
+  "eventsFormSearchPlace": "Search an address or place",
+  "@eventsFormSearchPlace": {
+    "description": "Label of the address search field in the event form."
+  },
+  "eventsFormSearchHint": "Google Places, greater Melbourne",
+  "@eventsFormSearchHint": {
+    "description": "Helper text under the address search field."
+  },
+  "eventsFormSearchNoResults": "No place matches",
+  "@eventsFormSearchNoResults": {
+    "description": "Shown under the address search field when the search returned nothing."
+  },
+  "eventsFormSearchUnavailable": "Address search is not available: {reason}",
+  "@eventsFormSearchUnavailable": {
+    "description": "Shown under the address search field when Google Places refused or is not set up.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "This API project is not authorized to use this API."
+      }
+    }
+  },
   "eventsRefresh": "Refresh",
   "@eventsRefresh": {
     "description": "Button that reloads the events list."
@@ -1815,7 +1859,7 @@
   "@eventsFormLocation": {
     "description": "Label of the event location section of the form."
   },
-  "eventsFormLocationHint": "Move the map to the place, then use its centre.",
+  "eventsFormLocationHint": "Tap the map, use its centre or a selected record, or search an address.",
   "@eventsFormLocationHint": {
     "description": "Helper text under the location in the form."
   },

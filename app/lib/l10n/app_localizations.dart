@@ -1991,6 +1991,54 @@ abstract class AppLocalizations {
   /// **'Publish event'**
   String get eventsPublish;
 
+  /// Button in the event form: the next tap on the map places the event pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick on the map'**
+  String get eventsFormPickOnMap;
+
+  /// Banner above the map while the user picks the event pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the map to place the event pin'**
+  String get eventsFormPickBanner;
+
+  /// Button on the pin-picking banner that returns to the form without a new pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop picking'**
+  String get eventsFormPickStop;
+
+  /// Button in the event form that pins the event at the map record the user selected.
+  ///
+  /// In en, this message translates to:
+  /// **'Use {title}'**
+  String eventsFormUseSelected(String title);
+
+  /// Label of the address search field in the event form.
+  ///
+  /// In en, this message translates to:
+  /// **'Search an address or place'**
+  String get eventsFormSearchPlace;
+
+  /// Helper text under the address search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Places, greater Melbourne'**
+  String get eventsFormSearchHint;
+
+  /// Shown under the address search field when the search returned nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No place matches'**
+  String get eventsFormSearchNoResults;
+
+  /// Shown under the address search field when Google Places refused or is not set up.
+  ///
+  /// In en, this message translates to:
+  /// **'Address search is not available: {reason}'**
+  String eventsFormSearchUnavailable(String reason);
+
   /// Button that reloads the events list.
   ///
   /// In en, this message translates to:
@@ -2324,7 +2372,7 @@ abstract class AppLocalizations {
   /// Helper text under the location in the form.
   ///
   /// In en, this message translates to:
-  /// **'Move the map to the place, then use its centre.'**
+  /// **'Tap the map, use its centre or a selected record, or search an address.'**
   String get eventsFormLocationHint;
 
   /// Button that sets the event location to the map's current centre.

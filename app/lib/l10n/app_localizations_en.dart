@@ -1127,6 +1127,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eventsPublish => 'Publish event';
 
   @override
+  String get eventsFormPickOnMap => 'Pick on the map';
+
+  @override
+  String get eventsFormPickBanner => 'Tap the map to place the event pin';
+
+  @override
+  String get eventsFormPickStop => 'Stop picking';
+
+  @override
+  String eventsFormUseSelected(String title) {
+    return 'Use $title';
+  }
+
+  @override
+  String get eventsFormSearchPlace => 'Search an address or place';
+
+  @override
+  String get eventsFormSearchHint => 'Google Places, greater Melbourne';
+
+  @override
+  String get eventsFormSearchNoResults => 'No place matches';
+
+  @override
+  String eventsFormSearchUnavailable(String reason) {
+    return 'Address search is not available: $reason';
+  }
+
+  @override
   String get eventsRefresh => 'Refresh';
 
   @override
@@ -1329,7 +1357,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get eventsFormLocationHint =>
-      'Move the map to the place, then use its centre.';
+      'Tap the map, use its centre or a selected record, or search an address.';
 
   @override
   String get eventsFormUseMapCentre => 'Use map centre';

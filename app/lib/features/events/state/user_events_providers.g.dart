@@ -110,7 +110,7 @@ final class UserEventSearchBoundsProvider
 }
 
 String _$userEventSearchBoundsHash() =>
-    r'2be2d2a581913e5c353c9d9d0ca3df25521322a9';
+    r'ae51cb6c45f170fd620d9f7abc02d2d55cb1b011';
 
 /// The user events near the map's viewport. It loads while the events panel
 /// is open, following the viewport with a debounce, and keeps the last list
@@ -157,7 +157,7 @@ final class NearbyUserEventsControllerProvider
 }
 
 String _$nearbyUserEventsControllerHash() =>
-    r'71e0a6ae9ba42d3c1a0d69463d7ac807edc556e0';
+    r'7bf61188ba27d04b693f69909000ac55ba38594f';
 
 /// The user events near the map's viewport. It loads while the events panel
 /// is open, following the viewport with a debounce, and keeps the last list
@@ -211,7 +211,7 @@ final class MyUserEventsControllerProvider
 }
 
 String _$myUserEventsControllerHash() =>
-    r'1cca88b405ffcf10b03b8ff3ae5ed01bce8f015e';
+    r'e56d0cd43041426969af2b591e8f2fb0ee543b0a';
 
 /// The caller's own and joined events.
 
@@ -283,7 +283,7 @@ final class UserEventDetailControllerProvider
 }
 
 String _$userEventDetailControllerHash() =>
-    r'6de4ac4e1c4642d0076a59116897ce4f181c8ff7';
+    r'e9118d8b6adbff5d18b467b29687daa38434865a';
 
 /// One event's details and the actions on it. Every successful action
 /// updates this state and the lists, so the panel never shows a stale copy.
@@ -568,6 +568,163 @@ abstract class _$OpenUserEvent extends $Notifier<String?> {
             as $ClassProviderElement<
               AnyNotifier<String?, String?>,
               String?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// Address and place search for the form: Google Places on the Web when the
+/// build has a browser Maps key, unavailable otherwise. Tests override it.
+
+@ProviderFor(placeSearch)
+final placeSearchProvider = PlaceSearchProvider._();
+
+/// Address and place search for the form: Google Places on the Web when the
+/// build has a browser Maps key, unavailable otherwise. Tests override it.
+
+final class PlaceSearchProvider
+    extends $FunctionalProvider<PlaceSearch, PlaceSearch, PlaceSearch>
+    with $Provider<PlaceSearch> {
+  /// Address and place search for the form: Google Places on the Web when the
+  /// build has a browser Maps key, unavailable otherwise. Tests override it.
+  PlaceSearchProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'placeSearchProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$placeSearchHash();
+
+  @$internal
+  @override
+  $ProviderElement<PlaceSearch> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  PlaceSearch create(Ref ref) {
+    return placeSearch(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlaceSearch value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlaceSearch>(value),
+    );
+  }
+}
+
+String _$placeSearchHash() => r'933be723820b22da916e7af49dbf4d11719f9683';
+
+@ProviderFor(UserEventPinPicker)
+final userEventPinPickerProvider = UserEventPinPickerProvider._();
+
+final class UserEventPinPickerProvider
+    extends $NotifierProvider<UserEventPinPicker, UserEventPinPickerState> {
+  UserEventPinPickerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'userEventPinPickerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$userEventPinPickerHash();
+
+  @$internal
+  @override
+  UserEventPinPicker create() => UserEventPinPicker();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(UserEventPinPickerState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<UserEventPinPickerState>(value),
+    );
+  }
+}
+
+String _$userEventPinPickerHash() =>
+    r'1f3463f5d9e6c165d42ceed87b5abbf140a481f0';
+
+abstract class _$UserEventPinPicker extends $Notifier<UserEventPinPickerState> {
+  UserEventPinPickerState build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref =
+        this.ref as $Ref<UserEventPinPickerState, UserEventPinPickerState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<UserEventPinPickerState, UserEventPinPickerState>,
+              UserEventPinPickerState,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(UserEventFormDraft)
+final userEventFormDraftProvider = UserEventFormDraftProvider._();
+
+final class UserEventFormDraftProvider
+    extends $NotifierProvider<UserEventFormDraft, UserEventFormSnapshot?> {
+  UserEventFormDraftProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'userEventFormDraftProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$userEventFormDraftHash();
+
+  @$internal
+  @override
+  UserEventFormDraft create() => UserEventFormDraft();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(UserEventFormSnapshot? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<UserEventFormSnapshot?>(value),
+    );
+  }
+}
+
+String _$userEventFormDraftHash() =>
+    r'be2f4f03f3aa64437ba8216e2b2c09aee2e137b3';
+
+abstract class _$UserEventFormDraft extends $Notifier<UserEventFormSnapshot?> {
+  UserEventFormSnapshot? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref =
+        this.ref as $Ref<UserEventFormSnapshot?, UserEventFormSnapshot?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<UserEventFormSnapshot?, UserEventFormSnapshot?>,
+              UserEventFormSnapshot?,
               Object?,
               Object?
             >;

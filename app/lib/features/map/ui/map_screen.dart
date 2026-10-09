@@ -464,10 +464,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget _eventsPanel({
     VoidCallback? onClose,
     ValueChanged<AgentLatLng>? onShowOnMap,
+    VoidCallback? onPickOnMap,
   }) => UserEventsPanel(
     key: const ValueKey('map-events-panel'),
     onClose: onClose,
     onShowOnMap: onShowOnMap ?? _showEventOnMap,
+    onPickOnMap: onPickOnMap,
   );
 
   void _showEventsSheet(BuildContext context) {
@@ -489,9 +491,63 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   Navigator.of(sheetContext).pop();
                   _showEventOnMap(point);
                 },
+                // Picking a pin needs the map; the tap reopens the sheet.
+                onPickOnMap: () => Navigator.of(sheetContext).pop(),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The tap that places the event pin while the form is picking one; the
+  /// panel comes back (or stays) so the form shows the point.
+  void _placeEventPin(BuildContext context, LatLng position) {
+    ref
+        .read(userEventPinPickerProvider.notifier)
+        .place(AgentLatLng(lat: position.latitude, lng: position.longitude));
+    _returnToEventForm(context);
+  }
+
+  void _returnToEventForm(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 1050) {
+      if (!_showEvents) setState(() => _showEvents = true);
+    } else {
+      _showEventsSheet(context);
+    }
+  }
+
+  /// Shown above the map while the event form waits for a tap.
+  Widget _pinPickingBanner(AppLocalizations strings) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      key: const ValueKey('map-pin-picking-banner'),
+      color: colors.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              Icons.add_location_alt_outlined,
+              color: colors.onTertiaryContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                strings.eventsFormPickBanner,
+                style: TextStyle(color: colors.onTertiaryContainer),
+              ),
+            ),
+            TextButton(
+              key: const ValueKey('map-pin-picking-stop'),
+              onPressed: () {
+                ref.read(userEventPinPickerProvider.notifier).cancel();
+                _returnToEventForm(context);
+              },
+              child: Text(strings.eventsFormPickStop),
+            ),
+          ],
         ),
       ),
     );
@@ -617,6 +673,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final userEvents = ref.watch(
       nearbyUserEventsControllerProvider.select((state) => state.events),
     );
+    final pickingPin = ref.watch(
+      userEventPinPickerProvider.select((state) => state.active),
+    );
     final clock = ref.watch(melbourneClockProvider);
     final map = LayoutBuilder(
       builder: (context, constraints) => AggregateRenderLayer(
@@ -631,6 +690,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           selectedItemId: selection.highlightedItemId,
           onItemSelected: _selectItem,
           onAggregateSelected: _selectItem,
+          onMapTap: pickingPin
+              ? (position) => _placeEventPin(context, position)
+              : null,
           onCameraChanged: (camera) {
             _zoom = camera.zoom;
             _regionGeneration++;
@@ -787,6 +849,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     : null,
               ),
               ?highlights,
+              if (pickingPin) _pinPickingBanner(strings),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

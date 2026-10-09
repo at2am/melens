@@ -7,9 +7,11 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/config/env.dart';
 import '../../../core/network/http_client.dart';
 import '../../../core/time/melbourne_time.dart';
+import '../../agent/data/agent_models.dart';
 import '../../agent/state/agent_providers.dart';
 import '../../map/data/map_models.dart';
 import '../../map/state/viewport_controller.dart';
+import '../data/place_search.dart';
 import '../data/user_event_models.dart';
 import '../data/user_events_client.dart';
 
@@ -385,4 +387,88 @@ class OpenUserEvent extends _$OpenUserEvent {
   void open(String eventId) => state = eventId;
 
   void clear() => state = null;
+}
+
+/// Address and place search for the form: Google Places on the Web when the
+/// build has a browser Maps key, unavailable otherwise. Tests override it.
+@Riverpod(keepAlive: true)
+PlaceSearch placeSearch(Ref ref) {
+  final search = const GooglePlaceSearch();
+  return ref.watch(envProvider).hasGoogleMapsWebApiKey && search.isAvailable
+      ? search
+      : const UnavailablePlaceSearch();
+}
+
+/// Picking the event's pin on the map: the form starts it, the map screen
+/// shows a banner and hands the next tap back, the form takes the point.
+final class UserEventPinPickerState {
+  const UserEventPinPickerState({this.active = false, this.picked});
+
+  final bool active;
+
+  /// The tapped point, until the form takes it.
+  final AgentLatLng? picked;
+}
+
+@Riverpod(keepAlive: true)
+class UserEventPinPicker extends _$UserEventPinPicker {
+  @override
+  UserEventPinPickerState build() => const UserEventPinPickerState();
+
+  void start() => state = const UserEventPinPickerState(active: true);
+
+  void cancel() => state = const UserEventPinPickerState();
+
+  void place(AgentLatLng point) =>
+      state = UserEventPinPickerState(picked: point);
+
+  /// The picked point, cleared; null when none was picked.
+  AgentLatLng? take() {
+    final picked = state.picked;
+    if (picked != null) state = const UserEventPinPickerState();
+    return picked;
+  }
+}
+
+/// What the form holds while the sheet that hosts it is closed to pick a pin
+/// on the map (a narrow window covers the map with the sheet). The panel
+/// reopens on the form and the form restores these fields.
+final class UserEventFormSnapshot {
+  const UserEventFormSnapshot({
+    required this.editing,
+    required this.title,
+    required this.description,
+    required this.placeName,
+    required this.start,
+    required this.end,
+    required this.anonymous,
+    required this.capacity,
+    required this.point,
+  });
+
+  /// The event being edited, or null for a new one.
+  final UserEvent? editing;
+  final String title;
+  final String description;
+  final String placeName;
+  final DateTime start;
+  final DateTime? end;
+  final bool anonymous;
+  final String capacity;
+  final AgentLatLng point;
+}
+
+@Riverpod(keepAlive: true)
+class UserEventFormDraft extends _$UserEventFormDraft {
+  @override
+  UserEventFormSnapshot? build() => null;
+
+  void keep(UserEventFormSnapshot snapshot) => state = snapshot;
+
+  /// The snapshot, cleared.
+  UserEventFormSnapshot? take() {
+    final snapshot = state;
+    if (snapshot != null) state = null;
+    return snapshot;
+  }
 }
