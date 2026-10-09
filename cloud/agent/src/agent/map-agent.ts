@@ -1,6 +1,7 @@
 import { InMemorySessionService, LlmAgent, Runner, StreamingMode, createEvent, type BaseLlm, type LlmRequest, type LlmResponse, type RunConfig } from '@google/adk';
 import type { Part } from '@google/genai';
 
+import { attachmentRefOf } from '../protocol/attachments.js';
 import type { StopReason, StoredTurn } from '../protocol/schemas.js';
 import type { TurnContext, TurnRunner } from '../server.js';
 import { TurnRegistry, buildTool } from '../tools/define.js';
@@ -9,6 +10,8 @@ import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, turnMessage 
 import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
+/** Vertex AI's 400 for an attached file it cannot decode. */
+const UNREADABLE_FILE = /could not be decoded|malformed or corrupted/i;
 
 /** ADK reports a failed model call (credentials, quota, a blocked response) as an event with `errorCode` or `errorMessage` and no content. */
 export class ModelCallError extends Error {
@@ -95,7 +98,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
 
       const sessionService = new InMemorySessionService();
       const session = await sessionService.createSession({ appName: APP_NAME, userId: turn.uid, sessionId: turn.session.id });
-      for (const content of historyContents(turn.history)) {
+      for (const content of historyContents(turn.history, turn.historyImages)) {
         await sessionService.appendEvent({ session, event: createEvent({ invocationId: 'history',
           author: content.role === 'user' ? 'user' : AGENT_NAME, content }) });
       }
@@ -105,7 +108,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
       let failed = false;
       try {
         const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
-          newMessage: turnMessage(turn.request.input, turn.request.context), runConfig, abortSignal: turn.signal });
+          newMessage: turnMessage(turn.request.input, turn.request.context, turn.images), runConfig, abortSignal: turn.signal });
         for await (const event of events) {
           if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
           if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
@@ -126,7 +129,10 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
           failed = true;
           options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown',
             detail: error instanceof Error ? error.message.slice(0, 300) : undefined });
-          turn.sink.emit({ event: 'error', message: 'The agent could not finish this turn', retryable: true, usage: registry.usage.final(false) });
+          // Gemini refuses a photo it cannot decode; sending the same turn again cannot help.
+          const unreadablePhoto = error instanceof ModelCallError && turn.images.length > 0 && UNREADABLE_FILE.test(error.message);
+          turn.sink.emit({ event: 'error', message: unreadablePhoto ? 'A photo could not be read. Send a different one.' : 'The agent could not finish this turn',
+            retryable: !unreadablePhoto, usage: registry.usage.final(false) });
           throw error;
         }
       }
@@ -134,7 +140,8 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
       const stop: StopReason = registry.asked !== null ? 'asked' : turn.signal.aborted ? 'cancelled' : registry.budgetForced ? 'budget' : 'end';
       const usage = registry.usage.final(!turn.signal.aborted && !failed);
       turn.sink.emit({ event: 'done', stop, usage });
-      return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input, text: answer,
+      return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input,
+        attachments: turn.images.map(attachmentRefOf), text: answer,
         cards: registry.cards, uiActions: registry.uiActions, question: registry.asked, stop, trace: registry.trace.slice(0, 200),
         usage: { ...usage, perCall: registry.usage.perCall.slice(0, 64) } };
     },

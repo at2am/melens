@@ -197,7 +197,7 @@ test('a grounding call that outlives its timeout returns upstream_unavailable an
 test('the pending question and stored history reach the model', async () => {
   const llm = new ScriptedLlm([() => streamedText('Fitzroy it is.', usage(80, 5))]);
   const pending = { id: 'q_1', text: 'Which gardens?', options: ['Fitzroy Gardens', 'Carlton Gardens'], allowFreeText: true };
-  const history = [{ id: 't_0', seq: 1, createdAt: '2026-10-10T07:30:00.000Z', input: { kind: 'text' as const, text: 'take me to the gardens' }, text: '',
+  const history = [{ id: 't_0', seq: 1, createdAt: '2026-10-10T07:30:00.000Z', input: { kind: 'text' as const, text: 'take me to the gardens' }, attachments: [], text: '',
     cards: [], uiActions: [], question: pending, stop: 'asked' as const, trace: [],
     usage: { calls: 1, input: 1, cachedInput: 0, output: 1, thoughts: 0, toolUseInput: 0, total: 2, complete: true, perCall: [] } }];
   const turn = { ...turnContext('Fitzroy', { pendingQuestion: pending, history }), request: { input: { kind: 'answer' as const, questionId: 'q_1', value: 'Fitzroy Gardens' }, context: CONTEXT } };
@@ -206,6 +206,37 @@ test('the pending question and stored history reach the model', async () => {
   assert.equal(contents.length, 3, 'history user + model, then the new message');
   assert.match(contents[1]?.parts?.[0]?.text ?? '', /asked: "Which gardens\?"/);
   assert.match(contents[2]?.parts?.[1]?.text ?? '', /Answer to question q_1: Fitzroy Gardens/);
+});
+
+test('photos reach the model with the message, recent history photos go back, older ones are named and a stopped answer is marked', async () => {
+  const llm = new ScriptedLlm([() => streamedText('That is Degraves Street.', usage(900, 5))]);
+  const photo = { id: 'a_new', mimeType: 'image/jpeg' as const, data: Buffer.from([0xff, 0xd8, 0xff, 0x00]) };
+  const recent = { id: 'a_recent', mimeType: 'image/png' as const, data: Buffer.from([0x89, 0x50, 0x4e, 0x47]) };
+  const stored = (id: string, seq: number, text: string, answer: string, attachment: string, stop: 'end' | 'cancelled') => ({ id, seq,
+    createdAt: '2026-10-10T07:30:00.000Z', input: { kind: 'text' as const, text }, attachments: [{ id: attachment, kind: 'image' as const, mimeType: 'image/png' as const, bytes: 4 }],
+    text: answer, cards: [], uiActions: [], question: null, stop, trace: [],
+    usage: { calls: 1, input: 1, cachedInput: 0, output: 1, thoughts: 0, toolUseInput: 0, total: 2, complete: true, perCall: [] } });
+  const history = [stored('t_0', 1, '', 'A laneway.', 'a_old', 'end'), stored('t_1', 2, 'and this one?', 'Looking', 'a_recent', 'cancelled')];
+  const turn = turnContext('Where is it?', { history, images: [photo], historyImages: new Map([[recent.id, recent]]) });
+  const result = await runner(llm).runner.run(turn);
+  const contents = llm.seen[0]!.contents;
+  assert.equal(contents.length, 5);
+  assert.match(contents[0]?.parts?.[0]?.text ?? '', /sent a photo without a message/);
+  assert.equal(contents[0]?.parts?.[1]?.text, '[a photo attached here, not shown again]');
+  assert.deepEqual(contents[2]?.parts?.[1]?.inlineData, { mimeType: 'image/png', data: recent.data.toString('base64') });
+  assert.match(contents[3]?.parts?.[0]?.text ?? '', /Looking\n\[the user stopped this answer before it finished\]/);
+  assert.equal(contents[4]?.parts?.[1]?.text, 'Where is it?');
+  assert.deepEqual(contents[4]?.parts?.[2]?.inlineData, { mimeType: 'image/jpeg', data: photo.data.toString('base64') });
+  assert.deepEqual(result.attachments, [{ id: 'a_new', kind: 'image', mimeType: 'image/jpeg', bytes: 4 }]);
+});
+
+test('a photo Gemini cannot decode fails the turn with an error that says so and offers no retry', async () => {
+  const llm = new ScriptedLlm([() => { throw new Error('{"error":{"code":400,"message":"The provided file is malformed or corrupted and could not be decoded.","status":"INVALID_ARGUMENT"}}'); }]);
+  const turn = turnContext('', { images: [{ id: 'a_1', mimeType: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 0x00]) }] });
+  await assert.rejects(runner(llm).runner.run(turn), { name: 'ModelCallError' });
+  const error = turn.sink.sent.at(-1);
+  assert.equal(error?.event, 'error');
+  assert.deepEqual(error?.event === 'error' ? [error.message, error.retryable] : null, ['A photo could not be read. Send a different one.', false]);
 });
 
 test('a failed model call ends the turn with an error event rather than a silent done', async () => {

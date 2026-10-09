@@ -104,6 +104,44 @@ Map<String, dynamic> _$RequestContextToJson(RequestContext instance) =>
       'localTime': instance.localTime,
     };
 
+TurnAttachment _$TurnAttachmentFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('TurnAttachment', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['kind', 'mimeType', 'data']);
+      final val = TurnAttachment(
+        mimeType: $checkedConvert('mimeType', (v) => v as String),
+        data: $checkedConvert('data', (v) => v as String),
+        kind: $checkedConvert('kind', (v) => v as String? ?? 'image'),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$TurnAttachmentToJson(TurnAttachment instance) =>
+    <String, dynamic>{
+      'kind': instance.kind,
+      'mimeType': instance.mimeType,
+      'data': instance.data,
+    };
+
+AttachmentRef _$AttachmentRefFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('AttachmentRef', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['id', 'kind', 'mimeType', 'bytes']);
+      final val = AttachmentRef(
+        id: $checkedConvert('id', (v) => v as String),
+        kind: $checkedConvert('kind', (v) => v as String),
+        mimeType: $checkedConvert('mimeType', (v) => v as String),
+        bytes: $checkedConvert('bytes', (v) => (v as num).toInt()),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$AttachmentRefToJson(AttachmentRef instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'kind': instance.kind,
+      'mimeType': instance.mimeType,
+      'bytes': instance.bytes,
+    };
+
 TurnRequest _$TurnRequestFromJson(Map<String, dynamic> json) =>
     $checkedCreate('TurnRequest', json, ($checkedConvert) {
       $checkKeys(json, requiredKeys: const ['input', 'context']);
@@ -116,6 +154,12 @@ TurnRequest _$TurnRequestFromJson(Map<String, dynamic> json) =>
           'context',
           (v) => RequestContext.fromJson(v as Map<String, dynamic>),
         ),
+        attachments: $checkedConvert(
+          'attachments',
+          (v) => (v as List<dynamic>?)
+              ?.map((e) => TurnAttachment.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
       );
       return val;
     });
@@ -124,6 +168,7 @@ Map<String, dynamic> _$TurnRequestToJson(TurnRequest instance) =>
     <String, dynamic>{
       'input': instance.input.toJson(),
       'context': instance.context.toJson(),
+      'attachments': ?instance.attachments?.map((e) => e.toJson()).toList(),
     };
 
 AgentTimeWindow _$AgentTimeWindowFromJson(Map<String, dynamic> json) =>
@@ -461,6 +506,14 @@ StoredTurn _$StoredTurnFromJson(
       'usage',
       (v) => TurnUsage.fromJson(v as Map<String, dynamic>),
     ),
+    attachments: $checkedConvert(
+      'attachments',
+      (v) =>
+          (v as List<dynamic>?)
+              ?.map((e) => AttachmentRef.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    ),
   );
   return val;
 });
@@ -471,6 +524,7 @@ Map<String, dynamic> _$StoredTurnToJson(StoredTurn instance) =>
       'seq': instance.seq,
       'createdAt': instance.createdAt,
       'input': instance.input.toJson(),
+      'attachments': instance.attachments.map((e) => e.toJson()).toList(),
       'text': instance.text,
       'cards': instance.cards.map((e) => e.toJson()).toList(),
       'uiActions': instance.uiActions.map((e) => e.toJson()).toList(),

@@ -27,12 +27,20 @@ abstract interface class AgentClient {
 
   /// Runs one turn and yields its events as they arrive. Completing
   /// [abortTrigger] aborts the request; the server sees the disconnect and
-  /// cancels the run (agent-protocol.md, Rules).
+  /// cancels the run (agent-protocol.md, Rules). A turn sent while another
+  /// runs in the session interrupts that one.
   Stream<AgentEvent> runTurn(
     String sessionId,
     TurnRequest request, {
     Future<void>? abortTrigger,
   });
+
+  /// Stops the session's running turn wherever it runs, even when the
+  /// disconnect of an aborted request does not reach the server.
+  Future<void> cancelTurn(String sessionId);
+
+  /// The bytes of a stored photo of the session.
+  Future<Uint8List> getAttachment(String sessionId, String attachmentId);
 }
 
 sealed class AgentClientException implements Exception {
@@ -178,13 +186,32 @@ final class HttpAgentClient implements AgentClient {
   }
 
   @override
+  Future<void> cancelTurn(String sessionId) async {
+    _validateId(sessionId);
+    await _send('POST', ['v1', 'sessions', sessionId, 'cancel']);
+  }
+
+  @override
+  Future<Uint8List> getAttachment(String sessionId, String attachmentId) {
+    _validateId(sessionId);
+    _validateId(attachmentId);
+    return _send('GET', [
+      'v1',
+      'sessions',
+      sessionId,
+      'attachments',
+      attachmentId,
+    ], accept: 'image/*');
+  }
+
+  @override
   Stream<AgentEvent> runTurn(
     String sessionId,
     TurnRequest request, {
     Future<void>? abortTrigger,
   }) async* {
     _validateId(sessionId);
-    final headers = await _headers(stream: true);
+    final headers = await _headers(accept: 'text/event-stream');
     final body = _encode(request.toJson());
     final httpRequest =
         http.AbortableRequest(
@@ -243,12 +270,12 @@ final class HttpAgentClient implements AgentClient {
     return _decode(() => AgentEvent.fromJson(json));
   }
 
-  Future<Map<String, String>> _headers({bool stream = false}) async {
+  Future<Map<String, String>> _headers({String? accept}) async {
     final token = await tokenSource();
     if (token == null || token.isEmpty) throw const AgentSignInException();
     return {
       'authorization': 'Bearer $token',
-      'accept': stream ? 'text/event-stream' : 'application/json',
+      'accept': accept ?? 'application/json',
     };
   }
 
@@ -257,7 +284,27 @@ final class HttpAgentClient implements AgentClient {
     String method,
     List<String> segments,
   ) async {
-    final headers = await _headers();
+    final bytes = await _send(method, segments);
+    if (bytes.isEmpty) return null;
+    final Object? json;
+    try {
+      json = jsonDecode(utf8.decode(bytes));
+    } on FormatException {
+      throw const AgentProtocolException('The response was not JSON');
+    }
+    if (json is! Map<String, dynamic>) {
+      throw const AgentProtocolException('The response was not an object');
+    }
+    return json;
+  }
+
+  /// A session route's body, bounded and timed out; empty for `204`.
+  Future<Uint8List> _send(
+    String method,
+    List<String> segments, {
+    String? accept,
+  }) async {
+    final headers = await _headers(accept: accept);
     final timeout = Completer<void>();
     final timer = Timer(requestTimeout, timeout.complete);
     final request =
@@ -274,17 +321,7 @@ final class HttpAgentClient implements AgentClient {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw _httpFailure(response.statusCode, bytes);
       }
-      if (bytes.isEmpty) return null;
-      final Object? json;
-      try {
-        json = jsonDecode(utf8.decode(bytes));
-      } on FormatException {
-        throw const AgentProtocolException('The response was not JSON');
-      }
-      if (json is! Map<String, dynamic>) {
-        throw const AgentProtocolException('The response was not an object');
-      }
-      return json;
+      return bytes;
     } on http.RequestAbortedException {
       throw const AgentTimeoutException();
     } on http.ClientException {
@@ -347,7 +384,7 @@ final class HttpAgentClient implements AgentClient {
     if (id.isEmpty ||
         id.length > 64 ||
         !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id)) {
-      throw ArgumentError.value(id, 'sessionId');
+      throw ArgumentError.value(id, 'id');
     }
   }
 

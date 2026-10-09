@@ -144,15 +144,91 @@ sealed class TurnInput with _$TurnInput {
       _$TurnInputFromJson(json);
 }
 
+/// The most photos one turn carries, and the most bytes one photo may have
+/// (`ATTACHMENT_LIMITS` in the service's schemas).
+const int maxPhotosPerTurn = 4;
+const int maxPhotoBytes = 1000000;
+
+/// The photo types the service accepts.
+const Set<String> photoMimeTypes = {
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+};
+
+/// A photo attached to a text turn: its type and its bytes in standard
+/// base64.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class TurnAttachment {
+  const TurnAttachment({
+    required this.mimeType,
+    required this.data,
+    this.kind = 'image',
+  });
+
+  @JsonKey(required: true)
+  final String kind;
+
+  @JsonKey(required: true)
+  final String mimeType;
+
+  @JsonKey(required: true)
+  final String data;
+
+  factory TurnAttachment.fromJson(Map<String, dynamic> json) =>
+      _$TurnAttachmentFromJson(json);
+
+  Map<String, dynamic> toJson() => _$TurnAttachmentToJson(this);
+}
+
+/// A stored photo of a turn; its bytes come from
+/// `AgentClient.getAttachment`.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class AttachmentRef {
+  const AttachmentRef({
+    required this.id,
+    required this.kind,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  @JsonKey(required: true)
+  final String id;
+
+  @JsonKey(required: true)
+  final String kind;
+
+  @JsonKey(required: true)
+  final String mimeType;
+
+  @JsonKey(required: true)
+  final int bytes;
+
+  factory AttachmentRef.fromJson(Map<String, dynamic> json) =>
+      _$AttachmentRefFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AttachmentRefToJson(this);
+}
+
 @JsonSerializable(checked: true, explicitToJson: true)
 final class TurnRequest {
-  const TurnRequest({required this.input, required this.context});
+  const TurnRequest({
+    required this.input,
+    required this.context,
+    this.attachments,
+  });
 
   @JsonKey(required: true)
   final TurnInput input;
 
   @JsonKey(required: true)
   final RequestContext context;
+
+  /// Photos, only with a `text` input, whose text may then be empty.
+  @JsonKey(includeIfNull: false)
+  final List<TurnAttachment>? attachments;
 
   factory TurnRequest.fromJson(Map<String, dynamic> json) =>
       _$TurnRequestFromJson(json);
@@ -640,6 +716,7 @@ final class StoredTurn {
     required this.stop,
     required this.trace,
     required this.usage,
+    this.attachments = const [],
   });
 
   @JsonKey(required: true)
@@ -653,6 +730,10 @@ final class StoredTurn {
 
   @JsonKey(required: true)
   final TurnInput input;
+
+  /// The photos the user attached; turns stored before photos have none.
+  @JsonKey(defaultValue: <AttachmentRef>[])
+  final List<AttachmentRef> attachments;
 
   @JsonKey(required: true)
   final String text;

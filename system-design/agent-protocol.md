@@ -1,6 +1,6 @@
 # Agent protocol
 
-**Status:** Draft. Revised 2026-10-09 for the agent service runtime (own Cloud Run service, TypeScript, map contract ids, sessions persisted per user) and for streamed token usage. Plan task F3 (agent framework contract and result card format) finalises it.
+**Status:** Draft. Revised 2026-10-09 for the agent service runtime (own Cloud Run service, TypeScript, map contract ids, sessions persisted per user), for streamed token usage, and for interrupting a running turn and attaching photos. Plan task F3 (agent framework contract and result card format) finalises it.
 
 How the Flutter app talks to the agent service on Cloud Run. The app is an agent client: it sends context, renders streamed events, applies UI actions and renders cards. It never calls a language model itself; all reasoning, tools, keys and source checks stay on the server.
 
@@ -14,7 +14,9 @@ All routes are called on the agent service's Cloud Run URL directly (or a custom
 | `GET /v1/sessions` | List the caller's sessions, newest first: `id`, `title`, `createdAt`, `updatedAt`, `turnCount` |
 | `GET /v1/sessions/{sessionId}` | The session's stored turns, for redrawing the chat panel |
 | `DELETE /v1/sessions/{sessionId}` | Delete the session and its turns |
-| `POST /v1/sessions/{sessionId}/turns` | Run one turn; the response is a stream of server-sent events |
+| `POST /v1/sessions/{sessionId}/turns` | Run one turn; the response is a stream of server-sent events. A turn still running in the session is interrupted ([Rules](#rules), 4) |
+| `POST /v1/sessions/{sessionId}/cancel` | Stop the session's running turn, wherever it runs; `204` also when none runs |
+| `GET /v1/sessions/{sessionId}/attachments/{attachmentId}` | A stored photo's bytes, with its image type, for redrawing a restored turn |
 
 The app has two base URLs: `MAP_BASE_URL` for the map query service and `AGENT_BASE_URL` for this service; they are different Cloud Run services ([architecture.md](architecture.md#key-decisions)). The Cloud Run request timeout is 300 seconds, enough for a turn of 16 model calls.
 
@@ -55,6 +57,8 @@ Flutter                                  Cloud Run: agent service (ADK, TypeScri
 | `analyse` | The user taps Analyse on a "?" marker | `featureId` |
 | `answer` | The user taps an option under a question | `questionId`, `value` |
 
+A `text` input may carry photos the user attached, in `attachments` next to `input`; its `text` may then be empty. Each is `{ "kind": "image", "mimeType": "image/jpeg", "data": "<standard base64>" }`: at most 4 per turn, each at most 1,000,000 bytes, of type `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. The server checks that the bytes start like the declared type and answers `400` otherwise. The app downsizes photos before sending (long edge 1,600 px, JPEG quality 80 where the platform re-encodes) and re-encodes anything still too large, or of another type, as a smaller PNG. Gemini reads the photos with the message; a photo Gemini cannot decode ends the turn with an `error` that says so and is not `retryable`.
+
 `context` is sent on every turn. The app is the source of truth for what is on screen; the server does not guess. `userLocation` is present only when the user granted location access.
 
 ## Events
@@ -77,8 +81,8 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 1. **Recommendations only in cards.** Streamed text carries explanations and transitions. Places, events and routes appear in `card` events, which are sent only after source validation (see [agent-design.md](agent-design.md#source-rules)).
 2. **UI actions are one-way.** The server does not wait for the app to confirm an action. If an action fails in the app, the next request's `context` shows the real state.
 3. **Features by id.** Cards and UI actions reference `featureId`s, which are [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem ids. The app resolves them against the items it has loaded from the map query service, which keeps events small and consistent with the map. Card items also carry a `location`, so an item the app has not loaded still shows a pin; `highlight_features` reports ids the server could not find as `missing`.
-4. **Server-side sessions, per user.** Conversation history is stored in Firestore under the caller's uid and survives restarts and new revisions. The app keeps the current `sessionId` locally and can list and reopen earlier sessions. A session belongs to one uid; another user's session id returns `not_found`, never `forbidden`. One turn runs at a time per session; a second concurrent turn is rejected with `409`.
-5. **Cancellation reaches the server.** When the user taps stop or leaves the screen, the app aborts the request. The server detects the disconnect and cancels the run, so it stops spending tokens and grounding calls.
+4. **Server-side sessions, per user.** Conversation history is stored in Firestore under the caller's uid and survives restarts and new revisions. The app keeps the current `sessionId` locally and can list and reopen earlier sessions. A session belongs to one uid; another user's session id returns `not_found`, never `forbidden`. One turn runs at a time per session, and a new turn interrupts the running one, so the user can redirect the agent at any moment: the server asks the running turn to stop, waits up to 5 seconds for it to store what it has (so the new turn's history includes it, marked as stopped), then runs the new turn. A turn that does not stop in time loses its lease; it is stored when it ends, without touching the newer turn's lease or pending question. The store numbers turns in the order they finish.
+5. **Cancellation reaches the server.** When the user taps stop, the app aborts the request and calls `POST /v1/sessions/{sessionId}/cancel`; leaving the screen or the session aborts the request too. The server cancels the run on the disconnect, on the cancel route, on a newer turn and at the turn deadline, so it stops spending tokens and grounding calls: model calls, BigQuery queries and grounding calls in flight are aborted. The stop request travels through the session's lease (`activeTurn.cancelRequested`), which the running turn watches, so it works whichever Cloud Run instance runs the turn. A stopped turn ends with `done` stop `cancelled` and is stored with what it produced so far.
 6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. Tapping an option sends an `answer` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
 
 ## Token usage
@@ -120,12 +124,14 @@ Sessions are stored in Firestore in the project's agent database. Only the agent
 
 | Document | Fields |
 | --- | --- |
-| `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`) or null, `expiresAt` for the TTL policy |
-| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, argument summary, row count, error, duration, memo flag) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
+| `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`, `cancelRequested` once a stop is asked) or null, `expiresAt` for the TTL policy |
+| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), `attachments` (`id`, `kind`, `mimeType`, `bytes` of each photo), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, argument summary, row count, error, duration, memo flag) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
 
-Stored is what the app needs to redraw the conversation and what the model needs for the next turn: user input, answer text, cards, questions and answers, and the compact trace. The request `context` is not stored, and `userLocation` never is. Full tool results and grounding payloads are not stored with the session; grounding has its own cache.
+| `users/{uid}/sessions/{sessionId}/attachments/{attachmentId}` | One photo: `turnId`, `mimeType`, `data` (the bytes), `createdAt`, `expiresAtTs`. Written with its turn, deleted with it |
 
-The prompt for a turn carries the last 20 turns; older turns remain available to the app through `GET /v1/sessions/{sessionId}`. Limits: 50 sessions per uid, deleting the oldest when a new one is created; 200 turns per session; a 30-day TTL from `updatedAt`. An anonymous uid is lost when the browser clears site data, and its sessions expire with the TTL.
+Stored is what the app needs to redraw the conversation and what the model needs for the next turn: user input and photos, answer text, cards, questions and answers, and the compact trace. The request `context` is not stored, and `userLocation` never is. Full tool results and grounding payloads are not stored with the session; grounding has its own cache.
+
+The prompt for a turn carries the last 20 turns; older turns remain available to the app through `GET /v1/sessions/{sessionId}`. The photos of the last 3 turns go back to the model with them; older photos are only named, so a follow-up about a recent photo still sees it. Limits: 50 sessions per uid, deleting the oldest when a new one is created; 200 turns per session; a 30-day TTL from `updatedAt`. An anonymous uid is lost when the browser clears site data, and its sessions expire with the TTL.
 
 The chat panel shows the user's session list. The user can switch to an earlier session, start a new one and delete one; switching restores that conversation from `GET /v1/sessions/{sessionId}`.
 
@@ -137,8 +143,8 @@ Firebase Anonymous Auth gives every user, judges included, a uid without a sign-
 
 | Part | Responsibility |
 | --- | --- |
-| `AgentClient` | Transport, SSE parsing, cancellation |
-| `ChatController` | Conversation state, the turn in progress, any pending question and the turn's running token counter from `usage` events; restores a session from `GET /v1/sessions/{sessionId}` |
+| `AgentClient` | Transport, SSE parsing, cancellation (abort and the cancel route), stored photos |
+| `ChatController` | Conversation state, the turn in progress, any pending question and the turn's running token counter from `usage` events; a message sent while a turn runs interrupts it; restores a session from `GET /v1/sessions/{sessionId}` |
 | `SessionList` | Lists, switches, creates and deletes the user's sessions |
 | `MapActions` | Applies `ui_action` events to the map |
 | Card registry | One widget per card `type`, which maps to a use case |

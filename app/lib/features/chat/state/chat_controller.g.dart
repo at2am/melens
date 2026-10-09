@@ -10,19 +10,22 @@ part of 'chat_controller.dart';
 // ignore_for_file: type=lint, type=warning
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter
-/// implementation). One turn runs at a time; events are ordered by `seq`.
+/// implementation). One turn runs at a time; a message sent while one runs
+/// interrupts it. Events are ordered by `seq`.
 
 @ProviderFor(ChatController)
 final chatControllerProvider = ChatControllerProvider._();
 
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter
-/// implementation). One turn runs at a time; events are ordered by `seq`.
+/// implementation). One turn runs at a time; a message sent while one runs
+/// interrupts it. Events are ordered by `seq`.
 final class ChatControllerProvider
     extends $NotifierProvider<ChatController, ChatState> {
   /// Conversation state: the open session, its turns, the turn in progress,
   /// any pending question and the session list (agent-protocol.md, Flutter
-  /// implementation). One turn runs at a time; events are ordered by `seq`.
+  /// implementation). One turn runs at a time; a message sent while one runs
+  /// interrupts it. Events are ordered by `seq`.
   ChatControllerProvider._()
     : super(
         from: null,
@@ -50,11 +53,12 @@ final class ChatControllerProvider
   }
 }
 
-String _$chatControllerHash() => r'332580f1841b81fde7ba420ae5000337c048f2ac';
+String _$chatControllerHash() => r'9b0f18b00a29ed2c44b227f50038ff574fbd93e0';
 
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter
-/// implementation). One turn runs at a time; events are ordered by `seq`.
+/// implementation). One turn runs at a time; a message sent while one runs
+/// interrupts it. Events are ordered by `seq`.
 
 abstract class _$ChatController extends $Notifier<ChatState> {
   ChatState build();

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -5,20 +7,47 @@ import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/agent/data/agent_client.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/agent/state/agent_providers.dart';
+import 'package:melens/features/chat/data/chat_photos.dart';
+import 'package:melens/features/chat/state/chat_photo_providers.dart';
 import 'package:melens/features/chat/state/request_context.dart';
 import 'package:melens/features/chat/ui/chat_panel.dart';
+import 'package:melens/features/chat/ui/chat_photo_view.dart';
 import 'package:melens/l10n/app_localizations.dart';
 
 import '../../agent/fake_agent_client.dart';
+
+/// A one-pixel PNG.
+final onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA'
+  '60e6kgAAAABJRU5ErkJggg==',
+);
+
+final class FakePhotoPicker implements PhotoPicker {
+  FakePhotoPicker(this.result);
+
+  final PhotoPick result;
+  final sources = <PhotoSource>[];
+
+  @override
+  Future<PhotoPick> pick(PhotoSource source, {required int limit}) async {
+    sources.add(source);
+    return (
+      photos: result.photos.take(limit).toList(),
+      rejected: result.rejected,
+    );
+  }
+}
 
 Future<ProviderContainer> showPanel(
   WidgetTester tester,
   FakeAgentClient client, {
   List<CardItem> tapped = const [],
+  PhotoPicker? picker,
 }) async {
   final container = ProviderContainer(
     overrides: [
       agentClientProvider.overrideWithValue(client),
+      if (picker != null) photoPickerProvider.overrideWithValue(picker),
       requestContextBuilderProvider.overrideWithValue(
         ({String? openCardId}) => RequestContext(
           viewport: const AgentViewport(
@@ -242,9 +271,24 @@ void main() {
     expect(find.text('Reading the details'), findsOneWidget);
     expect(find.text('not found · 0 ms'), findsOneWidget);
     expect(
-      find.textContaining('2 calls · 1,200 in (400 cached)'),
+      find.textContaining('2 calls · ↑ 1,200 (400 cached) · ↓ 80'),
       findsOneWidget,
     );
+    for (final index in [0, 1]) {
+      final item = find.byKey(ValueKey('agent-card-item-c_1-$index'));
+      final tile = tester.widget<Material>(
+        find.descendant(of: item, matching: find.byType(Material)).first,
+      );
+      expect(
+        (tile.shape! as RoundedRectangleBorder).side.style,
+        BorderStyle.solid,
+        reason: 'each item is an outlined tile of its own',
+      );
+      expect(
+        find.descendant(of: item, matching: find.byIcon(Icons.chevron_right)),
+        findsOneWidget,
+      );
+    }
     expect(find.byKey(const ValueKey('chat-send')), findsOneWidget);
 
     await tester.tap(find.text('Market night'));
@@ -322,6 +366,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(client.lastTurn.aborted, isTrue);
+    expect(client.calls, contains('cancel:s_1'));
     expect(find.text('Stopped.'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('chat-retry')));
@@ -329,6 +374,81 @@ void main() {
     await tester.pump();
     expect(client.turns.length, 2);
     expect(client.lastTurn.request.input, const TurnInput.text(text: 'Hi'));
+    await client.lastTurn.close();
+    await tester.pump();
+  });
+
+  testWidgets('a message sent while a turn runs interrupts it', (tester) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Live music tonight?',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    final first = client.lastTurn;
+    expect(find.byKey(const ValueKey('chat-stop')), findsOneWidget);
+    expect(find.text('Type to interrupt with a new message…'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Cafés instead',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    expect(first.aborted, isTrue);
+    expect(client.turns.length, 2);
+    expect(
+      client.lastTurn.request.input,
+      const TurnInput.text(text: 'Cafés instead'),
+    );
+    expect(find.text('Stopped.'), findsOneWidget);
+    expect(find.text('Cafés instead'), findsOneWidget);
+    await client.lastTurn.close();
+    await tester.pump();
+  });
+
+  testWidgets('photos are attached, can be removed, and go with the message', (
+    tester,
+  ) async {
+    final client = FakeAgentClient();
+    final picker = FakePhotoPicker((
+      photos: [ChatPhoto(mimeType: 'image/png', bytes: onePixelPng)],
+      rejected: 1,
+    ));
+    await showPanel(tester, client, picker: picker);
+
+    Future<void> attach() async {
+      await tester.tap(find.byKey(const ValueKey('chat-attach')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose photos'));
+      await tester.pumpAndSettle();
+    }
+
+    await attach();
+    expect(picker.sources, [PhotoSource.gallery]);
+    expect(find.byKey(const ValueKey('chat-pending-photos')), findsOneWidget);
+    expect(
+      find.text('One photo could not be used: it is unreadable or too large.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-photo-remove-0')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('chat-pending-photos')), findsNothing);
+
+    await attach();
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    final request = client.lastTurn.request;
+    expect(request.input, const TurnInput.text(text: ''));
+    expect(request.attachments!.single.mimeType, 'image/png');
+    expect(request.attachments!.single.data, base64Encode(onePixelPng));
+    expect(find.byKey(const ValueKey('chat-pending-photos')), findsNothing);
+    expect(find.byType(ChatPhotoView), findsOneWidget, reason: 'in the turn');
     await client.lastTurn.close();
     await tester.pump();
   });

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -7,6 +8,7 @@ import '../../agent/data/agent_client.dart';
 import '../../agent/data/agent_models.dart';
 import '../../agent/state/agent_providers.dart';
 import '../../map/state/map_actions.dart';
+import '../data/chat_photos.dart';
 import 'chat_models.dart';
 import 'request_context.dart';
 
@@ -14,7 +16,8 @@ part 'chat_controller.g.dart';
 
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter
-/// implementation). One turn runs at a time; events are ordered by `seq`.
+/// implementation). One turn runs at a time; a message sent while one runs
+/// interrupts it. Events are ordered by `seq`.
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {
   static final _log = Logger('ChatController');
@@ -45,13 +48,33 @@ class ChatController extends _$ChatController {
     }
   }
 
-  Future<void> send(TurnInput input) async {
+  /// Sends one input; [photos] go only with a text input, whose text may
+  /// then be empty. A turn still running is interrupted: its request is
+  /// aborted and the server stops it, stores what it has and runs this one.
+  Future<void> send(
+    TurnInput input, {
+    List<ChatPhoto> photos = const [],
+  }) async {
     if (!state.canSend) return;
     final normalised = switch (input) {
       TextTurnInput(:final text) => TurnInput.text(text: text.trim()),
       _ => input,
     };
-    if (normalised case TextTurnInput(:final text) when text.isEmpty) return;
+    final sent = normalised is TextTurnInput
+        ? photos
+              .where((photo) => photo.bytes != null)
+              .take(maxPhotosPerTurn)
+              .toList(growable: false)
+        : const <ChatPhoto>[];
+    if (normalised case TextTurnInput(:final text)
+        when text.isEmpty && sent.isEmpty) {
+      return;
+    }
+    if (state.isRunning) {
+      _generation++;
+      _abortRun();
+      _markCancelled();
+    }
     var sessionId = state.sessionId;
     if (sessionId == null) {
       try {
@@ -79,6 +102,7 @@ class ChatController extends _$ChatController {
         ChatTurn(
           localId: ++_nextLocalId,
           input: normalised,
+          photos: sent,
           phase: ChatTurnPhase.running,
         ),
       ],
@@ -91,7 +115,19 @@ class ChatController extends _$ChatController {
     try {
       final events = _client.runTurn(
         sessionId,
-        TurnRequest(input: normalised, context: context),
+        TurnRequest(
+          input: normalised,
+          context: context,
+          attachments: sent.isEmpty
+              ? null
+              : [
+                  for (final photo in sent)
+                    TurnAttachment(
+                      mimeType: photo.mimeType,
+                      data: base64Encode(photo.bytes!),
+                    ),
+                ],
+        ),
         abortTrigger: abort.future,
       );
       await for (final event in events) {
@@ -129,24 +165,61 @@ class ChatController extends _$ChatController {
   Future<void> answer(AgentQuestion question, String option) =>
       send(TurnInput.answer(questionId: question.id, value: option));
 
-  /// Sends the last failed or cancelled input again.
+  /// Sends the last failed or cancelled input again, with its photos; a
+  /// restored turn's photos are downloaded first.
   Future<void> retryLast() async {
-    if (!state.canSend || state.turns.isEmpty) return;
+    if (!state.canSend || state.isRunning || state.turns.isEmpty) return;
     final last = state.turns.last;
     if (last.phase == ChatTurnPhase.done) return;
+    final generation = _generation;
+    final List<ChatPhoto> photos;
+    try {
+      photos = await Future.wait(last.photos.map(_loadPhoto));
+    } on AgentClientException catch (error) {
+      if (ref.mounted) state = state.copyWith(error: ChatError.from(error));
+      return;
+    }
+    if (!ref.mounted || generation != _generation) return;
     state = state.copyWith(
       turns: state.turns.sublist(0, state.turns.length - 1),
     );
-    await send(last.input);
+    await send(last.input, photos: photos);
   }
 
-  /// Aborts the turn in progress; the server sees the disconnect.
+  Future<ChatPhoto> _loadPhoto(ChatPhoto photo) async {
+    final sessionId = photo.sessionId;
+    final attachmentId = photo.attachmentId;
+    if (photo.bytes != null || sessionId == null || attachmentId == null) {
+      return photo;
+    }
+    return ChatPhoto(
+      mimeType: photo.mimeType,
+      bytes: await _client.getAttachment(sessionId, attachmentId),
+    );
+  }
+
+  /// Stops the turn in progress: the request is aborted, and the server is
+  /// told directly, so the turn stops even when the disconnect does not
+  /// reach it.
   void cancel() {
     if (!state.isRunning) return;
     _generation++;
     _abortRun();
     _markCancelled();
+    if (state.sessionId case final sessionId?) {
+      unawaited(_cancelOnServer(sessionId));
+    }
     unawaited(_refreshSessions(quiet: true));
+  }
+
+  Future<void> _cancelOnServer(String sessionId) async {
+    try {
+      await _client.cancelTurn(sessionId);
+    } on AgentClientException catch (error) {
+      // The aborted request still reaches the server as a disconnect, and a
+      // new message interrupts whatever is left.
+      _log.fine('Cancelling the turn on the server failed', error);
+    }
   }
 
   Future<void> openSession(String sessionId) async {
@@ -160,7 +233,9 @@ class ChatController extends _$ChatController {
         isRestoring: false,
         sessionId: detail.session.id,
         sessionTitle: detail.session.title,
-        turns: detail.turns.map(_fromStored).toList(growable: false),
+        turns: [
+          for (final turn in detail.turns) _fromStored(detail.session.id, turn),
+        ],
         pendingQuestion: detail.pendingQuestion,
         clearPendingQuestion: detail.pendingQuestion == null,
       );
@@ -382,7 +457,7 @@ class ChatController extends _$ChatController {
   /// A stored turn redraws as finished steps. The trace and the stored
   /// actions are both in call order, so each successful UI action tool call
   /// takes the next stored action.
-  ChatTurn _fromStored(StoredTurn turn) {
+  ChatTurn _fromStored(String sessionId, StoredTurn turn) {
     final actions = [
       for (final action in turn.uiActions)
         ChatActionRecord(
@@ -419,6 +494,14 @@ class ChatController extends _$ChatController {
     return ChatTurn(
       localId: ++_nextLocalId,
       input: turn.input,
+      photos: [
+        for (final attachment in turn.attachments)
+          ChatPhoto(
+            mimeType: attachment.mimeType,
+            sessionId: sessionId,
+            attachmentId: attachment.id,
+          ),
+      ],
       turnId: turn.id,
       phase: turn.stop == StopReason.cancelled
           ? ChatTurnPhase.cancelled

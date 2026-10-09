@@ -13,6 +13,7 @@ export const viewportSchema = z.strictObject({
 }).refine((viewport) => viewport.north > viewport.south && viewport.east > viewport.west, 'Viewport must have north > south and east > west');
 
 const localTime = z.iso.datetime({ offset: true });
+const count = z.number().int().nonnegative();
 
 export const requestContextSchema = z.strictObject({
   viewport: viewportSchema,
@@ -26,14 +27,38 @@ export const requestContextSchema = z.strictObject({
 export type RequestContext = z.infer<typeof requestContextSchema>;
 
 export const turnInputSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('text'), text: z.string().trim().min(1).max(2_000) }),
+  /** Empty only when the request attaches photos; the request schema checks that. */
+  z.strictObject({ kind: z.literal('text'), text: z.string().trim().max(2_000) }),
   z.strictObject({ kind: z.literal('area'), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
   z.strictObject({ kind: z.literal('analyse'), featureId: identifierSchema }),
   z.strictObject({ kind: z.literal('answer'), questionId: identifierSchema, value: z.string().trim().min(1).max(200) }),
 ]);
 export type TurnInput = z.infer<typeof turnInputSchema>;
 
-export const turnRequestSchema = z.strictObject({ input: turnInputSchema, context: requestContextSchema });
+/** Photos the user attaches to a text turn; the app downsizes them first. */
+export const ATTACHMENT_LIMITS = { perTurn: 4, bytes: 1_000_000 } as const;
+export const imageMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+export type ImageMimeType = z.infer<typeof imageMimeTypeSchema>;
+
+/** One attached photo: standard base64 of at most `ATTACHMENT_LIMITS.bytes` bytes. */
+export const attachmentInputSchema = z.strictObject({
+  kind: z.literal('image'),
+  mimeType: imageMimeTypeSchema,
+  data: z.base64().min(4).max(Math.ceil(ATTACHMENT_LIMITS.bytes / 3) * 4),
+});
+export type AttachmentInput = z.infer<typeof attachmentInputSchema>;
+
+/** A stored photo as a turn names it; the bytes are read with `GET /v1/sessions/{id}/attachments/{attachmentId}`. */
+export const attachmentRefSchema = z.strictObject({ id: identifierSchema, kind: z.literal('image'), mimeType: imageMimeTypeSchema, bytes: count });
+export type AttachmentRef = z.infer<typeof attachmentRefSchema>;
+
+export const turnRequestSchema = z.strictObject({
+  input: turnInputSchema,
+  context: requestContextSchema,
+  attachments: z.array(attachmentInputSchema).max(ATTACHMENT_LIMITS.perTurn).optional(),
+}).refine((request) => (request.attachments ?? []).length === 0 || request.input.kind === 'text', 'Only a text turn attaches photos')
+  .refine((request) => request.input.kind !== 'text' || request.input.text !== '' || (request.attachments ?? []).length > 0,
+    'A text turn needs text or a photo');
 export type TurnRequest = z.infer<typeof turnRequestSchema>;
 
 export const timeWindowSchema = z.strictObject({ from: localTime.optional(), to: localTime.optional() });
@@ -71,7 +96,6 @@ export type Card = z.infer<typeof cardSchema>;
 
 export const uiActionNameSchema = z.enum(['show_layers', 'focus_map', 'draw_route', 'highlight_features']);
 
-const count = z.number().int().nonnegative();
 /** One model call's usage, copied from Gemini's usageMetadata; a field Gemini did not return is 0. */
 export const callUsageSchema = z.strictObject({
   index: z.number().int().positive(),
@@ -139,6 +163,8 @@ export const storedTurnSchema = z.strictObject({
   seq: count,
   createdAt: z.iso.datetime(),
   input: turnInputSchema,
+  /** The photos the user attached, in order; turns stored before photos existed have none. */
+  attachments: z.array(attachmentRefSchema).max(ATTACHMENT_LIMITS.perTurn).default([]),
   text: z.string(),
   cards: z.array(cardSchema),
   uiActions: z.array(z.strictObject({ action: uiActionNameSchema, args: z.record(z.string(), z.unknown()) })),

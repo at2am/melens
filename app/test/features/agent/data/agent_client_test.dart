@@ -257,6 +257,95 @@ void main() {
     expect((events[2] as AgentDoneEvent).stop, StopReason.end);
   });
 
+  test('photos go in the turn request; stop and stored photos have their '
+      'own routes', () async {
+    final capture = Capture();
+    final photo = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    final client = clientWith(capture: capture, (request) async {
+      switch ('${request.method} ${request.url.path}') {
+        case 'POST /v1/sessions/s_1/turns':
+          return sseResponse([]);
+        case 'POST /v1/sessions/s_1/cancel':
+          return jsonResponse(204, null);
+        case 'GET /v1/sessions/s_1/attachments/a_1':
+          return http.StreamedResponse(
+            Stream.value(photo),
+            200,
+            headers: const {'content-type': 'image/png'},
+          );
+      }
+      return errorResponse(404, 'notFound', false);
+    });
+
+    await client
+        .runTurn(
+          's_1',
+          TurnRequest(
+            input: const TurnInput.text(text: ''),
+            context: context,
+            attachments: [
+              TurnAttachment(mimeType: 'image/png', data: base64Encode(photo)),
+            ],
+          ),
+        )
+        .toList();
+    expect((jsonDecode(capture.body!) as Map<String, dynamic>)['attachments'], [
+      {'kind': 'image', 'mimeType': 'image/png', 'data': base64Encode(photo)},
+    ]);
+
+    await client.cancelTurn('s_1');
+    expect(capture.request!.method, 'POST');
+    expect(capture.request!.url.path, '/v1/sessions/s_1/cancel');
+
+    expect(await client.getAttachment('s_1', 'a_1'), photo);
+    expect(capture.request!.headers['accept'], 'image/*');
+    await expectLater(
+      client.getAttachment('s_1', 'a_2'),
+      throwsA(
+        isA<AgentHttpException>().having(
+          (error) => error.code,
+          'code',
+          AgentErrorCode.notFound,
+        ),
+      ),
+    );
+    expect(() => client.getAttachment('s_1', '../x'), throwsArgumentError);
+  });
+
+  test('a stored turn decodes its photos, and an older turn has none', () {
+    final json = {
+      'id': 't_1',
+      'seq': 1,
+      'createdAt': '2026-10-10T07:00:00.000Z',
+      'input': {'kind': 'text', 'text': ''},
+      'text': 'A laneway.',
+      'cards': <Object?>[],
+      'uiActions': <Object?>[],
+      'question': null,
+      'stop': 'end',
+      'trace': <Object?>[],
+      'usage': {
+        'calls': 1,
+        'input': 10,
+        'cachedInput': 0,
+        'output': 5,
+        'thoughts': 0,
+        'toolUseInput': 0,
+        'total': 15,
+        'complete': true,
+      },
+    };
+    expect(StoredTurn.fromJson(json).attachments, isEmpty);
+    final withPhoto = StoredTurn.fromJson({
+      ...json,
+      'attachments': [
+        {'id': 'a_1', 'kind': 'image', 'mimeType': 'image/jpeg', 'bytes': 12},
+      ],
+    });
+    expect(withPhoto.attachments.single.id, 'a_1');
+    expect(withPhoto.attachments.single.mimeType, 'image/jpeg');
+  });
+
   test('a turn answered without an event stream is a protocol error', () async {
     final client = clientWith(
       (request) async => jsonResponse(200, {'ok': true}),

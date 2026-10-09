@@ -1,14 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import type { IdTokenVerifier } from './auth/verifier.js';
-import { AGENT_ERROR_CODES, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
+import { decodeImages, type TurnImage } from './protocol/attachments.js';
+import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
   type AgentErrorCode, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
 import { openSseStream, type EventSink } from './protocol/sse.js';
 import type { RateLimiter } from './rate-limit.js';
 import { SESSION_LIMITS, newId, summaryOf, type SessionRecord, type SessionStore } from './sessions/store.js';
 
-/** A turn request is the user's text plus the map context; 64 KiB is far above any real one. */
-export const MAX_REQUEST_BYTES = 64 * 1024;
+/** A turn request is the user's text, the map context (64 KiB is far above any real one) and up to four photos in base64. */
+export const MAX_REQUEST_BYTES = 64 * 1024 + ATTACHMENT_LIMITS.perTurn * Math.ceil(ATTACHMENT_LIMITS.bytes / 3) * 4;
+
+/** How long a new message waits for the running turn it interrupts to stop and store itself before taking its lease. */
+export const SUPERSEDE_WAIT_MS = 5_000;
 
 export interface TurnContext {
   readonly uid: string;
@@ -16,8 +20,12 @@ export interface TurnContext {
   readonly turnId: string;
   readonly seq: number;
   readonly request: TurnRequest;
+  /** The photos attached to this turn, decoded and checked. */
+  readonly images: readonly TurnImage[];
   /** The most recent stored turns, oldest first; the prompt carries them. */
   readonly history: readonly StoredTurn[];
+  /** The photos of the last `SESSION_LIMITS.promptImageTurns` history turns, by attachment id. */
+  readonly historyImages: ReadonlyMap<string, TurnImage>;
   readonly sink: EventSink;
   readonly signal: AbortSignal;
   readonly startedAt: Date;
@@ -32,7 +40,9 @@ type Route =
   | { readonly kind: 'health' }
   | { readonly kind: 'sessions'; readonly method: 'GET' | 'POST' }
   | { readonly kind: 'session'; readonly method: 'GET' | 'DELETE'; readonly sessionId: string }
-  | { readonly kind: 'turn'; readonly sessionId: string };
+  | { readonly kind: 'turn'; readonly sessionId: string }
+  | { readonly kind: 'cancel'; readonly sessionId: string }
+  | { readonly kind: 'attachment'; readonly sessionId: string; readonly attachmentId: string };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -45,6 +55,12 @@ function matchRoute(method: string, pathname: string): Route | null {
   }
   const turn = /^\/v1\/sessions\/([^/]+)\/turns$/.exec(pathname);
   if (turn !== null && ID.test(turn[1]!) && method === 'POST') return { kind: 'turn', sessionId: turn[1]! };
+  const cancel = /^\/v1\/sessions\/([^/]+)\/cancel$/.exec(pathname);
+  if (cancel !== null && ID.test(cancel[1]!) && method === 'POST') return { kind: 'cancel', sessionId: cancel[1]! };
+  const attachment = /^\/v1\/sessions\/([^/]+)\/attachments\/([^/]+)$/.exec(pathname);
+  if (attachment !== null && ID.test(attachment[1]!) && ID.test(attachment[2]!) && method === 'GET') {
+    return { kind: 'attachment', sessionId: attachment[1]!, attachmentId: attachment[2]! };
+  }
   return null;
 }
 
@@ -94,6 +110,8 @@ export interface AgentServerOptions {
   /** Exact origins the Web app is served from; the agent additionally allows the Authorization header. */
   readonly allowedOrigins: readonly string[];
   readonly turnTimeoutMs: number;
+  /** Defaults to `SUPERSEDE_WAIT_MS`. */
+  readonly supersedeWaitMs?: number;
   readonly clock?: () => Date;
 }
 
@@ -120,30 +138,100 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     return identity.uid;
   }
 
+  /** Resolves once `turnId` no longer holds the session's lease, or after the supersede wait. */
+  function waitForRelease(uid: string, sessionId: string, turnId: string): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      let unwatch: (() => void) | null = null;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unwatch?.();
+        resolve();
+      };
+      const timer = setTimeout(settle, options.supersedeWaitMs ?? SUPERSEDE_WAIT_MS);
+      unwatch = options.store.watchSession(uid, sessionId, (record) => {
+        if (record === null || record.activeTurn?.turnId !== turnId) settle();
+      });
+      if (settled) unwatch();
+    });
+  }
+
+  /**
+   * One turn runs per session, and a new message interrupts it: the running turn is asked to stop, gets a
+   * moment to store what it has (so the new turn's history includes it), and then loses its lease either way.
+   */
+  async function acquireLease(uid: string, sessionId: string, turnId: string): Promise<void> {
+    const first = await options.store.acquireTurn(uid, sessionId, turnId, clock());
+    if (first === 'acquired') return;
+    if (first === 'missing') throw new AgentServiceError('notFound');
+    const running = await options.store.requestCancel(uid, sessionId, clock());
+    if (running !== null) await waitForRelease(uid, sessionId, running);
+    const second = await options.store.acquireTurn(uid, sessionId, turnId, clock(), running ?? undefined);
+    if (second === 'missing') throw new AgentServiceError('notFound');
+    if (second === 'busy') throw new AgentServiceError('turnInProgress');
+  }
+
+  /** Photos of the most recent turns go back to the model; one that cannot be read is left out, not fatal. */
+  async function loadHistoryImages(uid: string, sessionId: string, history: readonly StoredTurn[]): Promise<Map<string, TurnImage>> {
+    const ids = history.slice(-SESSION_LIMITS.promptImageTurns).flatMap((turn) => turn.attachments.map((attachment) => attachment.id));
+    const images = await Promise.all(ids.map((id) => options.store.getAttachment(uid, sessionId, id).catch(() => null)));
+    return new Map(images.filter((image) => image !== null).map((image) => [image.id, image]));
+  }
+
   async function runTurn(uid: string, sessionId: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = await readJsonBody(request);
     const parsed = turnRequestSchema.safeParse(body);
     if (!parsed.success) throw new AgentServiceError('invalidRequest');
-    const now = clock();
-    if (!options.rateLimiter.allow(uid, now)) throw new AgentServiceError('rateLimited');
-    const session = await options.store.get(uid, sessionId);
-    if (session === null) throw new AgentServiceError('notFound');
-    const turnId = newId('t');
-    const lease = await options.store.acquireTurn(uid, sessionId, turnId, now);
-    if (lease === 'missing') throw new AgentServiceError('notFound');
-    if (lease === 'busy') throw new AgentServiceError('turnInProgress');
-    const history = await options.store.listTurns(uid, sessionId, SESSION_LIMITS.promptTurns);
+    const images = decodeImages(parsed.data.attachments ?? [], ATTACHMENT_LIMITS.bytes);
+    if (!options.rateLimiter.allow(uid, clock())) throw new AgentServiceError('rateLimited');
 
-    // The client leaving or the Cloud Run deadline cancels the run, so it stops spending tokens.
+    // The client leaving, the stop button, a newer message or the Cloud Run deadline cancels the run, so it
+    // stops spending tokens. The client may already leave while this request waits for an interrupted turn.
     const controller = new AbortController();
     const onClose = () => controller.abort();
     response.on('close', onClose);
+    const turnId = newId('t');
+    let session: SessionRecord;
+    let history: StoredTurn[];
+    let historyImages: Map<string, TurnImage>;
+    try {
+      await acquireLease(uid, sessionId, turnId);
+    } catch (error) {
+      response.off('close', onClose);
+      throw error;
+    }
+    if (controller.signal.aborted) {
+      // The client left while the turn it interrupted wound down; there is nobody to answer.
+      response.off('close', onClose);
+      await options.store.releaseTurn(uid, sessionId, turnId);
+      return;
+    }
+    try {
+      const record = await options.store.get(uid, sessionId);
+      if (record === null) throw new AgentServiceError('notFound');
+      session = record;
+      history = await options.store.listTurns(uid, sessionId, SESSION_LIMITS.promptTurns);
+      historyImages = await loadHistoryImages(uid, sessionId, history);
+    } catch (error) {
+      response.off('close', onClose);
+      await options.store.releaseTurn(uid, sessionId, turnId);
+      throw error;
+    }
+
+    // The stop button and a newer message reach the turn through its lease, whichever instance runs it.
+    const unwatch = options.store.watchSession(uid, sessionId, (record) => {
+      const active = record?.activeTurn ?? null;
+      if (record === null || (active !== null && (active.turnId !== turnId || active.cancelRequested === true))) controller.abort();
+    });
+    const startedAt = clock();
     const timer = setTimeout(() => controller.abort(), options.turnTimeoutMs);
     const sink = openSseStream(response, turnId);
     try {
-      const turn = await options.runner.run({ uid, session, turnId, seq: session.turnCount + 1, request: parsed.data,
-        history, sink, signal: controller.signal, startedAt: now });
-      await options.store.completeTurn(uid, sessionId, turn, clock());
+      const turn = await options.runner.run({ uid, session, turnId, seq: session.turnCount + 1, request: parsed.data, images,
+        history, historyImages, sink, signal: controller.signal, startedAt });
+      await options.store.completeTurn(uid, sessionId, turn, clock(), images);
     } catch (error) {
       if (!sink.sent.some((event) => event.event === 'done' || event.event === 'error')) {
         sink.emit({ event: 'error', message: controller.signal.aborted ? 'The turn was cancelled or timed out' : 'The agent could not finish this turn',
@@ -153,6 +241,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
       process.stderr.write(`${JSON.stringify({ severity: 'ERROR', event: 'turnFailed', turnId, reason: error instanceof Error ? error.name : 'unknown' })}\n`);
     } finally {
       clearTimeout(timer);
+      unwatch();
       response.off('close', onClose);
       sink.close();
     }
@@ -200,6 +289,21 @@ export function createAgentHttpServer(options: AgentServerOptions) {
         case 'turn':
           await runTurn(uid, route.sessionId, request, response);
           return;
+        case 'cancel': {
+          // The stop button: the running turn stops wherever it runs and is stored as cancelled.
+          if (await options.store.get(uid, route.sessionId) === null) throw new AgentServiceError('notFound');
+          await options.store.requestCancel(uid, route.sessionId, clock());
+          response.writeHead(204); response.end();
+          return;
+        }
+        case 'attachment': {
+          const image = await options.store.getAttachment(uid, route.sessionId, route.attachmentId);
+          if (image === null) throw new AgentServiceError('notFound');
+          response.writeHead(200, { 'Content-Type': image.mimeType, 'Content-Length': image.data.length,
+            'Cache-Control': 'private, max-age=86400, immutable', 'X-Content-Type-Options': 'nosniff' });
+          response.end(image.data);
+          return;
+        }
       }
     } catch (error) {
       writeError(response, errorCodeOf(error));
