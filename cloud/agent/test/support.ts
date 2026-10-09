@@ -37,8 +37,15 @@ export function streamedText(text: string, meta: GenerateContentResponseUsageMet
   ];
 }
 
+/**
+ * The flushed function-call response and the trailing aggregated response that carries the usage: the two
+ * complete responses ADK's streaming aggregator yields for a tool call. The tool runs between them.
+ */
 export function functionCall(name: string, args: Record<string, unknown>, meta: GenerateContentResponseUsageMetadata, text?: string): LlmResponse[] {
-  return [{ content: { role: 'model', parts: [...(text === undefined ? [] : [{ text }]), { functionCall: { name, args } }] }, partial: false, usageMetadata: meta }];
+  return [
+    { content: { role: 'model', parts: [...(text === undefined ? [] : [{ text }]), { functionCall: { name, args } }] }, partial: false, usageMetadata: {} },
+    { partial: false, usageMetadata: meta },
+  ];
 }
 
 export function eventItem(id: string, title: string, lng: number, lat: number, startAt: string, endAt: string): MapItem {

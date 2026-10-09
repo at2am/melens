@@ -9,6 +9,13 @@ import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, turnMessage 
 
 const APP_NAME = 'melens';
 
+/** A streamed chunk's usage block may exist with no counts; only the trailing aggregated response carries them. */
+function hasUsage(metadata: LlmResponse['usageMetadata']): boolean {
+  if (metadata === undefined) return false;
+  return [metadata.promptTokenCount, metadata.candidatesTokenCount, metadata.thoughtsTokenCount, metadata.totalTokenCount]
+    .some((value) => typeof value === 'number' && value > 0);
+}
+
 export interface MapAgentOptions {
   /** A Gemini instance for Vertex AI, or any BaseLlm (tests inject a scripted one). */
   readonly model: BaseLlm;
@@ -40,9 +47,19 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
       const registry = new TurnRegistry({ turnId: turn.turnId, uid: turn.uid, request: turn.request, sink: turn.sink,
         signal: turn.signal, clock, ...(options.log === undefined ? {} : { log: options.log }) });
       const tools = toolSpecs(options.tools).map((spec) => buildTool(spec, registry));
-      let callStartedAt = 0;
       let streamedText = false;
       let answer = '';
+      // ADK runs afterModelCallback for every response of a streamed call: the flushed function-call
+      // response, whose chunk carries no usage, and the trailing aggregated one that carries it. One
+      // request is one call, so a call stays open until a response brings usage or the next request starts.
+      let openCall: { startedAt: number; finishedAt: number | null } | null = null;
+      const closeCall = (metadata?: LlmResponse['usageMetadata']): void => {
+        if (openCall === null) return;
+        const usage = registry.usage.record(metadata, { agent: AGENT_NAME, model: modelName,
+          durationMs: (openCall.finishedAt ?? clock().getTime()) - openCall.startedAt });
+        openCall = null;
+        turn.sink.emit({ event: 'usage', call: usage, turn: registry.usage.turn });
+      };
 
       const agent = new LlmAgent({
         name: AGENT_NAME,
@@ -50,10 +67,11 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         instruction: instructionFor(turn.session.pendingQuestion),
         tools,
         beforeModelCallback: ({ request }): LlmResponse | undefined => {
-          callStartedAt = clock().getTime();
+          closeCall();
           streamedText = false;
           // ask_user ends the turn: the step after its answer gets an empty final response instead of a model call.
           if (registry.asked !== null) return { content: { role: 'model', parts: [{ text: '' }] }, partial: false };
+          openCall = { startedAt: clock().getTime(), finishedAt: null };
           const index = registry.usage.calls + 1;
           if (registry.toolsDisabled || index >= options.maxModelCalls) {
             stripTools(request);
@@ -65,10 +83,10 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
           return undefined;
         },
         afterModelCallback: ({ response }): LlmResponse | undefined => {
-          if (response.partial === true) return undefined;
-          const usage = registry.usage.record(response.usageMetadata, { agent: AGENT_NAME, model: modelName,
-            durationMs: clock().getTime() - callStartedAt });
-          turn.sink.emit({ event: 'usage', call: usage, turn: registry.usage.turn });
+          if (response.partial === true || openCall === null) return undefined;
+          // The first complete response ends the model's work; tools run before the trailing usage arrives.
+          openCall.finishedAt ??= clock().getTime();
+          if (hasUsage(response.usageMetadata)) closeCall(response.usageMetadata);
           return undefined;
         },
       });
@@ -98,7 +116,9 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
             turn.sink.emit({ event: 'text', delta: text });
           }
         }
+        closeCall();
       } catch (error) {
+        openCall = null; // a failed call reports no usage of its own; the error event carries the totals
         if (!turn.signal.aborted) {
           failed = true;
           options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown' });

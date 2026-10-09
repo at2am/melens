@@ -50,13 +50,25 @@ test('a tool call sends its status, the result reaches the next model call, and 
   const turn = turnContext('what is on tonight?');
   const { runner: run, reader } = runner(llm);
   const stored = await run.run(turn);
-  assert.deepEqual(kinds(turn.sink.sent), ['usage', 'status', 'text', 'text', 'usage', 'done']);
+  // The tool call's usage arrives on the trailing response, after the tool ran; it is still one model call.
+  assert.deepEqual(kinds(turn.sink.sent), ['status', 'usage', 'text', 'text', 'usage', 'done']);
   assert.equal(stored.text, 'Found 2 events; first event:2.', 'sorted by distance from the centre');
   assert.deepEqual(reader.queries, [{ layers: ['event'] }]);
   assert.deepEqual(stored.trace.map((entry) => [entry.tool, entry.rows, entry.error]), [['search_features', 2, null]]);
   assert.equal(stored.usage.calls, 2);
   assert.equal(stored.usage.total, 632);
-  assert.equal(stored.usage.perCall[1]?.index, 2);
+  assert.deepEqual(stored.usage.perCall.map((call) => [call.index, call.total]), [[1, 220], [2, 412]]);
+  const turnCounts = turn.sink.sent.flatMap((event) => event.event === 'usage' ? [event.turn.calls] : []);
+  assert.deepEqual(turnCounts, [1, 2]);
+});
+
+test('a model call that never reports usage is counted once, as zeros', async () => {
+  const llm = new ScriptedLlm([() => [{ content: { role: 'model', parts: [{ text: 'No usage came back.' }] }, partial: false }]]);
+  const turn = turnContext('hi');
+  const stored = await runner(llm).runner.run(turn);
+  assert.deepEqual(kinds(turn.sink.sent), ['text', 'usage', 'done']);
+  assert.deepEqual(stored.usage, { calls: 1, input: 0, cachedInput: 0, output: 0, thoughts: 0, toolUseInput: 0, total: 0, complete: true,
+    perCall: [{ index: 1, agent: 'map_agent', model: 'gemini-test', input: 0, cachedInput: 0, output: 0, thoughts: 0, toolUseInput: 0, total: 0, durationMs: 0 }] });
 });
 
 test('show_card rejects sources no tool returned, then accepts a searched feature and emits the card', async () => {
@@ -75,7 +87,7 @@ test('show_card rejects sources no tool returned, then accepts a searched featur
   ]);
   const turn = turnContext('what is on tonight?');
   const stored = await runner(llm).runner.run(turn);
-  assert.deepEqual(kinds(turn.sink.sent), ['usage', 'usage', 'status', 'usage', 'card', 'text', 'text', 'usage', 'done']);
+  assert.deepEqual(kinds(turn.sink.sent), ['usage', 'status', 'usage', 'card', 'usage', 'text', 'text', 'usage', 'done']);
   assert.equal(stored.cards.length, 1);
   assert.equal(stored.cards[0]?.id, 'c_t_test_1');
   assert.deepEqual(stored.trace.map((entry) => entry.error), ['unverified_sources', null, null]);
@@ -87,7 +99,7 @@ test('ask_user sends the question and ends the turn without another model call',
   ]);
   const turn = turnContext('take me to the gardens');
   const stored = await runner(llm).runner.run(turn);
-  assert.deepEqual(kinds(turn.sink.sent), ['usage', 'question', 'done']);
+  assert.deepEqual(kinds(turn.sink.sent), ['question', 'usage', 'done']);
   assert.equal(stored.stop, 'asked');
   assert.equal(stored.question?.text, 'Which gardens?');
   assert.equal(llm.seen.length, 1);
@@ -105,7 +117,9 @@ test('the call budget removes the tools for the last call and the turn ends with
   const turn = turnContext('keep going');
   const stored = await runner(llm, { maxModelCalls: 3 }).runner.run(turn);
   assert.equal(stored.stop, 'budget');
+  // Each tool call streams two complete responses; the budget counts requests, so all three happen.
   assert.equal(stored.usage.calls, 3);
+  assert.equal(llm.seen.length, 3);
   assert.equal(stored.uiActions.length, 2);
   assert.match(llm.seen[1]?.contents.at(-1)?.parts?.[0]?.text ?? '', /last chance/);
   assert.match(llm.seen[2]?.contents.at(-1)?.parts?.[0]?.text ?? '', /no tools/);
