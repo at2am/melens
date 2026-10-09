@@ -73,9 +73,12 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   void _scrollToEnd(ChatState chat) {
     final last = chat.turns.isEmpty ? null : chat.turns.last;
+    // Every change that adds a row to the last turn moves the scroll: text,
+    // a step starting or finishing, a card.
+    final steps = last?.steps ?? const <ChatStep>[];
     final length =
         (last?.text.length ?? 0) +
-        (last?.statuses.length ?? 0) +
+        steps.fold<int>(0, (sum, step) => sum + (step.isRunning ? 1 : 2)) +
         (last?.cards.length ?? 0);
     if (chat.turns.length == _renderedTurns && length == _renderedLength) {
       return;

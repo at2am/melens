@@ -487,15 +487,32 @@ final class AgentQuestion {
   Map<String, dynamic> toJson() => _$AgentQuestionToJson(this);
 }
 
+/// Where a tool call is: `running` when it starts, then `done` or `failed`
+/// (a tool error) when it ends.
+enum AgentStepState { running, done, failed }
+
 /// One server-sent event of a turn. Every event carries `turnId` and an
-/// increasing `seq`, so the app can de-duplicate and order them.
+/// increasing `seq`, so the app can de-duplicate and order them. Every tool
+/// call is one step; the events it produces carry the same `stepId`.
 @Freezed(unionKey: 'event', fromJson: true, toJson: true)
 sealed class AgentEvent with _$AgentEvent {
+  /// A step of the turn: sent with state `running` when the tool call
+  /// starts and again with `done` or `failed` when it ends. [detail] sums up
+  /// the arguments; [rows], [durationMs], [error] and [memo] arrive with the
+  /// finished event.
   @FreezedUnionValue('status')
   const factory AgentEvent.status({
     @JsonKey(required: true) required String turnId,
     @JsonKey(required: true) required int seq,
+    @JsonKey(required: true) required String stepId,
+    @JsonKey(required: true) required AgentStepState state,
+    @JsonKey(required: true) required String tool,
     @JsonKey(required: true) required String text,
+    @JsonKey(includeIfNull: false) String? detail,
+    @JsonKey(includeIfNull: false) int? rows,
+    @JsonKey(includeIfNull: false) String? error,
+    @JsonKey(includeIfNull: false) int? durationMs,
+    @Default(false) bool memo,
   }) = AgentStatusEvent;
 
   @FreezedUnionValue('text')
@@ -509,6 +526,7 @@ sealed class AgentEvent with _$AgentEvent {
   const factory AgentEvent.uiAction({
     @JsonKey(required: true) required String turnId,
     @JsonKey(required: true) required int seq,
+    @JsonKey(required: true) required String stepId,
     @JsonKey(required: true) required UiActionName action,
     @JsonKey(required: true) required Map<String, dynamic> args,
   }) = AgentUiActionEvent;
@@ -517,6 +535,7 @@ sealed class AgentEvent with _$AgentEvent {
   const factory AgentEvent.card({
     @JsonKey(required: true) required String turnId,
     @JsonKey(required: true) required int seq,
+    @JsonKey(required: true) required String stepId,
     @JsonKey(required: true) required AgentCard card,
   }) = AgentCardEvent;
 
@@ -524,6 +543,7 @@ sealed class AgentEvent with _$AgentEvent {
   const factory AgentEvent.question({
     @JsonKey(required: true) required String turnId,
     @JsonKey(required: true) required int seq,
+    @JsonKey(required: true) required String stepId,
     @JsonKey(required: true) required AgentQuestion question,
   }) = AgentQuestionEvent;
 
@@ -556,7 +576,9 @@ sealed class AgentEvent with _$AgentEvent {
       _$AgentEventFromJson(json);
 }
 
-/// One line of the compact tool trace stored with a turn.
+/// One line of the compact tool trace stored with a turn: the step as the
+/// app showed it while the turn ran. Turns stored before `detail` and `memo`
+/// existed lack them.
 @JsonSerializable(checked: true, explicitToJson: true)
 final class TraceEntry {
   const TraceEntry({
@@ -566,6 +588,8 @@ final class TraceEntry {
     required this.rows,
     required this.error,
     required this.durationMs,
+    this.detail,
+    this.memo = false,
   });
 
   @JsonKey(required: true)
@@ -574,8 +598,13 @@ final class TraceEntry {
   @JsonKey(required: true)
   final Map<String, dynamic> args;
 
+  /// The tool's status line; null in turns stored before UI tools had one.
   @JsonKey(required: true)
   final String? status;
+
+  /// A short summary of the arguments.
+  @JsonKey(includeIfNull: false)
+  final String? detail;
 
   @JsonKey(required: true)
   final int? rows;
@@ -585,6 +614,10 @@ final class TraceEntry {
 
   @JsonKey(required: true)
   final int durationMs;
+
+  /// Answered from an identical earlier call in the same turn.
+  @JsonKey(defaultValue: false)
+  final bool memo;
 
   factory TraceEntry.fromJson(Map<String, dynamic> json) =>
       _$TraceEntryFromJson(json);

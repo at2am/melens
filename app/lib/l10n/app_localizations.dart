@@ -1486,6 +1486,102 @@ abstract class AppLocalizations {
   /// **'Thinking…'**
   String get chatThinking;
 
+  /// Progress line under a running turn while the answer text streams and no tool call is running.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing…'**
+  String get chatWriting;
+
+  /// How many rows a finished tool call returned, shown on its step row.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 result} other{{count} results}}'**
+  String chatStepRows(int count);
+
+  /// Marks a step whose tool call was answered from an identical earlier call in the same turn.
+  ///
+  /// In en, this message translates to:
+  /// **'reused'**
+  String get chatStepMemo;
+
+  /// Duration of a tool call of one second or more, shown on its step row.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String chatStepSeconds(String seconds);
+
+  /// Duration of a tool call under one second, shown on its step row.
+  ///
+  /// In en, this message translates to:
+  /// **'{millis} ms'**
+  String chatStepMillis(int millis);
+
+  /// A failed step whose tool error code the app has no label for; the code is shown as sent.
+  ///
+  /// In en, this message translates to:
+  /// **'failed: {code}'**
+  String chatStepFailed(String code);
+
+  /// Step outcome when the agent called a tool with arguments the server rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'invalid arguments'**
+  String get chatToolErrorInvalidArguments;
+
+  /// Step outcome when a tool could not find the feature or place asked for.
+  ///
+  /// In en, this message translates to:
+  /// **'not found'**
+  String get chatToolErrorNotFound;
+
+  /// Step outcome when analyse_anomaly was called on a feature that is not an anomaly.
+  ///
+  /// In en, this message translates to:
+  /// **'not an anomaly'**
+  String get chatToolErrorNotAnAnomaly;
+
+  /// Step outcome when a card cited sources no tool returned in the turn.
+  ///
+  /// In en, this message translates to:
+  /// **'unverified sources'**
+  String get chatToolErrorUnverifiedSources;
+
+  /// Step outcome when draw_route could not find a route.
+  ///
+  /// In en, this message translates to:
+  /// **'no route found'**
+  String get chatToolErrorRouteNotFound;
+
+  /// Step outcome when the data source or a Google API did not answer.
+  ///
+  /// In en, this message translates to:
+  /// **'source unavailable'**
+  String get chatToolErrorUpstreamUnavailable;
+
+  /// Title of the details pane that shows a tapped card item which is not a map record.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent result'**
+  String get cardItemDetailsTitle;
+
+  /// Tooltip of the close button of the card item details pane.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the result details'**
+  String get cardItemDetailsClose;
+
+  /// Explains, in the card item details pane, why the item has no map record details.
+  ///
+  /// In en, this message translates to:
+  /// **'This result is not a record on the map. It comes from the source below, as the agent reported it.'**
+  String get cardItemDetailsNotOnMap;
+
+  /// Button in the card item details pane that opens the item's source link.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the source'**
+  String get cardItemDetailsOpenSource;
+
   /// Shown under a turn the user cancelled.
   ///
   /// In en, this message translates to:

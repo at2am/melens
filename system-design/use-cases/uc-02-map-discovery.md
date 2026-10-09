@@ -25,7 +25,7 @@ The main GenAI feature: the user points at the map and learns what makes that pl
 ## Behaviour
 
 1. The user selects a point on the map, or asks in the chat about where they are. The app sends the coordinates, the current time and the enabled layers.
-2. The `area_brief` workflow searches layer features and heritage records within a radius, then uses Maps grounding for place details. From the chat, `map_agent` calls the same workflow as a tool.
+2. The `area_brief` workflow searches layer features and heritage records within a radius, and uses Maps grounding only for place details the layers do not carry or when they return nothing useful there. From the chat, `map_agent` calls the same workflow as a tool.
 3. The first answer is an `area_brief` card with a fixed format: neighbourhood character, recommended places, upcoming activities.
 4. The chat stays open; follow-up questions go to `map_agent`.
 

@@ -796,6 +796,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatThinking => 'Thinking…';
 
   @override
+  String get chatWriting => 'Writing…';
+
+  @override
+  String chatStepRows(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count results',
+      one: '1 result',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatStepMemo => 'reused';
+
+  @override
+  String chatStepSeconds(String seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String chatStepMillis(int millis) {
+    return '$millis ms';
+  }
+
+  @override
+  String chatStepFailed(String code) {
+    return 'failed: $code';
+  }
+
+  @override
+  String get chatToolErrorInvalidArguments => 'invalid arguments';
+
+  @override
+  String get chatToolErrorNotFound => 'not found';
+
+  @override
+  String get chatToolErrorNotAnAnomaly => 'not an anomaly';
+
+  @override
+  String get chatToolErrorUnverifiedSources => 'unverified sources';
+
+  @override
+  String get chatToolErrorRouteNotFound => 'no route found';
+
+  @override
+  String get chatToolErrorUpstreamUnavailable => 'source unavailable';
+
+  @override
+  String get cardItemDetailsTitle => 'Agent result';
+
+  @override
+  String get cardItemDetailsClose => 'Close the result details';
+
+  @override
+  String get cardItemDetailsNotOnMap =>
+      'This result is not a record on the map. It comes from the source below, as the agent reported it.';
+
+  @override
+  String get cardItemDetailsOpenSource => 'Open the source';
+
+  @override
   String get chatTurnCancelled => 'Stopped.';
 
   @override

@@ -16,6 +16,8 @@ const configSchema = z.strictObject({
   publicSourcesFile: z.string().min(1).nullable(),
   maxModelCalls: positiveInteger.max(64),
   turnTimeoutMs: positiveInteger.max(300_000),
+  /** How long one grounding call may take before the tool gives up and the model answers from the map data. */
+  groundingTimeoutMs: positiveInteger.max(300_000),
   turnsPerHour: positiveInteger.max(10_000),
 });
 
@@ -45,6 +47,7 @@ export function loadAgentConfig(env: Readonly<Record<string, string | undefined>
     publicSourcesFile: env.AGENT_PUBLIC_SOURCES_FILE ?? env.MAP_PUBLIC_SOURCES_FILE ?? null,
     maxModelCalls: integerSetting(env.AGENT_MAX_MODEL_CALLS, 16),
     turnTimeoutMs: integerSetting(env.AGENT_TURN_TIMEOUT_MS, 300_000),
+    groundingTimeoutMs: integerSetting(env.AGENT_GROUNDING_TIMEOUT_MS, 40_000),
     turnsPerHour: integerSetting(env.AGENT_TURNS_PER_HOUR, 120),
   });
   if (!parsed.success) {

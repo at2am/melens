@@ -49,9 +49,16 @@ void main() {
   group('events', () {
     test('every event type decodes with its envelope', () {
       final events = [
-        envelope('status', 0, {'text': 'Searching the map'}),
+        envelope('status', 0, {
+          'stepId': 's_1',
+          'state': 'running',
+          'tool': 'search_features',
+          'text': 'Searching the map',
+          'detail': 'events · within 500 m',
+        }),
         envelope('text', 1, {'delta': 'Near you'}),
         envelope('ui_action', 2, {
+          'stepId': 's_2',
           'action': 'focus_map',
           'args': {
             'target': {
@@ -60,8 +67,9 @@ void main() {
             'zoom': 16,
           },
         }),
-        envelope('card', 3, {'card': cardJson}),
+        envelope('card', 3, {'stepId': 's_3', 'card': cardJson}),
         envelope('question', 4, {
+          'stepId': 's_4',
           'question': {
             'id': 'q_1',
             'text': 'Which gardens?',
@@ -97,9 +105,16 @@ void main() {
 
       expect(events.map((event) => event.seq), [0, 1, 2, 3, 4, 5, 6, 7]);
       expect(events.every((event) => event.turnId == 't_8f3c'), isTrue);
-      expect(events[0], isA<AgentStatusEvent>());
+      final status = events[0] as AgentStatusEvent;
+      expect(status.stepId, 's_1');
+      expect(status.state, AgentStepState.running);
+      expect(status.tool, 'search_features');
+      expect(status.detail, 'events · within 500 m');
+      expect(status.rows, isNull);
+      expect(status.memo, isFalse);
       expect((events[1] as AgentTextEvent).delta, 'Near you');
       final action = events[2] as AgentUiActionEvent;
+      expect(action.stepId, 's_2');
       expect(action.action, UiActionName.focusMap);
       expect(action.args['zoom'], 16);
       final card = (events[3] as AgentCardEvent).card;
@@ -285,6 +300,10 @@ void main() {
       expect(turn.cards.single.id, 'c_1');
       expect(turn.uiActions.single.action, UiActionName.highlightFeatures);
       expect(turn.trace.single.status, 'Searching the map');
+      // Turns stored before the trace carried them read as no detail and
+      // no memo.
+      expect(turn.trace.single.detail, isNull);
+      expect(turn.trace.single.memo, isFalse);
       expect(turn.usage.complete, isTrue);
       expect(turn.usage.perCall, isEmpty);
       expect(turn.stop, StopReason.end);

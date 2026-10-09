@@ -50,7 +50,7 @@ final class ChatControllerProvider
   }
 }
 
-String _$chatControllerHash() => r'1550c8bb4808755441ff3287966178f3e6c9c65e';
+String _$chatControllerHash() => r'332580f1841b81fde7ba420ae5000337c048f2ac';
 
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter

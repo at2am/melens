@@ -198,7 +198,14 @@ void main() {
     final client = clientWith(capture: capture, (request) async {
       return sseResponse([
         ': keep-alive\n\n',
-        sse('status', {'turnId': 't_1', 'seq': 0, 'text': 'Searching the map'}),
+        sse('status', {
+          'turnId': 't_1',
+          'seq': 0,
+          'stepId': 's_1',
+          'state': 'running',
+          'tool': 'search_features',
+          'text': 'Searching the map',
+        }),
         sse('text', {
           'turnId': 't_1',
           'seq': 1,

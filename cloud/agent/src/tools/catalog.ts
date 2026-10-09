@@ -13,6 +13,15 @@ export const toolLayerSchema = z.enum(['pedestrian', 'anomaly', 'disruption', 'e
 export type ToolLayer = z.infer<typeof toolLayerSchema>;
 const DEFAULT_LAYERS: readonly ToolLayer[] = ['event', 'disruption', 'news', 'planning', 'pedestrian', 'anomaly'];
 
+/** How a layer reads in a step's argument summary. */
+const LAYER_LABELS: Record<ToolLayer, string> = {
+  pedestrian: 'pedestrian counts', anomaly: 'anomalies', disruption: 'disruptions', event: 'events', news: 'news', planning: 'planning',
+};
+function layerList(layers: readonly ToolLayer[]): string { return layers.map((layer) => LAYER_LABELS[layer]).join(', '); }
+function distanceLabel(metres: number): string { return metres >= 1_000 ? `${(metres / 1_000).toFixed(1).replace(/\.0$/, '')} km` : `${metres} m`; }
+function pointLabel(point: LatLng): string { return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`; }
+function featureLabel(turn: TurnRegistry, id: string): string { return turn.features.get(id)?.title ?? id; }
+
 const bboxSchema = z.strictObject({
   north: z.number().min(-90).max(90), south: z.number().min(-90).max(90), east: z.number().min(-180).max(180), west: z.number().min(-180).max(180),
 }).refine((box) => box.north > box.south && box.east > box.west, 'bbox needs north > south and east > west');
@@ -61,9 +70,14 @@ function overlaps(feature: CompactFeature, window: { from: string; to: string })
   return (from === null || from < end) && (to === null || to > start);
 }
 
+/** Without a configured value a grounding call may take this long before the tool gives up. */
+export const DEFAULT_GROUNDING_TIMEOUT_MS = 40_000;
+
 export interface ToolDependencies {
   readonly features: FeatureReader;
   readonly grounding: GroundingModel | null;
+  /** A grounding call that takes longer returns `upstream_unavailable`, so the model answers from the map data instead of waiting. */
+  readonly groundingTimeoutMs?: number;
 }
 
 interface SearchOutcome { readonly features: CompactFeature[]; readonly states: Record<string, string> }
@@ -89,6 +103,13 @@ async function searchArea(deps: ToolDependencies, turn: TurnRegistry, area: Area
   return { features, states };
 }
 
+/** The layers a search covers: the requested ones, else the layers visible on the map, else every layer. */
+function searchLayers(requested: readonly ToolLayer[] | undefined, turn: TurnRegistry): readonly ToolLayer[] {
+  if (requested !== undefined) return requested;
+  const contextLayers = turn.turn.request.context.layers.filter((layer): layer is ToolLayer => toolLayerSchema.safeParse(layer).success);
+  return contextLayers.length > 0 ? contextLayers : DEFAULT_LAYERS;
+}
+
 const searchFeatures = (deps: ToolDependencies) => defineTool({
   name: 'search_features',
   description: 'Find map features (events, transport disruptions, news, planning applications, pedestrian sensors, anomalies) in an area, '
@@ -103,12 +124,15 @@ const searchFeatures = (deps: ToolDependencies) => defineTool({
     sort: z.enum(['distance', 'time']).optional().describe('Default distance from the area centre'),
     limit: z.number().int().min(1).max(50).optional().describe('1 to 50, default 20'),
   }),
+  detail(args, turn) {
+    const area = args.area.bbox !== undefined ? 'in an area' : `within ${distanceLabel(args.area.radius_m!)}`;
+    return [layerList(searchLayers(args.layers, turn)), area, ...(args.query === undefined ? [] : [`"${args.query}"`])].join(' · ');
+  },
   async run(args, turn) {
     const now = turn.now();
     const window = windowOf(args.time, now, { back: 24 * HOUR, ahead: 24 * HOUR });
     if (window === null) return toolError('invalid_arguments', 'time.from must be before time.to');
-    const contextLayers = turn.turn.request.context.layers.filter((layer): layer is ToolLayer => toolLayerSchema.safeParse(layer).success);
-    const layers = args.layers ?? (contextLayers.length > 0 ? contextLayers : DEFAULT_LAYERS);
+    const layers = searchLayers(args.layers, turn);
     const { features, states } = await searchArea(deps, turn, args.area, layers, window);
     const filtered = args.query === undefined ? features : features.filter((feature) => matchesKeywords(feature, args.query!));
     filtered.sort(args.sort === 'time'
@@ -144,6 +168,7 @@ const getFeature = defineTool({
   status: 'Reading the details',
   readOnly: true,
   schema: z.strictObject({ id: z.string().min(1).max(256).describe('A feature id returned by search_features or nearby_context') }),
+  detail(args, turn) { return featureLabel(turn, args.id); },
   async run(args, turn) {
     const item = turn.features.get(args.id);
     if (item === undefined) return toolError('not_found', 'No feature with this id was returned in this conversation; search first.');
@@ -163,6 +188,7 @@ const nearbyContext = (deps: ToolDependencies) => defineTool({
     radius_m: z.number().int().min(100).max(3_000).optional().describe('Default 1000'),
     time: timeWindowSchema.optional().describe('Defaults to the past 24 hours through the next 6 hours'),
   }),
+  detail(args) { return `within ${distanceLabel(args.radius_m ?? 1_000)} of ${pointLabel(args.point)}`; },
   async run(args, turn) {
     const window = windowOf(args.time, turn.now(), { back: 24 * HOUR, ahead: 6 * HOUR });
     if (window === null) return toolError('invalid_arguments', 'time.from must be before time.to');
@@ -180,14 +206,18 @@ const showLayers = defineTool({
   name: 'show_layers',
   description: 'Change which layers are visible on the map, optionally filtered by category or time. Use it when the user asks to see or hide '
     + 'something, such as "only show live music tonight".',
-  status: null,
+  status: 'Updating the map layers',
   readOnly: false,
   schema: z.strictObject({
     layers: z.array(toolLayerSchema).min(1).max(6),
     mode: z.enum(['only', 'add', 'remove']).optional().describe('Default add; only hides every other layer'),
     filter: z.strictObject({ categories: z.array(z.string().min(1).max(40)).max(10).optional(), time: timeWindowSchema.optional() }).optional(),
   }),
-  async run(args, turn) {
+  detail(args) {
+    const verb = args.mode === 'only' ? 'only' : args.mode === 'remove' ? 'hide' : 'show';
+    return `${verb} ${layerList(args.layers)}`;
+  },
+  async run(args, turn, step) {
     const current = new Set<string>(turn.turn.request.context.layers);
     const mode = args.mode ?? 'add';
     const visible = mode === 'only' ? new Set<string>(args.layers)
@@ -195,7 +225,7 @@ const showLayers = defineTool({
         : new Set([...current, ...args.layers]);
     const action = { action: 'show_layers' as const, args: { layers: args.layers, mode, ...(args.filter === undefined ? {} : { filter: args.filter }) } };
     turn.uiActions.push(action);
-    turn.sink.emit({ event: 'ui_action', ...action });
+    turn.sink.emit({ event: 'ui_action', stepId: step.id, ...action });
     return { ok: true, visible_layers: [...visible] };
   },
 });
@@ -204,7 +234,7 @@ const focusMap = defineTool({
   name: 'focus_map',
   description: 'Move the map to a place, an area or a feature. Use it when the user asks to go somewhere or look at something, '
     + 'and before showing results that are off screen.',
-  status: null,
+  status: 'Moving the map',
   readOnly: false,
   schema: z.strictObject({
     target: z.strictObject({ point: latLngSchema.optional(), bbox: bboxSchema.optional(), feature_id: z.string().min(1).max(256).optional() })
@@ -212,7 +242,11 @@ const focusMap = defineTool({
         'Give exactly one of point, bbox or feature_id'),
     zoom: z.number().int().min(10).max(20).optional().describe('The app picks one if omitted'),
   }),
-  async run(args, turn) {
+  detail(args, turn) {
+    if (args.target.feature_id !== undefined) return `to ${featureLabel(turn, args.target.feature_id)}`;
+    return args.target.point !== undefined ? `to ${pointLabel(args.target.point)}` : 'to an area';
+  },
+  async run(args, turn, step) {
     let target: Record<string, unknown> = args.target;
     if (args.target.feature_id !== undefined) {
       const item = turn.features.get(args.target.feature_id);
@@ -221,7 +255,7 @@ const focusMap = defineTool({
     }
     const action = { action: 'focus_map' as const, args: { target, ...(args.zoom === undefined ? {} : { zoom: args.zoom }) } };
     turn.uiActions.push(action);
-    turn.sink.emit({ event: 'ui_action', ...action });
+    turn.sink.emit({ event: 'ui_action', stepId: step.id, ...action });
     return { ok: true };
   },
 });
@@ -230,18 +264,22 @@ const highlightFeatures = defineTool({
   name: 'highlight_features',
   description: 'Highlight features on the map, such as the places you are talking about. Pass feature ids only; places from Google Maps '
     + 'appear as pins in their card instead.',
-  status: null,
+  status: 'Highlighting features',
   readOnly: false,
   schema: z.strictObject({
     ids: z.array(z.string().min(1).max(256)).min(1).max(30),
     clear_previous: z.boolean().optional().describe('Default true'),
   }),
-  async run(args, turn) {
+  detail(args, turn) {
+    const titles = args.ids.map((id) => featureLabel(turn, id));
+    return titles.length <= 3 ? titles.join(', ') : `${titles.slice(0, 3).join(', ')} and ${titles.length - 3} more`;
+  },
+  async run(args, turn, step) {
     const found = args.ids.filter((id) => turn.features.has(id));
     const missing = args.ids.filter((id) => !turn.features.has(id));
     const action = { action: 'highlight_features' as const, args: { ids: found, clear_previous: args.clear_previous ?? true, missing } };
     turn.uiActions.push(action);
-    turn.sink.emit({ event: 'ui_action', ...action });
+    turn.sink.emit({ event: 'ui_action', stepId: step.id, ...action });
     return { ok: true, missing };
   },
 });
@@ -250,7 +288,7 @@ const showCard = defineTool({
   name: 'show_card',
   description: 'Show the user a result card. Every specific recommendation (a place, an event, a stop on a walk, a historical fact about a place) '
     + 'goes in a card, not in plain text. Each item must cite a feature id or a URL that a tool returned in this turn.',
-  status: null,
+  status: 'Preparing a card',
   readOnly: false,
   schema: z.strictObject({
     type: z.enum(['plan', 'history', 'list']).describe('plan lists stops in visiting order'),
@@ -258,7 +296,8 @@ const showCard = defineTool({
     intro: z.string().max(300).optional(),
     items: z.array(cardItemSchema).min(1).max(13),
   }),
-  async run(args, turn) {
+  detail(args) { return `"${args.title}" · ${args.items.length} ${args.items.length === 1 ? 'item' : 'items'}`; },
+  async run(args, turn, step) {
     const failing = args.items.flatMap((item, index) => {
       const ok = 'feature_id' in item.source ? turn.featureIds.has(item.source.feature_id) : turn.urls.has(item.source.url);
       return ok ? [] : [index];
@@ -272,7 +311,7 @@ const showCard = defineTool({
     const card = { id: turn.nextCardId(), type: args.type, title: args.title, ...(args.intro === undefined ? {} : { intro: args.intro }),
       items: args.items, ...(attribution === undefined ? {} : { attribution }) };
     turn.cards.push(card);
-    turn.sink.emit({ event: 'card', card });
+    turn.sink.emit({ event: 'card', stepId: step.id, card });
     return { card_id: card.id };
   },
 });
@@ -282,17 +321,18 @@ const askUser = defineTool({
   description: 'Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, '
     + 'which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about '
     + 'preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. Calling this ends your turn.',
-  status: null,
+  status: 'Asking you a question',
   readOnly: false,
   schema: z.strictObject({
     question: z.string().min(1).max(200),
     options: z.array(z.string().min(1).max(40)).min(2).max(4),
     allow_free_text: z.boolean().optional().describe('Default true'),
   }),
-  async run(args, turn) {
+  detail(args) { return args.question; },
+  async run(args, turn, step) {
     const question = { id: turn.nextQuestionId(), text: args.question, options: args.options, allowFreeText: args.allow_free_text ?? true };
     turn.asked = question;
-    turn.sink.emit({ event: 'question', question });
+    turn.sink.emit({ event: 'question', stepId: step.id, question });
     return { question_id: question.id };
   },
 });
@@ -302,21 +342,35 @@ function groundingTool(kind: 'maps' | 'search', deps: ToolDependencies): ToolSpe
   return defineTool({
     name: maps ? 'maps_grounding' : 'search_grounding',
     description: maps
-      ? 'Ask Google Maps about places near a location: what is there, opening hours, ratings, what a place is like. Use it for places that '
-        + 'are not on our map layers, such as cafés, bookstores and parks. Ask in English.'
-      : 'Search the web for facts our data does not cover: opening details, what happened somewhere recently, background on an event, '
-        + 'general questions about Melbourne. Cite the sources it returns.',
+      ? 'Ask Google Maps for the details of one specific place: its opening hours, rating, what it is like, where exactly it is. Slow, often a '
+        + 'minute: use it only when the user asks about a specific place our map layers do not carry (a café, a shop, a park), after search_features. '
+        + 'Not for finding venues, events or things to do: the layers and search_grounding cover those. Ask in English.'
+      : 'Search the web for facts our data does not cover: opening details, parking rules, weather, what happened somewhere recently, background '
+        + 'on an event, general questions about Melbourne. Use it only when no map tool can answer or their results leave a gap; try search_features '
+        + 'or nearby_context first. Prefer it over maps_grounding for anything that is not one place\'s details. Cite the sources it returns.',
     status: maps ? 'Checking Google Maps' : 'Searching the web',
     readOnly: true,
     schema: maps
       ? z.strictObject({ question: z.string().min(1).max(300), location: latLngSchema.optional().describe("Defaults to the centre of the user's viewport") })
       : z.strictObject({ question: z.string().min(1).max(300) }),
+    detail(args) { return (args as { question: string }).question; },
     async run(args, turn) {
       if (deps.grounding === null) return toolError('upstream_unavailable', 'Grounding is not configured in this environment.');
       const viewport = turn.turn.request.context.viewport;
       const location = maps ? (args as { location?: LatLng }).location ?? { lat: (viewport.north + viewport.south) / 2, lng: (viewport.east + viewport.west) / 2 } : null;
       const startedAt = turn.now().getTime();
-      const result = await deps.grounding.ground({ kind, question: (args as { question: string }).question, location, signal: turn.signal });
+      // The call gives up after the configured time, so a slow grounding service costs the turn one tool error, not minutes.
+      const timeoutMs = deps.groundingTimeoutMs ?? DEFAULT_GROUNDING_TIMEOUT_MS;
+      const timeout = AbortSignal.timeout(timeoutMs);
+      let result;
+      try {
+        result = await deps.grounding.ground({ kind, question: (args as { question: string }).question, location, signal: AbortSignal.any([turn.signal, timeout]) });
+      } catch (error) {
+        if (!timeout.aborted || turn.signal.aborted) throw error;
+        turn.turn.log?.({ severity: 'WARNING', event: 'groundingTimedOut', turnId: turn.turn.turnId, tool: maps ? 'maps_grounding' : 'search_grounding', timeoutMs });
+        return toolError('upstream_unavailable', `Google ${maps ? 'Maps' : 'Search'} grounding did not answer within ${Math.round(timeoutMs / 1000)} seconds; `
+          + 'answer with the map data you have and say what is missing.', { timeoutMs });
+      }
       const usage = turn.usage.record(result.usage, { agent: `grounding:${kind}`, model: result.model, durationMs: turn.now().getTime() - startedAt });
       turn.sink.emit({ event: 'usage', call: usage, turn: turn.usage.turn });
       for (const source of result.sources) turn.urls.add(source.url);

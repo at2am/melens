@@ -52,7 +52,7 @@ final class MapSelectionState {
       highlightedItemId == null ? null : aggregateId;
 
   bool get canRetry =>
-      item != null &&
+      selectedItemId != null &&
       detailError is MapRepositoryException &&
       (detailError! as MapRepositoryException).retryable;
 
@@ -108,6 +108,25 @@ class SelectionController extends _$SelectionController {
           : MapSelectionDisposition.matching,
     );
     if (!withdrawn) await _loadDetails();
+  }
+
+  /// Selects a record the map has not loaded, for example one an agent card
+  /// cites, and fetches its details from the snapshot the map is showing.
+  /// Until the fetch returns the details show only the loading state.
+  Future<void> selectById(
+    String id, {
+    required MapReadContext context,
+    required MapQueryMode mode,
+    required MapDataMode dataMode,
+  }) async {
+    _cancelRequest();
+    state = MapSelectionState(
+      selectedItemId: id,
+      context: context,
+      mode: mode,
+      dataMode: dataMode,
+    );
+    await _loadDetails();
   }
 
   void clear() {
@@ -210,10 +229,14 @@ class SelectionController extends _$SelectionController {
     );
   }
 
+  /// Fetches the selected record. A record selected from the map must come
+  /// back in the version that was selected; one selected by id has no
+  /// version to compare.
   Future<void> _loadDetails() async {
+    final id = state.selectedItemId;
     final original = state.item;
     final context = state.context;
-    if (original == null || context == null) return;
+    if (id == null || context == null) return;
     _cancelRequest();
     final generation = _generation;
     final cancellation = MapRequestCancellation();
@@ -222,12 +245,12 @@ class SelectionController extends _$SelectionController {
     try {
       final response = await ref
           .read(mapRepositoryProvider)
-          .getItem(original.id, context, cancellation: cancellation);
+          .getItem(id, context, cancellation: cancellation);
       if (generation != _generation || cancellation.isCancelled) return;
       if (response.requestId != context.requestId ||
           response.snapshotId != context.snapshotId ||
-          response.item.id != original.id ||
-          response.item.versionId != original.versionId ||
+          response.item.id != id ||
+          (original != null && response.item.versionId != original.versionId) ||
           response.mode != state.mode ||
           response.dataMode != state.dataMode) {
         throw const MapContractException(MapContractFailure.requestMismatch);

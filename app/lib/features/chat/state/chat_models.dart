@@ -69,6 +69,66 @@ final class ChatActionRecord {
   final MapActionReport report;
 }
 
+/// One tool call of a turn, as the trace shows it: a spinner while it runs,
+/// then its rows, duration or error. The `ui_action` the call produced is
+/// attached, so the step row shows whether the map applied it.
+final class ChatStep {
+  const ChatStep({
+    required this.id,
+    required this.tool,
+    required this.text,
+    required this.state,
+    this.detail,
+    this.rows,
+    this.error,
+    this.durationMs,
+    this.memo = false,
+    this.textOffset = 0,
+    this.action,
+  });
+
+  final String id;
+  final String tool;
+
+  /// The tool's status line, for example "Searching the map".
+  final String text;
+  final AgentStepState state;
+
+  /// A short summary of the arguments.
+  final String? detail;
+  final int? rows;
+
+  /// A tool error code when the state is `failed`.
+  final String? error;
+  final int? durationMs;
+
+  /// Answered from an identical earlier call in the same turn.
+  final bool memo;
+
+  /// How much answer text had streamed when the step started, so the view
+  /// shows the step between the text before it and the text after it.
+  final int textOffset;
+
+  /// The `ui_action` this step produced, as the app handled it.
+  final ChatActionRecord? action;
+
+  bool get isRunning => state == AgentStepState.running;
+
+  ChatStep copyWith({ChatActionRecord? action}) => ChatStep(
+    id: id,
+    tool: tool,
+    text: text,
+    state: state,
+    detail: detail,
+    rows: rows,
+    error: error,
+    durationMs: durationMs,
+    memo: memo,
+    textOffset: textOffset,
+    action: action ?? this.action,
+  );
+}
+
 /// One exchange: the user's input and everything the agent streamed back.
 final class ChatTurn {
   const ChatTurn({
@@ -76,7 +136,7 @@ final class ChatTurn {
     required this.input,
     required this.phase,
     this.turnId,
-    this.statuses = const [],
+    this.steps = const [],
     this.text = '',
     this.actions = const [],
     this.cards = const [],
@@ -94,9 +154,11 @@ final class ChatTurn {
   /// Assigned by the server; null until the first event arrives.
   final String? turnId;
 
-  /// The status lines, in order: the visible reasoning trace.
-  final List<String> statuses;
+  /// The tool calls, in order: the visible reasoning trace.
+  final List<ChatStep> steps;
   final String text;
+
+  /// Every `ui_action` of the turn; those with a step are also on it.
   final List<ChatActionRecord> actions;
   final List<AgentCard> cards;
   final AgentQuestion? question;
@@ -109,10 +171,26 @@ final class ChatTurn {
 
   bool get isRunning => phase == ChatTurnPhase.running;
 
+  /// The model is working between tool calls: nothing shows progress but
+  /// the turn is still running.
+  bool get isThinking => isRunning && !steps.any((step) => step.isRunning);
+
+  /// Answer text has streamed since the last step started.
+  bool get isWriting =>
+      text.length > (steps.isEmpty ? 0 : steps.last.textOffset);
+
+  /// Actions no step claimed, for example from a server without step ids.
+  List<ChatActionRecord> get unattachedActions {
+    final attached = steps.map((step) => step.action).nonNulls.toSet();
+    return actions
+        .where((record) => !attached.contains(record))
+        .toList(growable: false);
+  }
+
   ChatTurn copyWith({
     ChatTurnPhase? phase,
     String? turnId,
-    List<String>? statuses,
+    List<ChatStep>? steps,
     String? text,
     List<ChatActionRecord>? actions,
     List<AgentCard>? cards,
@@ -126,7 +204,7 @@ final class ChatTurn {
     input: input,
     phase: phase ?? this.phase,
     turnId: turnId ?? this.turnId,
-    statuses: statuses ?? this.statuses,
+    steps: steps ?? this.steps,
     text: text ?? this.text,
     actions: actions ?? this.actions,
     cards: cards ?? this.cards,

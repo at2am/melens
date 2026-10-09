@@ -84,6 +84,54 @@ void main() {
     },
   );
 
+  test('selecting by id fetches a record the map has not loaded', () async {
+    final item = t016Item();
+    final loading = controller.selectById(
+      item.id,
+      context: context,
+      mode: MapQueryMode.current,
+      dataMode: MapDataMode.sample,
+    );
+    var state = container.read(selectionControllerProvider);
+    expect(state.selectedItemId, item.id);
+    expect(state.item, isNull);
+    expect(state.isLoading, isTrue);
+    expect(state.highlightedItemId, isNull);
+    final call = repository.details.single;
+    expect(call.id, item.id);
+    expect(call.context.snapshotId, 'original-snapshot');
+    call.result.complete(t016Details(item, context));
+    await loading;
+    state = container.read(selectionControllerProvider);
+    expect(state.isLoading, isFalse);
+    expect(state.item, same(item));
+    expect(state.disposition, MapSelectionDisposition.matching);
+    expect(state.highlightedItemId, item.id);
+  });
+
+  test('selecting by id reports a record the service does not have', () async {
+    final loading = controller.selectById(
+      'event:gone',
+      context: context,
+      mode: MapQueryMode.current,
+      dataMode: MapDataMode.sample,
+    );
+    repository.details.single.result.completeError(
+      const MapHttpException(
+        statusCode: 404,
+        retryable: false,
+        code: MapServiceErrorCode.notFound,
+      ),
+    );
+    await loading;
+    final state = container.read(selectionControllerProvider);
+    expect(state.selectedItemId, 'event:gone');
+    expect(state.item, isNull);
+    expect(state.isLoading, isFalse);
+    expect(state.disposition, MapSelectionDisposition.removed);
+    expect(state.canRetry, isFalse);
+  });
+
   test('rapid selection ignores cancelled success and errors', () async {
     final first = t016Item();
     final second = first.copyWith(id: 'second-record');

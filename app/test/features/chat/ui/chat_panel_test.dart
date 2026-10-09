@@ -89,17 +89,98 @@ void main() {
     expect(find.byKey(const ValueKey('chat-stop')), findsOneWidget);
 
     final turn = client.lastTurn;
+    // A running step replaces the Thinking line with its own spinner.
     turn.emit(
-      const AgentEvent.status(turnId: 't_1', seq: 0, text: 'Searching the map'),
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 0,
+        stepId: 's_1',
+        state: AgentStepState.running,
+        tool: 'search_features',
+        text: 'Searching the map',
+        detail: 'events · within 500 m',
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Thinking…'), findsNothing);
+    expect(
+      find.text('Searching the map · events · within 500 m'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('chat-step-1-s_1')),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
     );
     turn.emit(
-      const AgentEvent.text(turnId: 't_1', seq: 1, delta: 'Two things nearby.'),
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 1,
+        stepId: 's_1',
+        state: AgentStepState.done,
+        tool: 'search_features',
+        text: 'Searching the map',
+        detail: 'events · within 500 m',
+        rows: 2,
+        durationMs: 1800,
+      ),
     );
-    turn.emit(const AgentEvent.card(turnId: 't_1', seq: 2, card: fakeCard));
+    await tester.pump();
+    // Between steps the Thinking line is back; the finished step shows its
+    // rows and duration.
+    expect(find.text('Thinking…'), findsOneWidget);
+    expect(find.text('2 results · 1.8 s'), findsOneWidget);
+    turn.emit(
+      const AgentEvent.text(turnId: 't_1', seq: 2, delta: 'Two things nearby.'),
+    );
+    await tester.pump();
+    expect(find.text('Writing…'), findsOneWidget);
+    turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 3,
+        stepId: 's_2',
+        state: AgentStepState.running,
+        tool: 'show_card',
+        text: 'Preparing a card',
+      ),
+    );
+    turn.emit(
+      const AgentEvent.card(
+        turnId: 't_1',
+        seq: 4,
+        stepId: 's_2',
+        card: fakeCard,
+      ),
+    );
+    turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 5,
+        stepId: 's_2',
+        state: AgentStepState.done,
+        tool: 'show_card',
+        text: 'Preparing a card',
+        durationMs: 3,
+      ),
+    );
+    turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 6,
+        stepId: 's_3',
+        state: AgentStepState.running,
+        tool: 'highlight_features',
+        text: 'Highlighting features',
+      ),
+    );
     turn.emit(
       const AgentEvent.uiAction(
         turnId: 't_1',
-        seq: 3,
+        seq: 7,
+        stepId: 's_3',
         action: UiActionName.highlightFeatures,
         args: <String, dynamic>{
           'ids': ['event:1'],
@@ -109,9 +190,31 @@ void main() {
       ),
     );
     turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 8,
+        stepId: 's_3',
+        state: AgentStepState.done,
+        tool: 'highlight_features',
+        text: 'Highlighting features',
+      ),
+    );
+    turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 9,
+        stepId: 's_4',
+        state: AgentStepState.failed,
+        tool: 'get_feature',
+        text: 'Reading the details',
+        error: 'not_found',
+        durationMs: 0,
+      ),
+    );
+    turn.emit(
       const AgentEvent.done(
         turnId: 't_1',
-        seq: 4,
+        seq: 10,
         stop: StopReason.end,
         usage: fakeFinalUsage,
       ),
@@ -120,12 +223,24 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Searching the map'), findsOneWidget);
+    expect(find.text('Thinking…'), findsNothing);
+    expect(find.text('Writing…'), findsNothing);
+    expect(
+      find.text('Searching the map · events · within 500 m'),
+      findsOneWidget,
+    );
     expect(find.text('Two things nearby.'), findsOneWidget);
+    expect(find.text('Preparing a card'), findsOneWidget);
+    expect(find.text('3 ms'), findsOneWidget);
     expect(find.text('Tonight near Flinders Street'), findsOneWidget);
     expect(find.text('Market night'), findsOneWidget);
     expect(find.text('Place details from Google Maps'), findsOneWidget);
-    expect(find.text('Highlight features · applied'), findsOneWidget);
+    // The UI action's outcome sits on its step; no separate chip.
+    expect(find.text('Highlighting features'), findsOneWidget);
+    expect(find.text('applied'), findsOneWidget);
+    expect(find.byType(Chip), findsNothing);
+    expect(find.text('Reading the details'), findsOneWidget);
+    expect(find.text('not found · 0 ms'), findsOneWidget);
     expect(
       find.textContaining('2 calls · 1,200 in (400 cached)'),
       findsOneWidget,
@@ -154,6 +269,7 @@ void main() {
       const AgentEvent.question(
         turnId: 't_1',
         seq: 0,
+        stepId: 's_1',
         question: AgentQuestion(
           id: 'q_1',
           text: 'Which gardens?',

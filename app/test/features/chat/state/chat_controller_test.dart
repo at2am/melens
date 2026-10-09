@@ -60,16 +60,54 @@ void main() {
     expect(turn.request.context.viewport.north, -37.80);
 
     turn.emit(
-      const AgentEvent.status(turnId: 't_1', seq: 0, text: 'Searching the map'),
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 0,
+        stepId: 's_1',
+        state: AgentStepState.running,
+        tool: 'search_features',
+        text: 'Searching the map',
+        detail: 'events · within 500 m',
+      ),
     );
-    turn.emit(const AgentEvent.text(turnId: 't_1', seq: 1, delta: 'Near you '));
+    await pumpEventQueue();
+    final running = stateOf(container).turns.single;
+    expect(running.steps.single.isRunning, isTrue);
+    expect(running.isThinking, isFalse);
     turn.emit(
-      const AgentEvent.text(turnId: 't_1', seq: 2, delta: 'there is a market.'),
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 1,
+        stepId: 's_1',
+        state: AgentStepState.done,
+        tool: 'search_features',
+        text: 'Searching the map',
+        detail: 'events · within 500 m',
+        rows: 3,
+        durationMs: 240,
+      ),
+    );
+    await pumpEventQueue();
+    expect(stateOf(container).turns.single.isThinking, isTrue);
+    turn.emit(const AgentEvent.text(turnId: 't_1', seq: 2, delta: 'Near you '));
+    turn.emit(
+      const AgentEvent.text(turnId: 't_1', seq: 3, delta: 'there is a market.'),
+    );
+    turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 4,
+        stepId: 's_2',
+        state: AgentStepState.running,
+        tool: 'highlight_features',
+        text: 'Highlighting features',
+      ),
     );
     turn.emit(
       const AgentEvent.uiAction(
         turnId: 't_1',
-        seq: 3,
+        seq: 5,
+        stepId: 's_2',
         action: UiActionName.highlightFeatures,
         args: <String, dynamic>{
           'ids': ['event:1'],
@@ -79,9 +117,22 @@ void main() {
       ),
     );
     turn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 6,
+        stepId: 's_2',
+        state: AgentStepState.done,
+        tool: 'highlight_features',
+        text: 'Highlighting features',
+        durationMs: 1,
+      ),
+    );
+    // An action whose step id is unknown is still applied and kept.
+    turn.emit(
       const AgentEvent.uiAction(
         turnId: 't_1',
-        seq: 4,
+        seq: 7,
+        stepId: 's_9',
         action: UiActionName.showLayers,
         args: <String, dynamic>{
           'layers': ['event'],
@@ -89,11 +140,18 @@ void main() {
         },
       ),
     );
-    turn.emit(const AgentEvent.card(turnId: 't_1', seq: 5, card: fakeCard));
+    turn.emit(
+      const AgentEvent.card(
+        turnId: 't_1',
+        seq: 8,
+        stepId: 's_3',
+        card: fakeCard,
+      ),
+    );
     turn.emit(
       const AgentEvent.usage(
         turnId: 't_1',
-        seq: 6,
+        seq: 9,
         call: fakeCall,
         turn: fakeUsage,
       ),
@@ -105,7 +163,7 @@ void main() {
     turn.emit(
       const AgentEvent.done(
         turnId: 't_1',
-        seq: 7,
+        seq: 10,
         stop: StopReason.end,
         usage: fakeFinalUsage,
       ),
@@ -118,7 +176,24 @@ void main() {
     final finished = state.turns.single;
     expect(finished.phase, ChatTurnPhase.done);
     expect(finished.turnId, 't_1');
-    expect(finished.statuses, ['Searching the map']);
+    expect(finished.steps.map((step) => step.text), [
+      'Searching the map',
+      'Highlighting features',
+    ]);
+    final search = finished.steps.first;
+    expect(search.state, AgentStepState.done);
+    expect(search.rows, 3);
+    expect(search.durationMs, 240);
+    expect(search.detail, 'events · within 500 m');
+    expect(search.textOffset, 0);
+    final highlight = finished.steps.last;
+    expect(highlight.textOffset, 'Near you there is a market.'.length);
+    expect(highlight.action?.action.action, UiActionName.highlightFeatures);
+    expect(highlight.action?.report.outcome, MapActionOutcome.applied);
+    expect(
+      finished.unattachedActions.single.action.action,
+      UiActionName.showLayers,
+    );
     expect(finished.cards.single.id, 'c_1');
     expect(finished.stop, StopReason.end);
     expect(finished.usage?.complete, isTrue);
@@ -164,7 +239,12 @@ void main() {
       );
       await pumpEventQueue();
       client.lastTurn.emit(
-        const AgentEvent.question(turnId: 't_1', seq: 0, question: question),
+        const AgentEvent.question(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          question: question,
+        ),
       );
       client.lastTurn.emit(
         const AgentEvent.done(
@@ -358,16 +438,36 @@ void main() {
                 tool: 'search_features',
                 args: <String, dynamic>{},
                 status: 'Searching the map',
+                detail: 'events · within 500 m',
                 rows: 3,
                 error: null,
                 durationMs: 10,
+              ),
+              TraceEntry(
+                tool: 'search_features',
+                args: <String, dynamic>{},
+                status: 'Searching the map',
+                detail: 'events · within 500 m',
+                rows: 3,
+                error: null,
+                durationMs: 0,
+                memo: true,
+              ),
+              TraceEntry(
+                tool: 'focus_map',
+                args: <String, dynamic>{},
+                status: 'Moving the map',
+                detail: 'to -37.8100, 144.9600',
+                rows: null,
+                error: null,
+                durationMs: 1,
               ),
               TraceEntry(
                 tool: 'show_card',
                 args: <String, dynamic>{},
                 status: null,
                 rows: null,
-                error: null,
+                error: 'unverified_sources',
                 durationMs: 1,
               ),
             ],
@@ -389,7 +489,27 @@ void main() {
       final restored = state.turns.single;
       expect(restored.phase, ChatTurnPhase.done);
       expect(restored.text, 'Here is what I found.');
-      expect(restored.statuses, ['Searching the map']);
+      // Every trace line is a finished step; a line without a status line
+      // falls back to the tool name, and the stored action sits on its step.
+      expect(restored.steps.map((step) => step.text), [
+        'Searching the map',
+        'Searching the map',
+        'Moving the map',
+        'show_card',
+      ]);
+      expect(restored.steps.map((step) => step.state), [
+        AgentStepState.done,
+        AgentStepState.done,
+        AgentStepState.done,
+        AgentStepState.failed,
+      ]);
+      expect(restored.steps[1].memo, isTrue);
+      expect(
+        restored.steps[2].action?.report.outcome,
+        MapActionOutcome.restored,
+      );
+      expect(restored.steps.last.error, 'unverified_sources');
+      expect(restored.unattachedActions, isEmpty);
       expect(restored.cards.single.id, 'c_1');
       expect(restored.actions.single.report.outcome, MapActionOutcome.restored);
       expect(restored.usage?.complete, isTrue);

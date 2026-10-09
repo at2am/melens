@@ -37,6 +37,7 @@ Breaking one of these can disqualify the entry.
 
 - Specific facts and recommendations (places, events, times, crowds, disruptions) appear in cards, and every card item cites a feature id (a map contract MapItem id) or a web link returned in the same turn. General advice may be plain text but never presents live data without a tool result. Enforce this in code (see `agent-design.md`, Source rules).
 - Agents act and state their assumptions rather than ask. They ask the user only when the context cannot resolve an ambiguity: one question per turn, with options.
+- Melens data first. Agents answer from the map's own tools and call Google Maps grounding or web search only when those tools cannot answer the request or leave a gap that needs filling, never as a routine step.
 - The Flutter app never calls a language model. All agent logic runs in the agent service on Cloud Run.
 - Predictions are always labelled as predictions (`is_prediction`) and never styled as live data.
 - UI text, prompts and demo content are in English, because Maps grounding only supports English.

@@ -8,6 +8,30 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import 'card_registry.dart';
 
+/// A card item's time window in Melbourne local time, or an empty string
+/// when both ends are missing.
+String formatCardTimeWindow(
+  AppLocalizations strings,
+  MelbourneClock clock,
+  AgentTimeWindow time,
+) {
+  String? local(String? value) {
+    if (value == null) return null;
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return value;
+    final melbourne = clock.toMelbourne(parsed);
+    return '${DateFormat.MMMEd('en_AU').format(melbourne)} '
+        '${DateFormat.Hm('en_AU').format(melbourne)}';
+  }
+
+  final from = local(time.from);
+  final to = local(time.to);
+  if (from != null && to != null) return strings.cardTimeRange(from, to);
+  if (from != null) return strings.cardTimeFrom(from);
+  if (to != null) return strings.cardTimeUntil(to);
+  return '';
+}
+
 String cardTypeLabel(AppLocalizations strings, CardType type) => switch (type) {
   CardType.areaBrief => strings.cardTypeAreaBrief,
   CardType.anomalyAnalysis => strings.cardTypeAnomalyAnalysis,
@@ -124,7 +148,9 @@ class _CardItemView extends StatelessWidget {
     final theme = Theme.of(context);
     final source = item.source;
     final time = item.time;
-    final when = time == null ? null : _formatWindow(strings, time);
+    final when = time == null
+        ? null
+        : formatCardTimeWindow(strings, clock, time);
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -180,7 +206,7 @@ class _CardItemView extends StatelessWidget {
                         ),
                       ],
                     ),
-                    LinkCardSource(:final url, :final title) => _SourceLink(
+                    LinkCardSource(:final url, :final title) => CardSourceLink(
                       url: url,
                       title: title,
                       onOpenSource: onOpenSource,
@@ -194,28 +220,17 @@ class _CardItemView extends StatelessWidget {
       ),
     );
   }
-
-  String _formatWindow(AppLocalizations strings, AgentTimeWindow time) {
-    String? local(String? value) {
-      if (value == null) return null;
-      final parsed = DateTime.tryParse(value);
-      if (parsed == null) return value;
-      final melbourne = clock.toMelbourne(parsed);
-      return '${DateFormat.MMMEd('en_AU').format(melbourne)} '
-          '${DateFormat.Hm('en_AU').format(melbourne)}';
-    }
-
-    final from = local(time.from);
-    final to = local(time.to);
-    if (from != null && to != null) return strings.cardTimeRange(from, to);
-    if (from != null) return strings.cardTimeFrom(from);
-    if (to != null) return strings.cardTimeUntil(to);
-    return '';
-  }
 }
 
-class _SourceLink extends StatelessWidget {
-  const _SourceLink({required this.url, this.title, this.onOpenSource});
+/// A card item's web source: its title or host, opened through
+/// [onOpenSource] when the URL is a public one the app may open.
+class CardSourceLink extends StatelessWidget {
+  const CardSourceLink({
+    required this.url,
+    this.title,
+    this.onOpenSource,
+    super.key,
+  });
 
   final String url;
   final String? title;

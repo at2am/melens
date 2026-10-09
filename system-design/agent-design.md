@@ -103,11 +103,13 @@ Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](to
 | --- | --- | --- |
 | Data | `search_features`, `get_feature`, `heritage_lookup`, `get_anomaly`, `pedestrian_pattern`, `nearby_context` | Read our own data from the published BigQuery views (heritage from its public API) |
 | Workflow | `area_brief`, `analyse_anomaly` | Run a known multi-step procedure in one call |
-| Grounding | `maps_grounding`, `search_grounding` | Answer open questions beyond our data |
+| Grounding | `maps_grounding`, `search_grounding` | Answer what our data does not cover; a fallback after the data tools, or a supplement where they leave a gap, never a routine step |
 | UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
 | Conversation | `ask_user` | Ask one question when the context cannot resolve the request |
 
 UI action tools return to the model straight away and send a `ui_action` or `card` event to the app without waiting for a reply. The next turn's request context reports the real map state.
+
+**Melens data first.** The loop answers from the data tools. `maps_grounding` and `search_grounding` run only when those tools cannot answer the request (places, opening hours, parking, weather, history and general facts the layers do not carry) or when their results leave a gap the question needs filled, never as a routine step or to pad a card. Each grounding call is a separate, slow, billed model call: on 2026-10-09 Maps grounding took 48 to 110 s per call and Search grounding about 10 s, so Search is preferred and Maps is reserved for one specific place's details. A grounding call that exceeds `AGENT_GROUNDING_TIMEOUT_MS` (default 40 s) returns `upstream_unavailable` and the model answers from the map data. The rule is in the instruction and in the two tools' descriptions.
 
 ### Precision
 

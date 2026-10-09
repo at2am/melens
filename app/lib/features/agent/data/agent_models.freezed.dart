@@ -735,14 +735,14 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String text)?  status,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)?  text,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)?  uiAction,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentCard card)?  card,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentQuestion question)?  question,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)?  usage,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)?  done,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentStepState state, @JsonKey(required: true)  String tool, @JsonKey(required: true)  String text, @JsonKey(includeIfNull: false)  String? detail, @JsonKey(includeIfNull: false)  int? rows, @JsonKey(includeIfNull: false)  String? error, @JsonKey(includeIfNull: false)  int? durationMs,  bool memo)?  status,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)?  text,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)?  uiAction,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentCard card)?  card,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentQuestion question)?  question,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)?  usage,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)?  done,TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case AgentStatusEvent() when status != null:
-return status(_that.turnId,_that.seq,_that.text);case AgentTextEvent() when text != null:
+return status(_that.turnId,_that.seq,_that.stepId,_that.state,_that.tool,_that.text,_that.detail,_that.rows,_that.error,_that.durationMs,_that.memo);case AgentTextEvent() when text != null:
 return text(_that.turnId,_that.seq,_that.delta);case AgentUiActionEvent() when uiAction != null:
-return uiAction(_that.turnId,_that.seq,_that.action,_that.args);case AgentCardEvent() when card != null:
-return card(_that.turnId,_that.seq,_that.card);case AgentQuestionEvent() when question != null:
-return question(_that.turnId,_that.seq,_that.question);case AgentUsageEvent() when usage != null:
+return uiAction(_that.turnId,_that.seq,_that.stepId,_that.action,_that.args);case AgentCardEvent() when card != null:
+return card(_that.turnId,_that.seq,_that.stepId,_that.card);case AgentQuestionEvent() when question != null:
+return question(_that.turnId,_that.seq,_that.stepId,_that.question);case AgentUsageEvent() when usage != null:
 return usage(_that.turnId,_that.seq,_that.call,_that.turn);case AgentDoneEvent() when done != null:
 return done(_that.turnId,_that.seq,_that.stop,_that.usage);case AgentErrorEvent() when error != null:
 return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);case _:
@@ -763,14 +763,14 @@ return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);c
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String text)  status,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)  text,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)  uiAction,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentCard card)  card,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentQuestion question)  question,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)  usage,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)  done,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentStepState state, @JsonKey(required: true)  String tool, @JsonKey(required: true)  String text, @JsonKey(includeIfNull: false)  String? detail, @JsonKey(includeIfNull: false)  int? rows, @JsonKey(includeIfNull: false)  String? error, @JsonKey(includeIfNull: false)  int? durationMs,  bool memo)  status,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)  text,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)  uiAction,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentCard card)  card,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentQuestion question)  question,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)  usage,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)  done,required TResult Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)  error,}) {final _that = this;
 switch (_that) {
 case AgentStatusEvent():
-return status(_that.turnId,_that.seq,_that.text);case AgentTextEvent():
+return status(_that.turnId,_that.seq,_that.stepId,_that.state,_that.tool,_that.text,_that.detail,_that.rows,_that.error,_that.durationMs,_that.memo);case AgentTextEvent():
 return text(_that.turnId,_that.seq,_that.delta);case AgentUiActionEvent():
-return uiAction(_that.turnId,_that.seq,_that.action,_that.args);case AgentCardEvent():
-return card(_that.turnId,_that.seq,_that.card);case AgentQuestionEvent():
-return question(_that.turnId,_that.seq,_that.question);case AgentUsageEvent():
+return uiAction(_that.turnId,_that.seq,_that.stepId,_that.action,_that.args);case AgentCardEvent():
+return card(_that.turnId,_that.seq,_that.stepId,_that.card);case AgentQuestionEvent():
+return question(_that.turnId,_that.seq,_that.stepId,_that.question);case AgentUsageEvent():
 return usage(_that.turnId,_that.seq,_that.call,_that.turn);case AgentDoneEvent():
 return done(_that.turnId,_that.seq,_that.stop,_that.usage);case AgentErrorEvent():
 return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);}
@@ -787,14 +787,14 @@ return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String text)?  status,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)?  text,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)?  uiAction,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentCard card)?  card,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  AgentQuestion question)?  question,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)?  usage,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)?  done,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentStepState state, @JsonKey(required: true)  String tool, @JsonKey(required: true)  String text, @JsonKey(includeIfNull: false)  String? detail, @JsonKey(includeIfNull: false)  int? rows, @JsonKey(includeIfNull: false)  String? error, @JsonKey(includeIfNull: false)  int? durationMs,  bool memo)?  status,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String delta)?  text,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  UiActionName action, @JsonKey(required: true)  Map<String, dynamic> args)?  uiAction,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentCard card)?  card,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String stepId, @JsonKey(required: true)  AgentQuestion question)?  question,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  CallUsage call, @JsonKey(required: true)  TurnUsage turn)?  usage,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  StopReason stop, @JsonKey(required: true)  TurnUsage usage)?  done,TResult? Function(@JsonKey(required: true)  String turnId, @JsonKey(required: true)  int seq, @JsonKey(required: true)  String message, @JsonKey(required: true)  bool retryable, @JsonKey(required: true)  TurnUsage usage)?  error,}) {final _that = this;
 switch (_that) {
 case AgentStatusEvent() when status != null:
-return status(_that.turnId,_that.seq,_that.text);case AgentTextEvent() when text != null:
+return status(_that.turnId,_that.seq,_that.stepId,_that.state,_that.tool,_that.text,_that.detail,_that.rows,_that.error,_that.durationMs,_that.memo);case AgentTextEvent() when text != null:
 return text(_that.turnId,_that.seq,_that.delta);case AgentUiActionEvent() when uiAction != null:
-return uiAction(_that.turnId,_that.seq,_that.action,_that.args);case AgentCardEvent() when card != null:
-return card(_that.turnId,_that.seq,_that.card);case AgentQuestionEvent() when question != null:
-return question(_that.turnId,_that.seq,_that.question);case AgentUsageEvent() when usage != null:
+return uiAction(_that.turnId,_that.seq,_that.stepId,_that.action,_that.args);case AgentCardEvent() when card != null:
+return card(_that.turnId,_that.seq,_that.stepId,_that.card);case AgentQuestionEvent() when question != null:
+return question(_that.turnId,_that.seq,_that.stepId,_that.question);case AgentUsageEvent() when usage != null:
 return usage(_that.turnId,_that.seq,_that.call,_that.turn);case AgentDoneEvent() when done != null:
 return done(_that.turnId,_that.seq,_that.stop,_that.usage);case AgentErrorEvent() when error != null:
 return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);case _:
@@ -809,12 +809,20 @@ return error(_that.turnId,_that.seq,_that.message,_that.retryable,_that.usage);c
 @JsonSerializable()
 
 class AgentStatusEvent implements AgentEvent {
-  const AgentStatusEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.text,  String? $type}): $type = $type ?? 'status';
+  const AgentStatusEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.stepId, @JsonKey(required: true) required this.state, @JsonKey(required: true) required this.tool, @JsonKey(required: true) required this.text, @JsonKey(includeIfNull: false) this.detail, @JsonKey(includeIfNull: false) this.rows, @JsonKey(includeIfNull: false) this.error, @JsonKey(includeIfNull: false) this.durationMs, this.memo = false,  String? $type}): $type = $type ?? 'status';
   factory AgentStatusEvent.fromJson(Map<String, dynamic> json) => _$AgentStatusEventFromJson(json);
 
 @override@JsonKey(required: true) final  String turnId;
 @override@JsonKey(required: true) final  int seq;
+@JsonKey(required: true) final  String stepId;
+@JsonKey(required: true) final  AgentStepState state;
+@JsonKey(required: true) final  String tool;
 @JsonKey(required: true) final  String text;
+@JsonKey(includeIfNull: false) final  String? detail;
+@JsonKey(includeIfNull: false) final  int? rows;
+@JsonKey(includeIfNull: false) final  String? error;
+@JsonKey(includeIfNull: false) final  int? durationMs;
+@JsonKey() final  bool memo;
 
 @JsonKey(name: 'event')
 final String $type;
@@ -833,18 +841,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentStatusEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.text, text) || other.text == text));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentStatusEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.state, state) || other.state == state)&&(identical(other.tool, tool) || other.tool == tool)&&(identical(other.text, text) || other.text == text)&&(identical(other.detail, detail) || other.detail == detail)&&(identical(other.rows, rows) || other.rows == rows)&&(identical(other.error, error) || other.error == error)&&(identical(other.durationMs, durationMs) || other.durationMs == durationMs)&&(identical(other.memo, memo) || other.memo == memo));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,turnId,seq,text);
+    return Object.hash(runtimeType,turnId,seq,stepId,state,tool,text,detail,rows,error,durationMs,memo);
 }
 
 @override
 String toString() {
-    return 'AgentEvent.status(turnId: $turnId, seq: $seq, text: $text)';
+    return 'AgentEvent.status(turnId: $turnId, seq: $seq, stepId: $stepId, state: $state, tool: $tool, text: $text, detail: $detail, rows: $rows, error: $error, durationMs: $durationMs, memo: $memo)';
 }
 
 
@@ -855,7 +863,7 @@ abstract mixin class $AgentStatusEventCopyWith<$Res> implements $AgentEventCopyW
   factory $AgentStatusEventCopyWith(AgentStatusEvent value, $Res Function(AgentStatusEvent) _then) = _$AgentStatusEventCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) String text
+@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) String stepId,@JsonKey(required: true) AgentStepState state,@JsonKey(required: true) String tool,@JsonKey(required: true) String text,@JsonKey(includeIfNull: false) String? detail,@JsonKey(includeIfNull: false) int? rows,@JsonKey(includeIfNull: false) String? error,@JsonKey(includeIfNull: false) int? durationMs, bool memo
 });
 
 
@@ -872,12 +880,20 @@ class _$AgentStatusEventCopyWithImpl<$Res>
 
 /// Create a copy of AgentEvent
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? text = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? stepId = null,Object? state = null,Object? tool = null,Object? text = null,Object? detail = freezed,Object? rows = freezed,Object? error = freezed,Object? durationMs = freezed,Object? memo = null,}) {
   return _then(AgentStatusEvent(
 turnId: null == turnId ? _self.turnId : turnId // ignore: cast_nullable_to_non_nullable
 as String,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
-as int,text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
-as String,
+as int,stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
+as String,state: null == state ? _self.state : state // ignore: cast_nullable_to_non_nullable
+as AgentStepState,tool: null == tool ? _self.tool : tool // ignore: cast_nullable_to_non_nullable
+as String,text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
+as String,detail: freezed == detail ? _self.detail : detail // ignore: cast_nullable_to_non_nullable
+as String?,rows: freezed == rows ? _self.rows : rows // ignore: cast_nullable_to_non_nullable
+as int?,error: freezed == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
+as String?,durationMs: freezed == durationMs ? _self.durationMs : durationMs // ignore: cast_nullable_to_non_nullable
+as int?,memo: null == memo ? _self.memo : memo // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -967,11 +983,12 @@ as String,
 @JsonSerializable()
 
 class AgentUiActionEvent implements AgentEvent {
-  const AgentUiActionEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.action, @JsonKey(required: true) required  Map<String, dynamic> args,  String? $type}): _args = args,$type = $type ?? 'ui_action';
+  const AgentUiActionEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.stepId, @JsonKey(required: true) required this.action, @JsonKey(required: true) required  Map<String, dynamic> args,  String? $type}): _args = args,$type = $type ?? 'ui_action';
   factory AgentUiActionEvent.fromJson(Map<String, dynamic> json) => _$AgentUiActionEventFromJson(json);
 
 @override@JsonKey(required: true) final  String turnId;
 @override@JsonKey(required: true) final  int seq;
+@JsonKey(required: true) final  String stepId;
 @JsonKey(required: true) final  UiActionName action;
  final  Map<String, dynamic> _args;
 @JsonKey(required: true) Map<String, dynamic> get args {
@@ -998,18 +1015,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentUiActionEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.action, action) || other.action == action)&&const DeepCollectionEquality().equals(other.args, _args));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentUiActionEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.action, action) || other.action == action)&&const DeepCollectionEquality().equals(other.args, _args));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,turnId,seq,action,const DeepCollectionEquality().hash(_args));
+    return Object.hash(runtimeType,turnId,seq,stepId,action,const DeepCollectionEquality().hash(_args));
 }
 
 @override
 String toString() {
-    return 'AgentEvent.uiAction(turnId: $turnId, seq: $seq, action: $action, args: $args)';
+    return 'AgentEvent.uiAction(turnId: $turnId, seq: $seq, stepId: $stepId, action: $action, args: $args)';
 }
 
 
@@ -1020,7 +1037,7 @@ abstract mixin class $AgentUiActionEventCopyWith<$Res> implements $AgentEventCop
   factory $AgentUiActionEventCopyWith(AgentUiActionEvent value, $Res Function(AgentUiActionEvent) _then) = _$AgentUiActionEventCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) UiActionName action,@JsonKey(required: true) Map<String, dynamic> args
+@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) String stepId,@JsonKey(required: true) UiActionName action,@JsonKey(required: true) Map<String, dynamic> args
 });
 
 
@@ -1037,11 +1054,12 @@ class _$AgentUiActionEventCopyWithImpl<$Res>
 
 /// Create a copy of AgentEvent
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? action = null,Object? args = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? stepId = null,Object? action = null,Object? args = null,}) {
   return _then(AgentUiActionEvent(
 turnId: null == turnId ? _self.turnId : turnId // ignore: cast_nullable_to_non_nullable
 as String,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
-as int,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
+as int,stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
+as String,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
 as UiActionName,args: null == args ? _self._args : args // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,
   ));
@@ -1054,11 +1072,12 @@ as Map<String, dynamic>,
 @JsonSerializable()
 
 class AgentCardEvent implements AgentEvent {
-  const AgentCardEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.card,  String? $type}): $type = $type ?? 'card';
+  const AgentCardEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.stepId, @JsonKey(required: true) required this.card,  String? $type}): $type = $type ?? 'card';
   factory AgentCardEvent.fromJson(Map<String, dynamic> json) => _$AgentCardEventFromJson(json);
 
 @override@JsonKey(required: true) final  String turnId;
 @override@JsonKey(required: true) final  int seq;
+@JsonKey(required: true) final  String stepId;
 @JsonKey(required: true) final  AgentCard card;
 
 @JsonKey(name: 'event')
@@ -1078,18 +1097,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentCardEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.card, card) || other.card == card));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentCardEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.card, card) || other.card == card));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,turnId,seq,card);
+    return Object.hash(runtimeType,turnId,seq,stepId,card);
 }
 
 @override
 String toString() {
-    return 'AgentEvent.card(turnId: $turnId, seq: $seq, card: $card)';
+    return 'AgentEvent.card(turnId: $turnId, seq: $seq, stepId: $stepId, card: $card)';
 }
 
 
@@ -1100,7 +1119,7 @@ abstract mixin class $AgentCardEventCopyWith<$Res> implements $AgentEventCopyWit
   factory $AgentCardEventCopyWith(AgentCardEvent value, $Res Function(AgentCardEvent) _then) = _$AgentCardEventCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) AgentCard card
+@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) String stepId,@JsonKey(required: true) AgentCard card
 });
 
 
@@ -1117,11 +1136,12 @@ class _$AgentCardEventCopyWithImpl<$Res>
 
 /// Create a copy of AgentEvent
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? card = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? stepId = null,Object? card = null,}) {
   return _then(AgentCardEvent(
 turnId: null == turnId ? _self.turnId : turnId // ignore: cast_nullable_to_non_nullable
 as String,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
-as int,card: null == card ? _self.card : card // ignore: cast_nullable_to_non_nullable
+as int,stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
+as String,card: null == card ? _self.card : card // ignore: cast_nullable_to_non_nullable
 as AgentCard,
   ));
 }
@@ -1133,11 +1153,12 @@ as AgentCard,
 @JsonSerializable()
 
 class AgentQuestionEvent implements AgentEvent {
-  const AgentQuestionEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.question,  String? $type}): $type = $type ?? 'question';
+  const AgentQuestionEvent({@JsonKey(required: true) required this.turnId, @JsonKey(required: true) required this.seq, @JsonKey(required: true) required this.stepId, @JsonKey(required: true) required this.question,  String? $type}): $type = $type ?? 'question';
   factory AgentQuestionEvent.fromJson(Map<String, dynamic> json) => _$AgentQuestionEventFromJson(json);
 
 @override@JsonKey(required: true) final  String turnId;
 @override@JsonKey(required: true) final  int seq;
+@JsonKey(required: true) final  String stepId;
 @JsonKey(required: true) final  AgentQuestion question;
 
 @JsonKey(name: 'event')
@@ -1157,18 +1178,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentQuestionEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.question, question) || other.question == question));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is AgentQuestionEvent&&(identical(other.turnId, turnId) || other.turnId == turnId)&&(identical(other.seq, seq) || other.seq == seq)&&(identical(other.stepId, stepId) || other.stepId == stepId)&&(identical(other.question, question) || other.question == question));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,turnId,seq,question);
+    return Object.hash(runtimeType,turnId,seq,stepId,question);
 }
 
 @override
 String toString() {
-    return 'AgentEvent.question(turnId: $turnId, seq: $seq, question: $question)';
+    return 'AgentEvent.question(turnId: $turnId, seq: $seq, stepId: $stepId, question: $question)';
 }
 
 
@@ -1179,7 +1200,7 @@ abstract mixin class $AgentQuestionEventCopyWith<$Res> implements $AgentEventCop
   factory $AgentQuestionEventCopyWith(AgentQuestionEvent value, $Res Function(AgentQuestionEvent) _then) = _$AgentQuestionEventCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) AgentQuestion question
+@JsonKey(required: true) String turnId,@JsonKey(required: true) int seq,@JsonKey(required: true) String stepId,@JsonKey(required: true) AgentQuestion question
 });
 
 
@@ -1196,11 +1217,12 @@ class _$AgentQuestionEventCopyWithImpl<$Res>
 
 /// Create a copy of AgentEvent
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? question = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? turnId = null,Object? seq = null,Object? stepId = null,Object? question = null,}) {
   return _then(AgentQuestionEvent(
 turnId: null == turnId ? _self.turnId : turnId // ignore: cast_nullable_to_non_nullable
 as String,seq: null == seq ? _self.seq : seq // ignore: cast_nullable_to_non_nullable
-as int,question: null == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
+as int,stepId: null == stepId ? _self.stepId : stepId // ignore: cast_nullable_to_non_nullable
+as String,question: null == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
 as AgentQuestion,
   ));
 }

@@ -27,6 +27,7 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
   const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools: {
     features: createSharedFeatureReader({ config: config.query, publicSources }),
     grounding: createVertexGrounding({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
+    groundingTimeoutMs: config.groundingTimeoutMs,
   } });
   // Local development may keep sessions in memory and trust a fixed token; Cloud Run never does.
   const development = env.AGENT_DEVELOPMENT_MODE === 'true';
@@ -36,7 +37,10 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     ? staticVerifier({ [env.AGENT_DEVELOPMENT_TOKEN]: 'dev-user' }) : createFirebaseVerifier(config.projectId);
   const server = createAgentHttpServer({ store, verifier, runner, rateLimiter: createRateLimiter(config.turnsPerHour),
     allowedOrigins: config.allowedOrigins, turnTimeoutMs: config.turnTimeoutMs });
-  server.on('error', () => { log({ severity: 'ERROR', event: 'agentServerFailed' }); process.exitCode = 1; });
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    log({ severity: 'ERROR', event: 'agentServerFailed', reason: error.code ?? error.message, port });
+    process.exitCode = 1;
+  });
   const close = () => { server.close(); server.closeAllConnections(); };
   process.once('SIGINT', close);
   process.once('SIGTERM', close);

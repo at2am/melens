@@ -12,6 +12,8 @@ import '../../../core/network/public_source_opener.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
+import '../../cards/ui/card_item_details.dart';
+import '../../cards/ui/card_registry.dart';
 import '../../chat/ui/chat_panel.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
@@ -62,6 +64,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _regionReadFailed = false;
   bool _showUnlocated = false;
   bool _showChat = false;
+
+  /// A tapped card item with no map record, shown in the details pane.
+  CardItem? _cardItem;
   int _detailSequence = 0;
   TimeWindow? _selectedWindow;
   String? _selectedFilters;
@@ -174,7 +179,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       viewport.responseQuery?.areaFilter,
       viewport.responseQuery?.boundaryFilter,
     );
-    setState(() => _showUnlocated = false);
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = null;
+    });
     unawaited(
       ref
           .read(selectionControllerProvider.notifier)
@@ -190,10 +198,44 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  /// Selects a record the map has not loaded by its id, against the
+  /// snapshot the map is showing, and reconciles it with the view once its
+  /// details arrive. Without a loaded snapshot there is nothing to read from.
+  Future<bool> _selectFeatureById(String id) async {
+    final viewport = ref.read(viewportControllerProvider);
+    final response = viewport.response;
+    if (response == null) return false;
+    _selectedWindow = viewport.responseQuery?.window;
+    _selectedFilters = _filters(
+      viewport.responseQuery?.areaFilter,
+      viewport.responseQuery?.boundaryFilter,
+    );
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = null;
+    });
+    await ref
+        .read(selectionControllerProvider.notifier)
+        .selectById(
+          id,
+          context: MapReadContext(
+            requestId: 'map-detail-${++_detailSequence}',
+            snapshotId: response.snapshotId,
+          ),
+          mode: response.mode,
+          dataMode: response.dataMode,
+        );
+    if (mounted) _reconcileSelection();
+    return true;
+  }
+
   void _selectUnlocated(UnlocatedSelection selected, UnlocatedQuery query) {
     _selectedWindow = query.window;
     _selectedFilters = _filters(query.areaFilter, query.boundaryFilter);
-    setState(() => _showUnlocated = false);
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = null;
+    });
     unawaited(
       ref
           .read(selectionControllerProvider.notifier)
@@ -316,8 +358,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  /// A tapped card item selects its map feature when it is loaded, and moves
-  /// the camera to its location otherwise.
+  /// A tapped card item opens its details beside the map. A map record is
+  /// selected as if tapped on the map, fetched by id when the map has not
+  /// loaded it; any other item shows what the card knows about it. The
+  /// camera moves to the item's location when the map does not show it.
   void _onCardItemTap(CardItem item) {
     final source = item.source;
     if (source is FeatureCardSource) {
@@ -326,8 +370,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _selectItem(loaded);
         return;
       }
+      if (item.location case final location?) _focusPoint(location);
+      unawaited(
+        _selectFeatureById(source.featureId).then((selected) {
+          if (!selected && mounted) _showCardItem(item);
+        }),
+      );
+      return;
     }
     if (item.location case final location?) _focusPoint(location);
+    _showCardItem(item);
+  }
+
+  void _showCardItem(CardItem item) {
+    ref.read(selectionControllerProvider.notifier).clear();
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = item;
+    });
   }
 
   MapItem? _loadedItem(String id) {
@@ -341,12 +401,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return null;
   }
 
-  Widget _chatPanel({VoidCallback? onClose}) => ChatPanel(
-    key: const ValueKey('map-chat-panel'),
-    onClose: onClose,
-    onCardItemTap: _onCardItemTap,
-    onOpenSource: _sourceOpener,
-  );
+  Widget _chatPanel({VoidCallback? onClose, CardItemCallback? onCardItemTap}) =>
+      ChatPanel(
+        key: const ValueKey('map-chat-panel'),
+        onClose: onClose,
+        onCardItemTap: onCardItemTap ?? _onCardItemTap,
+        onOpenSource: _sourceOpener,
+      );
 
   void _showChatSheet(BuildContext context) {
     unawaited(
@@ -362,6 +423,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
               child: _chatPanel(
                 onClose: () => Navigator.of(sheetContext).pop(),
+                // The sheet covers the map, so a tapped item closes it to
+                // show the details it opened.
+                onCardItemTap: (item) {
+                  Navigator.of(sheetContext).pop();
+                  _onCardItemTap(item);
+                },
               ),
             ),
           ),
@@ -538,6 +605,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 onOpenSource: _sourceOpener,
                 onRefreshSnapshot: () => unawaited(_refreshAggregateSnapshot()),
               ),
+      );
+    } else if (_cardItem case final cardItem?) {
+      details = CardItemDetails(
+        item: cardItem,
+        onClose: () => setState(() => _cardItem = null),
+        onOpenSource: _sourceOpener,
       );
     } else {
       details = null;
