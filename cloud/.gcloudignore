@@ -7,6 +7,8 @@
 !shared/**
 !map/
 !map/**
+!agent/
+!agent/**
 **/node_modules/
 **/dist/
 **/build/
@@ -14,6 +16,7 @@
 **/coverage/
 shared/README.md
 map/README.md
+agent/README.md
 map/infra/?*
 !map/infra/dev-public-sources.json
 **/.env

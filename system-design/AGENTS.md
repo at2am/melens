@@ -11,7 +11,7 @@ Melens is a mobile and web app that shows City of Melbourne datasets as map laye
 | Path | Contents |
 | --- | --- |
 | `system-design/` | Design docs, use cases and agent instructions. Read the relevant ones before building a feature. |
-| `cloud/` | Google Cloud backend, TypeScript on Node 24: `cloud/data` ingestion jobs, `cloud/shared` the query library every reader uses (contract, fixed queries, runner, adapters), `cloud/map` the map query service, `cloud/agent` the agent service (planned). Read each folder's README before changing it. |
+| `cloud/` | Google Cloud backend, TypeScript on Node 24: `cloud/data` ingestion jobs, `cloud/shared` the query library every reader uses (contract, fixed queries, runner, adapters), `cloud/map` the map query service, `cloud/agent` the agent service. Read each folder's README before changing it. |
 | `app/` | Flutter app for Android, iOS and Web. Read `app/README.md` before changing it. |
 
 Design docs, in reading order:

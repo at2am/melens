@@ -1,6 +1,6 @@
 # Tools
 
-**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. This is the contract for plan task F3 until the tools exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
+**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. Implemented in `cloud/agent` on 2026-10-09: `search_features`, `get_feature`, `nearby_context`, `show_layers`, `focus_map`, `highlight_features`, `show_card`, `ask_user`, `maps_grounding` and `search_grounding` (the Zod schemas in `cloud/agent/src/tools/catalog.ts` are now their source of truth); the other tools remain this contract until they exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
 
 These are the tools of the chat agent `map_agent`. The two workflow tools run the same code as the app's map-tap and Analyse entry points. How the loop uses the tools is in [agent-design.md](agent-design.md); the events they send to the app are in [agent-protocol.md](agent-protocol.md).
 
@@ -43,7 +43,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | `LatLng` | `{ "lat": number, "lng": number }` | WGS84 |
 | `Area` | `{ "center": LatLng, "radius_m": integer }` or `{ "bbox": { "north", "south", "east", "west" } }` | `radius_m` 50–5000; a bbox at most 10 km per side |
 | `TimeWindow` | `{ "from": time, "to": time }` | Either end may be omitted |
-| `LayerId` | `"pedestrian"`, `"anomaly"`, `"disruption"`, `"event"`, `"news"`, `"parking"`, or `"user:<source_id>"` | `parking` is P2; `user:` layers come from UC-07 |
+| `LayerId` | `"pedestrian"`, `"anomaly"`, `"disruption"`, `"event"`, `"news"`, `"planning"`, `"parking"`, or `"user:<source_id>"` | The point-feature layers of map contract v1; `parking` is P2; `user:` layers come from UC-07. The code enum currently stops at `planning` |
 | `FeatureId` | string | A [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem `id`; the server resolves the current `versionId`. The example ids in this file are illustrative until F3 confirms them against the published views |
 | `CompactFeature` | See below | What list results contain |
 | `Source` | `{ "feature_id": FeatureId }` or `{ "url": string, "title"?: string }` | What a card item cites |
@@ -114,7 +114,7 @@ Status line: "Reading the details". Cost: one BigQuery query.
 | --- | --- | --- |
 | `id` | `FeatureId` | Yes |
 
-Returns the full map item (map contract v1 MapItem: id, version, layer, geometry, time, sources and kind-specific details). Geometry is simplified to at most 200 points. Errors: `not_found`.
+Returns the full map item (map contract v1 MapItem: id, version, layer, geometry, time, sources and kind-specific details). Geometry is simplified to at most 200 points. Errors: `not_found`. The first version serves features that a search returned earlier in the same turn; a lookup by id alone over the views is a later task.
 
 ### `heritage_lookup`
 

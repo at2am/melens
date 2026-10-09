@@ -46,7 +46,7 @@ The map app does not query BigQuery directly and has no Firestore map listener. 
 | --- | --- | --- |
 | Flutter app | Android, iOS, Web on Firebase Hosting | Platform-neutral map state/data; first acceptance on Web; native acceptance separately recorded |
 | Map query service | Cloud Run service, cloud/map | Catalog, bounded viewport/detail/unlocated/member queries, budgets and public-field filtering |
-| Agent service | Cloud Run service, cloud/agent (planned) | Chat loop, workflows and tools; Gemini through Vertex AI; streamed events ([agent-protocol.md](agent-protocol.md)) |
+| Agent service | Cloud Run service, cloud/agent | Chat loop, workflows and tools; Gemini through Vertex AI; streamed events ([agent-protocol.md](agent-protocol.md)) |
 | Ingestion | Cloud Run jobs, Cloud Scheduler, cloud/data | Source admission, normalization, publication and provenance |
 | BigQuery | Google Cloud | Published query views and historical facts; the anomaly detector (a cloud/data job) publishes anomaly results here |
 | GCS | Google Cloud | Permitted NDJSON batch staging; not the client wire format |
@@ -88,4 +88,4 @@ Cloud Run, BigQuery and GCS stay in `australia-southeast2`. The Vertex AI locati
 
 ## Open implementation work
 
-`cloud/agent` does not exist yet; its deployment script follows the pattern of `cloud/map/infra/deploy.sh` (immutable image digest, plan by default, identity audit). Map endpoints/adapters/deployment are later feature 002 tasks (T011–T014/T019 onward); T001 is a contract freeze, not an implementation claim. Source gates remain in feature 001. Anomaly production (a cloud/data job writing to BigQuery), the Firebase Hosting release (T054) and the deployed-origin CORS update on both services retain separate owners and acceptance.
+`cloud/agent` exists (see its README for what the first version covers); its deployment script, following `cloud/map/infra/deploy.sh` (immutable image digest, plan by default, identity audit), is still to be written. Map endpoints/adapters/deployment are later feature 002 tasks (T011–T014/T019 onward); T001 is a contract freeze, not an implementation claim. Source gates remain in feature 001. Anomaly production (a cloud/data job writing to BigQuery), the Firebase Hosting release (T054) and the deployed-origin CORS update on both services retain separate owners and acceptance.

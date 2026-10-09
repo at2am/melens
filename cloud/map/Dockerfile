@@ -5,12 +5,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY map/package.json map/
-RUN npm ci
+COPY agent/package.json agent/
+RUN npm ci --workspace map
 COPY shared/tsconfig.json shared/
 COPY shared/src/ shared/src/
 COPY map/tsconfig.json map/
 COPY map/src/ map/src/
-RUN npm run build --workspace map && npm prune --omit=dev
+RUN npm run build --workspace map && npm prune --omit=dev --workspace map
 
 FROM node:24.21.0-bookworm-slim
 ENV NODE_ENV=production
