@@ -7,14 +7,11 @@ import { MapAdapterError, parsePublishedGeometry, publicSourceReference, publish
   type PublicSourceReference, type PublicSourceResolver, type PublishedItemBatch }
   from './adapter-common.js';
 import type { ViewRow } from './query-runner.js';
+import { BOUNDARY_SCHEMES as schemes } from './sql.js';
 
 export type BoundarySelection = NonNullable<ViewportQuery['boundaryFilter']>;
 export type BoundaryItem = Extract<MapItem, { kind: 'boundary' }>;
 
-const schemes = {
-  GCCSA: 'ASGS_GCCSA', LGA: 'ASGS_LGA', SA2: 'ASGS_SA2', STE: 'ASGS_STE',
-  CLUE_BLOCK: 'com_clue_block', MUNICIPAL: 'com_municipal',
-} as const;
 const boundaryRowSchema = z.object({
   boundary_id: z.string(), version_id: z.string(), scheme: z.string(), code: z.string(),
   name: z.string(), vintage: z.string(), geometry_geojson: z.string(),

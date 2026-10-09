@@ -116,6 +116,7 @@ export const areaFilterSchema = z.strictObject({
   periodEnd: z.iso.date(),
 }).refine((filter) => filter.periodStart < filter.periodEnd, 'Statistical period must have periodStart < periodEnd');
 export const boundaryLevelSchema = z.enum(['GCCSA', 'LGA', 'SA2', 'STE', 'CLUE_BLOCK', 'MUNICIPAL']);
+export type BoundaryLevel = z.infer<typeof boundaryLevelSchema>;
 export const boundaryFilterSchema = z.strictObject({
   level: boundaryLevelSchema,
   vintage: identifier,
