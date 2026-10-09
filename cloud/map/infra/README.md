@@ -81,13 +81,32 @@ cannot lower it and BigQuery cannot partition on a string topic. The recommended
 publisher-maintained current table that the view and its dependants read; then lower the
 ceiling again. Until then the estimate keeps climbing with every 15-minute news batch.
 
-`dev-public-sources.json` contains only municipal boundary and development
-monitor references from their verified-open, active official manifests and
-published source metadata. Runtime coverage checks must recheck admission and
-publication on each request. An absent reference stays unavailable. No
-pedestrian, roads, transit, events, anomalies or candidate source is admitted by
-this registry. Each item adapter supplies its actual version reference rather
-than using a guessed dataset version.
+`dev-public-sources.json` is the reviewed public reference registry. A source
+reaches the map only while it is admitted and published in `v_source_coverage`
+*and* carries a reference here; runtime coverage checks recheck admission and
+publication on each request, and an absent reference stays `unavailable`. Each
+item adapter supplies its actual version reference rather than using a guessed
+dataset version.
+
+Until 2026-10-09 the registry held only the municipal boundary and development
+monitor references, so the planning layer showed only Development Activity Monitor
+records and the event and news layers answered `unavailable` even though their
+sources were admitted and published. The 2026-10-09 review added, from the
+connectors' `source.json` manifests and source-policy records:
+
+| Source | Licence | Reference URL | Attribution shown with records |
+| --- | --- | --- | --- |
+| `victoria.council.engagement` (planning) | `restricted`, facts and links only ([policy](../../data/docs/source-policies/council-engagement-admission.md)) | none; every record carries its council project link | Greater Melbourne councils — community engagement projects |
+| `ticketmaster.events` (event) | `restricted` ([release record](../../data/docs/validation/events-release-2026-10-01.md)); 24-hour visibility, direct event link required | Discovery API page | Event information provided by Ticketmaster |
+| `gdelt.news` (news) | `verified_open` with attribution to The GDELT Project | gdeltproject.org | News metadata from The GDELT Project |
+| `victoria.council.engagement_news` (news) | `restricted`, facts and links only | none; every record carries its council news link | Greater Melbourne councils — community engagement news |
+
+`deploy.sh` checks the registry against this reviewed table (source set, licence
+status reported by `v_source_coverage`, reference host) before any plan or apply.
+Still absent: pedestrian, road and transit disruption sources are not published
+in `v_source_coverage` at all (`notCovered`), anomalies need a wired producer
+(`unavailable`), and parking, crime statistics, rent and census references wait
+for their own review.
 
 The current boundary/pedestrian views do not prove latest record rights after
 withdrawal, so production composition rejects those record families without a
@@ -128,6 +147,18 @@ bytes; the CBD planning viewport then returned 118 drawable items of 218 matchin
 `completeness: complete`, and catalog and CORS checks passed under the query identity.
 Historical mode (105,077,139 bytes) was unaffected. `/healthz` still returns the frontend
 404. Rollback target: `melens-dev-map-00001-kq4` (400 MB ceiling, pre-workspace image).
+
+Revision `melens-dev-map-00004-w49` (image digest
+`sha256:9a3ecd9d64731f0e7c72f6bc9aa4e0fa9fc5581fd8bbf25f556c31b30d8d1b38`, same identity,
+limits, ceiling and origin) carries the six-source registry above and the shared
+BigQuery adapter fix: the client had been sending every TIMESTAMP and DATE parameter as
+NULL, so a current-mode event query matched only the three undated Ticketmaster rows
+instead of the 79 events in greater Melbourne that week (`clientQueryParameters` in
+`cloud/shared/src/query/bigquery-adapter.ts`, with a regression test). After the deploy
+the CBD viewport for 2026-10-09 to 2026-10-16 returned 65 matching events and 326
+planning records from both planning sources; `verify` read all six publications. News
+still answers `unavailable` because no news row adapter exists yet. Rollback target:
+`melens-dev-map-00003-nlr`.
 
 Rollback uses the previously recorded Cloud Run revision and
 `gcloud run services update-traffic melens-dev-map --project=melens-510012

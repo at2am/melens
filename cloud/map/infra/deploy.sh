@@ -61,9 +61,9 @@ elif [[ -n $confirm_project ]]; then
 fi
 task_tmp_dir=$(mktemp -d)
 trap 'rm -rf -- "$task_tmp_dir"' EXIT
-python3 - "$task_tmp_dir/env.json" "$script_dir/dev-public-sources.json" "$dynamic_scan_bytes" "${origins[@]}" <<'PY'
+python3 - "$task_tmp_dir/env.json" "$task_tmp_dir/expected-sources.json" "$script_dir/dev-public-sources.json" "$dynamic_scan_bytes" "${origins[@]}" <<'PY'
 import json, sys, urllib.parse
-env_path, registry_path, ceiling, *origins = sys.argv[1:]
+env_path, expected_path, registry_path, ceiling, *origins = sys.argv[1:]
 if len(origins) != len(set(origins)):
     raise SystemExit('Duplicate app origin')
 for origin in origins:
@@ -82,15 +82,33 @@ for origin in origins:
         raise SystemExit('App origin must use its canonical browser form')
 with open(registry_path) as handle:
     registry = json.load(handle)
-expected = {'melbourne.municipal_boundary', 'melbourne.development_monitor'}
+# The reviewed development sources (infra/README.md, 2026-10-09 admission): the licence status
+# v_source_coverage must report and the official host of the reference URL. A null URL is
+# reviewed only where every published record carries its own original link.
+reviewed = {
+    'melbourne.municipal_boundary': ('verified_open', 'data.melbourne.vic.gov.au'),
+    'melbourne.development_monitor': ('verified_open', 'data.melbourne.vic.gov.au'),
+    'victoria.council.engagement': ('restricted', None),
+    'ticketmaster.events': ('restricted', 'developer.ticketmaster.com'),
+    'gdelt.news': ('verified_open', 'www.gdeltproject.org'),
+    'victoria.council.engagement_news': ('restricted', None),
+}
+expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:
     raise SystemExit('Public registry differs from the reviewed development sources')
 for item in registry:
     if set(item) != {'sourceId', 'url', 'attribution', 'versionRef'} or not isinstance(item['attribution'], str) or not item['attribution'].strip() or item['versionRef'] is not None:
         raise SystemExit('Invalid public source reference')
-    parsed = urllib.parse.urlsplit(item['url'])
-    if parsed.scheme != 'https' or parsed.netloc != 'data.melbourne.vic.gov.au' or parsed.query or parsed.fragment:
+    host = reviewed[item['sourceId']][1]
+    if host is None:
+        if item['url'] is not None:
+            raise SystemExit('Public registry carries an unreviewed reference URL')
+        continue
+    parsed = urllib.parse.urlsplit(item['url'] or '')
+    if parsed.scheme != 'https' or parsed.netloc != host or parsed.query or parsed.fragment:
         raise SystemExit('Public registry requires the reviewed official dataset pages')
+with open(expected_path, 'w') as handle:
+    json.dump({source: status for source, (status, _host) in reviewed.items()}, handle)
 env = {
     'MAP_PROJECT_ID': 'melens-510012', 'MAP_BQ_LOCATION': 'australia-southeast2',
     'MAP_QUERY_DATASET': 'melens_query', 'MAP_DYNAMIC_SCAN_BYTES': ceiling,
@@ -107,9 +125,9 @@ print(json.dumps({'publicSources': sorted(expected), 'environment': env}, indent
 PY
 
 if $verify; then
-  python3 - "$gcloud_bin" "$bq_bin" "$project" "$identity" <<'PY'
+  python3 - "$gcloud_bin" "$bq_bin" "$project" "$identity" "$task_tmp_dir/expected-sources.json" <<'PY'
 import json, subprocess, sys
-gcloud, bq, project, identity = sys.argv[1:]
+gcloud, bq, project, identity, expected_path = sys.argv[1:]
 member = 'serviceAccount:' + identity
 def read(command):
     result = subprocess.run(command, text=True, capture_output=True)
@@ -158,21 +176,23 @@ for bucket in gc('storage', 'buckets', 'list'):
     bucket_policy = read([gcloud, 'storage', 'buckets', 'get-iam-policy', 'gs://' + name, '--format=json'])
     if any(member in binding.get('members', []) for binding in bucket_policy.get('bindings', [])):
         raise SystemExit('Query identity has an unexpected bucket grant')
+with open(expected_path) as handle:
+    expected_status = json.load(handle)
+row_limit = len(expected_status) + 1
 statement = '''SELECT source_id, license_status, access_status, latest_published_batch_id,
 latest_published_at, latest_published_output_count
 FROM `melens-510012.melens_query.v_source_coverage`
-WHERE source_id IN ('melbourne.municipal_boundary', 'melbourne.development_monitor')
-ORDER BY source_id LIMIT 3'''
+WHERE source_id IN (%s)
+ORDER BY source_id LIMIT %d''' % (', '.join("'%s'" % source for source in sorted(expected_status)), row_limit)
 publications = read([bq, 'query', '--project_id=' + project, '--location=australia-southeast2',
-    '--use_legacy_sql=false', '--maximum_bytes_billed=100000000', '--max_rows=3',
+    '--use_legacy_sql=false', '--maximum_bytes_billed=100000000', '--max_rows=' + str(row_limit),
     '--format=prettyjson', statement])
-expected_sources = {'melbourne.municipal_boundary', 'melbourne.development_monitor'}
-if len(publications) != 2 or {row['source_id'] for row in publications} != expected_sources or any(
-    row['license_status'] != 'verified_open' or row['access_status'] != 'active'
+if len(publications) != len(expected_status) or {row['source_id'] for row in publications} != set(expected_status) or any(
+    row['license_status'] != expected_status[row['source_id']] or row['access_status'] != 'active'
     or not row['latest_published_batch_id'] or not row['latest_published_at']
     for row in publications
 ):
-    raise SystemExit('Public references require both admitted active published sources')
+    raise SystemExit('Public references require every reviewed source to be admitted, active and published')
 print(json.dumps({'identity': identity, 'projectRoles': sorted(roles), 'queryAccess': 'READER on approved views only', 'ingestSecretBucketGrants': False, 'reviewedViews': len(views), 'publications': publications, 'publicationReadIdentity': 'existing CLI user; runtime query identity verified after deployment'}))
 PY
 fi
