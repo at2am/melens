@@ -63,6 +63,7 @@ Multi-turn chain:
 - [ ] The eval checks the tool trace for precise requests: the right tool with the right arguments.
 - [ ] Closing and reopening the app restores the conversation, and a new deployment of the agent service does not lose it. A user never sees another user's session.
 - [ ] The chat panel lists the user's sessions; switching to one restores that conversation, and new and delete work.
+- [ ] Every model call sends a `usage` event with Gemini's own input and output token counts while the turn runs; `done.usage` equals their sum and matches the stored turn.
 
 ## Notes
 

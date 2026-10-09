@@ -17,6 +17,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | Data access | Fixed parameterized queries over the published `melens_query` views with a read-only identity and `maximumBytesBilled`, the same rules as the map service's query runner |
 | Sessions | Persisted per Firebase uid in Firestore through a Firestore-backed ADK session service ([agent-protocol.md](agent-protocol.md#sessions)). Instances hold no conversation state, so the service can scale out; min-instances=1 while judging |
 | Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
+| Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
 | Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls |
 | Region | Cloud Run in `australia-southeast2` with the data; the Vertex AI location follows model and grounding availability (open question) |
@@ -72,12 +73,14 @@ flowchart TD
 
   subgraph Out["Events streamed to the app"]
     Status(["status"])
+    UsageEv(["usage"])
     UIEv(["ui_action"])
     CardEv(["card"])
     Done(["text + done"])
     Ask(["question + done"])
   end
 
+  Model -- "usageMetadata of every call" --> UsageEv
   Exec -- "data, workflow and grounding calls" --> Status
   Exec -- "UI action tools" --> UIEv
   Check -- "yes" --> CardEv
@@ -86,7 +89,7 @@ flowchart TD
   Exec -- "ask_user ends the turn" --> Ask
 ```
 
-Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK for TypeScript docs; see Open questions for the fallback if they are missing).
+Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. Every Gemini call, in the loop, in a workflow or in a grounding sub-agent, sends its token usage to the app as soon as it finishes. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK for TypeScript docs; see Open questions for the fallback if they are missing).
 
 ## The chat agent (`map_agent`)
 
@@ -129,6 +132,13 @@ The agent acts first and states its assumptions. It asks only when acting would 
 - Long tool results are compacted: every row shortened, only the first N rows kept, and the total count stated first. A `search_features` call in the CBD can match hundreds of features.
 - Grounding results are cached in Firestore by tool, normalised question, place and date, so repeated questions from different users hit the cache. Grounding is billed per call.
 - The prompt carries the last 20 turns of the session: user input, answer text, card summaries and the pending question. Older turns stay in Firestore for the app's history view and are not sent to the model.
+
+### Token accounting
+
+- Every model call's `usageMetadata` is read once, from the final non-partial response in the after-model callback, and sent to the app as a `usage` event before that call's tool calls run ([agent-protocol.md](agent-protocol.md#token-usage)). `@google/adk` 2.2.1 exposes it as `LlmResponse.usageMetadata`, aggregated across streamed chunks and across a paused-and-resumed generation.
+- Counts are Gemini's, never estimated. Input is `promptTokenCount` with `cachedContentTokenCount` broken out; output is `candidatesTokenCount` with `thoughtsTokenCount` broken out, because thinking is billed as output; `toolUsePromptTokenCount` covers the built-in grounding tools; `totalTokenCount` is copied. Grounding sub-agent calls and workflow generations report like any other call, under their own `agent` name.
+- The turn's totals are the sum of its calls. They are stored with the turn in Firestore and logged as one structured line per call (`turnId`, `agent`, `model`, counts) so Cloud Logging can sum tokens per model and per day. The service warns when a call's `total` differs from `input + output + thoughts` by more than `toolUseInput` (Gemini documents the total as prompt, thoughts and candidates), or when the configured model returns no `thoughtsTokenCount`, which some preview models have omitted.
+- A cancelled or failed call reports no usage; `done.usage.complete` is then `false`. Nothing is backfilled.
 
 ## Source rules
 
@@ -182,10 +192,11 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 - Include multi-turn chains that cross use cases, for example: "What's around here?", then "Why is it so busy right now?", then "OK, plan me a quiet walk away from the crowds."
 - Include cases where asking is right ("Take me to the gardens") and where it is wrong ("Plan a walk near me" with a known location); check them in the tool trace.
 - Checks per answer: a source for every card item, places that exist, correct times. For precise requests, also check the tool trace: the right tool with the right arguments.
+- Checks per turn: one `usage` event per model call in the trace, turn totals equal to the sum of the calls, and `done.usage` equal to the stored turn.
 - Run the set after every prompt or tool change. Results go into the deck as evidence for the technical score.
 
 ## Open questions
 
 - Whether Gemini's built-in grounding tools can be combined with function tools in one agent.
-- Whether ADK for TypeScript exposes the callbacks the loop needs (argument validation, read memo, result compaction, wrap-up note, model-call limit) and a pluggable session service. If not, the fallback is a hand-written loop over the Vertex AI SDK with the same tool registry, events and Firestore session store.
+- Whether ADK for TypeScript exposes the callbacks the loop needs (argument validation, read memo, result compaction, wrap-up note, model-call limit, per-call usage from the final non-partial model response) and a pluggable session service. If not, the fallback is a hand-written loop over the Vertex AI SDK with the same tool registry, events and Firestore session store.
 - The Vertex AI location for `gemini-3.8-flash` and the grounding tools.
