@@ -103,6 +103,19 @@ startup is verified; treat that as a separate health-path limitation. The exact
 platform cause is unconfirmed. Do not infer application or BigQuery health from
 this intercepted path, or change working IAM/ingress to repair it.
 
+The 2026-10-09 deployment moved the service to revision `melens-dev-map-00002-g2p`,
+image digest `sha256:fd88fdb18b285b33312e258e7f6021d207ed02e6ddf14a475970c15cf73c017f`
+(the first `cloud/` workspace build carrying `@melens/shared`), with the same identity,
+runtime limits and `http://localhost:8000` origin. The audit's approved list grew to the
+25 views `cloud/data/sql` publishes. Catalog and CORS checks passed under the query
+identity. The current-mode planning viewport returned `unavailable`: its dry run now
+estimates 481,467,396 bytes against the 400,000,000-byte reviewed ceiling (383,847,461 on
+2026-10-01; council engagement rows joined the geo view on 2026-10-07), so the loader
+denies the layer. Historical mode (105,077,139 bytes) still runs. Raising the ceiling or
+partitioning the view is a separate decision; the previous revision would deny the same
+query. `/healthz` still returns the frontend 404. Rollback target:
+`melens-dev-map-00001-kq4`.
+
 Rollback uses the previously recorded Cloud Run revision and
 `gcloud run services update-traffic melens-dev-map --project=melens-510012
 --region=australia-southeast2 --to-revisions=PREVIOUS_REVISION=100`. For the first

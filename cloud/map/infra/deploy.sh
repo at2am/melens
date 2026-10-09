@@ -129,10 +129,12 @@ if query.get('location') != 'australia-southeast2' or ingest.get('location') != 
 grants = [entry.get('role') for entry in query.get('access', []) if entry.get('userByEmail') == identity]
 if grants != ['READER'] or any(entry.get('userByEmail') == identity for entry in ingest.get('access', [])):
     raise SystemExit('Query identity dataset access differs from the reviewed view boundary')
+# Every view cloud/data/sql publishes into melens_query; the query identity reads the dataset.
 approved = {
     'v_area_indicators', 'v_boundaries', 'v_change_timeline', 'v_crime_area_statistics',
     'v_crime_news_current', 'v_events_current', 'v_geo_records_current', 'v_geo_records_history',
-    'v_news_current', 'v_news_history', 'v_news_sources', 'v_parking_current', 'v_parking_unmatched_observations',
+    'v_melbourne_news_current', 'v_news_current', 'v_news_history', 'v_news_sources', 'v_parking_current',
+    'v_parking_rule_reference', 'v_parking_sensor_current', 'v_parking_unmatched_observations',
     'v_pedestrian_observations', 'v_planning_changes_current', 'v_road_disruptions_current',
     'v_road_disruptions_history', 'v_source_abnormal_delay', 'v_source_coverage', 'v_source_health',
     'v_street_observations', 'v_transport_changes_current',
