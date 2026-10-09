@@ -3,8 +3,9 @@ import { MAX_PAGE_ITEMS, SERVICE_BBOX, compareMapItems, normalizedViewportIdenti
   parseUnlocatedQuery, parseViewportQuery, type LayerId, type MapItem, type MapItemPage, type UnlocatedQuery,
   type ViewportQuery } from '../contracts/map-contract.js';
 import { findPublicSource, sourceBelongsToLayer, type SourceCoverageSnapshot } from '../query/source-coverage.js';
+import { fitPage, layerBudgets } from './page-budget.js';
 import { assertSnapshotPublic, sourceWatermarks, type SnapshotAccess } from './viewport.js';
-import { MapServiceError, type StoredSnapshot } from './snapshot-store.js';
+import { CURSOR_PLACEHOLDER, MapServiceError, type StoredSnapshot } from './snapshot-store.js';
 
 export type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
 import type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
@@ -50,27 +51,21 @@ export function createUnlocatedService(options: SnapshotAccess & {
   function page(snapshot: StoredSnapshot, query: UnlocatedQuery, offset = 0): MapItemPage {
     const layer = query.cursor === undefined ? null : query.layers[0]!;
     const items = layer === null ? snapshot.listItems : snapshot.listItems.filter((item) => item.layerId === layer);
-    let count = Math.min(items.length - offset, query.pageSize ?? MAX_PAGE_ITEMS);
-    while (true) {
-      const selected = items.slice(offset, offset + count);
-      const more = offset + count < items.length;
-      const draft = { schemaVersion: 1, requestId: query.requestId, snapshotId: snapshot.id,
-        mode: snapshot.request.mode, generatedAt: (options.clock?.() ?? new Date()).toISOString(), dataMode: 'live',
-        items: selected, scope: snapshot.listScope, completeness: more ? 'partial' : snapshot.listCompleteness,
-        totalMatching: snapshot.listTotal, nextCursor: more ? 'x'.repeat(32) : null };
-      if (Buffer.byteLength(JSON.stringify(draft), 'utf8') <= maxBytes) {
-        if (count === 0 && more) throw new MapServiceError('budgetExceeded');
-        // Contract continuations select exactly one layer; cross-layer first pages need
-        // no ambiguous cursor. Loaded rows remain accessible through snapshot details.
-        const nextCursor = more && snapshot.selectedLayers.length === 1 ? options.store.cursor({
-          snapshotId: snapshot.id, family: 'unlocated', identity: snapshot.identity,
-          layerId: snapshot.selectedLayers[0]!, aggregateId: null, offset: offset + count,
-          pageSize: query.pageSize ?? MAX_PAGE_ITEMS }) : null;
-        return parseMapItemPage({ ...draft, nextCursor }, { production: true });
-      }
-      if (count === 0) throw new MapServiceError('budgetExceeded');
-      count -= 1;
-    }
+    const pageSize = query.pageSize ?? MAX_PAGE_ITEMS;
+    const draft = (selected: readonly MapItem[], more: boolean, nextCursor: string | null) => ({
+      schemaVersion: 1, requestId: query.requestId, snapshotId: snapshot.id, mode: snapshot.request.mode,
+      generatedAt: (options.clock?.() ?? new Date()).toISOString(), dataMode: 'live', items: selected,
+      scope: snapshot.listScope, completeness: more ? 'partial' : snapshot.listCompleteness,
+      totalMatching: snapshot.listTotal, nextCursor });
+    const { slice, more } = fitPage({ items, offset, limit: pageSize, maxBytes,
+      build: (selected, continues) => draft(selected, continues, continues ? CURSOR_PLACEHOLDER : null) });
+    if (slice.length === 0 && more) throw new MapServiceError('budgetExceeded');
+    // Contract continuations select exactly one layer; cross-layer first pages need
+    // no ambiguous cursor. Loaded rows remain accessible through snapshot details.
+    const nextCursor = more && snapshot.selectedLayers.length === 1 ? options.store.cursor({
+      snapshotId: snapshot.id, family: 'unlocated', identity: snapshot.identity,
+      layerId: snapshot.selectedLayers[0]!, aggregateId: null, offset: offset + slice.length, pageSize }) : null;
+    return parseMapItemPage(draft(slice, more, nextCursor), { production: true });
   }
   return {
     async query(value: unknown, execution: { readonly signal?: AbortSignal } = {}): Promise<MapItemPage> {
@@ -89,8 +84,8 @@ export function createUnlocatedService(options: SnapshotAccess & {
       const coverage = await options.readCoverage(unlocatedCoverageRequest(query), execution);
       const loaded: LoadedUnlocatedLayer[] = [];
       const approvedSourceIds: string[] = [];
-      const rowLimit = Math.max(1, Math.floor(MAX_PAGE_ITEMS / query.layers.length));
-      const resultBudgetBytes = Math.max(2, Math.floor((maxBytes - (options.resultEnvelopeReserveBytes ?? 64 * 1024)) / query.layers.length));
+      const { rowLimit, resultBudgetBytes } = layerBudgets(query.layers.length, maxBytes,
+        options.resultEnvelopeReserveBytes ?? 64 * 1024);
       for (const layerId of query.layers) {
         const approved = approveUnlocatedScope(query, layerId, coverage);
         approvedSourceIds.push(...approved.sourceIds);

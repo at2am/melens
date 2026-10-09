@@ -2,7 +2,8 @@ import { MAX_PAGE_ITEMS, parseViewportQuery, parseViewportResponse, normalizedVi
   type LayerId, type LayerResult, type MapItem, type ViewportQuery, type ViewportResponse }
   from '../contracts/map-contract.js';
 import { findPublicSource, type SourceCoverageReader, type SourceCoverageSnapshot } from '../query/source-coverage.js';
-import { MapServiceError, type SnapshotStore, type SourceWatermark, type StoredSnapshot,
+import { fitPage, layerBudgets } from './page-budget.js';
+import { CURSOR_PLACEHOLDER, MapServiceError, type SnapshotStore, type SourceWatermark, type StoredSnapshot,
   type StoredMemberGroup } from './snapshot-store.js';
 
 export interface LoadedViewportLayer {
@@ -46,7 +47,6 @@ export async function assertSnapshotPublic(snapshot: StoredSnapshot, access: Sna
   if (records.length > 0 && (access.checkPublicRecords === undefined
     || !await access.checkPublicRecords(records, snapshot, coverage, execution))) throw new MapServiceError('notAvailable');
 }
-const encodedBytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), 'utf8');
 function layerPage(layer: LayerResult, items: readonly MapItem[], more: boolean, cursor: string | null): LayerResult {
   const state = items.length > 0 ? 'available' : layer.state === 'available' ? 'unknown' : layer.state;
   return { ...layer, state, items: [...items], completeness: more ? 'partial' : layer.completeness,
@@ -61,34 +61,26 @@ export function createViewportService(options: SnapshotAccess & {
   const maxBytes = options.maxResponseBytes ?? 2 * 1024 * 1024;
   const now = () => (options.clock?.() ?? new Date()).toISOString();
   function responsePage(snapshot: StoredSnapshot, request: ViewportQuery, offset = 0): ViewportResponse {
+    const envelope = (layers: readonly LayerResult[]) => ({ schemaVersion: 1, requestId: request.requestId,
+      snapshotId: snapshot.id, generatedAt: now(), dataMode: 'live', mode: snapshot.request.mode, layers });
+    const pageSize = request.pageSize ?? MAX_PAGE_ITEMS;
     const results: LayerResult[] = [];
     let remaining = MAX_PAGE_ITEMS;
     for (const layerId of request.layers) {
       const layer = snapshot.layers.find((candidate) => candidate.layerId === layerId);
       if (layer === undefined) throw new MapServiceError('cursorMismatch');
       const start = request.cursor === undefined ? 0 : offset;
-      let count = Math.min(layer.items.length - start, request.pageSize ?? MAX_PAGE_ITEMS, remaining);
-      while (true) {
-        const items = layer.items.slice(start, start + count);
-        const more = start + count < layer.items.length;
-        const cursorPlaceholder = more ? 'x'.repeat(32) : null;
-        const draft = { schemaVersion: 1, requestId: request.requestId, snapshotId: snapshot.id,
-          generatedAt: now(), dataMode: 'live', mode: snapshot.request.mode,
-          layers: [...results, layerPage(layer, items, more, cursorPlaceholder)] };
-        if (encodedBytes(draft) <= maxBytes) {
-          if (count === 0 && more && results.length === 0) throw new MapServiceError('budgetExceeded');
-          const cursor = more ? options.store.cursor({ snapshotId: snapshot.id, family: 'viewport',
-            identity: snapshot.identity, layerId, aggregateId: null, offset: start + count,
-            pageSize: request.pageSize ?? MAX_PAGE_ITEMS }) : null;
-          results.push(layerPage(layer, items, more, cursor)); remaining -= count; break;
-        }
-        if (count === 0) throw new MapServiceError('budgetExceeded');
-        count -= 1;
-      }
+      const { slice, more } = fitPage({ items: layer.items, offset: start, limit: Math.min(pageSize, remaining), maxBytes,
+        build: (items, continues) => envelope([...results,
+          layerPage(layer, items, continues, continues ? CURSOR_PLACEHOLDER : null)]) });
+      // A later layer may defer all of its rows to a continuation; the first must deliver at least one.
+      if (slice.length === 0 && more && results.length === 0) throw new MapServiceError('budgetExceeded');
+      const cursor = more ? options.store.cursor({ snapshotId: snapshot.id, family: 'viewport',
+        identity: snapshot.identity, layerId, aggregateId: null, offset: start + slice.length, pageSize }) : null;
+      results.push(layerPage(layer, slice, more, cursor));
+      remaining -= slice.length;
     }
-    return parseViewportResponse({ schemaVersion: 1, requestId: request.requestId, snapshotId: snapshot.id,
-      generatedAt: now(), dataMode: 'live', mode: snapshot.request.mode, layers: results },
-    { production: true, expectedRequest: request });
+    return parseViewportResponse(envelope(results), { production: true, expectedRequest: request });
   }
   return {
     async query(value: unknown, execution: { readonly signal?: AbortSignal } = {}): Promise<ViewportResponse> {
@@ -106,8 +98,8 @@ export function createViewportService(options: SnapshotAccess & {
       const coverage = await options.readCoverage(request, execution);
       if (coverage.completeness !== 'complete') throw new MapServiceError('serviceUnavailable');
       const loaded: LoadedViewportLayer[] = [];
-      const rowLimit = Math.max(1, Math.floor(MAX_PAGE_ITEMS / request.layers.length));
-      const resultBudgetBytes = Math.max(2, Math.floor((maxBytes - (options.resultEnvelopeReserveBytes ?? 64 * 1024)) / request.layers.length));
+      const { rowLimit, resultBudgetBytes } = layerBudgets(request.layers.length, maxBytes,
+        options.resultEnvelopeReserveBytes ?? 64 * 1024);
       // Sequential bounded queries avoid multiplying the per-request concurrency/scan allowance.
       for (const layerId of request.layers) {
         const entry = await options.loadLayer(request, layerId, coverage,
@@ -129,13 +121,13 @@ export function createViewportService(options: SnapshotAccess & {
       }
       const layers = loaded.map((entry) => entry.result);
       const groups = loaded.flatMap((entry) => entry.groups ?? []);
-      const sourceIds = [...layers.flatMap((layer) => layer.sourceIds), ...layers.flatMap((layer) => layer.items.flatMap((item) => item.sources.map((source) => source.sourceId))),
-        ...groups.flatMap((group) => group.members.flatMap((item) => item.sources.map((source) => source.sourceId)))];
-      const actualSourceIds = [...layers.flatMap((layer) => layer.items.flatMap((item) => item.sources.map((source) => source.sourceId))),
-        ...groups.flatMap((group) => group.members.flatMap((item) => item.sources.map((source) => source.sourceId)))];
-      sourceWatermarks(coverage, actualSourceIds);
-      // Sources without a publication may contribute unknown status, never stored public rows.
-      const publishedIds = sourceIds.filter((id) => findPublicSource(coverage, id) !== null);
+      const rowSourceIds = [...layers.flatMap((layer) => layer.items), ...groups.flatMap((group) => group.members)]
+        .flatMap((item) => item.sources.map((source) => source.sourceId));
+      // Every stored row must come from a published source. Coverage-only sources may
+      // contribute an unknown status, never stored public rows, so only they are filtered.
+      sourceWatermarks(coverage, rowSourceIds);
+      const publishedIds = [...layers.flatMap((layer) => layer.sourceIds), ...rowSourceIds]
+        .filter((id) => findPublicSource(coverage, id) !== null);
       const snapshot = options.store.create({ family: 'viewport', identity: normalizedViewportIdentity(request),
         request, selectedLayers: request.layers, sourceWatermarks: sourceWatermarks(coverage, publishedIds),
         layers, listItems: [], listCompleteness: 'complete', listTotal: null, listScope: null, groups });
