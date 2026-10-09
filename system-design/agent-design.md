@@ -1,6 +1,6 @@
 # Agent design
 
-**Status:** Draft. Revised 2026-10-09: the runtime is ADK for TypeScript on its own Cloud Run service, Gemini is called through Vertex AI only, data tools read the published BigQuery views, and chat sessions are persisted per user in Firestore. Revised 2026-09-28: one chat agent with the full tool registry replaces the earlier root agent that dispatched to separate discovery and insight agents. Tool names and arguments are working names until plan task F3 fixes the contract.
+**Status:** Draft, first implementation in `cloud/agent` on 2026-10-09 (see [its README](../cloud/agent/README.md) for what exists and what is still planned). Revised 2026-10-09: the runtime is ADK for TypeScript on its own Cloud Run service, Gemini is called through Vertex AI only, data tools read the published BigQuery views, and chat sessions are persisted per user in Firestore. Revised 2026-09-28: one chat agent with the full tool registry replaces the earlier root agent that dispatched to separate discovery and insight agents. Tool names and arguments are working names until plan task F3 fixes the contract.
 
 This file describes the agents inside the product, which run in the agent service on Cloud Run (`cloud/agent`, planned). The app talks to them through [agent-protocol.md](agent-protocol.md). Instructions for coding agents are in [AGENTS.md](AGENTS.md).
 
@@ -15,7 +15,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | HTTP layer | `node:http` directly, as in cloud/map: one SSE route plus health, hand-written CORS, body limits and error envelope shared with the map service. No web framework |
 | Models | Gemini only, through Vertex AI with the service identity. No Gemini API key, no other providers, no provider abstraction layer |
 | Data access | Fixed parameterized queries over the published `melens_query` views with a read-only identity and `maximumBytesBilled`, the same rules as the map service's query runner |
-| Sessions | Persisted per Firebase uid in Firestore through a Firestore-backed ADK session service ([agent-protocol.md](agent-protocol.md#sessions)). Instances hold no conversation state, so the service can scale out; min-instances=1 while judging |
+| Sessions | Persisted per Firebase uid in Firestore as stored turns ([agent-protocol.md](agent-protocol.md#sessions)); each turn rebuilds the ADK session in memory from the last 20 stored turns, so no raw tool results are persisted. Instances hold no conversation state, so the service can scale out; min-instances=1 while judging |
 | Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
 | Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
@@ -89,7 +89,7 @@ flowchart TD
   Exec -- "ask_user ends the turn" --> Ask
 ```
 
-Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. Every Gemini call, in the loop, in a workflow or in a grounding sub-agent, sends its token usage to the app as soon as it finishes. In ADK the loop is the `LlmAgent`'s own run loop; argument validation, read reuse, result compaction and the wrap-up note are model and tool callbacks, and the budget is the run config's model-call limit (check the callback names in the ADK for TypeScript docs; see Open questions for the fallback if they are missing).
+Reading it: map taps go straight to a workflow; chat text enters the loop. The loop repeats model call, then tool calls, until the model answers without calling a tool or the budget runs out. Workflows called from the loop send their card to the app and return a short summary to the model. An `ask_user` call ends the turn with a question. Every Gemini call, in the loop, in a workflow or in a grounding sub-agent, sends its token usage to the app as soon as it finishes. In ADK for TypeScript the loop is the `LlmAgent`'s own run loop. The wrap-up note, the call budget and the `ask_user` stop are `beforeModelCallback`; usage accounting is `afterModelCallback`; the budget is also the run config's `maxLlmCalls`. Argument validation and the read memo live inside each tool's `execute`, because a tool that throws cannot have its error rewritten for the model.
 
 ## The chat agent (`map_agent`)
 
@@ -181,7 +181,7 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 ## Gemini and ADK constraints
 
-- **Grounding with function tools.** If ADK's built-in Search or Maps tools cannot be combined with custom function tools in one agent, wrap each as a sub-agent (`AgentTool`). Every such call is a separate model call, so run Maps and Search in parallel when a question needs both. Verify this early.
+- **Grounding with function tools.** The loop keeps function tools only; `maps_grounding` and `search_grounding` are function tools that make one grounded Gemini call each through the Vertex AI SDK, so the built-in tools never share a request with function declarations. Every such call is a separate model call with its own `usage` event, and the loop can run Maps and Search in parallel.
 - **English only.** Maps grounding supports English only, so the app, prompts and deck are in English.
 - **Sessions.** Conversation history lives in Firestore, keyed by the Firebase uid, behind a session service adapter. Instances hold no session state between requests, so the service can scale out and a new revision keeps every conversation. A turn holds a short lease on its session, so two concurrent turns on one session are rejected rather than interleaved.
 - **Vertex AI location.** Cloud Run and the data are in Melbourne, but the chosen Gemini model and grounding tools may only be served from `global` or another region. Confirm before coding and record the location in the deployment configuration.
@@ -197,6 +197,5 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 ## Open questions
 
-- Whether Gemini's built-in grounding tools can be combined with function tools in one agent.
-- Whether ADK for TypeScript exposes the callbacks the loop needs (argument validation, read memo, result compaction, wrap-up note, model-call limit, per-call usage from the final non-partial model response) and a pluggable session service. If not, the fallback is a hand-written loop over the Vertex AI SDK with the same tool registry, events and Firestore session store.
+- Result compaction for long tool results (rows shortened, first N kept) is still to be implemented; the first version caps list sizes instead.
 - The Vertex AI location for `gemini-3.8-flash` and the grounding tools.

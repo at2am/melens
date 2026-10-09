@@ -4,14 +4,15 @@
   "private": true,
   "workspaces": [
     "shared",
-    "map"
+    "map",
+    "agent"
   ],
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
-    "build": "npm run build --workspace map",
-    "typecheck": "npm run typecheck --workspace map",
-    "test": "npm run test --workspace shared && npm run test --workspace map"
+    "build": "npm run build --workspace map && npm run build --workspace agent",
+    "typecheck": "npm run typecheck --workspace map && npm run typecheck --workspace agent",
+    "test": "npm run test --workspace shared && npm run test --workspace map && npm run test --workspace agent"
   }
 }

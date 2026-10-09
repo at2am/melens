@@ -1,0 +1,9 @@
+# Builds the agent image from the cloud/ source context so the image includes cloud/shared:
+#   gcloud builds submit cloud --config=cloud/agent/cloudbuild.yaml --substitutions=_IMAGE=REGISTRY/agent:TAG ...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '--file', 'agent/Dockerfile', '--tag', '${_IMAGE}', '.']
+images:
+  - '${_IMAGE}'
+substitutions:
+  _IMAGE: ''
