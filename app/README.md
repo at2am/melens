@@ -17,7 +17,7 @@ Without [fvm](https://fvm.app), install Flutter 3.47.5 stable and drop the `fvm`
 
 | Task | Command |
 | --- | --- |
-| Run | `fvm flutter run -d chrome --dart-define-from-file=config/dev.json` |
+| Run | `fvm flutter run -d chrome --web-port 8000 --dart-define-from-file=config/dev.json` (a fixed port so the agent service can allow the origin, see [Testing the agent](#testing-the-agent-locally)) |
 | Generate code after changing a `@riverpod`, `@freezed` or `@JsonSerializable` file | `fvm dart run build_runner build` (or `watch`) |
 | Generate strings after editing `lib/l10n/app_en.arb` | `fvm flutter gen-l10n` (`run` and `pub get` also do it) |
 | Analyze | `fvm flutter analyze` |
@@ -58,6 +58,10 @@ lib/
     data/               clients, repositories, freezed models
     state/              providers and notifiers
     ui/                 screens and widgets
+  features/agent/       the agent protocol: models and the SSE client
+  features/chat/        the chat panel: controller, session list, turn views
+  features/cards/       the card registry, one widget per card type
+  features/map/         the map screen, its state and MapActions
   l10n/                 app_en.arb and the generated AppLocalizations
 test/                   mirrors lib/
 config/                 build config; only example.json is committed
@@ -67,10 +71,11 @@ Where the parts in [agent-protocol.md](../system-design/agent-protocol.md#flutte
 
 | Part | Location |
 | --- | --- |
-| `AgentClient` and the protocol models | `lib/features/agent/data/` |
-| `ChatController` | `lib/features/chat/state/` |
-| `MapActions` | `lib/features/map/state/` |
-| Card registry, one widget per card type | `lib/features/cards/ui/` |
+| `AgentClient` and the protocol models | `lib/features/agent/data/` (`HttpAgentClient`, `agent_models.dart`) |
+| `ChatController` | `lib/features/chat/state/chat_controller.dart`; the request context comes from `request_context.dart` |
+| `SessionList` | `lib/features/chat/ui/session_list.dart`, backed by the same controller |
+| `MapActions` | `lib/features/map/state/map_actions.dart` (`MapActionsController`); the map screen applies `focus_map` and shows highlights |
+| Card registry, one widget per card type | `lib/features/cards/ui/card_registry.dart` |
 
 ## Conventions
 
@@ -93,6 +98,7 @@ Build-time values come from `--dart-define-from-file=config/<env>.json`. The fil
 | --- | --- | --- |
 | `MELENS_ENV` | `dev` or `prod` | `dev` |
 | `AGENT_BASE_URL` | The agent service on Cloud Run, called directly and not through Firebase Hosting | `http://localhost:8080` |
+| `AGENT_DEV_TOKEN` | A fixed bearer token for an agent service running in development mode (its `AGENT_DEVELOPMENT_TOKEN`), until Firebase Anonymous Auth supplies ID tokens. Development-only: a production build rejects it at startup | Empty, the chat panel reports that sign-in is not configured |
 | `MAP_BASE_URL` | The separate read-only map query service, serving bounded v1 JSON/GeoJSON | `http://localhost:8081` |
 | `MAP_DATA_MODE` | `live` or explicit development-only `sample`; live failures retain their error/coverage state | `live` |
 | `GOOGLE_MAPS_WEB_API_KEY` | Browser-restricted key for the Maps JavaScript API; read by the Web loader | Empty, map setup unavailable |
@@ -101,6 +107,18 @@ Build-time values come from `--dart-define-from-file=config/<env>.json`. The fil
 `config/example.json` explicitly selects `sample` for development. Samples must carry the persistent Sample data label. Production uses `MELENS_ENV=prod` and `MAP_DATA_MODE=live`; the app rejects production sample mode at startup. The service URL must be HTTP(S), without credentials, query or fragment. The map repository never changes data mode after a failed live request.
 
 On the Android emulator, the host machine is `10.0.2.2`, not `localhost`. Cloud Build should write ignored `config/prod.json` from Secret Manager before `flutter build web`. Browser Maps keys are visible in the built app and network requests; restrict the key to the intended Web origins and Maps JavaScript API. Do not print keys or commit populated configuration files.
+
+## Testing the agent locally
+
+The chat panel (toolbar speech-bubble button on the map screen) talks to the agent service through the [agent protocol](../system-design/agent-protocol.md). To test the agent from the app against a service running on your machine:
+
+1. Start the agent service in development mode from `cloud/agent` ([its README](../cloud/agent/README.md#local-commands)) with `AGENT_ALLOWED_ORIGINS=http://localhost:8000` and `AGENT_DEVELOPMENT_TOKEN=dev`. Development mode keeps sessions in memory and accepts that fixed token for the uid `dev-user`. The service still needs a real Google Cloud project id (lowercase, for example `melens-510012`) and Application Default Credentials (`gcloud auth application-default login`) to reach Gemini; without credentials every turn fails with a retryable error, and the service log line `modelLoopFailed` carries the reason.
+2. In `config/dev.json` set `AGENT_BASE_URL` to `http://localhost:8080` and `AGENT_DEV_TOKEN` to `dev`.
+3. Run the app with `--web-port 8000`, so the browser origin matches the allowed origin and the `Authorization` header passes the CORS preflight.
+
+What the panel shows, so the agent's behaviour can be judged turn by turn: every `status` line (the tool trace), the streamed answer, each `ui_action` with whether the map applied it (`show_layers` toggles layers of the current topic, `focus_map` moves the camera, `highlight_features` lists chips above the map, `draw_route` is not drawn yet), every card with its sources and Google Maps attribution, the agent's question with its options, and the turn's token usage from Gemini's own counts. The session list (history button) switches, creates and deletes conversations; the newest one is reopened when the panel first opens. Selecting a map record offers "Brief this area" (`area` input) and, for an anomaly, "Analyse this anomaly" (`analyse` input).
+
+Against the deployed service, point `AGENT_BASE_URL` at its Cloud Run URL; that needs Firebase Anonymous Auth in the app, which is not set up yet.
 
 ## Web
 
@@ -133,5 +151,5 @@ Sources: [Maps Flutter plugin](https://pub.dev/packages/google_maps_flutter), [e
 
 | Item | Why it waits | Already decided |
 | --- | --- | --- |
-| Firebase: `firebase_core`, `firebase_auth` | Needs the Firebase project and its registered apps (`flutterfire configure`) | Anonymous Auth supplies the agent ID token ([agent-protocol.md](../system-design/agent-protocol.md#authentication)). Firestore map listeners are superseded by the read-only map query service. Any future user-data store is a separate decision. Still open: whether to commit `firebase_options.dart`. Firebase client config is not a secret, but hard rule 5 bans committed API keys |
+| Firebase: `firebase_core`, `firebase_auth` | Needs the Firebase project and its registered apps (`flutterfire configure`) | Anonymous Auth supplies the agent ID token ([agent-protocol.md](../system-design/agent-protocol.md#authentication)); until then `agentTokenSourceProvider` sends the development token from `AGENT_DEV_TOKEN`, and the deployed agent service cannot be used from the app. Firestore map listeners are superseded by the read-only map query service. Any future user-data store is a separate decision. Still open: whether to commit `firebase_options.dart`. Firebase client config is not a secret, but hard rule 5 bans committed API keys |
 | Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Dependency and Web loader are prepared; 2D surface integration is T015, native setup is separate |

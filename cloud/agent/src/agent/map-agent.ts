@@ -10,6 +10,14 @@ import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
 
+/** ADK reports a failed model call (credentials, quota, a blocked response) as an event with `errorCode` or `errorMessage` and no content. */
+export class ModelCallError extends Error {
+  constructor(readonly code: string | undefined, message: string | undefined) {
+    super(message ?? 'The model call failed');
+    this.name = 'ModelCallError';
+  }
+}
+
 export interface MapAgentOptions {
   /** A Gemini instance for Vertex AI, or any BaseLlm (tests inject a scripted one). */
   readonly model: BaseLlm;
@@ -99,6 +107,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
           newMessage: turnMessage(turn.request.input, turn.request.context), runConfig, abortSignal: turn.signal });
         for await (const event of events) {
+          if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
           if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
           const parts = event.content.parts;
           if (parts.some((part) => part.functionResponse !== undefined)) continue;
@@ -115,7 +124,8 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         openCall = null; // a failed call reports no usage of its own; the error event carries the totals
         if (!turn.signal.aborted) {
           failed = true;
-          options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown' });
+          options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown',
+            detail: error instanceof Error ? error.message.slice(0, 300) : undefined });
           turn.sink.emit({ event: 'error', message: 'The agent could not finish this turn', retryable: true, usage: registry.usage.final(false) });
           throw error;
         }

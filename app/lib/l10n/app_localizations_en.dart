@@ -740,4 +740,251 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mapAnomalyCauseUnestablished =>
       'A difference from the baseline does not establish a cause.';
+
+  @override
+  String get chatPanelTitle => 'Agent chat';
+
+  @override
+  String get chatOpen => 'Open the agent chat';
+
+  @override
+  String get chatClose => 'Close the agent chat';
+
+  @override
+  String get chatSessions => 'Conversations';
+
+  @override
+  String get chatNewSession => 'New conversation';
+
+  @override
+  String get chatDeleteSession => 'Delete conversation';
+
+  @override
+  String get chatSessionUntitled => 'Untitled conversation';
+
+  @override
+  String chatSessionMeta(int count, String updated) {
+    return '$count turns, updated $updated';
+  }
+
+  @override
+  String get chatSessionsLoading => 'Loading conversations…';
+
+  @override
+  String get chatNoSessions => 'No conversations yet.';
+
+  @override
+  String get chatRestoring => 'Restoring the conversation…';
+
+  @override
+  String get chatEmpty =>
+      'Ask about what is on the map, for example \"What\'s around here?\" or \"Only show live music tonight.\"';
+
+  @override
+  String get chatInputHint => 'Ask about the map…';
+
+  @override
+  String get chatSend => 'Send';
+
+  @override
+  String get chatStop => 'Stop this turn';
+
+  @override
+  String get chatRetry => 'Retry';
+
+  @override
+  String get chatThinking => 'Thinking…';
+
+  @override
+  String get chatTurnCancelled => 'Stopped.';
+
+  @override
+  String get chatStopBudget =>
+      'The agent reached its call budget and wrapped up.';
+
+  @override
+  String get chatQuestionFreeText => 'Or type your own answer below.';
+
+  @override
+  String chatInputArea(String lat, String lng) {
+    return 'Selected the point $lat, $lng';
+  }
+
+  @override
+  String chatInputAnalyse(String featureId) {
+    return 'Analyse $featureId';
+  }
+
+  @override
+  String chatInputAnswer(String value) {
+    return 'Answer: $value';
+  }
+
+  @override
+  String get chatAnalyseSelected => 'Analyse this anomaly';
+
+  @override
+  String get chatBriefSelected => 'Brief this area';
+
+  @override
+  String chatUsage(
+    int calls,
+    String input,
+    String cached,
+    String output,
+    String thoughts,
+    String total,
+  ) {
+    return '$calls calls · $input in ($cached cached) · $output out · $thoughts thinking · $total total';
+  }
+
+  @override
+  String get chatUsageIncomplete =>
+      'Usage is incomplete: a model call was cut off.';
+
+  @override
+  String get chatActionShowLayers => 'Show layers';
+
+  @override
+  String get chatActionFocusMap => 'Focus map';
+
+  @override
+  String get chatActionDrawRoute => 'Draw route';
+
+  @override
+  String get chatActionHighlight => 'Highlight features';
+
+  @override
+  String get chatActionApplied => 'applied';
+
+  @override
+  String get chatActionPartial => 'partly applied';
+
+  @override
+  String get chatActionIgnored => 'ignored';
+
+  @override
+  String get chatActionUnsupported => 'not supported yet';
+
+  @override
+  String get chatActionRestored => 'from history';
+
+  @override
+  String chatActionSkipped(String items) {
+    return 'Not applied: $items';
+  }
+
+  @override
+  String get chatErrorSignIn =>
+      'Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.';
+
+  @override
+  String get chatErrorNetwork => 'The agent service could not be reached.';
+
+  @override
+  String get chatErrorTimeout => 'The agent service timed out.';
+
+  @override
+  String get chatErrorUnauthorized =>
+      'The agent service rejected the sign-in token.';
+
+  @override
+  String get chatErrorNotFound =>
+      'This conversation no longer exists on the server.';
+
+  @override
+  String get chatErrorTurnInProgress =>
+      'Another turn is still running in this conversation. Try again in a moment.';
+
+  @override
+  String get chatErrorRateLimited =>
+      'Too many turns in the last hour. Try again later.';
+
+  @override
+  String get chatErrorUnavailable =>
+      'The agent service is unavailable right now.';
+
+  @override
+  String get chatErrorInvalidRequest =>
+      'The agent service rejected the request.';
+
+  @override
+  String get chatErrorHttp => 'The agent service returned an unexpected error.';
+
+  @override
+  String get chatErrorProtocol =>
+      'The agent service sent something the app could not read.';
+
+  @override
+  String get chatErrorStreamEnded =>
+      'The turn ended before the agent finished.';
+
+  @override
+  String chatErrorServer(String message) {
+    return 'Agent error: $message';
+  }
+
+  @override
+  String get cardTypeAreaBrief => 'Area brief';
+
+  @override
+  String get cardTypeAnomalyAnalysis => 'Anomaly analysis';
+
+  @override
+  String get cardTypePlan => 'Plan';
+
+  @override
+  String get cardTypeHistory => 'History';
+
+  @override
+  String get cardTypeList => 'List';
+
+  @override
+  String cardItemTime(String time) {
+    return 'When: $time';
+  }
+
+  @override
+  String cardTimeRange(String from, String to) {
+    return '$from – $to';
+  }
+
+  @override
+  String cardTimeFrom(String from) {
+    return 'from $from';
+  }
+
+  @override
+  String cardTimeUntil(String to) {
+    return 'until $to';
+  }
+
+  @override
+  String cardItemCost(String cost) {
+    return 'Cost: $cost';
+  }
+
+  @override
+  String cardItemGettingThere(String text) {
+    return 'Getting there: $text';
+  }
+
+  @override
+  String cardSourceFeature(String id) {
+    return 'Source: map feature $id';
+  }
+
+  @override
+  String cardSourceLink(String title) {
+    return 'Source: $title';
+  }
+
+  @override
+  String get cardGoogleMapsAttribution => 'Place details from Google Maps';
+
+  @override
+  String get mapAgentHighlights => 'Highlighted by the agent';
+
+  @override
+  String get mapAgentHighlightsClear => 'Clear highlights';
 }

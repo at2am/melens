@@ -1016,5 +1016,368 @@
   "mapAnomalyCauseUnestablished": "A difference from the baseline does not establish a cause.",
   "@mapAnomalyCauseUnestablished": {
     "description": "Anomaly comparison is not a causal explanation. This view does not invent possible causes or call AI."
+  },
+  "chatPanelTitle": "Agent chat",
+  "@chatPanelTitle": {
+    "description": "Title of the chat panel before a conversation has a title."
+  },
+  "chatOpen": "Open the agent chat",
+  "@chatOpen": {
+    "description": "Tooltip of the map toolbar button that opens the chat panel."
+  },
+  "chatClose": "Close the agent chat",
+  "@chatClose": {
+    "description": "Tooltip of the chat panel's close button."
+  },
+  "chatSessions": "Conversations",
+  "@chatSessions": {
+    "description": "Title of the session list and tooltip of the button that opens it."
+  },
+  "chatNewSession": "New conversation",
+  "@chatNewSession": {
+    "description": "Button that starts a new conversation on the server."
+  },
+  "chatDeleteSession": "Delete conversation",
+  "@chatDeleteSession": {
+    "description": "Tooltip of the delete button on a session row."
+  },
+  "chatSessionUntitled": "Untitled conversation",
+  "@chatSessionUntitled": {
+    "description": "Session row title before its first message."
+  },
+  "chatSessionMeta": "{count} turns, updated {updated}",
+  "@chatSessionMeta": {
+    "description": "Session row subtitle: the turn count and the last update time. {count} is a number, {updated} a formatted date and time.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "updated": {
+        "type": "String"
+      }
+    }
+  },
+  "chatSessionsLoading": "Loading conversations…",
+  "@chatSessionsLoading": {
+    "description": "Shown while the session list loads."
+  },
+  "chatNoSessions": "No conversations yet.",
+  "@chatNoSessions": {
+    "description": "Shown when the user has no stored sessions."
+  },
+  "chatRestoring": "Restoring the conversation…",
+  "@chatRestoring": {
+    "description": "Shown while a stored session is fetched."
+  },
+  "chatEmpty": "Ask about what is on the map, for example \"What's around here?\" or \"Only show live music tonight.\"",
+  "@chatEmpty": {
+    "description": "Body of an empty conversation, with example prompts."
+  },
+  "chatInputHint": "Ask about the map…",
+  "@chatInputHint": {
+    "description": "Placeholder of the chat input box."
+  },
+  "chatSend": "Send",
+  "@chatSend": {
+    "description": "Tooltip of the send button."
+  },
+  "chatStop": "Stop this turn",
+  "@chatStop": {
+    "description": "Tooltip of the button that cancels the turn in progress."
+  },
+  "chatRetry": "Retry",
+  "@chatRetry": {
+    "description": "Button that sends the failed input or request again."
+  },
+  "chatThinking": "Thinking…",
+  "@chatThinking": {
+    "description": "Shown while a turn runs before any status or text arrived."
+  },
+  "chatTurnCancelled": "Stopped.",
+  "@chatTurnCancelled": {
+    "description": "Shown under a turn the user cancelled."
+  },
+  "chatStopBudget": "The agent reached its call budget and wrapped up.",
+  "@chatStopBudget": {
+    "description": "Shown when a turn ended because of the model call budget."
+  },
+  "chatQuestionFreeText": "Or type your own answer below.",
+  "@chatQuestionFreeText": {
+    "description": "Shown under a question whose options are not exhaustive."
+  },
+  "chatInputArea": "Selected the point {lat}, {lng}",
+  "@chatInputArea": {
+    "description": "User bubble for an area input. {lat} and {lng} are coordinates.",
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      }
+    }
+  },
+  "chatInputAnalyse": "Analyse {featureId}",
+  "@chatInputAnalyse": {
+    "description": "User bubble for an Analyse tap on a marker. {featureId} is the feature id.",
+    "placeholders": {
+      "featureId": {
+        "type": "String"
+      }
+    }
+  },
+  "chatInputAnswer": "Answer: {value}",
+  "@chatInputAnswer": {
+    "description": "User bubble for a tapped question option. {value} is the option text.",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "chatAnalyseSelected": "Analyse this anomaly",
+  "@chatAnalyseSelected": {
+    "description": "Chip that sends the selected anomaly marker to the agent for analysis."
+  },
+  "chatBriefSelected": "Brief this area",
+  "@chatBriefSelected": {
+    "description": "Chip that asks the agent what is around the selected point."
+  },
+  "chatUsage": "{calls} calls · {input} in ({cached} cached) · {output} out · {thoughts} thinking · {total} total",
+  "@chatUsage": {
+    "description": "Token usage of a turn, from Gemini's own counts. All placeholders are formatted numbers.",
+    "placeholders": {
+      "calls": {
+        "type": "int"
+      },
+      "input": {
+        "type": "String"
+      },
+      "cached": {
+        "type": "String"
+      },
+      "output": {
+        "type": "String"
+      },
+      "thoughts": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "chatUsageIncomplete": "Usage is incomplete: a model call was cut off.",
+  "@chatUsageIncomplete": {
+    "description": "Shown when the turn's usage totals miss a cancelled or failed model call."
+  },
+  "chatActionShowLayers": "Show layers",
+  "@chatActionShowLayers": {
+    "description": "Label of a show_layers UI action."
+  },
+  "chatActionFocusMap": "Focus map",
+  "@chatActionFocusMap": {
+    "description": "Label of a focus_map UI action."
+  },
+  "chatActionDrawRoute": "Draw route",
+  "@chatActionDrawRoute": {
+    "description": "Label of a draw_route UI action."
+  },
+  "chatActionHighlight": "Highlight features",
+  "@chatActionHighlight": {
+    "description": "Label of a highlight_features UI action."
+  },
+  "chatActionApplied": "applied",
+  "@chatActionApplied": {
+    "description": "Outcome of a UI action the map applied in full."
+  },
+  "chatActionPartial": "partly applied",
+  "@chatActionPartial": {
+    "description": "Outcome of a UI action the map applied in part."
+  },
+  "chatActionIgnored": "ignored",
+  "@chatActionIgnored": {
+    "description": "Outcome of a UI action the map could not apply."
+  },
+  "chatActionUnsupported": "not supported yet",
+  "@chatActionUnsupported": {
+    "description": "Outcome of a UI action the app does not implement yet."
+  },
+  "chatActionRestored": "from history",
+  "@chatActionRestored": {
+    "description": "Outcome of a UI action read back from a stored turn; it is not applied again."
+  },
+  "chatActionSkipped": "Not applied: {items}",
+  "@chatActionSkipped": {
+    "description": "Tooltip listing the layers or feature ids a UI action could not use. {items} is a comma-separated list.",
+    "placeholders": {
+      "items": {
+        "type": "String"
+      }
+    }
+  },
+  "chatErrorSignIn": "Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.",
+  "@chatErrorSignIn": {
+    "description": "Shown when no agent token is available."
+  },
+  "chatErrorNetwork": "The agent service could not be reached.",
+  "@chatErrorNetwork": {
+    "description": "Shown when the agent request failed before a response."
+  },
+  "chatErrorTimeout": "The agent service timed out.",
+  "@chatErrorTimeout": {
+    "description": "Shown when the agent request or turn timed out."
+  },
+  "chatErrorUnauthorized": "The agent service rejected the sign-in token.",
+  "@chatErrorUnauthorized": {
+    "description": "Shown on HTTP 401 from the agent service."
+  },
+  "chatErrorNotFound": "This conversation no longer exists on the server.",
+  "@chatErrorNotFound": {
+    "description": "Shown on HTTP 404 from the agent service."
+  },
+  "chatErrorTurnInProgress": "Another turn is still running in this conversation. Try again in a moment.",
+  "@chatErrorTurnInProgress": {
+    "description": "Shown on HTTP 409 from the agent service."
+  },
+  "chatErrorRateLimited": "Too many turns in the last hour. Try again later.",
+  "@chatErrorRateLimited": {
+    "description": "Shown on HTTP 429 from the agent service."
+  },
+  "chatErrorUnavailable": "The agent service is unavailable right now.",
+  "@chatErrorUnavailable": {
+    "description": "Shown on HTTP 503 from the agent service."
+  },
+  "chatErrorInvalidRequest": "The agent service rejected the request.",
+  "@chatErrorInvalidRequest": {
+    "description": "Shown on HTTP 400 from the agent service."
+  },
+  "chatErrorHttp": "The agent service returned an unexpected error.",
+  "@chatErrorHttp": {
+    "description": "Shown on an HTTP error without a known code."
+  },
+  "chatErrorProtocol": "The agent service sent something the app could not read.",
+  "@chatErrorProtocol": {
+    "description": "Shown when a response or event did not match the protocol."
+  },
+  "chatErrorStreamEnded": "The turn ended before the agent finished.",
+  "@chatErrorStreamEnded": {
+    "description": "Shown when the event stream closed without a done or error event."
+  },
+  "chatErrorServer": "Agent error: {message}",
+  "@chatErrorServer": {
+    "description": "An error event from the agent service. {message} is the server's text.",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "cardTypeAreaBrief": "Area brief",
+  "@cardTypeAreaBrief": {
+    "description": "Label of an area_brief card."
+  },
+  "cardTypeAnomalyAnalysis": "Anomaly analysis",
+  "@cardTypeAnomalyAnalysis": {
+    "description": "Label of an anomaly_analysis card."
+  },
+  "cardTypePlan": "Plan",
+  "@cardTypePlan": {
+    "description": "Label of a plan card; stops are numbered in visiting order."
+  },
+  "cardTypeHistory": "History",
+  "@cardTypeHistory": {
+    "description": "Label of a history card."
+  },
+  "cardTypeList": "List",
+  "@cardTypeList": {
+    "description": "Label of a list card."
+  },
+  "cardItemTime": "When: {time}",
+  "@cardItemTime": {
+    "description": "A card item's time window. {time} is a formatted range.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cardTimeRange": "{from} – {to}",
+  "@cardTimeRange": {
+    "description": "A time window with both ends. {from} and {to} are formatted local times.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "cardTimeFrom": "from {from}",
+  "@cardTimeFrom": {
+    "description": "A time window with only a start. {from} is a formatted local time.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      }
+    }
+  },
+  "cardTimeUntil": "until {to}",
+  "@cardTimeUntil": {
+    "description": "A time window with only an end. {to} is a formatted local time.",
+    "placeholders": {
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "cardItemCost": "Cost: {cost}",
+  "@cardItemCost": {
+    "description": "A card item's cost. {cost} is the server's text.",
+    "placeholders": {
+      "cost": {
+        "type": "String"
+      }
+    }
+  },
+  "cardItemGettingThere": "Getting there: {text}",
+  "@cardItemGettingThere": {
+    "description": "A card item's directions hint. {text} is the server's text.",
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
+  "cardSourceFeature": "Source: map feature {id}",
+  "@cardSourceFeature": {
+    "description": "A card item that cites a map feature. {id} is the feature id.",
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "cardSourceLink": "Source: {title}",
+  "@cardSourceLink": {
+    "description": "A card item that cites a web page. {title} is the page title or host.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "cardGoogleMapsAttribution": "Place details from Google Maps",
+  "@cardGoogleMapsAttribution": {
+    "description": "Required attribution under a card that used Google Maps grounding."
+  },
+  "mapAgentHighlights": "Highlighted by the agent",
+  "@mapAgentHighlights": {
+    "description": "Label of the chip row listing features the agent highlighted."
+  },
+  "mapAgentHighlightsClear": "Clear highlights",
+  "@mapAgentHighlightsClear": {
+    "description": "Button that clears the agent's highlights."
   }
 }

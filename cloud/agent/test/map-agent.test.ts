@@ -166,3 +166,13 @@ test('the pending question and stored history reach the model', async () => {
   assert.match(contents[1]?.parts?.[0]?.text ?? '', /asked: "Which gardens\?"/);
   assert.match(contents[2]?.parts?.[1]?.text ?? '', /Answer to question q_1: Fitzroy Gardens/);
 });
+
+test('a failed model call ends the turn with an error event rather than a silent done', async () => {
+  const llm = new ScriptedLlm([() => { throw new Error('Could not load the default credentials'); }]);
+  const turn = turnContext('hi');
+  await assert.rejects(runner(llm).runner.run(turn), { name: 'ModelCallError' });
+  assert.deepEqual(kinds(turn.sink.sent), ['error']);
+  const error = turn.sink.sent[0];
+  assert.equal(error?.event, 'error');
+  if (error?.event === 'error') { assert.equal(error.retryable, true); assert.equal(error.usage.complete, false); }
+});

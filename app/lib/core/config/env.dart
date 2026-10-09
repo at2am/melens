@@ -22,12 +22,17 @@ final class Env {
     MapDataMode mapDataMode = MapDataMode.live,
     String? googleMapsWebApiKey,
     String? googleMapsMapId,
+    String? agentDevToken,
   }) {
     _requireServiceUrl(agentBaseUrl, 'AGENT_BASE_URL');
     _requireServiceUrl(mapBaseUrl, 'MAP_BASE_URL');
     if (environment == AppEnvironment.prod &&
         mapDataMode == MapDataMode.sample) {
       throw ArgumentError('MAP_DATA_MODE=sample is development-only.');
+    }
+    final devToken = (agentDevToken ?? '').trim();
+    if (environment == AppEnvironment.prod && devToken.isNotEmpty) {
+      throw ArgumentError('AGENT_DEV_TOKEN is development-only.');
     }
     return Env._(
       environment: environment,
@@ -36,6 +41,7 @@ final class Env {
       mapDataMode: mapDataMode,
       googleMapsWebApiKey: (googleMapsWebApiKey ?? '').trim(),
       googleMapsMapId: (googleMapsMapId ?? '').trim(),
+      agentDevToken: devToken,
     );
   }
 
@@ -46,6 +52,7 @@ final class Env {
     required this.mapDataMode,
     required this.googleMapsWebApiKey,
     required this.googleMapsMapId,
+    required this.agentDevToken,
   });
 
   /// The values this build was compiled with, with local-dev defaults.
@@ -75,6 +82,7 @@ final class Env {
       'GOOGLE_MAPS_WEB_API_KEY',
     ),
     googleMapsMapId: const String.fromEnvironment('GOOGLE_MAPS_MAP_ID'),
+    agentDevToken: const String.fromEnvironment('AGENT_DEV_TOKEN'),
   );
 
   final AppEnvironment environment;
@@ -96,7 +104,15 @@ final class Env {
   /// Optional for the base 2D map. Required for advanced markers and 3D.
   final String googleMapsMapId;
 
+  /// A fixed bearer token for an agent service running in development mode
+  /// (its `AGENT_DEVELOPMENT_TOKEN`), until Firebase Anonymous Auth supplies
+  /// ID tokens (agent-protocol.md, Authentication). Empty in production, where
+  /// the constructor rejects it. Never log this value.
+  final String agentDevToken;
+
   bool get isDev => environment == AppEnvironment.dev;
+
+  bool get hasAgentDevToken => agentDevToken.isNotEmpty;
 
   bool get usesSampleMapData => mapDataMode == MapDataMode.sample;
 

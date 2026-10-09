@@ -11,8 +11,11 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../../../core/network/public_source_opener.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../agent/data/agent_models.dart';
+import '../../chat/ui/chat_panel.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
+import '../state/map_actions.dart';
 import '../state/map_providers.dart';
 import '../state/selection_controller.dart';
 import '../state/viewport_controller.dart';
@@ -32,6 +35,7 @@ class MapScreen extends ConsumerStatefulWidget {
     this.mapBuilder,
     this.visibleRegionReader,
     this.onZoomToBounds,
+    this.onFocusRequest,
     this.approvedUnlocatedScope,
     super.key,
   });
@@ -39,6 +43,9 @@ class MapScreen extends ConsumerStatefulWidget {
   final MapSurfaceBuilder? mapBuilder;
   final MapVisibleRegionReader? visibleRegionReader;
   final ValueChanged<MapBounds>? onZoomToBounds;
+
+  /// Receives the agent's `focus_map` requests instead of the platform map.
+  final ValueChanged<MapFocusRequest>? onFocusRequest;
 
   /// Optional admitted association. Otherwise use only verified catalog refs.
   final UnlocatedScope? approvedUnlocatedScope;
@@ -54,6 +61,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _usesVisibleRegion = false;
   bool _regionReadFailed = false;
   bool _showUnlocated = false;
+  bool _showChat = false;
   int _detailSequence = 0;
   TimeWindow? _selectedWindow;
   String? _selectedFilters;
@@ -81,6 +89,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listenManual(viewportControllerProvider, (previous, next) {
       _reconcileSelection();
     });
+    ref.listenManual(
+      mapActionsControllerProvider.select((state) => state.focus),
+      (previous, next) {
+        if (next != null && next.sequence != previous?.sequence) {
+          _applyFocus(next);
+        }
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final viewport = ref.read(viewportControllerProvider.notifier);
@@ -262,6 +278,142 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  /// Applies a `focus_map` action from the agent (agent-protocol.md,
+  /// Rules): a bounds target fits the box, a point target centres on it.
+  void _applyFocus(MapFocusRequest request) {
+    if (widget.onFocusRequest != null) {
+      widget.onFocusRequest!(request);
+      return;
+    }
+    final bounds = request.bounds;
+    final point = request.point;
+    if (bounds != null) {
+      _zoomToBounds(
+        MapBounds(
+          west: bounds.west,
+          south: bounds.south,
+          east: bounds.east,
+          north: bounds.north,
+        ),
+      );
+    } else if (point != null) {
+      _focusPoint(point, zoom: request.zoom);
+    }
+  }
+
+  void _focusPoint(AgentLatLng point, {int? zoom}) {
+    final controller = _map;
+    if (controller == null) return;
+    unawaited(
+      controller
+          .animateCamera(
+            CameraUpdate.newLatLngZoom(
+              LatLng(point.lat, point.lng),
+              (zoom ?? 16).toDouble(),
+            ),
+          )
+          .catchError((Object _) {}),
+    );
+  }
+
+  /// A tapped card item selects its map feature when it is loaded, and moves
+  /// the camera to its location otherwise.
+  void _onCardItemTap(CardItem item) {
+    final source = item.source;
+    if (source is FeatureCardSource) {
+      final loaded = _loadedItem(source.featureId);
+      if (loaded != null) {
+        _selectItem(loaded);
+        return;
+      }
+    }
+    if (item.location case final location?) _focusPoint(location);
+  }
+
+  MapItem? _loadedItem(String id) {
+    final response = ref.read(viewportControllerProvider).response;
+    if (response == null) return null;
+    for (final layer in response.layers) {
+      for (final item in layer.items) {
+        if (item.id == id) return item;
+      }
+    }
+    return null;
+  }
+
+  Widget _chatPanel({VoidCallback? onClose}) => ChatPanel(
+    key: const ValueKey('map-chat-panel'),
+    onClose: onClose,
+    onCardItemTap: _onCardItemTap,
+    onOpenSource: _sourceOpener,
+  );
+
+  void _showChatSheet(BuildContext context) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => PointerInterceptor(
+          child: SafeArea(
+            child: SizedBox(
+              height: math.min(
+                760,
+                MediaQuery.sizeOf(sheetContext).height * 0.9,
+              ),
+              child: _chatPanel(
+                onClose: () => Navigator.of(sheetContext).pop(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The features the agent highlighted, as chips above the map. The surface
+  /// highlights one selected item at a time, so a chip selects its feature.
+  Widget? _highlightBar(List<MapItem> items, MapActionsState actions) {
+    if (actions.highlightedIds.isEmpty && actions.missingIds.isEmpty) {
+      return null;
+    }
+    final strings = AppLocalizations.of(context);
+    final byId = {for (final item in items) item.id: item};
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            strings.mapAgentHighlights,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          for (final id in actions.highlightedIds)
+            ActionChip(
+              key: ValueKey('map-highlight-$id'),
+              avatar: const Icon(Icons.place_outlined, size: 16),
+              label: Text(byId[id]?.title ?? id),
+              onPressed: byId[id] == null ? null : () => _selectItem(byId[id]!),
+            ),
+          for (final id in actions.missingIds)
+            Chip(
+              key: ValueKey('map-highlight-missing-$id'),
+              avatar: const Icon(Icons.help_outline, size: 16),
+              label: Text(id),
+            ),
+          TextButton(
+            key: const ValueKey('map-highlights-clear'),
+            onPressed: () => ref
+                .read(mapActionsControllerProvider.notifier)
+                .clearHighlights(),
+            child: Text(strings.mapAgentHighlightsClear),
+          ),
+        ],
+      ),
+    );
+  }
+
   UnlocatedQuery? _unlocatedQuery(
     MapLayerCatalog? catalog,
     ViewportState state,
@@ -313,6 +465,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final layers = ref.watch(layerControllerProvider);
     final selection = ref.watch(selectionControllerProvider);
     final catalog = ref.watch(mapLayerCatalogProvider);
+    final actions = ref.watch(mapActionsControllerProvider);
     final unlocated = _unlocatedQuery(catalog.value, viewport);
     final response = viewport.response;
     final items =
@@ -393,10 +546,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 1050;
         final panel = _controls(catalog, viewport);
+        final highlights = _highlightBar(items, actions);
         return Scaffold(
           appBar: AppBar(
             title: Text(strings.mapScreenTitle),
             actions: [
+              IconButton(
+                key: const ValueKey('map-chat-toggle'),
+                tooltip: wide && _showChat
+                    ? strings.chatClose
+                    : strings.chatOpen,
+                isSelected: wide && _showChat,
+                onPressed: () {
+                  if (wide) {
+                    setState(() => _showChat = !_showChat);
+                  } else {
+                    _showChatSheet(context);
+                  }
+                },
+                icon: const Icon(Icons.chat_bubble_outline),
+                selectedIcon: const Icon(Icons.chat_bubble),
+              ),
               IconButton(
                 key: const ValueKey('map-layer-statuses'),
                 tooltip: strings.mapScreenStatuses,
@@ -440,6 +610,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ? const LinearProgressIndicator()
                     : null,
               ),
+              ?highlights,
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,6 +619,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     Expanded(
                       child: MapDetailsLayout(map: map, details: details),
                     ),
+                    if (wide && _showChat)
+                      SizedBox(
+                        width: 380,
+                        child: _chatPanel(
+                          onClose: () => setState(() => _showChat = false),
+                        ),
+                      ),
                   ],
                 ),
               ),
