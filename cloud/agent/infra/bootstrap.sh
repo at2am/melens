@@ -75,7 +75,7 @@ Project: ${project} (${environment})
 Region: ${REGION}
 Service identity: ${agent_email}
   ${QUERY_DATASET} dataset READER; project roles ${PROJECT_ROLES[*]}
-  No ${INGEST_DATASET}, bucket or secret access; the Maps Platform key grant happens at deployment
+  No ${INGEST_DATASET}, bucket or secret access; the Maps Platform key is granted when the Routes API tool reads it
 Firestore: ${FIRESTORE_DATABASE} in ${FIRESTORE_LOCATION}, Native mode, delete protection on
   TTL policy on ${TTL_FIELD} for the collection groups: ${TTL_COLLECTION_GROUPS[*]}
   Client security rules are not managed here; only the agent identity reaches the database
@@ -236,7 +236,7 @@ for name in ${secret_names[@]+"${secret_names[@]}"}; do
     accessible_secrets+=("$name")
   fi
 done
-report "secret access: ${accessible_secrets[*]:-none} (the Maps Platform key is granted at deployment only)"
+report "secret access: ${accessible_secrets[*]:-none} (the Maps Platform key is granted when the Routes API tool reads it)"
 
 db_state="$(firestore_state)"
 if [[ -z "$db_state" ]]; then
@@ -264,9 +264,9 @@ fi
 if $apply; then
   cat <<DONE
 Bootstrap complete for ${project}.
-No secret, bucket or Cloud Run permissions were granted. Grant secretAccessor on the
-Maps Platform key and deploy the service with the deployment script; register the
-project with Firebase and enable Anonymous Auth before the app can obtain ID tokens.
+No secret, bucket or Cloud Run permissions were granted. Deploy the service with
+infra/deploy.sh; register the project with Firebase and enable Anonymous Auth before
+the app can obtain ID tokens.
 DONE
 else
   echo "Verify complete for ${project}. No cloud resources were changed."
