@@ -61,3 +61,14 @@ The deployment configuration therefore sets `AGENT_VERTEX_LOCATION=global`. A re
 under `melens-dev-agent` is still required for acceptance; it happens with the first
 deployment, because the current user cannot impersonate the identity and no extra role is
 granted to obtain a local proof.
+
+The same day, with the CLI user's Application Default Credentials, the Firestore session
+store ran against the new database (create, lease, a rejected concurrent lease, a stored
+turn with `expiresAtTs`, list, delete; nothing left behind) and the service ran two real
+turns in development mode on this machine against Vertex AI `global` and the published
+views: a planning search around Flinders Street Station (`search_features`,
+`nearby_context`, `get_feature`, `highlight_features`, a `show_card` list of development
+monitor records) and a follow-up that used the stored history and Maps grounding. That
+run showed ADK reporting two complete responses per streamed tool call, which doubled the
+usage records and spent the call budget twice as fast; the loop now counts one call per
+request.
