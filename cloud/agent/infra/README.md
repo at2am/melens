@@ -16,7 +16,7 @@ cloud/agent/infra/bootstrap.sh --project PROJECT_ID --environment dev --apply --
 | Resource | Bootstrap | Later, at deployment |
 | --- | --- | --- |
 | `melens-ENV-agent` | `melens_query` dataset `READER`; project `aiplatform.user`, `bigquery.jobUser`, `datastore.user` | Cloud Run service identity. `secretAccessor` on the Maps Platform key only once the Routes API tool (`draw_route`) reads it; no current code reads a secret |
-| Firestore `(default)` | `australia-southeast2`, Native mode, delete protection; TTL policies on `expiresAtTs` for the `sessions`, `turns` and `attachments` collection groups | Nothing |
+| Firestore `(default)` | `australia-southeast2`, Native mode, delete protection; TTL policies on `expiresAtTs` for the `sessions`, `turns`, `attachments` and `userEvents` collection groups (`userEvents` added 2026-10-10 for UC-09, not yet applied) | Nothing |
 | APIs | Firestore, Vertex AI, Cloud Run, BigQuery, BigQuery Storage, Artifact Registry, Cloud Build, Secret Manager, IAM Credentials, IAM | Nothing |
 
 The audit fails on any other project role of the agent identity, on any `melens_ingest`

@@ -33,8 +33,11 @@ SOURCES = DEFAULT_SOURCES | frozenset({
     "melbourne.parking.bays", "melbourne.parking.sensors",
     "melbourne.parking.restrictions", "gdelt.news",
     "victoria.csa.recorded_offences", "ticketmaster.events",
+    "user.events",
 })
 SOURCE_SECRETS = {"ticketmaster.events": ["ticketmaster_discovery_api_key"]}
+# Content under a provider or user licence rather than an open-data licence.
+RESTRICTED_SOURCES = frozenset({"ticketmaster.events", "user.events"})
 QUERY_READ_SOURCES = frozenset({"gdelt.news", "melbourne.parking.sensors"})
 OBJECT_ROLE = "melensSourceObjects"
 BUCKET_ROLE = "melensSourceBucketMetadata"
@@ -100,7 +103,7 @@ def plan(project: str, environment: str, bucket: str,
         manifest = manifests.get(source, {})
         evidence = manifest.get("admission_evidence") or {}
         if (manifest.get("access_status") != "active"
-                or manifest.get("license_status") != ("restricted" if source == "ticketmaster.events" else "verified_open")
+                or manifest.get("license_status") != ("restricted" if source in RESTRICTED_SOURCES else "verified_open")
                 or evidence.get("secret_names", []) != SOURCE_SECRETS.get(source, [])):
             raise ValueError(f"Source admission or secret allowlist drift: {source}")
         identity = account_id(source, environment)

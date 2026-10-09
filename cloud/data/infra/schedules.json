@@ -574,6 +574,27 @@
       "service_account_email": null,
       "memory_mib": 1024,
       "dedicated_identity_permissions_verified": false
+    },
+    {
+      "source_id": "user.events",
+      "priority": "B",
+      "enabled": false,
+      "mode": "time",
+      "cadence_seconds": 300,
+      "check_interval_seconds": 300,
+      "cron_utc": "*/5 * * * *",
+      "interval_seconds": 300,
+      "overlap_seconds": 0,
+      "snapshot_revision": null,
+      "backfill_strategy": "manual_serial_contiguous_windows",
+      "request_cap_per_day": 300,
+      "maximum_bytes_billed": 500000000,
+      "secret_names": [],
+      "task_timeout_seconds": 300,
+      "max_requests_per_execution": 1,
+      "service_account_email": "melens-dev-user-eve-eb030e190d@melens-510012.iam.gserviceaccount.com",
+      "memory_mib": 512,
+      "dedicated_identity_permissions_verified": false
     }
   ],
   "notes": [

@@ -265,3 +265,24 @@ test('T011 denied, unpublished and absent sources remain unavailable to dynamic 
     }), notPublic);
   }
 });
+
+test('a user event carries its description, place and attendance from the JSON summary, in Melbourne time', () => {
+  const userSource: PublicSourceReference = { sourceId: 'user.events', url: null, attribution: 'Published by a Melens user', versionRef: null };
+  const row = geo({ source_id: userSource.sourceId, topic: 'event', geometry_geojson: point, assertion_kind: 'plan', record_status: 'planned',
+    original_url: null, valid_from: '2026-10-12T07:00:00Z', valid_to: '2026-10-12T08:00:00Z', published_at: '2026-10-10T02:15:00Z',
+    summary: JSON.stringify({ description: 'Easy 5 km, all paces welcome.', placeName: 'Boathouse Drive steps', attendeeCount: 3, anonymousAttendance: true }) });
+  const item = adaptEventRow(row, { source: userSource, mode: 'current', asOf: '2026-10-10T07:00:00Z' });
+  assert.equal(item.details.summary, 'Easy 5 km, all paces welcome.\n3 people are going');
+  assert.equal(item.details.venueName, 'Boathouse Drive steps');
+  assert.equal(item.details.category, 'community');
+  assert.equal(item.time.sourceTimezone, 'Australia/Melbourne');
+  assert.equal(item.lifecycle, 'planned');
+  assert.equal(item.sources[0]?.url, null);
+  assert.equal(mapItemSchema.safeParse(item).success, true);
+  const nobody = adaptEventRow({ ...row, summary: JSON.stringify({ description: 'Quiet one', placeName: null, attendeeCount: 0 }) }, { source: userSource });
+  assert.equal(nobody.details.summary, 'Quiet one');
+  assert.equal(nobody.details.venueName, null);
+  const plain = adaptEventRow({ ...row, summary: 'Written before the JSON summary existed' }, { source: userSource });
+  assert.equal(plain.details.summary, 'Written before the JSON summary existed');
+  assert.throws(() => adaptEventRow({ ...row, summary: '{not json' }, { source: userSource }), invalidRecord);
+});

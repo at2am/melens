@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { mapItemSchema, type MapItem } from '../contracts/map-contract.js';
 import {
   comparePublishedInstants, MapAdapterError, parsePublishedGeometry, publishedGeoRowSchema, publishedItemBatch,
@@ -8,6 +10,28 @@ import {
 import type { ViewRow } from './query-runner.js';
 
 export type EventItem = Extract<MapItem, { kind: 'event' }>;
+
+/** Events users publish in the app (UC-09); the `user_events` connector exports them with a JSON summary. */
+export const USER_EVENTS_SOURCE_ID = 'user.events';
+export const USER_EVENTS_TIMEZONE = 'Australia/Melbourne';
+export const USER_EVENTS_CATEGORY = 'community';
+
+const userEventSummarySchema = z.object({
+  description: z.string().nullish(), placeName: z.string().nullish(), attendeeCount: z.number().int().nonnegative().nullish(),
+  anonymousAttendance: z.boolean().nullish(),
+});
+
+/** The public summary of a user event: the description and how many are going; the place is the venue. */
+function userEventSummary(summary: string | null): { readonly summary: string | null; readonly placeName: string | null } | null {
+  if (summary === null || !summary.trimStart().startsWith('{')) return { summary, placeName: null };
+  let decoded: unknown;
+  try { decoded = JSON.parse(summary); } catch { throw new MapAdapterError(); }
+  const detail = userEventSummarySchema.parse(decoded);
+  const going = detail.attendeeCount == null || detail.attendeeCount === 0 ? null
+    : `${detail.attendeeCount} ${detail.attendeeCount === 1 ? 'person is' : 'people are'} going`;
+  const text = [publishedText(detail.description), going].filter((part) => part !== null).join('\n') || null;
+  return { summary: text, placeName: publishedText(detail.placeName) };
+}
 
 export function adaptEventRow(row: ViewRow, options: {
   readonly source: PublicSourceReference;
@@ -35,12 +59,16 @@ export function adaptEventRow(row: ViewRow, options: {
     const asOf = publishedInstant(options.asOf);
     const lifecycle = options.mode === 'current' && asOf !== null && sourceLifecycle === 'active'
       && startAt !== null && comparePublishedInstants(startAt, asOf) > 0 ? 'planned' : sourceLifecycle;
-    const summary = publishedText(row.summary);
-    const ticketSummary = sourceId === 'ticketmaster.events' && summary !== null
-      ? /^Ticketmaster status: [^;]*; local start: ([^;]*); venue: (.*)$/.exec(summary) : null;
+    const rawSummary = publishedText(row.summary);
+    const ticketSummary = sourceId === 'ticketmaster.events' && rawSummary !== null
+      ? /^Ticketmaster status: [^;]*; local start: ([^;]*); venue: (.*)$/.exec(rawSummary) : null;
     const sourceClock = ticketSummary?.[1]?.trim() ?? null;
-    const sourceTimezone = sourceClock === null ? null : /(?:^|\s)([A-Za-z_]+\/[A-Za-z_]+)$/.exec(sourceClock)?.[1] ?? null;
-    const venueName = ticketSummary?.[2] === 'unknown' ? null : publishedText(ticketSummary?.[2]);
+    const userSummary = sourceId === USER_EVENTS_SOURCE_ID ? userEventSummary(rawSummary) : null;
+    const sourceTimezone = userSummary !== null ? USER_EVENTS_TIMEZONE
+      : sourceClock === null ? null : /(?:^|\s)([A-Za-z_]+\/[A-Za-z_]+)$/.exec(sourceClock)?.[1] ?? null;
+    const venueName = userSummary !== null ? userSummary.placeName
+      : ticketSummary?.[2] === 'unknown' ? null : publishedText(ticketSummary?.[2]);
+    const summary = userSummary !== null ? userSummary.summary : rawSummary;
     const parsed = mapItemSchema.parse({ id, versionId, layerId: 'event', kind: 'event',
       title: publishedText(row.title), geometry, location: publishedLocation(row, geometry),
       assertionKind: publishedAssertion(row), lifecycle,
@@ -48,7 +76,7 @@ export function adaptEventRow(row: ViewRow, options: {
         source_time_text: row.source_time_text ?? sourceClock,
         source_timezone: row.source_timezone ?? sourceTimezone }),
       sources: [publicSourceReference(options.source, versionId, row.original_url)],
-      details: { summary, venueName, category: null, startAt, endAt,
+      details: { summary, venueName, category: userSummary === null ? null : USER_EVENTS_CATEGORY, startAt, endAt,
         status: lifecycle === 'withdrawn' ? 'unknown' : lifecycle },
     });
     if (parsed.kind !== 'event') throw new MapAdapterError();
