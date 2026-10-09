@@ -40,6 +40,25 @@ The result is a development-process health signal. It does not establish BigQuer
 
 Only an explicitly selected development sample repository may return sample data. A live query failure never switches to fixtures. Public field selection, source admission and retention remain required even when a source can be queried privately.
 
+## Code layout
+
+| Module | Responsibility |
+| --- | --- |
+| `src/server.ts` | HTTP transport: route matching, CORS preflight, bounded bodies, concurrency, timeouts, error envelopes |
+| `src/map-service.ts` | Composition root that wires the modules below together |
+| `src/errors.ts` | The one error-code table (status, retryable) and the error classes |
+| `src/contracts/map-contract.ts` | Frozen contract v1 schemas, instant comparison and the stable item order |
+| `src/query/sql.ts` | SQL fragments shared by every query family: projections, filters, scan budgets |
+| `src/query/view-queries.ts`, `unlocated-queries.ts`, `public-record-queries.ts` | The three fixed query families, composed from those fragments |
+| `src/query/query-runner.ts`, `bigquery-adapter.ts` | Dry run, byte/row/time bounds and cancellation; the only BigQuery client |
+| `src/query/layer-adapters.ts` plus the per-layer adapter modules | Published rows to contract items; the registry drives every layer check |
+| `src/query/source-coverage.ts` | Source admission, publication and coverage assessment |
+| `src/services/layer-loaders.ts` | Viewport and unlocated layer loads over the runner |
+| `src/services/public-records.ts` | Recheck that stored rows are still public before every snapshot read |
+| `src/services/viewport.ts`, `details.ts`, `unlocated.ts`, `page-budget.ts` | Snapshot-bound page services and the byte-budget page fitting they share |
+| `src/services/snapshot-store.ts` | Bounded in-memory snapshots and cursors |
+| `src/services/aggregation.ts`, `layer-catalog.ts` | Zoom-band grouping; layer registrations and the catalog |
+
 ## Query configuration
 
 T007 implemented `src/config.ts` and the fixed query runner. The validated settings are below; the parser is authoritative. None is needed for the health-only server.
