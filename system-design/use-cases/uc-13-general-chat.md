@@ -26,6 +26,7 @@ Beyond the fixed entry points, the chat box is one agent flexible enough for ran
 3. Map requests run through UI action tools, which the app applies.
 4. Specific recommendations arrive as cards; general answers arrive as text.
 5. When the request is ambiguous in a way the context cannot resolve, the agent asks one question with options (`ask_user`). Otherwise it acts and states its assumptions.
+6. Conversations are saved per user on the server ([agent-protocol.md](../agent-protocol.md#sessions)). The chat panel shows the user's session list; the user can switch to an earlier session, start a new one and delete one. Reopening the app restores the current session.
 
 ## Example queries
 
@@ -60,6 +61,8 @@ Multi-turn chain:
 - [ ] The agent asks only when the context cannot resolve an ambiguity or a required input has no default: at most one question per turn, with 2–4 options. It never asks for confirmation.
 - [ ] Every turn ends within the step budget; near the limit the agent wraps up and answers.
 - [ ] The eval checks the tool trace for precise requests: the right tool with the right arguments.
+- [ ] Closing and reopening the app restores the conversation, and a new deployment of the agent service does not lose it. A user never sees another user's session.
+- [ ] The chat panel lists the user's sessions; switching to one restores that conversation, and new and delete work.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 # Architecture
 
-**Status:** Map transport baseline updated on 2026-10-01 by feature 002 T001. Implementation and deployment acceptance remain open. Agent/user-data architecture remains a draft.
+**Status:** Map transport baseline updated on 2026-10-01 by feature 002 T001. Agent service runtime decided on 2026-10-09 (Draft until the team confirms). Implementation and deployment acceptance remain open. User-data architecture remains a draft.
 
 Each external source is ingested once. Map clients read bounded public views through a backend; AI tools and clients preserve the same source/version identity.
 
@@ -14,37 +14,46 @@ flowchart TB
     Mine["My data: Auth/BYO/events (deferred)"]
   end
   subgraph GCP["Google Cloud"]
-    Query["Read-only map query service: Cloud Run"]
-    Agent["API + agent service: ADK on Cloud Run"]
-    Jobs["Scheduled ingestion: one connector per source"]
+    Query["Map query service: Cloud Run service, cloud/map"]
+    Agent["Agent service: ADK for TypeScript on Cloud Run service, cloud/agent"]
+    Jobs["Scheduled ingestion: Cloud Run jobs, one per source, cloud/data"]
     BQ[("BigQuery: admitted published query views + history")]
     Storage[("GCS: permitted batch staging")]
-    AI["Google AI and Maps: Gemini, Places, Routes, grounding"]
+    FS[("Firestore: chat sessions per user, grounding cache, rate-limit counters")]
+    Auth["Firebase Auth: anonymous uid"]
+    AI["Vertex AI: Gemini, Search and Maps grounding"]
+    Maps["Maps Platform: Routes API, map rendering"]
   end
   Src["Official datasets, transport, permitted events/news"]
   Map -- "JSON/GeoJSON viewport, catalog, details" --> Query
   Query -- "fixed parameterized public-view reads" --> BQ
-  Chat -- "questions / streamed answers" --> Agent
+  Chat -- "Firebase ID token, SSE turns" --> Agent
+  Chat -. "sign in anonymously" .-> Auth
   Mine -- "add sources / publish (deferred)" --> Agent
-  Agent -- "source-backed tools" --> BQ
-  Agent -- "models and tools" --> AI
+  Agent -- "fixed parameterized public-view reads" --> BQ
+  Agent -- "sessions, cache, quota" --> FS
+  Agent -- "Gemini calls, grounding" --> AI
+  Agent -- "routes" --> Maps
   Jobs -- "pull on schedule" --> Src
   Jobs -- "allowed batch files" --> Storage
   Storage -- "batch load" --> BQ
   Jobs -- "high-frequency writes" --> BQ
 ```
 
-The map app does not query BigQuery directly and has no Firestore map listener. The dedicated query service is separate from ingestion and agent streaming. Future authentication/user-data storage decisions do not change the first map transport.
+The map app does not query BigQuery directly and has no Firestore map listener. The map query service, the agent service and ingestion are three separate Cloud Run deployments that share one published store. Future user-data storage decisions do not change the first map transport.
 
 | Component | Runs on | Responsibility |
 | --- | --- | --- |
 | Flutter app | Android, iOS, Web on Firebase Hosting | Platform-neutral map state/data; first acceptance on Web; native acceptance separately recorded |
-| Map query service | Cloud Run, cloud/map | Catalog, bounded viewport/detail/unlocated/member queries, budgets and public-field filtering |
-| Agent service | Cloud Run (ADK) | Chat/workflows/tools; streamed events ([agent-protocol.md](agent-protocol.md)) |
-| Ingestion | Cloud Run jobs, Cloud Scheduler | Source admission, normalization, publication and provenance in cloud/data |
-| BigQuery | Google Cloud | Published query views and historical facts; analytics producer owns anomaly results |
+| Map query service | Cloud Run service, cloud/map | Catalog, bounded viewport/detail/unlocated/member queries, budgets and public-field filtering |
+| Agent service | Cloud Run service, cloud/agent (planned) | Chat loop, workflows and tools; Gemini through Vertex AI; streamed events ([agent-protocol.md](agent-protocol.md)) |
+| Ingestion | Cloud Run jobs, Cloud Scheduler, cloud/data | Source admission, normalization, publication and provenance |
+| BigQuery | Google Cloud | Published query views and historical facts; the anomaly detector (a cloud/data job) publishes anomaly results here |
 | GCS | Google Cloud | Permitted NDJSON batch staging; not the client wire format |
-| Google AI and Maps | Google Cloud | Server-side Gemini tools; Maps rendering/grounding with required attribution |
+| Firestore | Google Cloud | Agent-only store, reached only by the agent service: chat sessions per user, grounding cache and rate-limit counters. Not a map data store |
+| Firebase Auth | Google Cloud | Anonymous uid for every user; the agent service verifies the ID token |
+| Vertex AI | Google Cloud | Gemini models and Search/Maps grounding, called with the agent service identity |
+| Maps Platform | Google Cloud | Routes API for `draw_route`; map rendering and grounding attribution in the app |
 
 ## Map model and shared boundary
 
@@ -54,21 +63,29 @@ Typed MapItem values contain stable id/version/layer, GeoJSON geometry or null, 
 
 V1 registers nine layers: pedestrian, anomaly, disruption, event, planning, boundary, news, rent and census. Registration does not imply available data. No unlocated fact gets a guessed point; no sparse sensors become claimed full-city population density.
 
+Agent tools and cards use the same identity: a `featureId` in [tools.md](tools.md) is a MapItem `id`, so the app can match cards and UI actions to items it loaded from the map service.
+
 ## Key decisions
 
 - **Cloud Run queries the published store.** Fixed parameterized BigQuery view reads use read-only identity, byte/time/row limits, bounded pagination and five-minute opaque source-version snapshots. Detail/member reads recheck public admission/retraction. The first map introduces no second query store or persistent response cache.
 - **JSON/GeoJSON at the client boundary.** Parquet may be useful for source exports/analytics, but clients use the frozen JSON model and explicit development sample mode. A failed live request never becomes sample data.
-- **Agents run server-side.** API keys, models and model-facing tools stay in Cloud Run; Flutter never calls a model. Agent tool contracts remain governed by tools.md and are not silently changed by the map contract.
+- **Two Cloud Run services face the app.** `melens-ENV-map` and `melens-ENV-agent` are separate services with separate images, identities, timeouts and scaling. The map service serves short JSON queries (30-second deadline, concurrency 8, one instance because of its in-memory snapshot store). The agent service serves long SSE turns (up to 300 seconds, higher concurrency, Vertex AI, Firestore and secret access). One service failing or rolling back does not take the other down, and the agent's broader identity never runs map query code.
+- **Agents run server-side, on Gemini only.** API keys, models and model-facing tools stay in Cloud Run; Flutter never calls a model. Gemini is called through Vertex AI with the service identity, so there is no Gemini API key and no multi-provider abstraction. Agent tool contracts remain governed by tools.md and are not silently changed by the map contract.
+- **Chat sessions are persisted per user in Firestore.** Every session belongs to a Firebase uid and is stored with its turns ([agent-protocol.md](agent-protocol.md#sessions)). Instances hold no conversation state between requests, so the agent service can scale out, a new revision keeps conversations, and the app can list and reopen earlier sessions. Only the agent service reads or writes Firestore; client security rules deny all access.
+- **Agent tools read the published views directly.** Data tools run fixed parameterized queries over `melens_query`, under the same rules as the map service's query runner: read-only identity, approved views only, dry run, `maximumBytesBilled`, timeouts. They do not call the map service over HTTP (it is single-instance and would become the bottleneck) and do not use Firestore for map data.
+- **TypeScript across cloud/.** The agent service uses ADK for TypeScript on Node 24, with the TypeScript and Zod versions already pinned in cloud/data and cloud/map. One language keeps shared validation, query and deployment code reusable.
 - **Web first.** Firebase Hosting is the submission target. Shared data/state does not prove identical native rendering or 3D support; acceptance is recorded per platform.
 - **P0 first.** G0 preparation, G1 development preview, G2 real P0 map, G3 full project P0 acceptance are separate. News/area expansion and optional H3/3D follow the documented gates; counts alone do not prove anomaly acceptance, and roads alone do not prove all transit acceptance.
 - **Supporting services.** Secret Manager supplies restricted keys; Cloud Build deploys; Cloud Scheduler triggers ingestion. No real secret enters committed configuration.
 
 ## Deployment constraints
 
-The Web origin and map-service CORS allowlist must agree. Only admitted public fields are exposed by the public prototype; no caller SQL, raw/staging records or private admission evidence. The map service identity has no ingestion write role. Build-time Maps/API configuration is documented in app/README.md.
+The Web origin and both services' CORS allowlists must agree; the agent service additionally allows the `Authorization` header. Only admitted public fields are exposed by the public prototype; no caller SQL, raw/staging records or private admission evidence. Neither service identity has an ingestion write role. Build-time Maps/API configuration is documented in app/README.md; the app carries two base URLs, `MAP_BASE_URL` and `AGENT_BASE_URL`.
 
-Agent streaming calls Cloud Run directly rather than relying on Firebase Hosting rewrite duration. Keep agent work inside the request or dispatch a managed task; Cloud Run request timeouts, instance policy and logging are owned by deployment configuration and measured before judging.
+Agent streaming calls Cloud Run directly rather than relying on Firebase Hosting rewrite duration. The agent service allows unauthenticated invocation at the Cloud Run level, because a browser cannot obtain an IAM token; it verifies the Firebase ID token on every request and rate-limits per uid. Its request timeout covers a full turn of 16 model calls (300 seconds). Sessions live in Firestore, so the service may run several instances; set min-instances=1 while judging to avoid cold starts. The Firestore database is created in `australia-southeast2` (confirm availability when creating it) with a TTL policy on session documents. Its identity, `melens-ENV-agent`, holds `melens_query` READER, project `bigquery.jobUser`, `aiplatform.user`, `datastore.user` and `secretAccessor` on the Maps Platform key only.
+
+Cloud Run, BigQuery and GCS stay in `australia-southeast2`. The Vertex AI location for the chosen Gemini model and grounding tools is confirmed before coding; it may have to be `global` or another region.
 
 ## Open implementation work
 
-Map endpoints/adapters/deployment are later feature 002 tasks (T011–T014/T019 onward); T001 is a contract freeze, not an implementation claim. Source gates remain in feature 001. Anomaly production, agent tool integration and user-data stores retain separate owners and acceptance.
+`cloud/agent` does not exist yet; its deployment script follows the pattern of `cloud/map/infra/deploy.sh` (immutable image digest, plan by default, identity audit). Map endpoints/adapters/deployment are later feature 002 tasks (T011–T014/T019 onward); T001 is a contract freeze, not an implementation claim. Source gates remain in feature 001. Anomaly production (a cloud/data job writing to BigQuery), the Firebase Hosting release (T054) and the deployed-origin CORS update on both services retain separate owners and acceptance.

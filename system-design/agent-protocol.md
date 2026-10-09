@@ -1,16 +1,27 @@
 # Agent protocol
 
-**Status:** Draft. Plan task F3 (agent framework contract and result card format) finalises it.
+**Status:** Draft. Revised 2026-10-09 for the agent service runtime (own Cloud Run service, TypeScript, map contract ids, sessions persisted per user). Plan task F3 (agent framework contract and result card format) finalises it.
 
 How the Flutter app talks to the agent service on Cloud Run. The app is an agent client: it sends context, renders streamed events, applies UI actions and renders cards. It never calls a language model itself; all reasoning, tools, keys and source checks stay on the server.
 
-## Endpoint
+## Endpoints
 
-`POST /v1/sessions/{sessionId}/turns`, called on the Cloud Run URL directly (or a custom domain mapped to Cloud Run), never through Firebase Hosting, which times out after 60 seconds. The response is a stream of server-sent events.
+All routes are called on the agent service's Cloud Run URL directly (or a custom domain mapped to Cloud Run), never through Firebase Hosting, which times out after 60 seconds. Every route requires the Firebase ID token and acts only on the caller's own sessions.
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /v1/sessions` | Create a session for the caller; returns `sessionId` |
+| `GET /v1/sessions` | List the caller's sessions, newest first: `id`, `title`, `createdAt`, `updatedAt`, `turnCount` |
+| `GET /v1/sessions/{sessionId}` | The session's stored turns, for redrawing the chat panel |
+| `DELETE /v1/sessions/{sessionId}` | Delete the session and its turns |
+| `POST /v1/sessions/{sessionId}/turns` | Run one turn; the response is a stream of server-sent events |
+
+The app has two base URLs: `MAP_BASE_URL` for the map query service and `AGENT_BASE_URL` for this service; they are different Cloud Run services ([architecture.md](architecture.md#key-decisions)). The Cloud Run request timeout is 300 seconds, enough for a turn of 16 model calls.
 
 ```
-Flutter                                  Cloud Run (ADK)
-  │ POST /turns {input, context}  ─────────▶│ route by input.kind: workflow or map_agent
+Flutter                                  Cloud Run: agent service (ADK, TypeScript)
+  │ POST /turns {input, context}  ─────────▶│ verify Firebase ID token, rate limit by uid
+  │                                         │ route by input.kind: workflow or map_agent
   │◀── status    "Checking nearby news…"     │ one per tool call
   │◀── text      streamed text               │
   │◀── ui_action focus_map / draw_route      │ when the agent calls a UI action tool
@@ -62,21 +73,37 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 
 1. **Recommendations only in cards.** Streamed text carries explanations and transitions. Places, events and routes appear in `card` events, which are sent only after source validation (see [agent-design.md](agent-design.md#source-rules)).
 2. **UI actions are one-way.** The server does not wait for the app to confirm an action. If an action fails in the app, the next request's `context` shows the real state.
-3. **Features by id.** Cards and UI actions reference `featureId`s. The app resolves them from the Firestore features it already listens to, which keeps events small and consistent with the map.
-4. **Server-side sessions.** Conversation history lives in the server session. The app keeps only `sessionId`.
+3. **Features by id.** Cards and UI actions reference `featureId`s, which are [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem ids. The app resolves them against the items it has loaded from the map query service, which keeps events small and consistent with the map. Card items also carry a `location`, so an item the app has not loaded still shows a pin; `highlight_features` reports ids the server could not find as `missing`.
+4. **Server-side sessions, per user.** Conversation history is stored in Firestore under the caller's uid and survives restarts and new revisions. The app keeps the current `sessionId` locally and can list and reopen earlier sessions. A session belongs to one uid; another user's session id returns `not_found`, never `forbidden`. One turn runs at a time per session; a second concurrent turn is rejected with `409`.
 5. **Cancellation reaches the server.** When the user taps stop or leaves the screen, the app aborts the request. The server detects the disconnect and cancels the run, so it stops spending tokens and grounding calls.
 6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. Tapping an option sends an `answer` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
 
+## Sessions
+
+Sessions are stored in Firestore in the project's agent database. Only the agent service reads or writes them, through the Admin SDK; client security rules deny all access, and the app never holds Firestore credentials.
+
+| Document | Fields |
+| --- | --- |
+| `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`) or null, `expiresAt` for the TTL policy |
+| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, row counts) and `usage` |
+
+Stored is what the app needs to redraw the conversation and what the model needs for the next turn: user input, answer text, cards, questions and answers, and the compact trace. The request `context` is not stored, and `userLocation` never is. Full tool results and grounding payloads are not stored with the session; grounding has its own cache.
+
+The prompt for a turn carries the last 20 turns; older turns remain available to the app through `GET /v1/sessions/{sessionId}`. Limits: 50 sessions per uid, deleting the oldest when a new one is created; 200 turns per session; a 30-day TTL from `updatedAt`. An anonymous uid is lost when the browser clears site data, and its sessions expire with the TTL.
+
+The chat panel shows the user's session list. The user can switch to an earlier session, start a new one and delete one; switching restores that conversation from `GET /v1/sessions/{sessionId}`.
+
 ## Authentication
 
-Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header and Cloud Run verifies it. This ties sessions to users and allows rate limiting, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.
+Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header. The Cloud Run service allows unauthenticated invocation at the platform level, because a browser cannot obtain an IAM token; the service itself verifies the Firebase ID token on every request and rejects a missing or invalid token before any model or tool call. This ties sessions to users and allows per-uid rate limiting, with counters in Firestore, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.
 
 ## Flutter implementation
 
 | Part | Responsibility |
 | --- | --- |
 | `AgentClient` | Transport, SSE parsing, cancellation |
-| `ChatController` | Conversation state, the turn in progress and any pending question |
+| `ChatController` | Conversation state, the turn in progress and any pending question; restores a session from `GET /v1/sessions/{sessionId}` |
+| `SessionList` | Lists, switches, creates and deletes the user's sessions |
 | `MapActions` | Applies `ui_action` events to the map |
 | Card registry | One widget per card `type`, which maps to a use case |
 
@@ -84,4 +111,4 @@ Firebase Anonymous Auth gives every user, judges included, a uid without a sign-
 
 ## Open questions
 
-- Where the JSON Schema for requests, events and cards lives, so Dart and backend models are generated from one source.
+- Where the JSON Schema for requests, events and cards lives, so Dart and backend models are generated from one source. With the service in TypeScript, the Zod schemas in `cloud/agent` are the natural source.
