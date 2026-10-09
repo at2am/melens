@@ -2,10 +2,10 @@
 
 `bootstrap.sh` prepares the agent service identity and its Firestore database in a
 project that [`cloud/data/infra/bootstrap.sh`](../../data/infra/README.md) already
-prepared. It plans by default, `--verify` is a read-only audit, and `--apply
---confirm-project` creates what is missing and then audits. It deploys nothing, grants
-no secret or bucket access and prints resource names, never credential material. Run it
-as the project integrator.
+prepared. `deploy.sh` then deploys the service to Cloud Run ([Deployment](#deployment)).
+Both plan by default, `--verify` is a read-only audit, and `--apply --confirm-project`
+changes the project and then audits. Neither grants secret or bucket access, and both
+print resource names, never credential material. Run them as the project integrator.
 
 ```sh
 cloud/agent/infra/bootstrap.sh --project PROJECT_ID --environment dev
@@ -15,7 +15,7 @@ cloud/agent/infra/bootstrap.sh --project PROJECT_ID --environment dev --apply --
 
 | Resource | Bootstrap | Later, at deployment |
 | --- | --- | --- |
-| `melens-ENV-agent` | `melens_query` dataset `READER`; project `aiplatform.user`, `bigquery.jobUser`, `datastore.user` | `secretAccessor` on the Maps Platform key only; Cloud Run service identity |
+| `melens-ENV-agent` | `melens_query` dataset `READER`; project `aiplatform.user`, `bigquery.jobUser`, `datastore.user` | Cloud Run service identity. `secretAccessor` on the Maps Platform key only once the Routes API tool (`draw_route`) reads it; no current code reads a secret |
 | Firestore `(default)` | `australia-southeast2`, Native mode, delete protection; TTL policies on `expiresAtTs` for the `sessions`, `turns` and `attachments` collection groups | Nothing |
 | APIs | Firestore, Vertex AI, Cloud Run, BigQuery, BigQuery Storage, Artifact Registry, Cloud Build, Secret Manager, IAM Credentials, IAM | Nothing |
 
@@ -50,9 +50,8 @@ both policies reached `ACTIVE`. `--verify` passes with no `melens_ingest` or sec
 for the identity.
 
 Chat photos (2026-10-09) added the `attachments` collection group to the script's TTL
-policies. Until `--apply --confirm-project melens-510012` is rerun, `--verify` reports that
-policy as missing. Photos are still deleted with their session and when their turn is
-trimmed, but a photo whose turn expires through the TTL stays until the policy exists.
+policies. The integrator reran `--apply --confirm-project melens-510012` the same day; the
+policy reached `ACTIVE` and `--verify` passes with all three policies `ACTIVE`.
 
 The same day, the Vertex AI location was probed with the CLI user's token (not the
 agent identity) through `generateContent` on `gemini-3.8-flash`:
@@ -77,3 +76,77 @@ monitor records) and a follow-up that used the stored history and Maps grounding
 run showed ADK reporting two complete responses per streamed tool call, which doubled the
 usage records and spent the call budget twice as fast; the loop now counts one call per
 request.
+
+## Deployment
+
+`deploy.sh` deploys `melens-dev-agent` in `melens-510012` only. Build the image from
+the `cloud/` directory as the container context, so it includes `cloud/shared`, and
+record its digest. `cloud/.gcloudignore` uploads only the package files, TypeScript
+configuration and sources of `cloud/shared` and `cloud/agent`, plus the public source
+registry. `agent/infra` is not uploaded.
+
+```sh
+gcloud builds submit cloud --project=melens-510012 \
+  --region=australia-southeast2 --timeout=900s \
+  --gcs-source-staging-dir=gs://melens-510012_cloudbuild/agent/source \
+  --gcs-log-dir=gs://melens-510012_cloudbuild/agent/logs \
+  --config=cloud/agent/cloudbuild.yaml \
+  --substitutions=_IMAGE=australia-southeast2-docker.pkg.dev/melens-510012/melens-data/agent:TAG
+cloud/agent/infra/deploy.sh \
+  --image australia-southeast2-docker.pkg.dev/melens-510012/melens-data/agent@sha256:DIGEST \
+  --allowed-origin http://localhost:8000 --dynamic-scan-bytes 1000000000 --verify
+```
+
+Rerun the same command with `--apply --confirm-project melens-510012` to deploy.
+
+- **Checks.**
+  - The script accepts only an immutable `agent@sha256` digest from the development registry, and exact HTTPS or loopback origins in canonical form.
+  - It accepts the reviewed dynamic scan ceilings of `cloud/map/infra/deploy.sh`, and 0 or 1 minimum instances.
+  - `--verify` runs the `bootstrap.sh` audit and checks that the digest exists.
+- **Settings.**
+  - The script writes every setting explicitly to a temporary env file: Vertex AI `global`, `gemini-3.8-flash`, 16 model calls, a 270 s turn timeout, 40 s grounding timeout, 120 turns per hour, and the map query ceilings.
+  - It never sets `AGENT_DEVELOPMENT_MODE` or `AGENT_DEVELOPMENT_TOKEN`. The service therefore keeps sessions in Firestore and accepts only Firebase ID tokens.
+- **Read-back.** After the apply, the script fails if the deployed environment, identity or image differ from the reviewed ones.
+- **Scope.** The apply creates or updates only `melens-dev-agent` and its service-level public invocation binding. It grants no project, data or secret permission.
+
+**Runtime bounds**
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| CPU and memory | 1 CPU, 1 GiB | A photo turn holds up to 4 MB of new photos and 12 MB of history photos |
+| Concurrency | 20 | Turns are long SSE streams that mostly wait on Gemini |
+| Instances | 0 to 2 | `--min-instances 1` while judging. Rate limits are in memory, so each instance counts on its own |
+| Request timeout | 300 s | The 270 s turn timeout ends and stores a turn before Cloud Run cuts the stream. The 330 s turn lease outlives both, so a crashed turn still frees its session |
+
+Cloud Run allows unauthenticated invocation because a browser cannot obtain an IAM token,
+and the service rejects every request without a valid Firebase ID token. `/healthz` is
+answered by the Google front end with a 404, as for the map service, so check the service
+on a `/v1` route.
+
+## 2026-10-09 development deployment
+
+- **Image.** Cloud Build `7aac0ab4-ed2a-450c-b0c3-e7ac7635d897` built
+  `agent:dev-20261009-60c982a` from `main` at `60c982a`, digest
+  `sha256:891ff17d0006d1ff8b312187c2778027d6009d775d123faaf57ab8612ad1ddf6`.
+- **Service.** `https://melens-dev-agent-saepk4k6hq-km.a.run.app`, revision
+  `melens-dev-agent-00002-4sb`, identity
+  `melens-dev-agent@melens-510012.iam.gserviceaccount.com`, allowed origin
+  `http://localhost:8000`, dynamic scan ceiling 1,000,000,000 bytes, 0 to 2 instances.
+- **Revisions.** The first revision, `00001`, used a 330 s request timeout. Revision
+  `00002` moved to 300 s with a 270 s turn timeout, so that the turn lease outlives the
+  request.
+
+Checks on the deployed service:
+
+| Check | Result |
+| --- | --- |
+| Startup log | `agentServerListening` with `development: false`, `global` and `gemini-3.8-flash` |
+| `GET /v1/sessions` without a token | 401 `unauthorized` |
+| A malformed bearer token | 401 `unauthorized` |
+| A Google ID token from the CLI user (not a Firebase token) | 401 `unauthorized` |
+| Preflight from `http://localhost:8000` | 204, with that origin, `Authorization` allowed |
+| Preflight from another origin | 400 |
+
+A real turn under `melens-dev-agent` is still required for acceptance. It needs a Firebase
+ID token, and the project is not registered with Firebase yet. Until then the app cannot use
+the deployed service; local development keeps `npm run dev` with the development token.

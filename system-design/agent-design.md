@@ -19,7 +19,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
 | Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
-| Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls |
+| Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls; the deployed turn timeout is 270 seconds, so the turn is stored before the stream is cut |
 | Region | Cloud Run and Firestore in `australia-southeast2` with the data; Gemini and the grounding tools from the `global` Vertex AI location, the only one that served `gemini-3.8-flash` and both grounding tools on 2026-10-09 |
 
 ## Three execution modes
