@@ -19,6 +19,7 @@ map/README.md
 agent/README.md
 map/infra/?*
 !map/infra/dev-public-sources.json
+agent/infra/?*
 **/.env
 **/.env.*
 **/*.key

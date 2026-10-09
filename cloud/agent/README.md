@@ -39,7 +39,7 @@ Development mode keeps sessions in memory and accepts `Authorization: Bearer dev
 | Variable | Default / requirement |
 | --- | --- |
 | `AGENT_PROJECT_ID` | Required (falls back to `MAP_PROJECT_ID`) |
-| `AGENT_VERTEX_LOCATION` | Required: `global` or the region that serves the model and the grounding tools |
+| `AGENT_VERTEX_LOCATION` | Required. `global` is the only location that served `gemini-3.8-flash`, Search grounding and Maps grounding for the project on 2026-10-09; `australia-southeast1` returned 404 ([infra/README.md](infra/README.md)) |
 | `AGENT_MODEL` | `gemini-3.8-flash` |
 | `AGENT_FIRESTORE_DATABASE` | `(default)` |
 | `AGENT_ALLOWED_ORIGINS` | Comma-separated exact Web origins; the service also allows the `Authorization` header |
@@ -67,7 +67,7 @@ Development mode keeps sessions in memory and accepts `Authorization: Bearer dev
 
 ## Runtime identity and deployment
 
-The service identity `melens-ENV-agent` needs `melens_query` READER and project `bigquery.jobUser` (data tools), `aiplatform.user` (Gemini and grounding through Vertex AI), `datastore.user` on the agent Firestore database and, later, `secretAccessor` on the Maps Platform key only ([architecture.md](../../system-design/architecture.md#deployment-constraints)). Cloud Run allows unauthenticated invocation at the platform level because a browser cannot obtain an IAM token; the service rejects every request without a valid Firebase ID token before any model or tool call. Request timeout 300 seconds; set min-instances=1 while judging.
+[`infra/bootstrap.sh`](infra/README.md) (plan by default, `--verify` for a read-only audit, `--apply --confirm-project` to create) prepares the service identity `melens-ENV-agent` with `melens_query` READER and project `bigquery.jobUser` (data tools), `aiplatform.user` (Gemini and grounding through Vertex AI) and `datastore.user` (the agent Firestore database), and the Firestore database `(default)` in `australia-southeast2` with TTL policies on `expiresAtTs` for the `sessions` and `turns` collection groups. `secretAccessor` on the Maps Platform key only is granted later, at deployment ([architecture.md](../../system-design/architecture.md#deployment-constraints)). Cloud Run allows unauthenticated invocation at the platform level because a browser cannot obtain an IAM token; the service rejects every request without a valid Firebase ID token before any model or tool call. Request timeout 300 seconds; set min-instances=1 while judging.
 
 Build from the `cloud/` directory as the container context so the image includes `cloud/shared`:
 
@@ -77,4 +77,4 @@ gcloud builds submit cloud --project=PROJECT_ID --region=australia-southeast2 \
   --substitutions=_IMAGE=australia-southeast2-docker.pkg.dev/PROJECT_ID/melens-data/agent:TAG
 ```
 
-The deployment script (plan by default, immutable digest, identity audit, following `cloud/map/infra/deploy.sh`) is still to be written. The Firestore database needs a TTL policy on `expiresAtTs` for the `sessions` and `turns` collection groups, and client security rules that deny all access.
+The deployment script (plan by default, immutable digest, identity audit, following `cloud/map/infra/deploy.sh`) is still to be written. The project is not registered with Firebase yet, so no client SDK reaches Firestore and no Firebase ID token exists; registering it and enabling Anonymous Auth, with client security rules that deny all access, is the app's Firebase setup. [infra/README.md](infra/README.md) records the 2026-10-09 development bootstrap and the Vertex AI location probe.

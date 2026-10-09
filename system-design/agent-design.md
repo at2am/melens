@@ -20,7 +20,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
 | Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls |
-| Region | Cloud Run in `australia-southeast2` with the data; the Vertex AI location follows model and grounding availability (open question) |
+| Region | Cloud Run and Firestore in `australia-southeast2` with the data; Gemini and the grounding tools from the `global` Vertex AI location, the only one that served `gemini-3.8-flash` and both grounding tools on 2026-10-09 |
 
 ## Three execution modes
 
@@ -184,7 +184,7 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 - **Grounding with function tools.** The loop keeps function tools only; `maps_grounding` and `search_grounding` are function tools that make one grounded Gemini call each through the Vertex AI SDK, so the built-in tools never share a request with function declarations. Every such call is a separate model call with its own `usage` event, and the loop can run Maps and Search in parallel.
 - **English only.** Maps grounding supports English only, so the app, prompts and deck are in English.
 - **Sessions.** Conversation history lives in Firestore, keyed by the Firebase uid, behind a session service adapter. Instances hold no session state between requests, so the service can scale out and a new revision keeps every conversation. A turn holds a short lease on its session, so two concurrent turns on one session are rejected rather than interleaved.
-- **Vertex AI location.** Cloud Run and the data are in Melbourne, but the chosen Gemini model and grounding tools may only be served from `global` or another region. Confirm before coding and record the location in the deployment configuration.
+- **Vertex AI location.** Cloud Run and the data are in Melbourne, but `gemini-3.8-flash`, Search grounding and Maps grounding are served from `global` and not from `australia-southeast1` (checked 2026-10-09). The deployment configuration records `AGENT_VERTEX_LOCATION=global`.
 
 ## Evaluation
 
@@ -198,4 +198,3 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 ## Open questions
 
 - Result compaction for long tool results (rows shortened, first N kept) is still to be implemented; the first version caps list sizes instead.
-- The Vertex AI location for `gemini-3.8-flash` and the grounding tools.
