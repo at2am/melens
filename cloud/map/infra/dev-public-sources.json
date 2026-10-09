@@ -10,5 +10,29 @@
     "url": "https://data.melbourne.vic.gov.au/explore/dataset/development-activity-monitor/",
     "attribution": "City of Melbourne — Development Activity Monitor",
     "versionRef": null
+  },
+  {
+    "sourceId": "victoria.council.engagement",
+    "url": null,
+    "attribution": "Greater Melbourne councils — community engagement projects (facts and links only)",
+    "versionRef": null
+  },
+  {
+    "sourceId": "ticketmaster.events",
+    "url": "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/",
+    "attribution": "Event information provided by Ticketmaster",
+    "versionRef": null
+  },
+  {
+    "sourceId": "gdelt.news",
+    "url": "https://www.gdeltproject.org/",
+    "attribution": "News metadata from The GDELT Project — https://www.gdeltproject.org/",
+    "versionRef": null
+  },
+  {
+    "sourceId": "victoria.council.engagement_news",
+    "url": null,
+    "attribution": "Greater Melbourne councils — community engagement news (facts and links only)",
+    "versionRef": null
   }
 ]

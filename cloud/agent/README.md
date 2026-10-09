@@ -23,14 +23,16 @@ npm ci
 npm run test --workspace agent
 ```
 
-Tests inject a scripted `BaseLlm`, a fake feature reader and an in-memory session store, so they need no Google credentials. Running the service locally against Vertex AI needs Application Default Credentials with access to the project:
+Tests inject a scripted `BaseLlm`, a fake feature reader and an in-memory session store, so they need no Google credentials. Running the service locally against Vertex AI needs Application Default Credentials with access to the project (`gcloud auth application-default login`) and the lowercase project id; without credentials every turn fails with a retryable `error` event and a `modelLoopFailed` log line naming the cause:
 
 ```sh
 cd cloud/agent
-AGENT_PROJECT_ID=PROJECT AGENT_VERTEX_LOCATION=global AGENT_ALLOWED_ORIGINS=http://localhost:8000 \
-AGENT_PUBLIC_SOURCES_FILE=../map/infra/dev-public-sources.json \
+AGENT_PROJECT_ID=melens-510012 AGENT_VERTEX_LOCATION=global AGENT_ALLOWED_ORIGINS=http://localhost:8000 \
+AGENT_PUBLIC_SOURCES_FILE=../map/infra/dev-public-sources.json MAP_DYNAMIC_SCAN_BYTES=1000000000 \
 AGENT_DEVELOPMENT_MODE=true AGENT_DEVELOPMENT_TOKEN=dev node dist/src/main.js
 ```
+
+`MAP_DYNAMIC_SCAN_BYTES` must match the reviewed map ceiling ([cloud/map/infra/README.md](../map/infra/README.md)): every current-mode geo query scans the whole `v_geo_records_current` view (about 630 MB on 2026-10-09), so the library default of 100 MB makes `search_features` and `nearby_context` answer `unavailable` for every layer.
 
 Development mode keeps sessions in memory and accepts `Authorization: Bearer dev` for the uid `dev-user`. Cloud Run never runs in development mode: it verifies Firebase ID tokens and stores sessions in Firestore.
 
