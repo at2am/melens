@@ -1,0 +1,25 @@
+# Upload only the shared package and the map container inputs. Dependencies, build output, tests and local config stay local.
+*
+!.dockerignore
+!package.json
+!package-lock.json
+!shared/
+!shared/**
+!map/
+!map/**
+**/node_modules/
+**/dist/
+**/build/
+**/test/
+**/coverage/
+shared/README.md
+map/README.md
+map/infra/?*
+!map/infra/dev-public-sources.json
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*service-account*.json
+**/*credentials*.json
+**/*.log*

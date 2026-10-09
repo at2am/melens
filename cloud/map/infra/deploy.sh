@@ -96,7 +96,7 @@ env = {
     'MAP_MAX_PAGE_ITEMS': '1000', 'MAP_MAX_RESPONSE_BYTES': '2097152',
     'MAP_RESPONSE_ENVELOPE_RESERVE_BYTES': '65536',
     'MAP_ALLOWED_ORIGINS': ','.join(origins),
-    'MAP_PUBLIC_SOURCES_FILE': '/app/infra/dev-public-sources.json',
+    'MAP_PUBLIC_SOURCES_FILE': '/app/map/infra/dev-public-sources.json',
 }
 with open(env_path, 'w') as handle:
     json.dump(env, handle, indent=2)

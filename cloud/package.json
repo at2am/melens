@@ -1,0 +1,17 @@
+{
+  "name": "@melens/cloud",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "map"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "npm run build --workspace map",
+    "typecheck": "npm run typecheck --workspace map",
+    "test": "npm run test --workspace shared && npm run test --workspace map"
+  }
+}

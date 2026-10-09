@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 
 import { SNAPSHOT_TTL_MS, type LayerId, type LayerResult, type MapItem,
-  type MapItemPage, type UnlocatedQuery, type ViewportQuery } from '../contracts/map-contract.js';
-import { MapServiceError } from '../errors.js';
+  type MapItemPage, type UnlocatedQuery, type ViewportQuery } from '@melens/shared/contracts/map-contract';
+import { MapServiceError } from '@melens/shared/errors';
 import { deepFreeze, jsonBytes } from '../util.js';
 
-export { MapServiceError, type MapServiceErrorCode } from '../errors.js';
+export { MapServiceError, type MapServiceErrorCode } from '@melens/shared/errors';
 export interface SourceWatermark { readonly sourceId: string; readonly batchId: string; readonly publishedAt: string }
 export interface StoredMemberGroup { readonly aggregate: Extract<MapItem, { kind: 'aggregate' }>; readonly members: readonly MapItem[] }
 export interface StoredSnapshot {

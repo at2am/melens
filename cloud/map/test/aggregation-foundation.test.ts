@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MAX_PAGE_ITEMS, MAX_RESPONSE_BYTES, SERVICE_BBOX, mapItemSchema } from '../src/contracts/map-contract.js';
-import type { Bbox, LayerResult, MapItem } from '../src/contracts/map-contract.js';
+import { MAX_PAGE_ITEMS, MAX_RESPONSE_BYTES, SERVICE_BBOX, mapItemSchema } from '@melens/shared/contracts/map-contract';
+import type { Bbox, LayerResult, MapItem } from '@melens/shared/contracts/map-contract';
 import { aggregateLayer, nominalZoomBand } from '../src/services/aggregation.js';
 import type { AggregateItem, ZoomBand } from '../src/services/aggregation.js';
 

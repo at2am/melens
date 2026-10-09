@@ -1,5 +1,5 @@
-import { MAX_PAGE_ITEMS } from '../contracts/map-contract.js';
-import { MapServiceError } from '../errors.js';
+import { MAX_PAGE_ITEMS } from '@melens/shared/contracts/map-contract';
+import { MapServiceError } from '@melens/shared/errors';
 import { jsonBytes } from '../util.js';
 
 /** Per-layer shares of the request's row and byte allowances. */

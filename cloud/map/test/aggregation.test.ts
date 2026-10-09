@@ -3,8 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { mapItemSchema, type Bbox, type LayerResult, type MapItem } from '../src/contracts/map-contract.js';
-import { adaptPedestrianRow } from '../src/query/pedestrian.js';
+import { mapItemSchema, type Bbox, type LayerResult, type MapItem } from '@melens/shared/contracts/map-contract';
+import { adaptPedestrianRow } from '@melens/shared/query/pedestrian';
 import { aggregateLayer } from '../src/services/aggregation.js';
 
 const BOUNDS: Bbox = [144.9, -37.9, 145.1, -37.7];

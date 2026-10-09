@@ -1,0 +1,9 @@
+# Builds the map image from the cloud/ source context so the image includes cloud/shared:
+#   gcloud builds submit cloud --config=cloud/map/cloudbuild.yaml --substitutions=_IMAGE=REGISTRY/map:TAG ...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '--file', 'map/Dockerfile', '--tag', '${_IMAGE}', '.']
+images:
+  - '${_IMAGE}'
+substitutions:
+  _IMAGE: ''

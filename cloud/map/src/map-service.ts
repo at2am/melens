@@ -1,14 +1,14 @@
-import type { MapConfig } from './config.js';
-import { parseMapLayerCatalog, sourceReferenceSchema } from './contracts/map-contract.js';
-import type { PublicSourceReference, PublicSourceResolver } from './query/adapter-common.js';
-import { createBigQueryViewAdapter, type BigQueryViewAdapter } from './query/bigquery-adapter.js';
-import { createViewQueryRunner } from './query/query-runner.js';
+import type { MapConfig } from '@melens/shared/config';
+import { parseMapLayerCatalog, sourceReferenceSchema } from '@melens/shared/contracts/map-contract';
+import type { PublicSourceReference, PublicSourceResolver } from '@melens/shared/query/adapter-common';
+import { createBigQueryViewAdapter, type BigQueryViewAdapter } from '@melens/shared/query/bigquery-adapter';
+import { createUnlocatedLayerLoader, createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
+import { createViewQueryRunner } from '@melens/shared/query/query-runner';
 import { createSourceCoverageReader, findPublicSource, type CoverageAreaResolver, type SourceCoverageSnapshot }
-  from './query/source-coverage.js';
+  from '@melens/shared/query/source-coverage';
 import { aggregateLayer } from './services/aggregation.js';
 import { createDetailService } from './services/details.js';
 import { createLayerCatalogService } from './services/layer-catalog.js';
-import { createUnlocatedLayerLoader, createViewportLayerLoader } from './services/layer-loaders.js';
 import { createPublicRecordChecker, type PublicRecordChecker } from './services/public-records.js';
 import { createSnapshotStore, type SnapshotStore } from './services/snapshot-store.js';
 import { createUnlocatedService } from './services/unlocated.js';

@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { mapItemSchema, normalizedViewportIdentity, parseViewportQuery, type MapItem }
-  from '../src/contracts/map-contract.js';
+  from '@melens/shared/contracts/map-contract';
 import {
   anomalyCatalogAssessment, consumeVerifiedAnomalyBatch, createAnomalyLayerLoader,
   type VerifiedAnomalyBatch,
-} from '../src/query/anomalies.js';
-import { MapQueryError } from '../src/query/query-runner.js';
-import type { SourceCoverageSnapshot } from '../src/query/source-coverage.js';
+} from '@melens/shared/query/anomalies';
+import { MapQueryError } from '@melens/shared/query/query-runner';
+import type { SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { createDetailService } from '../src/services/details.js';
 import { createSnapshotStore, MapServiceError } from '../src/services/snapshot-store.js';
 import { createViewportService } from '../src/services/viewport.js';

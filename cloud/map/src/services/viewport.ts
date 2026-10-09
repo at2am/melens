@@ -1,17 +1,13 @@
 import { MAX_PAGE_ITEMS, parseViewportQuery, parseViewportResponse, normalizedViewportIdentity,
   type LayerId, type LayerResult, type MapItem, type ViewportQuery, type ViewportResponse }
-  from '../contracts/map-contract.js';
-import { findPublicSource, type SourceCoverageReader, type SourceCoverageSnapshot } from '../query/source-coverage.js';
+  from '@melens/shared/contracts/map-contract';
+import { findPublicSource, type SourceCoverageReader, type SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { fitPage, layerBudgets } from './page-budget.js';
 import { CURSOR_PLACEHOLDER, MapServiceError, type SnapshotStore, type SourceWatermark, type StoredSnapshot,
   type StoredMemberGroup } from './snapshot-store.js';
+import type { LoadedViewportLayer, ViewportLayerLoader } from '@melens/shared/query/layer-loaders';
 
-export interface LoadedViewportLayer {
-  readonly result: LayerResult; readonly groups?: readonly StoredMemberGroup[];
-}
-export type ViewportLayerLoader = (request: ViewportQuery, layerId: LayerId,
-  coverage: SourceCoverageSnapshot, execution: { readonly signal?: AbortSignal;
-    readonly rowLimit: number; readonly resultBudgetBytes: number }) => Promise<LoadedViewportLayer>;
+export type { LoadedViewportLayer, ViewportLayerLoader } from '@melens/shared/query/layer-loaders';
 export type ViewportLayerAggregator = (layer: LayerResult, options: {
   readonly zoom: number; readonly bounds: [number, number, number, number];
 }) => { readonly items: readonly MapItem[]; readonly groups: ReadonlyMap<string, StoredMemberGroup> };

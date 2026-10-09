@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 
-import { loadMapConfig } from '../src/config.js';
-import type { MapItem, ViewportResponse } from '../src/contracts/map-contract.js';
+import { loadMapConfig } from '@melens/shared/config';
+import type { MapItem, ViewportResponse } from '@melens/shared/contracts/map-contract';
 import { createMapService } from '../src/map-service.js';
-import type { BigQueryViewAdapter, PreparedViewQuery } from '../src/query/bigquery-adapter.js';
-import type { ViewRow } from '../src/query/query-runner.js';
+import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
+import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapHttpServer } from '../src/server.js';
 import { MapServiceError } from '../src/services/snapshot-store.js';
 

@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto';
 import { MAX_PAGE_ITEMS, SERVICE_BBOX, compareMapItems, normalizedViewportIdentity, parseMapItemPage,
   parseUnlocatedQuery, parseViewportQuery, type LayerId, type MapItem, type MapItemPage, type UnlocatedQuery,
-  type ViewportQuery } from '../contracts/map-contract.js';
-import { findPublicSource, sourceBelongsToLayer, type SourceCoverageSnapshot } from '../query/source-coverage.js';
+  type ViewportQuery } from '@melens/shared/contracts/map-contract';
+import { findPublicSource, sourceBelongsToLayer, type SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { fitPage, layerBudgets } from './page-budget.js';
 import { assertSnapshotPublic, sourceWatermarks, type SnapshotAccess } from './viewport.js';
 import { CURSOR_PLACEHOLDER, MapServiceError, type StoredSnapshot } from './snapshot-store.js';
 
-export type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
-import type { ApprovedUnlocatedScope } from '../query/unlocated-queries.js';
+import type { ApprovedUnlocatedScope } from '@melens/shared/query/unlocated-queries';
+import type { LoadedUnlocatedLayer, UnlocatedLayerLoader } from '@melens/shared/query/layer-loaders';
+
+export type { ApprovedUnlocatedScope } from '@melens/shared/query/unlocated-queries';
+export type { LoadedUnlocatedLayer, UnlocatedLayerLoader } from '@melens/shared/query/layer-loaders';
 export function unlocatedCoverageRequest(query: UnlocatedQuery): ViewportQuery {
   const { scope: _scope, cursor: _cursor, snapshotId: _snapshotId, ...context } = query;
   return parseViewportQuery({ ...context, bbox: [...SERVICE_BBOX], zoom: 0 });
@@ -35,14 +38,6 @@ export function approveUnlocatedScope(query: UnlocatedQuery, layerId: LayerId,
   if (sourceIds.length === 0) throw new MapServiceError('notAvailable');
   return { sourceIds, areaRefs: [], sourceJurisdiction: jurisdiction };
 }
-export interface LoadedUnlocatedLayer {
-  readonly items: readonly MapItem[]; readonly completeness: 'complete' | 'partial'; readonly totalMatching: number | null;
-}
-export type UnlocatedLayerLoader = (query: UnlocatedQuery, layerId: LayerId,
-  coverage: SourceCoverageSnapshot, scope: ApprovedUnlocatedScope, execution: {
-    readonly signal?: AbortSignal; readonly rowLimit: number; readonly resultBudgetBytes: number;
-  }) => Promise<LoadedUnlocatedLayer>;
-
 export function createUnlocatedService(options: SnapshotAccess & {
   readonly loadLayer: UnlocatedLayerLoader; readonly maxResponseBytes?: number;
   readonly resultEnvelopeReserveBytes?: number;

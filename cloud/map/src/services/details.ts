@@ -1,6 +1,6 @@
 import { MAX_PAGE_ITEMS, parseMapItemPage, parseMapItemResponse, parseMapReadContext,
   type MapItem, type MapItemPage, type MapItemResponse, type MapReadContext }
-  from '../contracts/map-contract.js';
+  from '@melens/shared/contracts/map-contract';
 import { jsonBytes } from '../util.js';
 import { fitPage } from './page-budget.js';
 import { assertSnapshotPublic, type SnapshotAccess } from './viewport.js';

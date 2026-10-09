@@ -4,9 +4,9 @@ import { pathToFileURL } from 'node:url';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, errorResponseSchema, identifierSchema, sourceReferenceSchema }
-  from './contracts/map-contract.js';
-import { loadMapConfig } from './config.js';
-import { MAP_ERROR_CODES, MapServiceError, mapErrorCode, type MapServiceErrorCode } from './errors.js';
+  from '@melens/shared/contracts/map-contract';
+import { loadMapConfig } from '@melens/shared/config';
+import { MAP_ERROR_CODES, MapServiceError, mapErrorCode, type MapServiceErrorCode } from '@melens/shared/errors';
 import { createMapService, type MapService } from './map-service.js';
 
 /** The five contract routes and the health probe; every other path is notFound. */

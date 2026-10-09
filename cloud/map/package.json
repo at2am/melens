@@ -7,13 +7,16 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "prebuild": "tsc --project ../shared/tsconfig.json",
     "build": "tsc --project tsconfig.json",
+    "pretypecheck": "tsc --project ../shared/tsconfig.json",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "npm run build && cd dist && node --test",
     "dev": "node --watch src/dev-server.ts"
   },
   "dependencies": {
     "@google-cloud/bigquery": "9.1.0",
+    "@melens/shared": "0.1.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
