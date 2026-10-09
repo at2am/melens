@@ -1775,11 +1775,17 @@ abstract class AppLocalizations {
   /// **'Not applied: {items}'**
   String chatActionSkipped(String items);
 
-  /// Shown when no agent token is available.
+  /// Shown when the build has no Firebase configuration for this platform and no development token.
   ///
   /// In en, this message translates to:
-  /// **'Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.'**
+  /// **'Agent sign-in is not configured. Add the FIREBASE_ keys to config/dev.json (cloud/agent/infra/firebase.sh --app-config), or AGENT_DEV_TOKEN for a local agent.'**
   String get chatErrorSignIn;
+
+  /// Shown when anonymous sign-in or fetching its ID token failed for a reason other than the network.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign in to the agent service. Try again.'**
+  String get chatErrorSignInFailed;
 
   /// Shown when the agent request failed before a response.
   ///

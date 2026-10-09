@@ -60,6 +60,18 @@ final class AgentSignInException extends AgentClientException {
   String toString() => 'AgentSignInException: no agent token is configured';
 }
 
+/// Signing in for a token failed for a reason other than the network, so the
+/// request was not sent. Trying again signs in again.
+final class AgentSignInFailedException extends AgentClientException {
+  const AgentSignInFailedException();
+
+  @override
+  bool get retryable => true;
+
+  @override
+  String toString() => 'AgentSignInFailedException: signing in failed';
+}
+
 /// The service answered with its JSON error envelope or another non-2xx.
 final class AgentHttpException extends AgentClientException {
   const AgentHttpException({

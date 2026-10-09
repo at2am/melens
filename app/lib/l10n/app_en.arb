@@ -1359,9 +1359,13 @@
       }
     }
   },
-  "chatErrorSignIn": "Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.",
+  "chatErrorSignIn": "Agent sign-in is not configured. Add the FIREBASE_ keys to config/dev.json (cloud/agent/infra/firebase.sh --app-config), or AGENT_DEV_TOKEN for a local agent.",
   "@chatErrorSignIn": {
-    "description": "Shown when no agent token is available."
+    "description": "Shown when the build has no Firebase configuration for this platform and no development token."
+  },
+  "chatErrorSignInFailed": "Could not sign in to the agent service. Try again.",
+  "@chatErrorSignInFailed": {
+    "description": "Shown when anonymous sign-in or fetching its ID token failed for a reason other than the network."
   },
   "chatErrorNetwork": "The agent service could not be reached.",
   "@chatErrorNetwork": {

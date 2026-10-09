@@ -8,6 +8,48 @@ part 'env.g.dart';
 
 enum AppEnvironment { dev, prod }
 
+enum FirebasePlatform { web, android, ios }
+
+/// One platform's Firebase client configuration, which
+/// `cloud/agent/infra/firebase.sh --app-config` writes into the ignored
+/// config file. It is not a secret, but its API key stays out of the repo
+/// with the rest of the build configuration. Never log the key.
+final class FirebaseClientConfig {
+  const FirebaseClientConfig._({
+    required this.projectId,
+    required this.messagingSenderId,
+    required this.apiKey,
+    required this.appId,
+  });
+
+  /// Null unless every value is present.
+  static FirebaseClientConfig? from({
+    String? projectId,
+    String? messagingSenderId,
+    String? apiKey,
+    String? appId,
+  }) {
+    final values = [
+      projectId,
+      messagingSenderId,
+      apiKey,
+      appId,
+    ].map((value) => (value ?? '').trim()).toList(growable: false);
+    if (values.any((value) => value.isEmpty)) return null;
+    return FirebaseClientConfig._(
+      projectId: values[0],
+      messagingSenderId: values[1],
+      apiKey: values[2],
+      appId: values[3],
+    );
+  }
+
+  final String projectId;
+  final String messagingSenderId;
+  final String apiKey;
+  final String appId;
+}
+
 /// Build-time configuration.
 ///
 /// Values come from `--dart-define-from-file=config/<env>.json`; see
@@ -23,6 +65,14 @@ final class Env {
     String? googleMapsWebApiKey,
     String? googleMapsMapId,
     String? agentDevToken,
+    String? firebaseProjectId,
+    String? firebaseMessagingSenderId,
+    String? firebaseWebApiKey,
+    String? firebaseWebAppId,
+    String? firebaseAndroidApiKey,
+    String? firebaseAndroidAppId,
+    String? firebaseIosApiKey,
+    String? firebaseIosAppId,
   }) {
     _requireServiceUrl(agentBaseUrl, 'AGENT_BASE_URL');
     _requireServiceUrl(mapBaseUrl, 'MAP_BASE_URL');
@@ -34,6 +84,19 @@ final class Env {
     if (environment == AppEnvironment.prod && devToken.isNotEmpty) {
       throw ArgumentError('AGENT_DEV_TOKEN is development-only.');
     }
+    final firebase = {
+      for (final (platform, apiKey, appId) in [
+        (FirebasePlatform.web, firebaseWebApiKey, firebaseWebAppId),
+        (FirebasePlatform.android, firebaseAndroidApiKey, firebaseAndroidAppId),
+        (FirebasePlatform.ios, firebaseIosApiKey, firebaseIosAppId),
+      ])
+        platform: ?FirebaseClientConfig.from(
+          projectId: firebaseProjectId,
+          messagingSenderId: firebaseMessagingSenderId,
+          apiKey: apiKey,
+          appId: appId,
+        ),
+    };
     return Env._(
       environment: environment,
       agentBaseUrl: agentBaseUrl,
@@ -42,6 +105,7 @@ final class Env {
       googleMapsWebApiKey: (googleMapsWebApiKey ?? '').trim(),
       googleMapsMapId: (googleMapsMapId ?? '').trim(),
       agentDevToken: devToken,
+      firebase: firebase,
     );
   }
 
@@ -53,6 +117,7 @@ final class Env {
     required this.googleMapsWebApiKey,
     required this.googleMapsMapId,
     required this.agentDevToken,
+    required this.firebase,
   });
 
   /// The values this build was compiled with, with local-dev defaults.
@@ -83,6 +148,20 @@ final class Env {
     ),
     googleMapsMapId: const String.fromEnvironment('GOOGLE_MAPS_MAP_ID'),
     agentDevToken: const String.fromEnvironment('AGENT_DEV_TOKEN'),
+    firebaseProjectId: const String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    firebaseMessagingSenderId: const String.fromEnvironment(
+      'FIREBASE_MESSAGING_SENDER_ID',
+    ),
+    firebaseWebApiKey: const String.fromEnvironment('FIREBASE_WEB_API_KEY'),
+    firebaseWebAppId: const String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+    firebaseAndroidApiKey: const String.fromEnvironment(
+      'FIREBASE_ANDROID_API_KEY',
+    ),
+    firebaseAndroidAppId: const String.fromEnvironment(
+      'FIREBASE_ANDROID_APP_ID',
+    ),
+    firebaseIosApiKey: const String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    firebaseIosAppId: const String.fromEnvironment('FIREBASE_IOS_APP_ID'),
   );
 
   final AppEnvironment environment;
@@ -104,11 +183,16 @@ final class Env {
   /// Optional for the base 2D map. Required for advanced markers and 3D.
   final String googleMapsMapId;
 
-  /// A fixed bearer token for an agent service running in development mode
-  /// (its `AGENT_DEVELOPMENT_TOKEN`), until Firebase Anonymous Auth supplies
-  /// ID tokens (agent-protocol.md, Authentication). Empty in production, where
-  /// the constructor rejects it. Never log this value.
+  /// A fixed bearer token for an agent service running locally in
+  /// development mode (its `AGENT_DEVELOPMENT_TOKEN`), which accepts no
+  /// Firebase ID token. Empty in production, where the constructor rejects
+  /// it. Never log this value.
   final String agentDevToken;
+
+  /// The Firebase client configuration of each platform this build has one
+  /// for; the agent's ID tokens come from anonymous sign-in to that project
+  /// (agent-protocol.md, Authentication).
+  final Map<FirebasePlatform, FirebaseClientConfig> firebase;
 
   bool get isDev => environment == AppEnvironment.dev;
 

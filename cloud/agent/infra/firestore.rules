@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// No client reads or writes Firestore. The agent service reaches it through the Admin SDK
+// under its own identity, which these rules do not govern (system-design/AGENTS.md).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
