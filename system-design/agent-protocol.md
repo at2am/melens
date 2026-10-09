@@ -139,6 +139,8 @@ The chat panel shows the user's session list. The user can switch to an earlier 
 
 Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header. The Cloud Run service allows unauthenticated invocation at the platform level, because a browser cannot obtain an IAM token; the service itself verifies the Firebase ID token on every request and rejects a missing or invalid token before any model or tool call. This ties sessions to users and allows per-uid rate limiting, with counters in Firestore, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.
 
+Anonymous sign-in is the project's only provider, and Firestore's client rules deny every read and write (`cloud/agent/infra/firebase.sh`). The app waits for the Firebase SDK to restore its persisted user before it signs in, and signs in only when there is none, so a reload or restart keeps the uid and the user's sessions. A new browser or device, or cleared site data, is a new user. A development build may send the fixed development token instead, for an agent service running locally in development mode.
+
 ## Flutter implementation
 
 | Part | Responsibility |

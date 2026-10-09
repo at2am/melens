@@ -460,4 +460,13 @@ void main() {
     expect(find.byKey(const ValueKey('chat-error')), findsOneWidget);
     expect(find.textContaining('AGENT_DEV_TOKEN'), findsOneWidget);
   });
+
+  testWidgets('a failed sign-in is explained in the panel', (tester) async {
+    final client = FakeAgentClient()
+      ..listError = const AgentSignInFailedException();
+    await showPanel(tester, client);
+
+    expect(find.byKey(const ValueKey('chat-error')), findsOneWidget);
+    expect(find.textContaining('Could not sign in'), findsOneWidget);
+  });
 }

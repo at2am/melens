@@ -22,6 +22,7 @@ String chatInputText(AppLocalizations strings, TurnInput input) =>
 String chatErrorText(AppLocalizations strings, ChatError error) =>
     switch (error.kind) {
       ChatErrorKind.signIn => strings.chatErrorSignIn,
+      ChatErrorKind.signInFailed => strings.chatErrorSignInFailed,
       ChatErrorKind.network => strings.chatErrorNetwork,
       ChatErrorKind.timeout => strings.chatErrorTimeout,
       ChatErrorKind.http => switch (error.code) {

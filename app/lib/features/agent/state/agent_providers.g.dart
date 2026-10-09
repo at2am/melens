@@ -8,11 +8,65 @@ part of 'agent_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Anonymous Firebase sign-in on this platform; null when the build has no
+/// Firebase configuration for it. Tests override it.
+
+@ProviderFor(anonymousSignIn)
+final anonymousSignInProvider = AnonymousSignInProvider._();
+
+/// Anonymous Firebase sign-in on this platform; null when the build has no
+/// Firebase configuration for it. Tests override it.
+
+final class AnonymousSignInProvider
+    extends
+        $FunctionalProvider<
+          AnonymousSignIn?,
+          AnonymousSignIn?,
+          AnonymousSignIn?
+        >
+    with $Provider<AnonymousSignIn?> {
+  /// Anonymous Firebase sign-in on this platform; null when the build has no
+  /// Firebase configuration for it. Tests override it.
+  AnonymousSignInProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'anonymousSignInProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$anonymousSignInHash();
+
+  @$internal
+  @override
+  $ProviderElement<AnonymousSignIn?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  AnonymousSignIn? create(Ref ref) {
+    return anonymousSignIn(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AnonymousSignIn? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AnonymousSignIn?>(value),
+    );
+  }
+}
+
+String _$anonymousSignInHash() => r'9c89d182ebdb9eb8d4b6f2f0d0747a7878c7bd52';
+
 /// Where the agent's bearer token comes from.
 ///
-/// Until Firebase Anonymous Auth is set up (app README, Not set up yet), a
-/// development build sends the fixed token the agent service accepts in
-/// development mode. A build without one makes every agent call fail with
+/// A development token goes first: a local agent in development mode accepts
+/// nothing else. Otherwise the token is the ID token of the anonymous
+/// Firebase user. A build with neither makes every agent call fail with
 /// [AgentSignInException], which the chat panel explains.
 
 @ProviderFor(agentTokenSource)
@@ -20,9 +74,9 @@ final agentTokenSourceProvider = AgentTokenSourceProvider._();
 
 /// Where the agent's bearer token comes from.
 ///
-/// Until Firebase Anonymous Auth is set up (app README, Not set up yet), a
-/// development build sends the fixed token the agent service accepts in
-/// development mode. A build without one makes every agent call fail with
+/// A development token goes first: a local agent in development mode accepts
+/// nothing else. Otherwise the token is the ID token of the anonymous
+/// Firebase user. A build with neither makes every agent call fail with
 /// [AgentSignInException], which the chat panel explains.
 
 final class AgentTokenSourceProvider
@@ -35,9 +89,9 @@ final class AgentTokenSourceProvider
     with $Provider<AgentTokenSource> {
   /// Where the agent's bearer token comes from.
   ///
-  /// Until Firebase Anonymous Auth is set up (app README, Not set up yet), a
-  /// development build sends the fixed token the agent service accepts in
-  /// development mode. A build without one makes every agent call fail with
+  /// A development token goes first: a local agent in development mode accepts
+  /// nothing else. Otherwise the token is the ID token of the anonymous
+  /// Firebase user. A build with neither makes every agent call fail with
   /// [AgentSignInException], which the chat panel explains.
   AgentTokenSourceProvider._()
     : super(
@@ -72,7 +126,7 @@ final class AgentTokenSourceProvider
   }
 }
 
-String _$agentTokenSourceHash() => r'456226ac3b667928e27a7e7d98375ebb042e242a';
+String _$agentTokenSourceHash() => r'11d07936b4a2ebd5d51d331d5a30e083a8b43ac2';
 
 /// Tests override this with a scripted [AgentClient].
 

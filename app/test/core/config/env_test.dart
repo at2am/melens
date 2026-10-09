@@ -66,6 +66,25 @@ void main() {
     );
   });
 
+  test('a platform has a Firebase configuration only with every key', () {
+    final env = Env(
+      environment: AppEnvironment.prod,
+      agentBaseUrl: Uri.parse('https://agent.example'),
+      mapBaseUrl: Uri.parse('https://map.example'),
+      firebaseProjectId: ' melens-test ',
+      firebaseMessagingSenderId: '1234',
+      firebaseWebApiKey: 'web-key',
+      firebaseWebAppId: '1:1234:web:abc',
+      firebaseAndroidApiKey: 'android-key',
+      firebaseAndroidAppId: '  ',
+    );
+    expect(env.firebase.keys, [FirebasePlatform.web]);
+    final web = env.firebase[FirebasePlatform.web]!;
+    expect(web.projectId, 'melens-test');
+    expect(web.apiKey, 'web-key');
+    expect(createEnv().firebase, isEmpty);
+  });
+
   test('key readiness ignores whitespace without exposing key contents', () {
     expect(createEnv(key: '   ').hasGoogleMapsWebApiKey, isFalse);
     expect(

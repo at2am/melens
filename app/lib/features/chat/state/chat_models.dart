@@ -7,7 +7,11 @@ enum ChatTurnPhase { running, done, failed, cancelled }
 
 /// Why an agent call failed, for the panel to explain in its own words.
 enum ChatErrorKind {
+  /// This build has no way to obtain an agent token.
   signIn,
+
+  /// Signing in for a token failed; trying again may work.
+  signInFailed,
   network,
   timeout,
   http,
@@ -32,6 +36,10 @@ final class ChatError {
     AgentSignInException() => const ChatError(
       kind: ChatErrorKind.signIn,
       retryable: false,
+    ),
+    AgentSignInFailedException() => const ChatError(
+      kind: ChatErrorKind.signInFailed,
+      retryable: true,
     ),
     AgentNetworkException() => const ChatError(
       kind: ChatErrorKind.network,

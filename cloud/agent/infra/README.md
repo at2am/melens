@@ -27,12 +27,9 @@ Maps key grant is expected after deployment. Enabling a TTL policy is a long-run
 operation; the apply waits for it, and a `CREATING` state in `--verify` only means that
 wait is still in progress.
 
-The script does not manage Firestore security rules. The project is not registered with
-Firebase, so no client SDK can reach the database and no Firebase ID token exists; only
-the agent identity and project owners reach it through IAM. Registering the project with
-Firebase, enabling Anonymous Auth and deploying client rules that deny all access is
-the app's Firebase setup, and must happen before the deployed agent service can serve
-the app.
+The script does not manage Firestore security rules; `firebase.sh` does
+([Firebase](#firebase)). Only the agent identity and project owners reach the database
+through IAM, and the rules deny every client.
 
 The Vertex AI location is not a bootstrap resource. It is recorded in the deployment
 configuration as `AGENT_VERTEX_LOCATION` ([../README.md](../README.md#configuration)).
@@ -147,6 +144,59 @@ Checks on the deployed service:
 | Preflight from `http://localhost:8000` | 204, with that origin, `Authorization` allowed |
 | Preflight from another origin | 400 |
 
-A real turn under `melens-dev-agent` is still required for acceptance. It needs a Firebase
-ID token, and the project is not registered with Firebase yet. Until then the app cannot use
-the deployed service; local development keeps `npm run dev` with the development token.
+A real turn under `melens-dev-agent` was still required for acceptance; it ran the same day
+with an anonymous Firebase user ([Firebase](#firebase)).
+
+## Firebase
+
+`firebase.sh` registers the project with Firebase for the app's sign-in. It plans by
+default, `--verify` is a read-only audit and `--apply --confirm-project` creates what is
+missing and then audits. It accepts `melens-510012` only, calls the Firebase Management,
+Identity Toolkit and Firebase Rules APIs with the CLI user's gcloud token, grants no IAM
+role and never prints an API key.
+
+```sh
+cloud/agent/infra/firebase.sh --project melens-510012
+cloud/agent/infra/firebase.sh --project melens-510012 --verify --app-config app/config/dev.json
+cloud/agent/infra/firebase.sh --project melens-510012 --apply --confirm-project melens-510012
+```
+
+| Resource | State the audit requires |
+| --- | --- |
+| APIs | Firebase Management, Identity Toolkit, Secure Token, Firebase Rules, API Keys |
+| Firebase | The project is an active Firebase project |
+| Auth | Anonymous sign-in on. Email, phone and every identity provider off |
+| Apps | One Web app, one Android app and one iOS app, the mobile ones for `com.at2am.melens` |
+| Firestore rules | The `cloud.firestore` release serves [`firestore.rules`](firestore.rules), which denies every client read and write |
+
+`--app-config FILE` writes the eight `FIREBASE_*` keys of the three apps into that file
+after a passing audit, keeping its other keys. The file must be an ignored JSON file under
+`app/config`; the script prints only the key names. Firebase created one API key per
+platform, restricted to Firebase APIs but not to an app or a referrer. They are client
+configuration, not secrets, and stay out of the repo with the rest of the build
+configuration (hard rule 5).
+
+Anyone can create anonymous users, so the per-uid rate limit does not cap total use;
+Identity Toolkit limits sign-ups per IP address. App Check would tie tokens to the real
+app and is not set up.
+
+### 2026-10-09 setup
+
+Applied to `melens-510012`. The apply enabled the five APIs, added Firebase, initialized
+Auth (`identityPlatform:initializeAuth`), turned on anonymous sign-in, registered `Melens
+Web`, `Melens Android` and `Melens iOS` and released the deny-all rules. Creating the
+third app hit the per-minute provisioning quota once; the script now retries on 429.
+`--verify` passes. The authorized domains are `melens-510012.firebaseapp.com` and
+`melens-510012.web.app`; anonymous sign-in does not check them, and a Hosting domain or
+`localhost` is added only when a popup or redirect sign-in needs it.
+
+Checks the same day:
+
+| Check | Result |
+| --- | --- |
+| Anonymous sign-up through the Identity Toolkit REST API, then a turn on the deployed `melens-dev-agent` | 200; the token was accepted; the turn ran under the service identity in 107 s (4 model calls, a card) and was stored in Firestore; the session list and the session read it back |
+| A second anonymous user reads the first user's session | 404 `notFound` |
+| The built Web app in headless Chrome at `http://localhost:8000` against the deployed service | Opening the chat signed up once and listed sessions with the ID token; no console errors |
+| A session saved for that user, then a page reload | No new sign-up, the same uid from IndexedDB, and the saved session listed and reopened |
+
+The test sessions and users were deleted afterwards; the project had no Auth users left.

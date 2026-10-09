@@ -992,7 +992,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatErrorSignIn =>
-      'Agent sign-in is not configured. Set AGENT_DEV_TOKEN in config/dev.json for local development.';
+      'Agent sign-in is not configured. Add the FIREBASE_ keys to config/dev.json (cloud/agent/infra/firebase.sh --app-config), or AGENT_DEV_TOKEN for a local agent.';
+
+  @override
+  String get chatErrorSignInFailed =>
+      'Could not sign in to the agent service. Try again.';
 
   @override
   String get chatErrorNetwork => 'The agent service could not be reached.';
