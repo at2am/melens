@@ -89,7 +89,7 @@ The authorized views carry their reviewed access to ingestion tables. The query 
 
 ## Run the live entrypoint
 
-After building, run `node dist/src/server.js` with validated `MAP_PROJECT_ID`,
+`npm run dev` in `cloud/` builds and runs this service on 8081 together with the agent service on 8080, with the reviewed development settings ([agent README](../agent/README.md#local-commands)). By hand: after building, run `node dist/src/server.js` with validated `MAP_PROJECT_ID`,
 `MAP_ALLOWED_ORIGINS` (comma-separated exact origins) and
 `MAP_PUBLIC_SOURCES_FILE` (reviewed public URL/attribution registry).
 `PORT` defaults to8080; set8081 for the app's local map-service URL. Cloud Run supplies8080. Startup binds

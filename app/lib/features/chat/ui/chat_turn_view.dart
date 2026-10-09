@@ -57,9 +57,37 @@ String _outcomeLabel(AppLocalizations strings, MapActionOutcome outcome) =>
       MapActionOutcome.restored => strings.chatActionRestored,
     };
 
-/// One exchange: the user's input, then what the agent streamed back in the
-/// order it arrived: status lines, text, UI actions, cards, a question, the
-/// usage line and any error.
+/// The tool error codes of tools.md, in the user's words; an unknown code is
+/// shown as sent.
+String _toolErrorLabel(AppLocalizations strings, String code) => switch (code) {
+  'invalid_arguments' => strings.chatToolErrorInvalidArguments,
+  'not_found' => strings.chatToolErrorNotFound,
+  'not_an_anomaly' => strings.chatToolErrorNotAnAnomaly,
+  'unverified_sources' => strings.chatToolErrorUnverifiedSources,
+  'route_not_found' => strings.chatToolErrorRouteNotFound,
+  'upstream_unavailable' => strings.chatToolErrorUpstreamUnavailable,
+  _ => strings.chatStepFailed(code),
+};
+
+String _durationLabel(AppLocalizations strings, int durationMs) =>
+    durationMs >= 1000
+    ? strings.chatStepSeconds((durationMs / 1000).toStringAsFixed(1))
+    : strings.chatStepMillis(durationMs);
+
+IconData _outcomeIcon(MapActionOutcome outcome) => switch (outcome) {
+  MapActionOutcome.applied => Icons.check,
+  MapActionOutcome.partial => Icons.rule,
+  MapActionOutcome.ignored => Icons.block,
+  MapActionOutcome.unsupported => Icons.construction_outlined,
+  MapActionOutcome.restored => Icons.history,
+};
+
+/// One exchange: the user's input, then what the agent did in the order it
+/// happened. Each tool call is a step row that shows a spinner while it runs
+/// and its result afterwards; the answer text appears around the steps as
+/// it streamed; a Thinking or Writing line shows while the turn runs with no
+/// step in progress. Cards, the question, the usage line and any error
+/// follow.
 class ChatTurnView extends StatelessWidget {
   const ChatTurnView({
     required this.turn,
@@ -93,6 +121,7 @@ class ChatTurnView extends StatelessWidget {
         onAnswer != null;
     final error = turn.error;
     final usage = turn.usage;
+    final unattached = turn.unattachedActions;
     return Padding(
       key: ValueKey('chat-turn-${turn.localId}'),
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -117,53 +146,13 @@ class ChatTurnView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          for (final status in turn.statuses)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Row(
-                children: [
-                  Icon(Icons.bolt, size: 14, color: colors.tertiary),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      status,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (turn.isRunning && turn.text.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(strings.chatThinking, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-          if (turn.text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: SelectableText(
-                turn.text,
-                key: ValueKey('chat-answer-${turn.localId}'),
-              ),
-            ),
-          if (turn.actions.isNotEmpty)
+          ..._timeline(strings, theme),
+          if (unattached.isNotEmpty)
             Wrap(
               spacing: 6,
               runSpacing: 4,
               children: [
-                for (final record in turn.actions)
+                for (final record in unattached)
                   Tooltip(
                     message: record.report.skipped.isEmpty
                         ? ''
@@ -171,14 +160,10 @@ class ChatTurnView extends StatelessWidget {
                             record.report.skipped.join(', '),
                           ),
                     child: Chip(
-                      avatar: Icon(switch (record.report.outcome) {
-                        MapActionOutcome.applied => Icons.check,
-                        MapActionOutcome.partial => Icons.rule,
-                        MapActionOutcome.ignored => Icons.block,
-                        MapActionOutcome.unsupported =>
-                          Icons.construction_outlined,
-                        MapActionOutcome.restored => Icons.history,
-                      }, size: 16),
+                      avatar: Icon(
+                        _outcomeIcon(record.report.outcome),
+                        size: 16,
+                      ),
                       label: Text(
                         '${_actionLabel(strings, record.action.action)} · '
                         '${_outcomeLabel(strings, record.report.outcome)}',
@@ -286,6 +271,153 @@ class ChatTurnView extends StatelessWidget {
     );
   }
 
+  /// Steps and text in arrival order: the text that had streamed when a step
+  /// started goes before it, the rest after the last step.
+  List<Widget> _timeline(AppLocalizations strings, ThemeData theme) {
+    final widgets = <Widget>[];
+    final text = turn.text;
+    var cursor = 0;
+    for (final step in turn.steps) {
+      final offset = step.textOffset.clamp(cursor, text.length);
+      if (offset > cursor) {
+        widgets.add(_answer(text.substring(cursor, offset), cursor));
+        cursor = offset;
+      }
+      widgets.add(
+        _StepRow(
+          key: ValueKey('chat-step-${turn.localId}-${step.id}'),
+          step: step,
+        ),
+      );
+    }
+    if (text.length > cursor) {
+      widgets.add(_answer(text.substring(cursor), cursor));
+    }
+    if (turn.isThinking) {
+      widgets.add(
+        Padding(
+          key: ValueKey('chat-progress-${turn.localId}'),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                turn.isWriting ? strings.chatWriting : strings.chatThinking,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  Widget _answer(String text, int offset) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: SelectableText(
+      text,
+      key: ValueKey('chat-answer-${turn.localId}-$offset'),
+    ),
+  );
+
   static String _count(int value) =>
       NumberFormat.decimalPattern('en_AU').format(value);
+}
+
+/// One tool call: its state as an icon, the status line with the argument
+/// summary, and on the right what it returned: rows, the UI action outcome,
+/// "reused", the duration, or the error.
+class _StepRow extends StatelessWidget {
+  const _StepRow({required this.step, super.key});
+
+  final ChatStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final action = step.action;
+    final error = step.error;
+    final results = <String>[
+      if (error != null)
+        _toolErrorLabel(strings, error)
+      else ...[
+        if (step.rows case final rows?) strings.chatStepRows(rows),
+        if (action != null) _outcomeLabel(strings, action.report.outcome),
+        if (step.memo) strings.chatStepMemo,
+      ],
+      if (step.durationMs case final durationMs? when !step.memo)
+        _durationLabel(strings, durationMs),
+    ];
+    final Widget leading = switch (step.state) {
+      AgentStepState.running => const CircularProgressIndicator(strokeWidth: 2),
+      AgentStepState.done => Icon(
+        action == null
+            ? Icons.check_circle_outline
+            : _outcomeIcon(action.report.outcome),
+        size: 16,
+        color: colors.tertiary,
+      ),
+      AgentStepState.failed => Icon(
+        Icons.error_outline,
+        size: 16,
+        color: colors.error,
+      ),
+    };
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: Center(child: leading),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: step.text),
+                  if (step.detail case final detail?)
+                    TextSpan(
+                      text: ' · $detail',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                ],
+              ),
+              style: theme.textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (results.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Text(
+              results.join(' · '),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: error == null ? colors.onSurfaceVariant : colors.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (action == null || action.report.skipped.isEmpty) return row;
+    return Tooltip(
+      message: strings.chatActionSkipped(action.report.skipped.join(', ')),
+      child: row,
+    );
+  }
 }

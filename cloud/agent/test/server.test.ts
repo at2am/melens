@@ -78,10 +78,10 @@ test('sessions are created, listed, read and deleted per user', async () => {
 
 test('a turn streams numbered events and is stored with its question', async () => {
   const { call, close } = await start(scriptedRunner((turn) => {
-    turn.sink.emit({ event: 'status', text: 'Searching the map' });
+    turn.sink.emit({ event: 'status', stepId: 's_1', state: 'running', tool: 'search_features', text: 'Searching the map' });
     turn.sink.emit({ event: 'text', delta: 'Hello ' });
     turn.sink.emit({ event: 'text', delta: 'there.' });
-    turn.sink.emit({ event: 'question', question: { id: 'q_1', text: 'Which garden?', options: ['Fitzroy', 'Carlton'], allowFreeText: true } });
+    turn.sink.emit({ event: 'question', stepId: 's_2', question: { id: 'q_1', text: 'Which garden?', options: ['Fitzroy', 'Carlton'], allowFreeText: true } });
     turn.sink.emit({ event: 'done', stop: 'asked', usage: { ...zeroUsage(), calls: 1, input: 5, output: 2, total: 7, complete: true } });
   }));
   try {

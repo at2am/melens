@@ -97,13 +97,21 @@ export const questionSchema = z.strictObject({
 });
 export type Question = z.infer<typeof questionSchema>;
 
+/** Where a tool call is: `running` when it starts, then `done` or `failed` (a tool error) when it ends. */
+export const stepStateSchema = z.enum(['running', 'done', 'failed']);
+export type StepState = z.infer<typeof stepStateSchema>;
+
 const envelope = { turnId: identifierSchema, seq: count };
+/** Every tool call is one step; the events it produces carry the same `stepId`. */
+const step = { stepId: identifierSchema };
 export const agentEventSchema = z.discriminatedUnion('event', [
-  z.strictObject({ ...envelope, event: z.literal('status'), text: z.string().min(1).max(200) }),
+  z.strictObject({ ...envelope, ...step, event: z.literal('status'), state: stepStateSchema, tool: z.string().min(1).max(60),
+    text: z.string().min(1).max(200), detail: z.string().min(1).max(200).optional(), rows: count.optional(),
+    error: z.string().min(1).max(80).optional(), durationMs: count.optional(), memo: z.boolean().optional() }),
   z.strictObject({ ...envelope, event: z.literal('text'), delta: z.string().min(1) }),
-  z.strictObject({ ...envelope, event: z.literal('ui_action'), action: uiActionNameSchema, args: z.record(z.string(), z.unknown()) }),
-  z.strictObject({ ...envelope, event: z.literal('card'), card: cardSchema }),
-  z.strictObject({ ...envelope, event: z.literal('question'), question: questionSchema }),
+  z.strictObject({ ...envelope, ...step, event: z.literal('ui_action'), action: uiActionNameSchema, args: z.record(z.string(), z.unknown()) }),
+  z.strictObject({ ...envelope, ...step, event: z.literal('card'), card: cardSchema }),
+  z.strictObject({ ...envelope, ...step, event: z.literal('question'), question: questionSchema }),
   z.strictObject({ ...envelope, event: z.literal('usage'), call: callUsageSchema, turn: turnUsageSchema }),
   z.strictObject({ ...envelope, event: z.literal('done'), stop: stopReasonSchema, usage: finalUsageSchema }),
   z.strictObject({ ...envelope, event: z.literal('error'), message: z.string().min(1).max(300), retryable: z.boolean(), usage: finalUsageSchema }),
@@ -112,10 +120,16 @@ export type AgentEvent = z.infer<typeof agentEventSchema>;
 /** What a producer hands the stream; the stream adds the envelope. */
 export type AgentEventBody = AgentEvent extends infer E ? E extends AgentEvent ? Omit<E, 'turnId' | 'seq'> : never : never;
 
-/** One line of the compact tool trace stored with a turn and shown in the eval. */
+/**
+ * One line of the compact tool trace stored with a turn and shown in the eval: the tool, its arguments, the
+ * status line and argument summary the app showed, the row count, the error code and the duration. `memo`
+ * marks a read-only call answered from an earlier identical call. `detail` and `memo` default for turns
+ * stored before they existed.
+ */
 export const traceEntrySchema = z.strictObject({
   tool: z.string().min(1), args: z.record(z.string(), z.unknown()), status: z.string().max(200).nullable(),
-  rows: count.nullable(), error: z.string().max(80).nullable(), durationMs: count,
+  detail: z.string().max(200).nullable().default(null), rows: count.nullable(), error: z.string().max(80).nullable(),
+  durationMs: count, memo: z.boolean().default(false),
 });
 export type TraceEntry = z.infer<typeof traceEntrySchema>;
 

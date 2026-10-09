@@ -25,7 +25,7 @@ Shows the agent calling several tools to build a plan around the user's time, in
 ## Behaviour
 
 1. The user asks in the chat.
-2. `map_agent`, following the UC-03 playbook, finds candidates: events from the events layer for story 1, free places and activities for story 2, and Maps grounding for place details.
+2. `map_agent`, following the UC-03 playbook, finds candidates: events from the events layer for story 1, free places and activities for story 2, and Maps grounding only for stops the layers do not have, such as a café or a park.
 3. For a walk, it builds a route with the Maps grounding route capability (up to 13 waypoints) and calls `draw_route`, so the app draws it on the map.
 4. The plan arrives as a `plan` card, with times, stops and a source for each item.
 

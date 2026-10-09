@@ -39,7 +39,7 @@ test('a plain answer streams text deltas once and reports one usage event per mo
   assert.equal(llm.seen[0]?.contents.at(-1)?.parts?.[1]?.text, 'hi');
 });
 
-test('a tool call sends its status, the result reaches the next model call, and usage sums over calls', async () => {
+test('a tool call sends a running and a done status, the result reaches the next model call, and usage sums over calls', async () => {
   const llm = new ScriptedLlm([
     () => functionCall('search_features', { area: { center: { lat: -37.8136, lng: 144.9631 }, radius_m: 1500 }, layers: ['event'] }, usage(200, 20)),
     (request) => {
@@ -51,10 +51,16 @@ test('a tool call sends its status, the result reaches the next model call, and 
   const { runner: run, reader } = runner(llm);
   const stored = await run.run(turn);
   // The tool call's usage arrives on the trailing response, after the tool ran; it is still one model call.
-  assert.deepEqual(kinds(turn.sink.sent), ['status', 'usage', 'text', 'text', 'usage', 'done']);
+  assert.deepEqual(kinds(turn.sink.sent), ['status', 'status', 'usage', 'text', 'text', 'usage', 'done']);
+  const [running, done] = turn.sink.sent;
+  assert.deepEqual(running, { event: 'status', turnId: 't_test', seq: 0, stepId: 's_t_test_1', state: 'running', tool: 'search_features',
+    text: 'Searching the map', detail: 'events · within 1.5 km' });
+  assert.deepEqual(done, { event: 'status', turnId: 't_test', seq: 1, stepId: 's_t_test_1', state: 'done', tool: 'search_features',
+    text: 'Searching the map', detail: 'events · within 1.5 km', rows: 2, durationMs: 0 });
   assert.equal(stored.text, 'Found 2 events; first event:2.', 'sorted by distance from the centre');
   assert.deepEqual(reader.queries, [{ layers: ['event'] }]);
-  assert.deepEqual(stored.trace.map((entry) => [entry.tool, entry.rows, entry.error]), [['search_features', 2, null]]);
+  assert.deepEqual(stored.trace, [{ tool: 'search_features', args: { area: { center: { lat: -37.8136, lng: 144.9631 }, radius_m: 1500 }, layers: ['event'] },
+    status: 'Searching the map', detail: 'events · within 1.5 km', rows: 2, error: null, durationMs: 0, memo: false }]);
   assert.equal(stored.usage.calls, 2);
   assert.equal(stored.usage.total, 632);
   assert.deepEqual(stored.usage.perCall.map((call) => [call.index, call.total]), [[1, 220], [2, 412]]);
@@ -87,10 +93,16 @@ test('show_card rejects sources no tool returned, then accepts a searched featur
   ]);
   const turn = turnContext('what is on tonight?');
   const stored = await runner(llm).runner.run(turn);
-  assert.deepEqual(kinds(turn.sink.sent), ['usage', 'status', 'usage', 'card', 'usage', 'text', 'text', 'usage', 'done']);
+  // A rejected card is a failed step; the accepted one sends its card between its running and done status.
+  assert.deepEqual(kinds(turn.sink.sent), ['status', 'status', 'usage', 'status', 'status', 'usage', 'status', 'card', 'status', 'usage', 'text', 'text', 'usage', 'done']);
+  const failed = turn.sink.sent[1];
+  assert.equal(failed?.event === 'status' && failed.state === 'failed' && failed.error === 'unverified_sources' && failed.detail === '"Tonight" · 1 item', true);
+  const card = turn.sink.sent[7];
+  assert.equal(card?.event === 'card' && card.stepId === 's_t_test_3', true);
   assert.equal(stored.cards.length, 1);
   assert.equal(stored.cards[0]?.id, 'c_t_test_1');
   assert.deepEqual(stored.trace.map((entry) => entry.error), ['unverified_sources', null, null]);
+  assert.deepEqual(stored.trace.map((entry) => entry.detail), ['"Tonight" · 1 item', 'events · in an area', '"Tonight" · 2 items']);
 });
 
 test('ask_user sends the question and ends the turn without another model call', async () => {
@@ -99,7 +111,9 @@ test('ask_user sends the question and ends the turn without another model call',
   ]);
   const turn = turnContext('take me to the gardens');
   const stored = await runner(llm).runner.run(turn);
-  assert.deepEqual(kinds(turn.sink.sent), ['question', 'usage', 'done']);
+  assert.deepEqual(kinds(turn.sink.sent), ['status', 'question', 'status', 'usage', 'done']);
+  const question = turn.sink.sent[1];
+  assert.equal(question?.event === 'question' && question.stepId === 's_t_test_1', true);
   assert.equal(stored.stop, 'asked');
   assert.equal(stored.question?.text, 'Which gardens?');
   assert.equal(llm.seen.length, 1);
@@ -149,8 +163,35 @@ test('identical read-only calls are answered from the memo without a second quer
   const { runner: run, reader } = runner(llm);
   const stored = await run.run(turn);
   assert.equal(reader.queries.length, 1);
-  assert.deepEqual(stored.trace.map((entry) => entry.status), ['Searching the map', 'memo']);
-  assert.equal(kinds(turn.sink.sent).filter((kind) => kind === 'status').length, 1);
+  assert.deepEqual(stored.trace.map((entry) => [entry.status, entry.memo, entry.rows]), [['Searching the map', false, 2], ['Searching the map', true, 2]]);
+  // The memo hit is an instant step: one done status, no running one.
+  const statuses = turn.sink.sent.flatMap((event) => event.event === 'status' ? [[event.stepId, event.state, event.memo ?? false]] : []);
+  assert.deepEqual(statuses, [['s_t_test_1', 'running', false], ['s_t_test_1', 'done', false], ['s_t_test_2', 'done', true]]);
+});
+
+test('a grounding call that outlives its timeout returns upstream_unavailable and the turn goes on', async () => {
+  let aborted = false;
+  const grounding = { ground: (request: { signal: AbortSignal }) => new Promise<never>((_resolve, reject) => {
+    request.signal.addEventListener('abort', () => { aborted = true; reject(request.signal.reason as Error); });
+  }) };
+  const llm = new ScriptedLlm([
+    () => functionCall('maps_grounding', { question: 'Opening hours of the State Library' }, usage(100, 10)),
+    (request) => {
+      const response = request.contents.at(-1)?.parts?.[0]?.functionResponse?.response as { error: { code: string; message: string; details: { timeoutMs: number } } };
+      assert.equal(response.error.code, 'upstream_unavailable');
+      assert.match(response.error.message, /did not answer within 0 seconds/);
+      assert.equal(response.error.details.timeoutMs, 20);
+      return streamedText('Google Maps did not answer in time.', usage(150, 8));
+    },
+  ]);
+  const turn = turnContext('when does the library open?');
+  const stored = await createMapAgentRunner({ model: llm, maxModelCalls: 16, tools: { features: fakeReader([]), grounding, groundingTimeoutMs: 20 },
+    clock: () => new Date('2026-10-10T07:40:00Z') }).run(turn);
+  assert.equal(aborted, true, 'the timeout aborted the grounding call');
+  assert.equal(stored.text, 'Google Maps did not answer in time.');
+  assert.deepEqual(stored.trace.map((entry) => [entry.tool, entry.error]), [['maps_grounding', 'upstream_unavailable']]);
+  const failed = turn.sink.sent.find((event) => event.event === 'status' && event.state === 'failed');
+  assert.equal(failed?.event === 'status' && failed.error === 'upstream_unavailable', true);
 });
 
 test('the pending question and stored history reach the model', async () => {

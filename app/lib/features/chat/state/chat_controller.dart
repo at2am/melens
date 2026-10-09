@@ -228,20 +228,19 @@ class ChatController extends _$ChatController {
     var next = turn.copyWith(turnId: event.turnId, lastSeq: event.seq);
     AgentQuestion? pending;
     switch (event) {
-      case AgentStatusEvent(:final text):
-        next = next.copyWith(statuses: [...next.statuses, text]);
+      case AgentStatusEvent():
+        next = next.copyWith(steps: _mergeStep(next, event));
       case AgentTextEvent(:final delta):
         next = next.copyWith(text: next.text + delta);
-      case AgentUiActionEvent(:final action, :final args):
+      case AgentUiActionEvent(:final stepId, :final action, :final args):
         final uiAction = UiAction(action: action, args: args);
         final report = ref
             .read(mapActionsControllerProvider.notifier)
             .apply(uiAction);
+        final record = ChatActionRecord(action: uiAction, report: report);
         next = next.copyWith(
-          actions: [
-            ...next.actions,
-            ChatActionRecord(action: uiAction, report: report),
-          ],
+          actions: [...next.actions, record],
+          steps: _attachAction(next.steps, stepId, record),
         );
       case AgentCardEvent(:final card):
         next = next.copyWith(cards: [...next.cards, card]);
@@ -273,6 +272,38 @@ class ChatController extends _$ChatController {
       turns: [...turns.sublist(0, turns.length - 1), next],
       pendingQuestion: pending,
     );
+  }
+
+  /// The running step with this id takes the finished event's fields; a new
+  /// id starts a step at the current text length, so the view can place it.
+  static List<ChatStep> _mergeStep(ChatTurn turn, AgentStatusEvent event) {
+    final index = turn.steps.indexWhere((step) => step.id == event.stepId);
+    final existing = index < 0 ? null : turn.steps[index];
+    final step = ChatStep(
+      id: event.stepId,
+      tool: event.tool,
+      text: event.text,
+      state: event.state,
+      detail: event.detail ?? existing?.detail,
+      rows: event.rows,
+      error: event.error,
+      durationMs: event.durationMs,
+      memo: event.memo,
+      textOffset: existing?.textOffset ?? turn.text.length,
+      action: existing?.action,
+    );
+    if (existing == null) return [...turn.steps, step];
+    return [...turn.steps]..[index] = step;
+  }
+
+  static List<ChatStep> _attachAction(
+    List<ChatStep> steps,
+    String stepId,
+    ChatActionRecord record,
+  ) {
+    final index = steps.indexWhere((step) => step.id == stepId);
+    if (index < 0) return steps;
+    return [...steps]..[index] = steps[index].copyWith(action: record);
   }
 
   void _finish(ChatError error) {
@@ -340,25 +371,65 @@ class ChatController extends _$ChatController {
     return null;
   }
 
-  ChatTurn _fromStored(StoredTurn turn) => ChatTurn(
-    localId: ++_nextLocalId,
-    input: turn.input,
-    turnId: turn.id,
-    phase: turn.stop == StopReason.cancelled
-        ? ChatTurnPhase.cancelled
-        : ChatTurnPhase.done,
-    statuses: [for (final entry in turn.trace) ?entry.status],
-    text: turn.text,
-    actions: [
+  /// The tools whose successful call stores one `ui_action`, in call order.
+  static const _uiActionTools = {
+    'show_layers',
+    'focus_map',
+    'draw_route',
+    'highlight_features',
+  };
+
+  /// A stored turn redraws as finished steps. The trace and the stored
+  /// actions are both in call order, so each successful UI action tool call
+  /// takes the next stored action.
+  ChatTurn _fromStored(StoredTurn turn) {
+    final actions = [
       for (final action in turn.uiActions)
         ChatActionRecord(
           action: action,
           report: const MapActionReport(MapActionOutcome.restored),
         ),
-    ],
-    cards: turn.cards,
-    question: turn.question,
-    usage: turn.usage,
-    stop: turn.stop,
-  );
+    ];
+    var nextAction = 0;
+    final steps = <ChatStep>[];
+    for (final (index, entry) in turn.trace.indexed) {
+      ChatActionRecord? action;
+      if (entry.error == null &&
+          _uiActionTools.contains(entry.tool) &&
+          nextAction < actions.length) {
+        action = actions[nextAction++];
+      }
+      steps.add(
+        ChatStep(
+          id: 'trace-$index',
+          tool: entry.tool,
+          text: entry.status ?? entry.tool,
+          state: entry.error == null
+              ? AgentStepState.done
+              : AgentStepState.failed,
+          detail: entry.detail,
+          rows: entry.rows,
+          error: entry.error,
+          durationMs: entry.durationMs,
+          memo: entry.memo,
+          action: action,
+        ),
+      );
+    }
+    return ChatTurn(
+      localId: ++_nextLocalId,
+      input: turn.input,
+      turnId: turn.id,
+      phase: turn.stop == StopReason.cancelled
+          ? ChatTurnPhase.cancelled
+          : ChatTurnPhase.done,
+      steps: steps,
+      text: turn.text,
+      actions: actions,
+      cards: turn.cards,
+      question: turn.question,
+      usage: turn.usage,
+      stop: turn.stop,
+    );
+  }
 }

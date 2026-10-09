@@ -6,7 +6,7 @@ The chat agent behind the map: one Node.js 24 Cloud Run service that verifies th
 
 | Area | State |
 | --- | --- |
-| Protocol | Every route of the protocol: session create/list/read/delete and the SSE turn route; `status`, `text`, `ui_action`, `card`, `question`, `usage`, `done` and `error` events with `turnId` and `seq` |
+| Protocol | Every route of the protocol: session create/list/read/delete and the SSE turn route; `status`, `text`, `ui_action`, `card`, `question`, `usage`, `done` and `error` events with `turnId` and `seq`. Every tool call is a step: a `running` status with the tool's status line and an argument summary, then a `done` or `failed` one with rows, duration and error; `ui_action`, `card` and `question` carry the step's `stepId` |
 | Loop | `map_agent` as an ADK `LlmAgent` per turn: streaming, at most 16 model calls with the wrap-up note on the second-to-last call and no tools on the last, two invalid calls in a row disable tools, identical read-only calls answered from a memo, `ask_user` ends the turn |
 | Token usage | One `usage` event per model call (one request, however many complete responses ADK's streaming aggregator yields for it), copied from the `usageMetadata` Gemini attaches to the trailing response; totals in `done` and stored with the turn; one structured log line per call |
 | Tools | `search_features`, `get_feature`, `nearby_context` over `@melens/shared` (the map's query runner, loaders and admission); `show_layers`, `focus_map`, `highlight_features`, `show_card` (source validation), `ask_user`; `maps_grounding` and `search_grounding` as one-shot grounded Gemini calls |
@@ -23,7 +23,16 @@ npm ci
 npm run test --workspace agent
 ```
 
-Tests inject a scripted `BaseLlm`, a fake feature reader and an in-memory session store, so they need no Google credentials. Running the service locally against Vertex AI needs Application Default Credentials with access to the project (`gcloud auth application-default login`) and the lowercase project id; without credentials every turn fails with a retryable `error` event and a `modelLoopFailed` log line naming the cause:
+Tests inject a scripted `BaseLlm`, a fake feature reader and an in-memory session store, so they need no Google credentials. Running the service locally against Vertex AI needs Application Default Credentials with access to the project (`gcloud auth application-default login`) and the lowercase project id; without credentials every turn fails with a retryable `error` event and a `modelLoopFailed` log line naming the cause.
+
+The whole local stack, built and started with the settings below, is one command from `cloud/` (`cloud/scripts/dev.mts`): the map service on 8081 and this service on 8080, both allowing the app origin `http://localhost:8000`. `MAP_PORT` and `AGENT_PORT` move a service, `--no-build` reuses the last build, and any service variable set in the environment overrides the script's default. It refuses to start while a port is taken and stops both services on Ctrl-C.
+
+```sh
+cd cloud
+npm run dev
+```
+
+To run this service by hand instead:
 
 ```sh
 cd cloud/agent
@@ -48,6 +57,7 @@ Development mode keeps sessions in memory and accepts `Authorization: Bearer dev
 | `AGENT_PUBLIC_SOURCES_FILE` | The reviewed public source registry (the map's `infra/dev-public-sources.json`); falls back to `MAP_PUBLIC_SOURCES_FILE` |
 | `AGENT_MAX_MODEL_CALLS` | `16` |
 | `AGENT_TURN_TIMEOUT_MS` | `300000` |
+| `AGENT_GROUNDING_TIMEOUT_MS` | `40000`. A `maps_grounding` or `search_grounding` call that takes longer returns `upstream_unavailable` to the model, which answers from the map data and says what is missing. Measured on 2026-10-09: Maps grounding took 48 to 110 s per call, Search grounding about 10 s |
 | `AGENT_TURNS_PER_HOUR` | `120` per uid, in memory per instance |
 | `MAP_*` | The shared query configuration ([cloud/map/README.md](../map/README.md#query-configuration)); `MAP_PROJECT_ID` defaults to the agent project |
 | `PORT` | `8080` |

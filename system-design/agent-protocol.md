@@ -22,10 +22,11 @@ The app has two base URLs: `MAP_BASE_URL` for the map query service and `AGENT_B
 Flutter                                  Cloud Run: agent service (ADK, TypeScript)
   │ POST /turns {input, context}  ─────────▶│ verify Firebase ID token, rate limit by uid
   │                                         │ route by input.kind: workflow or map_agent
-  │◀── status    "Checking nearby news…"     │ one per tool call
+  │◀── status    {state: "running", …}       │ a tool call starts: its status line and arguments
   │◀── text      streamed text               │
   │◀── ui_action focus_map / draw_route      │ when the agent calls a UI action tool
   │◀── card      {type: "plan", …}           │ only after source validation
+  │◀── status    {state: "done", rows, …}    │ the call ends: rows, duration, or the error
   │◀── usage     {call, turn}                │ after every model call
   │◀── done      {stop, usage}               │
 ```
@@ -62,11 +63,11 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 
 | Event | Payload | App behaviour |
 | --- | --- | --- |
-| `status` | `text` | Shows a progress line. This is the visible reasoning trace in the demo |
+| `status` | `stepId`, `state` (`running`, `done`, `failed`), `tool`, `text` (the tool's status line), `detail` (a short summary of the arguments); when finished also `rows`, `durationMs`, `error` (a tool error code) and `memo` (answered from an identical earlier call) | Shows the step in the turn's trace: a spinner while it runs, then its row count, duration or error. Every tool call sends one `running` and one finished event with the same `stepId`; an instant call (memoised or invalid) sends only the finished one. This is the visible reasoning trace in the demo |
 | `text` | `delta` | Appends to the current answer |
-| `ui_action` | `action` (`show_layers`, `focus_map`, `draw_route`, `highlight_features`) and its arguments | The map controller applies it |
-| `card` | `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution | Renders the card widget for that type, with sources and Google Maps attribution |
-| `question` | `id`, `text`, `options`, `allowFreeText` | Shows the question with one button per option; a tap sends an `answer` input |
+| `ui_action` | `stepId`, `action` (`show_layers`, `focus_map`, `draw_route`, `highlight_features`) and its arguments | The map controller applies it; the chat shows the outcome on the step with that `stepId` |
+| `card` | `stepId`, `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution | Renders the card widget for that type, with sources and Google Maps attribution |
+| `question` | `stepId`, `id`, `text`, `options`, `allowFreeText` | Shows the question with one button per option; a tap sends an `answer` input |
 | `usage` | `call` (one model call: `index`, `agent`, `model`, token counts, `durationMs`) and `turn` (running totals) | Updates the token counter of the turn in progress; see [Token usage](#token-usage) |
 | `done` | `stop` (`end`, `asked`, `budget`, `cancelled`), `usage` (the final `turn` totals plus `complete`) | Ends the turn |
 | `error` | `message`, `retryable`, `usage` (totals so far, `complete: false` when a model call was cut off) | Shows the error; the user may retry if `retryable` |
@@ -120,7 +121,7 @@ Sessions are stored in Firestore in the project's agent database. Only the agent
 | Document | Fields |
 | --- | --- |
 | `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`) or null, `expiresAt` for the TTL policy |
-| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, row counts) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
+| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, argument summary, row count, error, duration, memo flag) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
 
 Stored is what the app needs to redraw the conversation and what the model needs for the next turn: user input, answer text, cards, questions and answers, and the compact trace. The request `context` is not stored, and `userLocation` never is. Full tool results and grounding payloads are not stored with the session; grounding has its own cache.
 

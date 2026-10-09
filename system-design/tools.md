@@ -32,7 +32,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 - **Data tools read BigQuery.** Every data tool runs a fixed parameterized query over the published `melens_query` views under the agent's read-only identity, with a dry run and `maximumBytesBilled`, the same rules as the map service's query runner. No caller SQL, no raw or staging tables, no Firestore map data and no HTTP calls to the map service.
 - **Times** are ISO 8601 with an offset, in Melbourne local time, for example `2026-10-10T19:00:00+11:00`.
 - **Lists** return at most 50 rows in compact form. The total always comes first, with `truncated: true` when rows were cut.
-- **Data, workflow and grounding calls send a `status` event** to the app with the tool's status line. This is the reasoning trace users and judges see. UI action and conversation tools send their own event instead.
+- **Every call sends `status` events** to the app: one with state `running` when it starts, carrying the tool's status line and a short summary of its arguments, and one with `done` or `failed` when it ends, carrying the row count, the duration and any error code. This is the reasoning trace users and judges see, step by step while the turn runs. UI action and conversation tools send their own event as well (`ui_action`, `card`, `question`), tagged with the same `stepId`.
 - **Read-only calls are memoised within a turn.** An identical call returns the earlier result. A UI action does not clear the memo, because no tool writes data.
 - **Descriptions for the model** say when to use the tool, not only what it does. They are the text given to the model, and eval results decide changes to them.
 
@@ -237,13 +237,13 @@ Returns `{ "card_id": "…", "summary": "…" }` with the causes and their confi
 
 ## Grounding tools
 
-If Gemini's built-in grounding cannot be combined with function tools in one agent, each of these is an `AgentTool` wrapping a one-shot Gemini call with that grounding enabled. Either way, the grounding metadata is returned to the loop so `show_card` can validate against it. Both are billed per call. The exact metadata fields follow the Gemini grounding response and are confirmed in F3.
+Grounding is the fallback, not a routine step: the agent calls these only when the data tools cannot answer the request or leave a gap the question needs filled ([agent-design.md](agent-design.md#tool-registry), Melens data first). Search grounding is preferred; Maps grounding is reserved for one specific place's details because it is far slower (48 to 110 s per call against 10 s, measured 2026-10-09). A call that exceeds `AGENT_GROUNDING_TIMEOUT_MS` (default 40 s) returns `upstream_unavailable`, so the model answers from the map data and says what is missing. If Gemini's built-in grounding cannot be combined with function tools in one agent, each of these is an `AgentTool` wrapping a one-shot Gemini call with that grounding enabled. Either way, the grounding metadata is returned to the loop so `show_card` can validate against it. Both are billed per call. The exact metadata fields follow the Gemini grounding response and are confirmed in F3.
 
 ### `maps_grounding`
 
 Status line: "Checking Google Maps". Cache: per normalised question, geohash-6 cell and date.
 
-**Description for the model:** Ask Google Maps about places near a location: what is there, opening hours, ratings, what a place is like. Use it for places that are not on our map layers, such as cafés, bookstores and parks. Ask in English.
+**Description for the model:** Ask Google Maps for the details of one specific place: its opening hours, rating, what it is like, where exactly it is. Slow, often a minute: use it only when the user asks about a specific place our map layers do not carry (a café, a shop, a park), after search_features. Not for finding venues, events or things to do: the layers and search_grounding cover those. Ask in English.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -264,7 +264,7 @@ Status line: "Checking Google Maps". Cache: per normalised question, geohash-6 c
 
 Status line: "Searching the web". Cache: per normalised question and date.
 
-**Description for the model:** Search the web for facts our data does not cover: opening details, what happened somewhere recently, background on an event, general questions about Melbourne. Cite the sources it returns.
+**Description for the model:** Search the web for facts our data does not cover: opening details, parking rules, weather, what happened somewhere recently, background on an event, general questions about Melbourne. Use it only when no map tool can answer or their results leave a gap; try search_features or nearby_context first. Prefer it over maps_grounding for anything that is not one place's details. Cite the sources it returns.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |

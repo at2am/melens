@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import type { GroundingPlace } from '../agent/grounding.js';
 import { UsageLedger } from '../agent/usage.js';
-import type { Card, Question, StoredTurn, TraceEntry, TurnRequest } from '../protocol/schemas.js';
+import type { Card, Question, StepState, StoredTurn, TraceEntry, TurnRequest } from '../protocol/schemas.js';
 import type { EventSink } from '../protocol/sse.js';
 import { toGenaiSchema } from './schema.js';
 
@@ -46,6 +46,7 @@ export class TurnRegistry {
   budgetForced = false;
   asked: Question | null = null;
   private questions = 0;
+  private steps = 0;
 
   constructor(readonly turn: {
     readonly turnId: string; readonly uid: string; readonly request: TurnRequest; readonly sink: EventSink;
@@ -67,21 +68,27 @@ export class TurnRegistry {
   }
 
   nextQuestionId(): string { this.questions += 1; return `q_${this.turn.turnId}_${this.questions}`; }
+  nextStepId(): string { this.steps += 1; return `s_${this.turn.turnId}_${this.steps}`; }
   nextCardId(): string { return `c_${this.turn.turnId}_${this.cards.length + 1}`; }
 
   memoGet(key: string): unknown { return this.memo.get(key); }
   memoSet(key: string, value: unknown): void { this.memo.set(key, value); }
 }
 
+/** The step a tool call runs as; the events the call emits carry its id so the app shows them under the step. */
+export interface ToolStep { readonly id: string }
+
 export interface ToolSpec<S extends z.ZodObject> {
   readonly name: string;
   readonly description: string;
-  /** The status line streamed before the call; null for UI and conversation tools. */
-  readonly status: string | null;
+  /** The status line of the call's step, for example "Searching the map"; the app shows it while the call runs and afterwards. */
+  readonly status: string;
   /** Identical read-only calls within a turn return the earlier result. */
   readonly readOnly: boolean;
   readonly schema: S;
-  run(args: z.output<S>, turn: TurnRegistry): Promise<unknown>;
+  /** A short, user-facing summary of the validated arguments, shown after the status line; at most 200 characters are sent. */
+  detail?(args: z.output<S>, turn: TurnRegistry): string;
+  run(args: z.output<S>, turn: TurnRegistry, step: ToolStep): Promise<unknown>;
 }
 
 export function defineTool<S extends z.ZodObject>(spec: ToolSpec<S>): ToolSpec<S> { return spec; }
@@ -91,17 +98,35 @@ function stableJson(value: unknown): string {
     ? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : item);
 }
 
+/** How many rows a result carries: a list's total, or the length of its items, places or sources, or the sum of its totals. */
 function rowsOf(result: unknown): number | null {
   if (typeof result !== 'object' || result === null) return null;
   const record = result as Record<string, unknown>;
   if (typeof record.total === 'number') return record.total;
   if (Array.isArray(record.items)) return record.items.length;
+  if (typeof record.totals === 'object' && record.totals !== null) {
+    return Object.values(record.totals as Record<string, unknown>).reduce<number>((sum, value) => typeof value === 'number' ? sum + value : sum, 0);
+  }
+  if (Array.isArray(record.places)) return record.places.length;
+  if (Array.isArray(record.sources)) return record.sources.length;
   return null;
+}
+
+const MAX_DETAIL = 200;
+
+function clipDetail(detail: string | undefined): string | undefined {
+  const trimmed = detail?.trim();
+  if (trimmed === undefined || trimmed === '') return undefined;
+  return trimmed.length > MAX_DETAIL ? `${trimmed.slice(0, MAX_DETAIL - 1)}…` : trimmed;
 }
 
 /**
  * The ADK tool for one spec. Gemini sees the schema as a declaration; the server validates the
  * arguments itself so an invalid call returns the error object (and counts) instead of throwing.
+ *
+ * Every call is one step of the turn's trace: a `status` event with state `running` when it starts
+ * and one with `done` or `failed` when it ends, carrying the row count, the error code and the
+ * duration. A memoised or invalid call is instant and sends only the final event.
  */
 export function buildTool<S extends z.ZodObject>(spec: ToolSpec<S>, turn: TurnRegistry): FunctionTool<import('@google/genai').Schema> {
   return new FunctionTool({
@@ -110,37 +135,49 @@ export function buildTool<S extends z.ZodObject>(spec: ToolSpec<S>, turn: TurnRe
     parameters: toGenaiSchema(spec.schema),
     async execute(rawArgs: unknown) {
       const startedAt = turn.now().getTime();
+      const stepId = turn.nextStepId();
+      const finish = (fields: { state: Exclude<StepState, 'running'>; detail?: string | undefined; rows: number | null; error: string | null; durationMs: number; memo?: boolean }): void => {
+        turn.sink.emit({ event: 'status', stepId, state: fields.state, tool: spec.name, text: spec.status,
+          ...(fields.detail === undefined ? {} : { detail: fields.detail }), ...(fields.rows === null ? {} : { rows: fields.rows }),
+          ...(fields.error === null ? {} : { error: fields.error }), durationMs: fields.durationMs, ...(fields.memo === true ? { memo: true } : {}) });
+      };
       const parsed = spec.schema.safeParse(rawArgs ?? {});
       const argsForTrace = typeof rawArgs === 'object' && rawArgs !== null ? rawArgs as Record<string, unknown> : {};
       if (!parsed.success) {
         turn.invalidCalls += 1;
         if (turn.invalidCalls >= MAX_INVALID_CALLS) turn.toolsDisabled = true;
         const message = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; ');
-        turn.trace.push({ tool: spec.name, args: argsForTrace, status: null, rows: null, error: 'invalid_arguments', durationMs: 0 });
+        turn.trace.push({ tool: spec.name, args: argsForTrace, status: spec.status, detail: null, rows: null, error: 'invalid_arguments', durationMs: 0, memo: false });
+        finish({ state: 'failed', rows: null, error: 'invalid_arguments', durationMs: 0 });
         return toolError('invalid_arguments', message, { issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) });
       }
       turn.invalidCalls = 0;
       const args = parsed.data;
+      const detail = clipDetail(spec.detail?.(args, turn));
       const key = `${spec.name}:${stableJson(args)}`;
       if (spec.readOnly) {
         const memo = turn.memoGet(key);
         if (memo !== undefined) {
-          turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: 'memo', rows: rowsOf(memo), error: null, durationMs: 0 });
+          const rows = rowsOf(memo);
+          turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error: null, durationMs: 0, memo: true });
+          finish({ state: 'done', detail, rows, error: null, durationMs: 0, memo: true });
           return memo;
         }
       }
-      if (spec.status !== null) turn.sink.emit({ event: 'status', text: spec.status });
+      turn.sink.emit({ event: 'status', stepId, state: 'running', tool: spec.name, text: spec.status, ...(detail === undefined ? {} : { detail }) });
       let result: unknown;
       try {
-        result = await spec.run(args, turn);
+        result = await spec.run(args, turn, { id: stepId });
       } catch (error) {
         turn.turn.log?.({ severity: 'WARNING', event: 'toolFailed', turnId: turn.turn.turnId, tool: spec.name, reason: error instanceof Error ? error.name : 'unknown' });
         result = toolError('upstream_unavailable', 'The data source or Google API did not answer; answer with what you have and say what is missing.');
       }
       const durationMs = Math.max(0, turn.now().getTime() - startedAt);
-      turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, rows: rowsOf(result),
-        error: isToolError(result) ? result.error.code : null, durationMs });
-      if (spec.readOnly && !isToolError(result)) turn.memoSet(key, result);
+      const rows = rowsOf(result);
+      const error = isToolError(result) ? result.error.code : null;
+      turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error, durationMs, memo: false });
+      finish({ state: error === null ? 'done' : 'failed', detail, rows, error, durationMs });
+      if (spec.readOnly && error === null) turn.memoSet(key, result);
       return result;
     },
   });

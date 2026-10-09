@@ -387,6 +387,8 @@ TraceEntry _$TraceEntryFromJson(Map<String, dynamic> json) =>
         rows: $checkedConvert('rows', (v) => (v as num?)?.toInt()),
         error: $checkedConvert('error', (v) => v as String?),
         durationMs: $checkedConvert('durationMs', (v) => (v as num).toInt()),
+        detail: $checkedConvert('detail', (v) => v as String?),
+        memo: $checkedConvert('memo', (v) => v as bool? ?? false),
       );
       return val;
     });
@@ -396,9 +398,11 @@ Map<String, dynamic> _$TraceEntryToJson(TraceEntry instance) =>
       'tool': instance.tool,
       'args': instance.args,
       'status': instance.status,
+      'detail': ?instance.detail,
       'rows': instance.rows,
       'error': instance.error,
       'durationMs': instance.durationMs,
+      'memo': instance.memo,
     };
 
 StoredTurn _$StoredTurnFromJson(
@@ -609,11 +613,32 @@ Map<String, dynamic> _$AnswerTurnInputToJson(AnswerTurnInput instance) =>
 
 AgentStatusEvent _$AgentStatusEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentStatusEvent', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['turnId', 'seq', 'text']);
+      $checkKeys(
+        json,
+        requiredKeys: const [
+          'turnId',
+          'seq',
+          'stepId',
+          'state',
+          'tool',
+          'text',
+        ],
+      );
       final val = AgentStatusEvent(
         turnId: $checkedConvert('turnId', (v) => v as String),
         seq: $checkedConvert('seq', (v) => (v as num).toInt()),
+        stepId: $checkedConvert('stepId', (v) => v as String),
+        state: $checkedConvert(
+          'state',
+          (v) => $enumDecode(_$AgentStepStateEnumMap, v),
+        ),
+        tool: $checkedConvert('tool', (v) => v as String),
         text: $checkedConvert('text', (v) => v as String),
+        detail: $checkedConvert('detail', (v) => v as String?),
+        rows: $checkedConvert('rows', (v) => (v as num?)?.toInt()),
+        error: $checkedConvert('error', (v) => v as String?),
+        durationMs: $checkedConvert('durationMs', (v) => (v as num?)?.toInt()),
+        memo: $checkedConvert('memo', (v) => v as bool? ?? false),
         $type: $checkedConvert('event', (v) => v as String?),
       );
       return val;
@@ -623,9 +648,23 @@ Map<String, dynamic> _$AgentStatusEventToJson(AgentStatusEvent instance) =>
     <String, dynamic>{
       'turnId': instance.turnId,
       'seq': instance.seq,
+      'stepId': instance.stepId,
+      'state': _$AgentStepStateEnumMap[instance.state]!,
+      'tool': instance.tool,
       'text': instance.text,
+      'detail': ?instance.detail,
+      'rows': ?instance.rows,
+      'error': ?instance.error,
+      'durationMs': ?instance.durationMs,
+      'memo': instance.memo,
       'event': instance.$type,
     };
+
+const _$AgentStepStateEnumMap = {
+  AgentStepState.running: 'running',
+  AgentStepState.done: 'done',
+  AgentStepState.failed: 'failed',
+};
 
 AgentTextEvent _$AgentTextEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentTextEvent', json, ($checkedConvert) {
@@ -649,10 +688,14 @@ Map<String, dynamic> _$AgentTextEventToJson(AgentTextEvent instance) =>
 
 AgentUiActionEvent _$AgentUiActionEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentUiActionEvent', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['turnId', 'seq', 'action', 'args']);
+      $checkKeys(
+        json,
+        requiredKeys: const ['turnId', 'seq', 'stepId', 'action', 'args'],
+      );
       final val = AgentUiActionEvent(
         turnId: $checkedConvert('turnId', (v) => v as String),
         seq: $checkedConvert('seq', (v) => (v as num).toInt()),
+        stepId: $checkedConvert('stepId', (v) => v as String),
         action: $checkedConvert(
           'action',
           (v) => $enumDecode(_$UiActionNameEnumMap, v),
@@ -667,6 +710,7 @@ Map<String, dynamic> _$AgentUiActionEventToJson(AgentUiActionEvent instance) =>
     <String, dynamic>{
       'turnId': instance.turnId,
       'seq': instance.seq,
+      'stepId': instance.stepId,
       'action': _$UiActionNameEnumMap[instance.action]!,
       'args': instance.args,
       'event': instance.$type,
@@ -674,10 +718,11 @@ Map<String, dynamic> _$AgentUiActionEventToJson(AgentUiActionEvent instance) =>
 
 AgentCardEvent _$AgentCardEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentCardEvent', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['turnId', 'seq', 'card']);
+      $checkKeys(json, requiredKeys: const ['turnId', 'seq', 'stepId', 'card']);
       final val = AgentCardEvent(
         turnId: $checkedConvert('turnId', (v) => v as String),
         seq: $checkedConvert('seq', (v) => (v as num).toInt()),
+        stepId: $checkedConvert('stepId', (v) => v as String),
         card: $checkedConvert(
           'card',
           (v) => AgentCard.fromJson(v as Map<String, dynamic>),
@@ -691,16 +736,21 @@ Map<String, dynamic> _$AgentCardEventToJson(AgentCardEvent instance) =>
     <String, dynamic>{
       'turnId': instance.turnId,
       'seq': instance.seq,
+      'stepId': instance.stepId,
       'card': instance.card.toJson(),
       'event': instance.$type,
     };
 
 AgentQuestionEvent _$AgentQuestionEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentQuestionEvent', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['turnId', 'seq', 'question']);
+      $checkKeys(
+        json,
+        requiredKeys: const ['turnId', 'seq', 'stepId', 'question'],
+      );
       final val = AgentQuestionEvent(
         turnId: $checkedConvert('turnId', (v) => v as String),
         seq: $checkedConvert('seq', (v) => (v as num).toInt()),
+        stepId: $checkedConvert('stepId', (v) => v as String),
         question: $checkedConvert(
           'question',
           (v) => AgentQuestion.fromJson(v as Map<String, dynamic>),
@@ -714,6 +764,7 @@ Map<String, dynamic> _$AgentQuestionEventToJson(AgentQuestionEvent instance) =>
     <String, dynamic>{
       'turnId': instance.turnId,
       'seq': instance.seq,
+      'stepId': instance.stepId,
       'question': instance.question.toJson(),
       'event': instance.$type,
     };

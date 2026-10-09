@@ -1093,6 +1093,90 @@
   "@chatThinking": {
     "description": "Shown while a turn runs before any status or text arrived."
   },
+  "chatWriting": "Writing…",
+  "@chatWriting": {
+    "description": "Progress line under a running turn while the answer text streams and no tool call is running."
+  },
+  "chatStepRows": "{count, plural, =1{1 result} other{{count} results}}",
+  "@chatStepRows": {
+    "description": "How many rows a finished tool call returned, shown on its step row.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatStepMemo": "reused",
+  "@chatStepMemo": {
+    "description": "Marks a step whose tool call was answered from an identical earlier call in the same turn."
+  },
+  "chatStepSeconds": "{seconds} s",
+  "@chatStepSeconds": {
+    "description": "Duration of a tool call of one second or more, shown on its step row.",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "chatStepMillis": "{millis} ms",
+  "@chatStepMillis": {
+    "description": "Duration of a tool call under one second, shown on its step row.",
+    "placeholders": {
+      "millis": {
+        "type": "int"
+      }
+    }
+  },
+  "chatStepFailed": "failed: {code}",
+  "@chatStepFailed": {
+    "description": "A failed step whose tool error code the app has no label for; the code is shown as sent.",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "chatToolErrorInvalidArguments": "invalid arguments",
+  "@chatToolErrorInvalidArguments": {
+    "description": "Step outcome when the agent called a tool with arguments the server rejected."
+  },
+  "chatToolErrorNotFound": "not found",
+  "@chatToolErrorNotFound": {
+    "description": "Step outcome when a tool could not find the feature or place asked for."
+  },
+  "chatToolErrorNotAnAnomaly": "not an anomaly",
+  "@chatToolErrorNotAnAnomaly": {
+    "description": "Step outcome when analyse_anomaly was called on a feature that is not an anomaly."
+  },
+  "chatToolErrorUnverifiedSources": "unverified sources",
+  "@chatToolErrorUnverifiedSources": {
+    "description": "Step outcome when a card cited sources no tool returned in the turn."
+  },
+  "chatToolErrorRouteNotFound": "no route found",
+  "@chatToolErrorRouteNotFound": {
+    "description": "Step outcome when draw_route could not find a route."
+  },
+  "chatToolErrorUpstreamUnavailable": "source unavailable",
+  "@chatToolErrorUpstreamUnavailable": {
+    "description": "Step outcome when the data source or a Google API did not answer."
+  },
+  "cardItemDetailsTitle": "Agent result",
+  "@cardItemDetailsTitle": {
+    "description": "Title of the details pane that shows a tapped card item which is not a map record."
+  },
+  "cardItemDetailsClose": "Close the result details",
+  "@cardItemDetailsClose": {
+    "description": "Tooltip of the close button of the card item details pane."
+  },
+  "cardItemDetailsNotOnMap": "This result is not a record on the map. It comes from the source below, as the agent reported it.",
+  "@cardItemDetailsNotOnMap": {
+    "description": "Explains, in the card item details pane, why the item has no map record details."
+  },
+  "cardItemDetailsOpenSource": "Open the source",
+  "@cardItemDetailsOpenSource": {
+    "description": "Button in the card item details pane that opens the item's source link."
+  },
   "chatTurnCancelled": "Stopped.",
   "@chatTurnCancelled": {
     "description": "Shown under a turn the user cancelled."
