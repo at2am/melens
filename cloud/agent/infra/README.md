@@ -16,7 +16,7 @@ cloud/agent/infra/bootstrap.sh --project PROJECT_ID --environment dev --apply --
 | Resource | Bootstrap | Later, at deployment |
 | --- | --- | --- |
 | `melens-ENV-agent` | `melens_query` dataset `READER`; project `aiplatform.user`, `bigquery.jobUser`, `datastore.user` | `secretAccessor` on the Maps Platform key only; Cloud Run service identity |
-| Firestore `(default)` | `australia-southeast2`, Native mode, delete protection; TTL policies on `expiresAtTs` for the `sessions` and `turns` collection groups | Nothing |
+| Firestore `(default)` | `australia-southeast2`, Native mode, delete protection; TTL policies on `expiresAtTs` for the `sessions`, `turns` and `attachments` collection groups | Nothing |
 | APIs | Firestore, Vertex AI, Cloud Run, BigQuery, BigQuery Storage, Artifact Registry, Cloud Build, Secret Manager, IAM Credentials, IAM | Nothing |
 
 The audit fails on any other project role of the agent identity, on any `melens_ingest`
@@ -48,6 +48,11 @@ and the three project roles, created the `(default)` Firestore database in
 and enabled the `expiresAtTs` TTL policy on the `sessions` and `turns` collection groups;
 both policies reached `ACTIVE`. `--verify` passes with no `melens_ingest` or secret access
 for the identity.
+
+Chat photos (2026-10-09) added the `attachments` collection group to the script's TTL
+policies. Until `--apply --confirm-project melens-510012` is rerun, `--verify` reports that
+policy as missing. Photos are still deleted with their session and when their turn is
+trimmed, but a photo whose turn expires through the TTL stays until the policy exists.
 
 The same day, the Vertex AI location was probed with the CLI user's token (not the
 agent identity) through `generateContent` on `gemini-3.8-flash`:

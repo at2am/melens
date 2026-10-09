@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -9,15 +11,20 @@ import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../map/data/map_models.dart';
 import '../../map/state/selection_controller.dart';
+import '../data/chat_photos.dart';
 import '../state/chat_controller.dart';
 import '../state/chat_models.dart';
+import '../state/chat_photo_providers.dart';
 import '../state/request_context.dart';
+import 'chat_photo_view.dart';
 import 'chat_turn_view.dart';
 import 'session_list.dart';
 
 /// The agent chat: streamed turns, cards, questions, the session list and
-/// the input box (UC-13). It reads and writes [chatControllerProvider], so
-/// it can be closed and reopened without losing the conversation.
+/// the input box with its photos (UC-13). A message sent while a turn runs
+/// interrupts it; the stop button stops it. It reads and writes
+/// [chatControllerProvider], so it can be closed and reopened without losing
+/// the conversation.
 class ChatPanel extends ConsumerStatefulWidget {
   const ChatPanel({
     this.onClose,
@@ -37,9 +44,12 @@ class ChatPanel extends ConsumerStatefulWidget {
 }
 
 class _ChatPanelState extends ConsumerState<ChatPanel> {
+  static final _log = Logger('ChatPanel');
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _inputFocus = FocusNode();
+  final List<ChatPhoto> _photos = [];
+  String? _photoNotice;
   int _renderedTurns = 0;
   int _renderedLength = 0;
 
@@ -61,13 +71,75 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   void _submit() {
     final text = _input.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _photos.isEmpty) return;
+    final photos = List.of(_photos);
     _input.clear();
+    setState(() {
+      _photos.clear();
+      _photoNotice = null;
+    });
     unawaited(
       ref
           .read(chatControllerProvider.notifier)
-          .send(TurnInput.text(text: text)),
+          .send(TurnInput.text(text: text), photos: photos),
     );
+    _inputFocus.requestFocus();
+  }
+
+  /// The camera is offered on phones; a browser's file chooser offers it
+  /// itself where the device has one.
+  bool get _offersCamera =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  Future<void> _pickPhotos() async {
+    final strings = AppLocalizations.of(context);
+    final remaining = maxPhotosPerTurn - _photos.length;
+    if (remaining <= 0) {
+      setState(() => _photoNotice = strings.chatPhotoLimit(maxPhotosPerTurn));
+      return;
+    }
+    final source = _offersCamera
+        ? await showModalBottomSheet<PhotoSource>(
+            context: context,
+            builder: (sheetContext) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_library_outlined),
+                    title: Text(strings.chatPhotoGallery),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(PhotoSource.gallery),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_camera_outlined),
+                    title: Text(strings.chatPhotoCamera),
+                    onTap: () =>
+                        Navigator.of(sheetContext).pop(PhotoSource.camera),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : PhotoSource.gallery;
+    if (source == null || !mounted) return;
+    final PhotoPick pick;
+    try {
+      pick = await ref.read(photoPickerProvider).pick(source, limit: remaining);
+    } on Object catch (error, stack) {
+      _log.warning('The photo picker failed', error, stack);
+      if (mounted) setState(() => _photoNotice = strings.chatPhotoPickFailed);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _photos.addAll(pick.photos.take(maxPhotosPerTurn - _photos.length));
+      _photoNotice = pick.rejected > 0
+          ? strings.chatPhotosRejected(pick.rejected)
+          : null;
+    });
     _inputFocus.requestFocus();
   }
 
@@ -196,7 +268,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                             ? (question, option) =>
                                   unawaited(controller.answer(question, option))
                             : null,
-                        onRetry: chat.canSend
+                        onRetry: chat.canSend && !chat.isRunning
                             ? () => unawaited(controller.retryLast())
                             : null,
                         onCardItemTap: widget.onCardItemTap,
@@ -266,11 +338,73 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                 ],
               ),
             ),
+          if (_photos.isNotEmpty || _photoNotice != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_photos.isNotEmpty)
+                    Wrap(
+                      key: const ValueKey('chat-pending-photos'),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final (index, photo) in _photos.indexed)
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ChatPhotoView(
+                                photo: photo,
+                                size: 56,
+                                label: strings.chatPhoto(index + 1),
+                              ),
+                              Positioned(
+                                top: -10,
+                                right: -10,
+                                child: IconButton.filledTonal(
+                                  key: ValueKey('chat-photo-remove-$index'),
+                                  tooltip: strings.chatPhotoRemove,
+                                  visualDensity: VisualDensity.compact,
+                                  iconSize: 14,
+                                  onPressed: () => setState(() {
+                                    _photos.removeAt(index);
+                                    _photoNotice = null;
+                                  }),
+                                  icon: const Icon(Icons.close),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  if (_photoNotice case final notice?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        notice,
+                        key: const ValueKey('chat-photo-notice'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.error,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
+            padding: const EdgeInsets.fromLTRB(4, 8, 8, 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                IconButton(
+                  key: const ValueKey('chat-attach'),
+                  tooltip: strings.chatAttachPhotos,
+                  onPressed: chat.isRestoring
+                      ? null
+                      : () => unawaited(_pickPhotos()),
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                ),
                 Expanded(
                   child: CallbackShortcuts(
                     bindings: {
@@ -286,7 +420,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
-                        hintText: strings.chatInputHint,
+                        hintText: chat.isRunning
+                            ? strings.chatInputHintRunning
+                            : strings.chatInputHint,
                         border: const OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -294,20 +430,21 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                if (chat.isRunning)
+                if (chat.isRunning) ...[
                   IconButton.filledTonal(
                     key: const ValueKey('chat-stop'),
                     tooltip: strings.chatStop,
                     onPressed: controller.cancel,
                     icon: const Icon(Icons.stop),
-                  )
-                else
-                  IconButton.filled(
-                    key: const ValueKey('chat-send'),
-                    tooltip: strings.chatSend,
-                    onPressed: chat.canSend ? _submit : null,
-                    icon: const Icon(Icons.send),
                   ),
+                  const SizedBox(width: 4),
+                ],
+                IconButton.filled(
+                  key: const ValueKey('chat-send'),
+                  tooltip: strings.chatSend,
+                  onPressed: chat.canSend ? _submit : null,
+                  icon: const Icon(Icons.send),
+                ),
               ],
             ),
           ),

@@ -1,12 +1,12 @@
 import type { Firestore, Timestamp } from 'firebase-admin/firestore';
 
-import { sessionSummarySchema, storedTurnSchema, type SessionSummary, type StoredTurn } from '../protocol/schemas.js';
-import { SESSION_LIMITS, newId, sessionTitle, summaryOf, type LeaseResult, type SessionRecord, type SessionStore } from './store.js';
+import { imageMimeTypeSchema, sessionSummarySchema, storedTurnSchema, type SessionSummary, type StoredTurn } from '../protocol/schemas.js';
+import { SESSION_LIMITS, leaseHeld, newId, sessionTitle, summaryOf, type LeaseResult, type SessionRecord, type SessionStore } from './store.js';
 
 /**
- * Sessions in the project's Firestore database: `users/{uid}/sessions/{sessionId}` with a `turns`
- * subcollection. Only the agent service reads or writes them; client rules deny all access.
- * `expiresAtTs` carries the TTL policy.
+ * Sessions in the project's Firestore database: `users/{uid}/sessions/{sessionId}` with `turns` and
+ * `attachments` (one photo per document, at most 1 MB) subcollections. Only the agent service reads or
+ * writes them; client rules deny all access. `expiresAtTs` carries the TTL policy.
  */
 export function createFirestoreSessionStore(options: { readonly projectId: string; readonly databaseId: string }): SessionStore {
   let firestore: Promise<{ db: Firestore; timestamp: (date: Date) => Timestamp }> | null = null;
@@ -70,20 +70,47 @@ export function createFirestoreSessionStore(options: { readonly projectId: strin
       const all = await query.get();
       return all.docs.map((doc) => { const { expiresAtTs: _ttl, ...turn } = doc.data(); return storedTurnSchema.parse(turn); });
     },
-    async acquireTurn(uid, sessionId, turnId, now): Promise<LeaseResult> {
+    async acquireTurn(uid, sessionId, turnId, now, takeOverFrom): Promise<LeaseResult> {
       const { db } = await load();
       const ref = sessions(db, uid).doc(sessionId);
       return db.runTransaction(async (transaction) => {
         const doc = await transaction.get(ref);
         const data = doc.data();
         if (data === undefined) return 'missing';
-        const record = recordOf(uid, data);
-        if (record.activeTurn !== null && record.activeTurn.expiresAt > now.toISOString()) return 'busy';
+        const active = recordOf(uid, data).activeTurn;
+        if (leaseHeld(active, now) && active.turnId !== takeOverFrom) return 'busy';
         transaction.update(ref, { activeTurn: { turnId, expiresAt: new Date(now.getTime() + SESSION_LIMITS.leaseMs).toISOString() } });
         return 'acquired';
       });
     },
-    async completeTurn(uid, sessionId, turn, now) {
+    async requestCancel(uid, sessionId, now) {
+      const { db } = await load();
+      const ref = sessions(db, uid).doc(sessionId);
+      return db.runTransaction(async (transaction) => {
+        const data = (await transaction.get(ref)).data();
+        if (data === undefined) return null;
+        const active = recordOf(uid, data).activeTurn;
+        if (!leaseHeld(active, now)) return null;
+        if (active.cancelRequested !== true) transaction.update(ref, { activeTurn: { ...active, cancelRequested: true } });
+        return active.turnId;
+      });
+    },
+    watchSession(uid, sessionId, listener) {
+      let stopped = false;
+      let unsubscribe: (() => void) | null = null;
+      void load().then(({ db }) => {
+        if (stopped) return;
+        unsubscribe = sessions(db, uid).doc(sessionId).onSnapshot((doc) => {
+          const data = doc.data();
+          let record: SessionRecord | null = null;
+          try { record = data === undefined ? null : recordOf(uid, data); } catch { return; }
+          listener(record);
+        // A broken listener leaves cancellation to the client disconnect and the turn timeout.
+        }, () => {});
+      }, () => {});
+      return () => { stopped = true; unsubscribe?.(); };
+    },
+    async completeTurn(uid, sessionId, turn, now, images = []) {
       const { db, timestamp } = await load();
       const ref = sessions(db, uid).doc(sessionId);
       const expiresAt = new Date(now.getTime() + SESSION_LIMITS.ttlMs);
@@ -92,16 +119,26 @@ export function createFirestoreSessionStore(options: { readonly projectId: strin
         const data = doc.data();
         if (data === undefined) return 0;
         const record = recordOf(uid, data);
-        transaction.set(ref.collection('turns').doc(turn.id), { ...turn, expiresAtTs: timestamp(expiresAt) });
+        const holds = record.activeTurn?.turnId === turn.id;
+        transaction.set(ref.collection('turns').doc(turn.id), { ...turn, seq: record.turnCount + 1, expiresAtTs: timestamp(expiresAt) });
+        for (const image of images) {
+          transaction.set(ref.collection('attachments').doc(image.id), { id: image.id, turnId: turn.id, mimeType: image.mimeType,
+            data: image.data, createdAt: now.toISOString(), expiresAtTs: timestamp(expiresAt) });
+        }
         transaction.update(ref, { title: record.title === '' && turn.input.kind === 'text' ? sessionTitle(turn.input.text) : record.title,
-          turnCount: record.turnCount + 1, updatedAt: now.toISOString(), pendingQuestion: turn.question, activeTurn: null,
+          turnCount: record.turnCount + 1, updatedAt: now.toISOString(),
+          ...(holds ? { pendingQuestion: turn.question, activeTurn: null } : {}),
           expiresAt: expiresAt.toISOString(), expiresAtTs: timestamp(expiresAt) });
         return record.turnCount + 1;
       });
       const excess = turnCount - SESSION_LIMITS.turnsPerSession;
       if (excess > 0) {
         const oldest = await ref.collection('turns').orderBy('seq', 'asc').limit(excess).get();
-        for (const doc of oldest.docs) await doc.ref.delete();
+        for (const doc of oldest.docs) {
+          const attachments = (doc.data().attachments ?? []) as { id: string }[];
+          for (const attachment of attachments) await ref.collection('attachments').doc(attachment.id).delete();
+          await doc.ref.delete();
+        }
       }
     },
     async releaseTurn(uid, sessionId, turnId) {
@@ -113,6 +150,13 @@ export function createFirestoreSessionStore(options: { readonly projectId: strin
         const active = data.activeTurn as SessionRecord['activeTurn'];
         if (active?.turnId === turnId) transaction.update(ref, { activeTurn: null });
       });
+    },
+    async getAttachment(uid, sessionId, attachmentId) {
+      const { db } = await load();
+      const data = (await sessions(db, uid).doc(sessionId).collection('attachments').doc(attachmentId).get()).data();
+      if (data === undefined || !Buffer.isBuffer(data.data)) return null;
+      const mimeType = imageMimeTypeSchema.safeParse(data.mimeType);
+      return mimeType.success ? { id: attachmentId, mimeType: mimeType.data, data: data.data } : null;
     },
   };
 }

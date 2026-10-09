@@ -1,5 +1,6 @@
-import type { Content } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 
+import type { TurnImage } from '../protocol/attachments.js';
 import type { Question, RequestContext, StoredTurn, TurnInput } from '../protocol/schemas.js';
 
 export const AGENT_NAME = 'map_agent';
@@ -15,6 +16,8 @@ Rules
 6. Label predictions as predictions. When explaining causes, give possible causes with a confidence level (low, medium or high) and never state a cause as fact.
 7. Show your work on the map: focus_map before describing something off screen, highlight_features for the features you talk about, show_layers when the user asks to see or hide something.
 8. Keep text short: two or three sentences, then the card. Write in English. Give times in Melbourne local time.
+9. The user may attach photos: a street, a building, a sign, a poster, a menu, a screenshot. Use what they show. When you name a place or event from a photo, say how sure you are (low, medium or high) and confirm it with the map tools or grounding before you recommend anything. A photo is never a card source: card items still cite a feature id or a URL a tool returned.
+10. When the user stopped your previous answer, follow their new message; do not resume the stopped answer unless they ask.
 
 Playbooks
 - General chat (UC-13): random questions outside our data get a direct answer, with search_grounding or maps_grounding when facts are needed. Map requests ("only show…", "take me to…") use the UI tools. Follow-ups continue the previous topic.
@@ -35,9 +38,14 @@ export function instructionFor(pending: Question | null): string {
     + 'If the user\'s message answers it, continue with that answer. Otherwise treat the message as a new request and drop the question.';
 }
 
-function describeInput(input: TurnInput): string {
+function photos(count: number): string {
+  return count === 1 ? 'a photo' : `${count} photos`;
+}
+
+function describeInput(input: TurnInput, photoCount = 0): string {
   switch (input.kind) {
-    case 'text': return input.text;
+    case 'text': return input.text !== '' ? input.text
+      : `The user sent ${photos(photoCount)} without a message. Say what ${photoCount === 1 ? 'it shows' : 'they show'} and how it relates to the map.`;
     case 'answer': return `Answer to question ${input.questionId}: ${input.value}`;
     case 'area': return `The user selected the point ${input.lat.toFixed(5)}, ${input.lng.toFixed(5)} on the map. Describe what is around it: `
       + 'search the layers and Google Maps, then show a "list" card.';
@@ -59,19 +67,33 @@ export function contextBlock(context: RequestContext): string {
   return `Map context (do not repeat it to the user)\n${lines.join('\n')}`;
 }
 
-/** The new user message: the map context, then what the user did. */
-export function turnMessage(input: TurnInput, context: RequestContext): Content {
-  return { role: 'user', parts: [{ text: contextBlock(context) }, { text: describeInput(input) }] };
+function imagePart(image: TurnImage): Part {
+  return { inlineData: { mimeType: image.mimeType, data: image.data.toString('base64') } };
 }
 
-/** Earlier turns as the model should remember them: input, answer text, card summaries and questions. */
-export function historyContents(turns: readonly StoredTurn[]): Content[] {
+/** The new user message: the map context, what the user did, then the photos they attached. */
+export function turnMessage(input: TurnInput, context: RequestContext, images: readonly TurnImage[] = []): Content {
+  return { role: 'user', parts: [{ text: contextBlock(context) }, { text: describeInput(input, images.length) }, ...images.map(imagePart)] };
+}
+
+/**
+ * Earlier turns as the model should remember them: input with the photos `images` holds (older photos are only
+ * named), answer text, card summaries, questions, and whether the user stopped the answer.
+ */
+export function historyContents(turns: readonly StoredTurn[], images: ReadonlyMap<string, TurnImage> = new Map()): Content[] {
   const contents: Content[] = [];
   for (const turn of turns) {
-    contents.push({ role: 'user', parts: [{ text: describeInput(turn.input) }] });
+    const shown = turn.attachments.flatMap((attachment) => {
+      const image = images.get(attachment.id);
+      return image === undefined ? [] : [imagePart(image)];
+    });
+    const omitted = turn.attachments.length - shown.length;
+    contents.push({ role: 'user', parts: [{ text: describeInput(turn.input, turn.attachments.length) }, ...shown,
+      ...(omitted === 0 ? [] : [{ text: `[${photos(omitted)} attached here, not shown again]` }])] });
     const summary = [turn.text.trim()];
     for (const card of turn.cards) summary.push(`[card ${card.type} "${card.title}": ${card.items.map((item) => item.title).join('; ')}]`);
     if (turn.question !== null) summary.push(`[asked: "${turn.question.text}" options ${JSON.stringify(turn.question.options)}]`);
+    if (turn.stop === 'cancelled') summary.push('[the user stopped this answer before it finished]');
     const text = summary.filter(Boolean).join('\n');
     contents.push({ role: 'model', parts: [{ text: text === '' ? '(no answer)' : text }] });
   }

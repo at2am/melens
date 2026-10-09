@@ -26,7 +26,9 @@ Beyond the fixed entry points, the chat box is one agent flexible enough for ran
 3. Map requests run through UI action tools, which the app applies.
 4. Specific recommendations arrive as cards; general answers arrive as text.
 5. When the request is ambiguous in a way the context cannot resolve, the agent asks one question with options (`ask_user`). Otherwise it acts and states its assumptions.
-6. Conversations are saved per user on the server ([agent-protocol.md](../agent-protocol.md#sessions)). The chat panel shows the user's session list; the user can switch to an earlier session, start a new one and delete one. Reopening the app restores the current session.
+6. The user can interrupt at any time: a new message stops the running turn and the agent answers it, knowing what it was doing; the stop button stops a turn without a new message.
+7. The user can attach photos (a street, a sign, a poster, a screenshot) to a message. The agent reads them, says how sure it is when it names a place or event from a photo, and confirms it with the map tools before recommending anything.
+8. Conversations are saved per user on the server ([agent-protocol.md](../agent-protocol.md#sessions)). The chat panel shows the user's session list; the user can switch to an earlier session, start a new one and delete one. Reopening the app restores the current session.
 
 ## Example queries
 
@@ -47,6 +49,15 @@ Asking (check whether `ask_user` was called):
 - "Take me to the gardens." Expect `ask_user` with options such as Fitzroy Gardens, Carlton Gardens and Royal Botanic Gardens.
 - "Plan a walk near me." with a known location. Expect no `ask_user`.
 
+Interrupting:
+
+- "Plan me an evening with live music and dinner", then, while it runs, "Actually, just one café near the State Library." Expect the first turn stopped and stored, and an answer about cafés.
+
+With a photo:
+
+- A photo of a street sign, with no text. Expect the street named with a confidence level, then a map search around it.
+- A photo of an event poster: "Is this on tonight, and how do I get there?" Expect `search_features` for the event before any card.
+
 Multi-turn chain:
 
 - "What's around here?", then "Why is it so busy right now?", then "OK, plan me a quiet walk away from the crowds."
@@ -64,11 +75,13 @@ Multi-turn chain:
 - [ ] Closing and reopening the app restores the conversation, and a new deployment of the agent service does not lose it. A user never sees another user's session.
 - [ ] The chat panel lists the user's sessions; switching to one restores that conversation, and new and delete work.
 - [ ] Every model call sends a `usage` event with Gemini's own input and output token counts while the turn runs; `done.usage` equals their sum and matches the stored turn.
+- [ ] Stop and a new message both end the running turn within a second, and the new message is never rejected because a turn is still running.
+- [ ] A photo with or without text gets an answer about what it shows; a follow-up about the same photo in the next turns still sees it; a reopened session shows its photos.
 
 ## Notes
 
 - The chat behaviour of UC-02, UC-03, UC-04 and UC-08 is this agent following those use cases' playbooks.
-- Status 2026-10-09: the agent service runs the loop with the first ten tools ([cloud/agent](../../cloud/agent/README.md)), and the app's chat panel ([app README](../../app/README.md#testing-the-agent-locally)) streams turns step by step (every tool call with its arguments, result and duration, live while it runs), applies `show_layers`, `focus_map` and `highlight_features`, renders cards and questions, opens a tapped card item's details beside the map, shows token usage and manages sessions. Still open from this list: Firebase Anonymous Auth in the app (the panel uses a development token), `draw_route` drawing, and the eval over the example queries.
+- Status 2026-10-09: the agent service runs the loop with the first ten tools ([cloud/agent](../../cloud/agent/README.md)), and the app's chat panel ([app README](../../app/README.md#testing-the-agent-locally)) streams turns step by step (every tool call with its arguments, result and duration, live while it runs), applies `show_layers`, `focus_map` and `highlight_features`, renders cards and questions, opens a tapped card item's details beside the map, shows token usage and manages sessions. Still open from this list: Firebase Anonymous Auth in the app (the panel uses a development token), `draw_route` drawing, and the eval over the example queries. Also 2026-10-09: interrupting (a new message stops the running turn; stop reaches the server through the session lease) and photos (up to four per message, read by Gemini, stored with the turn), checked against Vertex AI in development mode: an interrupted turn was stored as cancelled before the new one ran, a grounding call in flight was aborted within 20 ms, and a photo of a street sign was named and followed up.
 
 ## Open questions
 

@@ -42,7 +42,7 @@ The app's entry point already states the intent, so routing is code, not a model
 | --- | --- |
 | `area`: user selects a point on the map | `area_brief` workflow |
 | `analyse`: user taps Analyse on a "?" marker | `analyse_anomaly` workflow |
-| `text`: anything typed into the chat box | `map_agent` loop |
+| `text`: anything typed into the chat box, with any photos the user attached | `map_agent` loop |
 | Scheduled ingestion | Extraction pipeline |
 
 The chat agent can call both workflows as tools, so "why is it so busy here?" typed into the chat runs the same `analyse_anomaly` code as the button.
@@ -133,7 +133,9 @@ The agent acts first and states its assumptions. It asks only when acting would 
 - Identical read-only calls within one turn return the earlier result instead of running again.
 - Long tool results are compacted: every row shortened, only the first N rows kept, and the total count stated first. A `search_features` call in the CBD can match hundreds of features.
 - Grounding results are cached in Firestore by tool, normalised question, place and date, so repeated questions from different users hit the cache. Grounding is billed per call.
-- The prompt carries the last 20 turns of the session: user input, answer text, card summaries and the pending question. Older turns stay in Firestore for the app's history view and are not sent to the model.
+- The prompt carries the last 20 turns of the session: user input, answer text, card summaries and the pending question, and marks a turn the user stopped. The photos of the last 3 turns go with them; older photos are only named. Older turns stay in Firestore for the app's history view and are not sent to the model.
+- Photos are read by Gemini itself; there is no separate vision tool. A place or event named from a photo carries a confidence level and is confirmed with the map tools or grounding before it is recommended. A photo is never a card source.
+- A new message interrupts the running turn rather than waiting for it ([agent-protocol.md](agent-protocol.md#rules), rules 4 and 5); the instruction tells the agent to follow the new message and not resume the stopped answer unless asked.
 
 ### Token accounting
 

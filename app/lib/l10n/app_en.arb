@@ -1077,6 +1077,61 @@
   "@chatInputHint": {
     "description": "Placeholder of the chat input box."
   },
+  "chatInputHintRunning": "Type to interrupt with a new message…",
+  "@chatInputHintRunning": {
+    "description": "Hint in the chat input while a turn runs: sending a message stops the turn and answers the new one."
+  },
+  "chatAttachPhotos": "Attach photos",
+  "@chatAttachPhotos": {
+    "description": "Tooltip of the button that adds photos to the next message."
+  },
+  "chatPhotoGallery": "Choose photos",
+  "@chatPhotoGallery": {
+    "description": "Menu item: pick photos from the device's gallery or files."
+  },
+  "chatPhotoCamera": "Take a photo",
+  "@chatPhotoCamera": {
+    "description": "Menu item: take a photo with the camera."
+  },
+  "chatPhotoRemove": "Remove photo",
+  "@chatPhotoRemove": {
+    "description": "Tooltip of the button that removes a photo from the next message."
+  },
+  "chatPhotoLimit": "{count, plural, =1{One photo per message.} other{Up to {count} photos per message.}}",
+  "@chatPhotoLimit": {
+    "description": "Shown when the user tries to attach more photos than one message carries.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPhotosRejected": "{count, plural, =1{One photo could not be used: it is unreadable or too large.} other{{count} photos could not be used: they are unreadable or too large.}}",
+  "@chatPhotosRejected": {
+    "description": "Shown when picked photos could not be read or shrunk below the size limit.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPhotoPickFailed": "The photo picker could not be opened.",
+  "@chatPhotoPickFailed": {
+    "description": "Shown when the gallery or camera fails to open, for example without permission."
+  },
+  "chatPhoto": "Photo {index}",
+  "@chatPhoto": {
+    "description": "Accessibility label of a photo in the chat.",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "chatPhotoUnavailable": "Photo unavailable",
+  "@chatPhotoUnavailable": {
+    "description": "Shown in place of a stored photo that could not be loaded."
+  },
   "chatSend": "Send",
   "@chatSend": {
     "description": "Tooltip of the send button."
@@ -1227,9 +1282,9 @@
   "@chatBriefSelected": {
     "description": "Chip that asks the agent what is around the selected point."
   },
-  "chatUsage": "{calls} calls · {input} in ({cached} cached) · {output} out · {thoughts} thinking · {total} total",
+  "chatUsage": "{calls} calls · ↑ {input} ({cached} cached) · ↓ {output} · {thoughts} thinking · {total} total",
   "@chatUsage": {
-    "description": "Token usage of a turn, from Gemini's own counts. All placeholders are formatted numbers.",
+    "description": "Token usage of a turn, from Gemini's own counts: ↑ marks input (prompt) tokens, ↓ output tokens. All placeholders are formatted numbers.",
     "placeholders": {
       "calls": {
         "type": "int"
@@ -1250,6 +1305,10 @@
         "type": "String"
       }
     }
+  },
+  "chatUsageTooltip": "↑ input tokens sent to Gemini, with the part served from its cache · ↓ output tokens Gemini wrote · thinking tokens are billed as output",
+  "@chatUsageTooltip": {
+    "description": "Tooltip on a turn's token usage line, explaining the arrows."
   },
   "chatUsageIncomplete": "Usage is incomplete: a model call was cut off.",
   "@chatUsageIncomplete": {

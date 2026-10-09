@@ -1,6 +1,7 @@
 import '../../agent/data/agent_client.dart';
 import '../../agent/data/agent_models.dart';
 import '../../map/state/map_actions.dart';
+import '../data/chat_photos.dart';
 
 enum ChatTurnPhase { running, done, failed, cancelled }
 
@@ -135,6 +136,7 @@ final class ChatTurn {
     required this.localId,
     required this.input,
     required this.phase,
+    this.photos = const [],
     this.turnId,
     this.steps = const [],
     this.text = '',
@@ -149,6 +151,9 @@ final class ChatTurn {
 
   final int localId;
   final TurnInput input;
+
+  /// The photos sent with [input], in order.
+  final List<ChatPhoto> photos;
   final ChatTurnPhase phase;
 
   /// Assigned by the server; null until the first event arrives.
@@ -202,6 +207,7 @@ final class ChatTurn {
   }) => ChatTurn(
     localId: localId,
     input: input,
+    photos: photos,
     phase: phase ?? this.phase,
     turnId: turnId ?? this.turnId,
     steps: steps ?? this.steps,
@@ -250,7 +256,9 @@ final class ChatState {
 
   bool get isRunning => turns.isNotEmpty && turns.last.isRunning;
 
-  bool get canSend => !isRunning && !isRestoring;
+  /// A message may go at any time but while a session is restored; one sent
+  /// while a turn runs interrupts it.
+  bool get canSend => !isRestoring;
 
   ChatState copyWith({
     bool? started,

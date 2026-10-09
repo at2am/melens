@@ -1462,6 +1462,66 @@ abstract class AppLocalizations {
   /// **'Ask about the map…'**
   String get chatInputHint;
 
+  /// Hint in the chat input while a turn runs: sending a message stops the turn and answers the new one.
+  ///
+  /// In en, this message translates to:
+  /// **'Type to interrupt with a new message…'**
+  String get chatInputHintRunning;
+
+  /// Tooltip of the button that adds photos to the next message.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach photos'**
+  String get chatAttachPhotos;
+
+  /// Menu item: pick photos from the device's gallery or files.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose photos'**
+  String get chatPhotoGallery;
+
+  /// Menu item: take a photo with the camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get chatPhotoCamera;
+
+  /// Tooltip of the button that removes a photo from the next message.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo'**
+  String get chatPhotoRemove;
+
+  /// Shown when the user tries to attach more photos than one message carries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{One photo per message.} other{Up to {count} photos per message.}}'**
+  String chatPhotoLimit(int count);
+
+  /// Shown when picked photos could not be read or shrunk below the size limit.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{One photo could not be used: it is unreadable or too large.} other{{count} photos could not be used: they are unreadable or too large.}}'**
+  String chatPhotosRejected(int count);
+
+  /// Shown when the gallery or camera fails to open, for example without permission.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo picker could not be opened.'**
+  String get chatPhotoPickFailed;
+
+  /// Accessibility label of a photo in the chat.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}'**
+  String chatPhoto(int index);
+
+  /// Shown in place of a stored photo that could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo unavailable'**
+  String get chatPhotoUnavailable;
+
   /// Tooltip of the send button.
   ///
   /// In en, this message translates to:
@@ -1630,10 +1690,10 @@ abstract class AppLocalizations {
   /// **'Brief this area'**
   String get chatBriefSelected;
 
-  /// Token usage of a turn, from Gemini's own counts. All placeholders are formatted numbers.
+  /// Token usage of a turn, from Gemini's own counts: ↑ marks input (prompt) tokens, ↓ output tokens. All placeholders are formatted numbers.
   ///
   /// In en, this message translates to:
-  /// **'{calls} calls · {input} in ({cached} cached) · {output} out · {thoughts} thinking · {total} total'**
+  /// **'{calls} calls · ↑ {input} ({cached} cached) · ↓ {output} · {thoughts} thinking · {total} total'**
   String chatUsage(
     int calls,
     String input,
@@ -1642,6 +1702,12 @@ abstract class AppLocalizations {
     String thoughts,
     String total,
   );
+
+  /// Tooltip on a turn's token usage line, explaining the arrows.
+  ///
+  /// In en, this message translates to:
+  /// **'↑ input tokens sent to Gemini, with the part served from its cache · ↓ output tokens Gemini wrote · thinking tokens are billed as output'**
+  String get chatUsageTooltip;
 
   /// Shown when the turn's usage totals miss a cancelled or failed model call.
   ///

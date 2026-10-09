@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:melens/features/agent/data/agent_client.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
@@ -111,6 +112,10 @@ final class FakeAgentClient implements AgentClient {
   Object? getError;
   Object? deleteError;
   Object? turnError;
+  Object? cancelError;
+
+  /// Stored photo bytes by attachment id.
+  final attachments = <String, Uint8List>{};
 
   FakeTurn get lastTurn => turns.last;
 
@@ -153,6 +158,26 @@ final class FakeAgentClient implements AgentClient {
     if (deleteError case final error?) throw error;
     sessions.removeWhere((session) => session.id == sessionId);
     details.remove(sessionId);
+  }
+
+  @override
+  Future<void> cancelTurn(String sessionId) async {
+    calls.add('cancel:$sessionId');
+    if (cancelError case final error?) throw error;
+  }
+
+  @override
+  Future<Uint8List> getAttachment(String sessionId, String attachmentId) async {
+    calls.add('attachment:$sessionId/$attachmentId');
+    final bytes = attachments[attachmentId];
+    if (bytes == null) {
+      throw const AgentHttpException(
+        statusCode: 404,
+        retryable: false,
+        code: AgentErrorCode.notFound,
+      );
+    }
+    return bytes;
   }
 
   @override

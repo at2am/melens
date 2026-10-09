@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:melens/core/time/melbourne_time.dart';
@@ -388,7 +392,107 @@ void main() {
     expect(cancelled.stop, StopReason.cancelled);
     expect(cancelled.text, 'Partial');
     expect(client.lastTurn.aborted, isTrue);
+    expect(client.calls, contains('cancel:s_1'));
     expect(stateOf(container).canSend, isTrue);
+  });
+
+  test('a message sent while a turn runs interrupts it', () async {
+    final client = FakeAgentClient();
+    final container = makeContainer(client);
+    final chat = container.read(chatControllerProvider.notifier);
+
+    unawaited(chat.send(const TurnInput.text(text: 'Live music tonight?')));
+    await pumpEventQueue();
+    final first = client.lastTurn;
+    first.emit(const AgentEvent.text(turnId: 't_1', seq: 0, delta: 'Looking'));
+    await pumpEventQueue();
+    expect(stateOf(container).canSend, isTrue);
+
+    final second = chat.send(const TurnInput.text(text: 'Cafés instead'));
+    await pumpEventQueue();
+    expect(first.aborted, isTrue);
+    expect(
+      client.calls.where((call) => call.startsWith('cancel:')),
+      isEmpty,
+      reason: 'the new turn interrupts the old one on the server',
+    );
+    var turns = stateOf(container).turns;
+    expect(turns.map((turn) => turn.phase), [
+      ChatTurnPhase.cancelled,
+      ChatTurnPhase.running,
+    ]);
+    expect(turns.first.text, 'Looking');
+    expect(
+      client.lastTurn.request.input,
+      const TurnInput.text(text: 'Cafés instead'),
+    );
+
+    client.lastTurn.emit(
+      const AgentEvent.done(
+        turnId: 't_2',
+        seq: 0,
+        stop: StopReason.end,
+        usage: fakeFinalUsage,
+      ),
+    );
+    await client.lastTurn.close();
+    await second;
+    turns = stateOf(container).turns;
+    expect(turns.last.phase, ChatTurnPhase.done);
+    expect(turns.first.phase, ChatTurnPhase.cancelled);
+  });
+
+  test('restored photos load from the service and go again on retry', () async {
+    final client = FakeAgentClient();
+    final photo = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0]);
+    client.sessions.add(fakeSession('s_9', title: 'Where is this?'));
+    client.details['s_9'] = SessionDetail(
+      session: fakeSession('s_9', title: 'Where is this?', turnCount: 1),
+      pendingQuestion: null,
+      turns: const [
+        StoredTurn(
+          id: 't_1',
+          seq: 1,
+          createdAt: fakeStamp,
+          input: TurnInput.text(text: 'Where is this?'),
+          attachments: [
+            AttachmentRef(
+              id: 'a_1',
+              kind: 'image',
+              mimeType: 'image/jpeg',
+              bytes: 4,
+            ),
+          ],
+          text: 'Looking',
+          cards: [],
+          uiActions: [],
+          question: null,
+          stop: StopReason.cancelled,
+          trace: [],
+          usage: fakeFinalUsage,
+        ),
+      ],
+    );
+    client.attachments['a_1'] = photo;
+    final container = makeContainer(client);
+    final chat = container.read(chatControllerProvider.notifier);
+
+    await chat.openSession('s_9');
+    final restored = stateOf(container).turns.single;
+    expect(restored.phase, ChatTurnPhase.cancelled);
+    expect(restored.photos.single.attachmentId, 'a_1');
+    expect(restored.photos.single.sessionId, 's_9');
+    expect(restored.photos.single.bytes, isNull);
+
+    unawaited(chat.retryLast());
+    await pumpEventQueue();
+    expect(client.calls, contains('attachment:s_9/a_1'));
+    final request = client.lastTurn.request;
+    expect(request.input, const TurnInput.text(text: 'Where is this?'));
+    expect(request.attachments!.single.mimeType, 'image/jpeg');
+    expect(request.attachments!.single.data, base64Encode(photo));
+    expect(stateOf(container).turns.single.photos.single.bytes, photo);
+    await client.lastTurn.close();
   });
 
   test(

@@ -6,6 +6,7 @@ import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../map/state/map_actions.dart';
 import '../state/chat_models.dart';
+import 'chat_photo_view.dart';
 
 String chatInputText(AppLocalizations strings, TurnInput input) =>
     switch (input) {
@@ -82,8 +83,8 @@ IconData _outcomeIcon(MapActionOutcome outcome) => switch (outcome) {
   MapActionOutcome.restored => Icons.history,
 };
 
-/// One exchange: the user's input, then what the agent did in the order it
-/// happened. Each tool call is a step row that shows a spinner while it runs
+/// One exchange: the user's input and photos, then what the agent did in the
+/// order it happened. Each tool call is a step row that shows a spinner while it runs
 /// and its result afterwards; the answer text appears around the steps as
 /// it streamed; a Thinking or Writing line shows while the turn runs with no
 /// step in progress. Cards, the question, the usage line and any error
@@ -122,29 +123,53 @@ class ChatTurnView extends StatelessWidget {
     final error = turn.error;
     final usage = turn.usage;
     final unattached = turn.unattachedActions;
+    final inputText = chatInputText(strings, turn.input);
     return Padding(
       key: ValueKey('chat-turn-${turn.localId}'),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 480),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
+          if (turn.photos.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(bottom: inputText.isEmpty ? 0 : 4),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final (index, photo) in turn.photos.indexed)
+                    ChatPhotoView(
+                      key: ValueKey('chat-photo-${turn.localId}-$index'),
+                      photo: photo,
+                      size: 96,
+                      label: strings.chatPhoto(index + 1),
+                      expandable: true,
+                    ),
+                ],
               ),
-              child: Text(
-                chatInputText(strings, turn.input),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onPrimaryContainer,
+            ),
+          if (inputText.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 480),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  inputText,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onPrimaryContainer,
+                  ),
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 8),
           ..._timeline(strings, theme),
           if (unattached.isNotEmpty)
@@ -244,18 +269,24 @@ class ChatTurnView extends StatelessWidget {
             ),
           if (usage != null) ...[
             const SizedBox(height: 4),
-            Text(
-              strings.chatUsage(
-                usage.calls,
-                _count(usage.input),
-                _count(usage.cachedInput),
-                _count(usage.output),
-                _count(usage.thoughts),
-                _count(usage.total),
-              ),
-              key: ValueKey('chat-usage-${turn.localId}'),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colors.onSurfaceVariant,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Tooltip(
+                message: strings.chatUsageTooltip,
+                child: Text(
+                  strings.chatUsage(
+                    usage.calls,
+                    _count(usage.input),
+                    _count(usage.cachedInput),
+                    _count(usage.output),
+                    _count(usage.thoughts),
+                    _count(usage.total),
+                  ),
+                  key: ValueKey('chat-usage-${turn.localId}'),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
             if (usage.complete == false)

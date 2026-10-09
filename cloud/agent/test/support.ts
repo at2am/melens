@@ -71,10 +71,12 @@ export function fakeReader(items: readonly MapItem[]): FeatureReader & { readonl
 export const CONTEXT: RequestContext = { viewport: { north: -37.80, south: -37.83, east: 144.98, west: 144.95 }, zoom: 15,
   userLocation: { lat: -37.8136, lng: 144.9631 }, layers: ['event'], localTime: '2026-10-10T18:40:00+11:00' };
 
-export function turnContext(text: string, options: { pendingQuestion?: SessionRecord['pendingQuestion']; history?: TurnContext['history']; signal?: AbortSignal } = {}): TurnContext {
+export function turnContext(text: string, options: { pendingQuestion?: SessionRecord['pendingQuestion']; history?: TurnContext['history']; signal?: AbortSignal;
+  images?: TurnContext['images']; historyImages?: TurnContext['historyImages'] } = {}): TurnContext {
   const request: TurnRequest = { input: { kind: 'text', text }, context: CONTEXT };
   const session: SessionRecord = { id: 's_test', uid: 'u_test', title: '', createdAt: '2026-10-10T07:00:00.000Z', updatedAt: '2026-10-10T07:00:00.000Z',
     turnCount: 0, pendingQuestion: options.pendingQuestion ?? null, activeTurn: null, expiresAt: '2026-11-09T07:00:00.000Z' };
-  return { uid: 'u_test', session, turnId: 't_test', seq: 1, request, history: options.history ?? [], sink: collectingSink('t_test'),
+  return { uid: 'u_test', session, turnId: 't_test', seq: 1, request, images: options.images ?? [], history: options.history ?? [],
+    historyImages: options.historyImages ?? new Map(), sink: collectingSink('t_test'),
     signal: options.signal ?? new AbortController().signal, startedAt: new Date('2026-10-10T07:40:00Z') };
 }

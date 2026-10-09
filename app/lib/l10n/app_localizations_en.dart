@@ -784,6 +784,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputHint => 'Ask about the map…';
 
   @override
+  String get chatInputHintRunning => 'Type to interrupt with a new message…';
+
+  @override
+  String get chatAttachPhotos => 'Attach photos';
+
+  @override
+  String get chatPhotoGallery => 'Choose photos';
+
+  @override
+  String get chatPhotoCamera => 'Take a photo';
+
+  @override
+  String get chatPhotoRemove => 'Remove photo';
+
+  @override
+  String chatPhotoLimit(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Up to $count photos per message.',
+      one: 'One photo per message.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String chatPhotosRejected(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count photos could not be used: they are unreadable or too large.',
+      one: 'One photo could not be used: it is unreadable or too large.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get chatPhotoPickFailed => 'The photo picker could not be opened.';
+
+  @override
+  String chatPhoto(int index) {
+    return 'Photo $index';
+  }
+
+  @override
+  String get chatPhotoUnavailable => 'Photo unavailable';
+
+  @override
   String get chatSend => 'Send';
 
   @override
@@ -898,8 +947,12 @@ class AppLocalizationsEn extends AppLocalizations {
     String thoughts,
     String total,
   ) {
-    return '$calls calls · $input in ($cached cached) · $output out · $thoughts thinking · $total total';
+    return '$calls calls · ↑ $input ($cached cached) · ↓ $output · $thoughts thinking · $total total';
   }
+
+  @override
+  String get chatUsageTooltip =>
+      '↑ input tokens sent to Gemini, with the part served from its cache · ↓ output tokens Gemini wrote · thinking tokens are billed as output';
 
   @override
   String get chatUsageIncomplete =>
