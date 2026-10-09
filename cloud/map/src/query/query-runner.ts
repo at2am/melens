@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { validateMapConfig, type MapConfig } from '../config.js';
-import { parseUnlocatedQuery, parseViewportQuery } from '../contracts/map-contract.js';
+import { identifierSchema, parseUnlocatedQuery, parseViewportQuery } from '../contracts/map-contract.js';
+import { MapQueryError } from '../errors.js';
 import type { AdapterQueryJob, BigQueryViewAdapter } from './bigquery-adapter.js';
 import { publicRecordKeysSchema, preparePublicRecordQuery } from './public-record-queries.js';
 import { approvedUnlocatedScopeSchema, prepareUnlocatedQuery } from './unlocated-queries.js';
@@ -13,7 +14,7 @@ const queryInputSchema = z.strictObject({
   family: z.enum(['viewport', 'unlocated', 'publicRecords']).optional(),
   recordKeys: publicRecordKeysSchema.optional(),
   approvedScope: approvedUnlocatedScopeSchema.optional(),
-  publicSourceIds: z.array(z.string().min(1).max(256).regex(/^\S+$/)).max(1_000).optional(),
+  publicSourceIds: z.array(identifierSchema).max(1_000).optional(),
   resultBudgetBytes: z.number().int().min(2).optional(),
 });
 const jsonRecordSchema = z.record(z.string(), z.json());
@@ -33,29 +34,7 @@ export type ViewQueryResult = {
   readonly reason: 'rowLimit' | 'byteLimit' | 'pageLimit';
 };
 
-const errors = {
-  invalidRequest: { status: 400, retryable: false },
-  cursorMismatch: { status: 400, retryable: false },
-  notAvailable: { status: 410, retryable: false },
-  budgetExceeded: { status: 503, retryable: false },
-  queryTimeout: { status: 504, retryable: true },
-  serviceUnavailable: { status: 503, retryable: true },
-};
-export type MapQueryErrorCode = keyof typeof errors;
-
-/** Never attach SDK messages, SQL, project paths, job IDs, or row contents. */
-export class MapQueryError extends Error {
-  readonly messageKey: string;
-  readonly status: number;
-  readonly retryable: boolean;
-  constructor(readonly code: MapQueryErrorCode) {
-    super(`Map query failed: ${code}`);
-    this.name = 'MapQueryError';
-    this.messageKey = `map.error.${code}`;
-    this.status = errors[code].status;
-    this.retryable = errors[code].retryable;
-  }
-}
+export { MapQueryError, type MapQueryErrorCode } from '../errors.js';
 
 function safeQueryError(error: unknown): MapQueryError {
   if (error instanceof MapQueryError) return error;

@@ -1,13 +1,15 @@
 import { z } from 'zod';
 
 import {
-  MAX_PAGE_ITEMS, coverageSchema, layerResultSchema, timeWindowSchema,
-  type Bbox, type Coverage, type LayerId, type LayerResult, type MapItem,
+  MAX_PAGE_ITEMS, compareInstants, coverageSchema, identifierSchema as identifier, layerResultSchema,
+  timeWindowSchema, type Bbox, type Coverage, type LayerId, type LayerResult, type MapItem,
   type TimeWindow, type ViewportQuery,
 } from '../contracts/map-contract.js';
-import { MapQueryError, type ViewQueryResult } from './query-runner.js';
+import { MapQueryError } from '../errors.js';
+import type { ViewQueryResult } from './query-runner.js';
 
-const identifier = z.string().min(1).max(256).regex(/^\S+$/);
+/** Source metadata instants are validated contract instants, so the contract comparison applies. */
+export const compareSourceInstants = compareInstants;
 const instant = timeWindowSchema.shape.from;
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const sourceRowSchema = z.object({
@@ -62,18 +64,6 @@ export interface CoverageQueryRunner {
 export type SourceCoverageReader = (
   request: ViewportQuery, execution?: { readonly signal?: AbortSignal },
 ) => Promise<SourceCoverageSnapshot>;
-
-/** Compare validated public instants without losing BigQuery microseconds. */
-export function compareSourceInstants(left: string, right: string): number {
-  const micros = (value: string) => {
-    const fraction = /\.(\d+)Z$/.exec(value)?.[1] ?? '';
-    return BigInt(Date.parse(value.replace(/\.\d+Z$/, 'Z'))) * 1_000n
-      + BigInt(fraction.padEnd(6, '0'));
-  };
-  const a = micros(left);
-  const b = micros(right);
-  return a === b ? 0 : a < b ? -1 : 1;
-}
 
 export function parseSourceCoverage(result: ViewQueryResult): SourceCoverageSnapshot {
   try {

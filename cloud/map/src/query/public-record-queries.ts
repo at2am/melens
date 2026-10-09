@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import type { MapConfig } from '../config.js';
-import type { ViewportQuery } from '../contracts/map-contract.js';
+import { identifierSchema as id, type ViewportQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import type { ViewQueryId } from './view-queries.js';
 
-const id = z.string().min(1).max(256).regex(/^\S+$/);
 export const publicRecordKeysSchema = z.array(z.strictObject({
   id, versionId: id, sourceId: id, sensorId: id.optional(), observedAt: z.string().max(32).optional(),
 })).min(1).max(1_000);

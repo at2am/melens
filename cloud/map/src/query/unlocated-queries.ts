@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import type { MapConfig } from '../config.js';
-import type { UnlocatedQuery } from '../contracts/map-contract.js';
+import { identifierSchema as id, type UnlocatedQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import type { ViewQueryId } from './view-queries.js';
 
-const id = z.string().min(1).max(256).regex(/^\S+$/);
 export const approvedUnlocatedScopeSchema = z.strictObject({
   sourceIds: z.array(id).min(1).max(1_000), areaRefs: z.array(id).max(1_000),
   sourceJurisdiction: z.string().min(1).max(4_096).nullable(),

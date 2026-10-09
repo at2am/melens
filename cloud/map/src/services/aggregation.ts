@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import {
-  MAX_PAGE_ITEMS, MAX_RESPONSE_BYTES, bboxSchema, mapItemSchema,
+  MAX_PAGE_ITEMS, MAX_RESPONSE_BYTES, bboxSchema, compareMapItems, mapItemSchema,
+  normalizedInstant as canonicalInstant,
 } from '../contracts/map-contract.js';
 import type { Bbox, LayerResult, MapItem, TimeWindow } from '../contracts/map-contract.js';
+import { deepFreeze, jsonBytes } from '../util.js';
 
 export type ZoomBand = 'overview' | 'district' | 'neighbourhood' | 'closeUp';
 export type AggregateItem = Extract<MapItem, { kind: 'aggregate' }>;
@@ -57,7 +59,7 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
   const excludedIds: string[] = [];
   const passthrough: MapItem[] = [];
   const buckets = new Map<string, PointItem[]>();
-  for (const candidate of [...layer.items].sort(compareItems)) {
+  for (const candidate of [...layer.items].sort(compareMapItems)) {
     if (candidate.layerId !== layer.layerId) throw new TypeError('Aggregation item does not belong to its layer');
     if (seenIds.has(candidate.id)) throw new TypeError('A snapshot layer must contain one version per stable item id');
     seenIds.add(candidate.id);
@@ -65,7 +67,7 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
       excludedIds.push(candidate.id);
       continue;
     }
-    const item = freezeItem(mapItemSchema.parse(candidate));
+    const item = deepFreeze(mapItemSchema.parse(candidate));
     if (item.geometry?.type !== 'Point' || !isGroupable(item)) {
       passthrough.push(item);
       continue;
@@ -89,7 +91,7 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
     items.push(aggregate);
     groups.set(aggregate.id, Object.freeze({ aggregate, members: Object.freeze([...members]) }));
   }
-  items.sort(compareItems);
+  items.sort(compareMapItems);
   assertByteLimit(items);
   return { band, items, groups, excludedIds };
 }
@@ -116,11 +118,7 @@ function isGroupable(item: MapItem): item is GroupableItem {
 }
 
 function normalizedInstant(value: string | null): string | null {
-  if (value === null) return null;
-  return value.replace(/\.(\d+)Z$/, (_match, fraction: string) => {
-    const significant = fraction.replace(/0+$/, '');
-    return significant === '' ? 'Z' : `.${significant}Z`;
-  });
+  return value === null ? null : canonicalInstant(value);
 }
 
 function sourceIds(item: MapItem): string[] {
@@ -223,7 +221,7 @@ function createAggregate(members: readonly PointItem[], layer: LayerResult, view
   };
   const parsed = mapItemSchema.parse(aggregate);
   if (parsed.kind !== 'aggregate') throw new TypeError('Expected aggregate');
-  return freezeItem(parsed);
+  return deepFreeze(parsed);
 }
 
 function memberBounds(members: readonly PointItem[], viewportBounds: Bbox): Bbox {
@@ -259,24 +257,10 @@ function compareStrings(left: string, right: string): number {
   return left === right ? 0 : left < right ? -1 : 1;
 }
 
-function compareItems(left: MapItem, right: MapItem): number {
-  return compareStrings(left.layerId, right.layerId) || compareStrings(left.id, right.id) || compareStrings(left.versionId, right.versionId);
-}
-
 function digest(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
 function assertByteLimit(items: readonly MapItem[]): void {
-  if (Buffer.byteLength(JSON.stringify(items), 'utf8') > MAX_RESPONSE_BYTES) throw new RangeError('Aggregation exceeds the 2 MiB response limit');
-}
-
-function freezeItem<T extends MapItem>(item: T): T {
-  function freeze(value: unknown): void {
-    if (typeof value !== 'object' || value === null || Object.isFrozen(value)) return;
-    for (const child of Object.values(value)) freeze(child);
-    Object.freeze(value);
-  }
-  freeze(item);
-  return item;
+  if (jsonBytes(items) > MAX_RESPONSE_BYTES) throw new RangeError('Aggregation exceeds the 2 MiB response limit');
 }

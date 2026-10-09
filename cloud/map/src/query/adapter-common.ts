@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { geometrySchema, sourceReferenceSchema, type MapGeometry, type MapItem }
+import { compareInstants, compareMapItems, geometrySchema, sourceReferenceSchema, type MapGeometry, type MapItem }
   from '../contracts/map-contract.js';
 import type { ViewRow } from './query-runner.js';
 
@@ -50,18 +50,22 @@ export function publishedInstant(value: unknown): string | null {
   return parsed.data;
 }
 
-function instantMicroseconds(value: string): bigint {
+function requirePublishedInstant(value: unknown): string {
   const parsed = publishedInstant(value);
   if (parsed === null) throw new MapAdapterError();
+  return parsed;
+}
+
+function instantMicroseconds(value: string): bigint {
+  const parsed = requirePublishedInstant(value);
   const fraction = /\.(\d+)Z$/.exec(parsed)?.[1] ?? '';
   return BigInt(Date.parse(parsed.replace(/\.\d+Z$/, 'Z'))) * 1_000n
     + BigInt(fraction.padEnd(6, '0'));
 }
 
+/** Both operands must be published instants; a malformed one fails the record, not the comparison. */
 export function comparePublishedInstants(left: string, right: string): number {
-  const a = instantMicroseconds(left);
-  const b = instantMicroseconds(right);
-  return a === b ? 0 : a < b ? -1 : 1;
+  return compareInstants(requirePublishedInstant(left), requirePublishedInstant(right));
 }
 
 export function offsetPublishedInstant(value: string, deltaMs: number): string {
@@ -183,14 +187,10 @@ export function resolvePublishedSource(row: ViewRow, resolveSource: PublicSource
 
 /** Fail the layer rather than silently dropping malformed records or preserving a false exact count. */
 export function orderedPublishedItems<T extends MapItem>(items: readonly T[]): T[] {
-  const compare = (a: string, b: string) => a === b ? 0 : a < b ? -1 : 1;
-  const ordered = [...items].sort((a, b) => compare(a.layerId, b.layerId)
-    || compare(a.id, b.id) || compare(a.versionId, b.versionId));
-  if (ordered.some((item, index) => {
-    const previous = ordered[index - 1];
-    return previous !== undefined && previous.layerId === item.layerId
-      && previous.id === item.id && previous.versionId === item.versionId;
-  })) throw new MapAdapterError();
+  const ordered = [...items].sort(compareMapItems);
+  if (ordered.some((item, index) => index > 0 && compareMapItems(ordered[index - 1]!, item) === 0)) {
+    throw new MapAdapterError();
+  }
   return ordered;
 }
 

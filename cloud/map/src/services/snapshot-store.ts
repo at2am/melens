@@ -2,12 +2,10 @@ import { randomBytes } from 'node:crypto';
 
 import { SNAPSHOT_TTL_MS, type LayerId, type LayerResult, type MapItem,
   type MapItemPage, type UnlocatedQuery, type ViewportQuery } from '../contracts/map-contract.js';
+import { MapServiceError } from '../errors.js';
+import { deepFreeze, jsonBytes } from '../util.js';
 
-export type MapServiceErrorCode = 'invalidRequest' | 'cursorMismatch' | 'notFound' | 'notAvailable'
-  | 'snapshotExpired' | 'rateLimited' | 'budgetExceeded' | 'queryTimeout' | 'serviceUnavailable';
-export class MapServiceError extends Error {
-  constructor(readonly code: MapServiceErrorCode) { super(`Map request failed: ${code}`); }
-}
+export { MapServiceError, type MapServiceErrorCode } from '../errors.js';
 export interface SourceWatermark { readonly sourceId: string; readonly batchId: string; readonly publishedAt: string }
 export interface StoredMemberGroup { readonly aggregate: Extract<MapItem, { kind: 'aggregate' }>; readonly members: readonly MapItem[] }
 export interface StoredSnapshot {
@@ -33,15 +31,7 @@ export interface StoredCursor {
   readonly aggregateId: string | null; readonly offset: number; readonly pageSize: number;
 }
 
-function freeze<T>(value: T): T {
-  if (value !== null && typeof value === 'object') {
-    for (const nested of Object.values(value)) freeze(nested);
-    Object.freeze(value);
-  }
-  return value;
-}
 const token = () => randomBytes(24).toString('base64url');
-const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), 'utf8');
 
 /** Bounded in-process immutable pages; tokens contain no source or query contents. */
 export function createSnapshotStore(options: {
@@ -60,7 +50,7 @@ export function createSnapshotStore(options: {
   function remove(id: string, markExpired: boolean) {
     const entry = snapshots.get(id);
     if (entry !== undefined) { memoryBytes -= entry.bytes; snapshots.delete(id); }
-    for (const [key, cursor] of cursors) if (cursor.snapshotId === id) { memoryBytes -= bytes(cursor); cursors.delete(key); }
+    for (const [key, cursor] of cursors) if (cursor.snapshotId === id) { memoryBytes -= jsonBytes(cursor); cursors.delete(key); }
     if (markExpired) {
       expired.add(id);
       while (expired.size > maxSnapshots * 2) expired.delete(expired.values().next().value!);
@@ -74,8 +64,8 @@ export function createSnapshotStore(options: {
     create(input: Omit<StoredSnapshot, 'id' | 'createdAt' | 'expiresAt'>): StoredSnapshot {
       prune();
       const createdAt = now();
-      const snapshot = freeze(structuredClone({ ...input, id: token(), createdAt, expiresAt: createdAt + SNAPSHOT_TTL_MS }));
-      const size = bytes(snapshot);
+      const snapshot = deepFreeze(structuredClone({ ...input, id: token(), createdAt, expiresAt: createdAt + SNAPSHOT_TTL_MS }));
+      const size = jsonBytes(snapshot);
       if (size > maxBytes || snapshots.size >= maxSnapshots || memoryBytes + size > maxBytes) throw new MapServiceError('rateLimited');
       snapshots.set(snapshot.id, { snapshot, bytes: size }); memoryBytes += size;
       return snapshot;
@@ -95,10 +85,10 @@ export function createSnapshotStore(options: {
         const { id: _id, ...binding } = cursor;
         if (JSON.stringify(binding) === JSON.stringify(input)) return cursor.id;
       }
-      const cursor = freeze({ ...input, id: token() });
-      if (cursors.size >= maxCursors || memoryBytes + bytes(cursor) > maxBytes) throw new MapServiceError('rateLimited');
+      const cursor = deepFreeze({ ...input, id: token() });
+      if (cursors.size >= maxCursors || memoryBytes + jsonBytes(cursor) > maxBytes) throw new MapServiceError('rateLimited');
       // Cursor overhead is separately bounded by maxCursors; reserve it against total memory too.
-      cursors.set(cursor.id, cursor); memoryBytes += bytes(cursor);
+      cursors.set(cursor.id, cursor); memoryBytes += jsonBytes(cursor);
       return cursor.id;
     },
     readCursor(id: string): StoredCursor {
