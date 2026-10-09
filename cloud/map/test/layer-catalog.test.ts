@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseMapLayerCatalog } from '../src/contracts/map-contract.js';
-import { MapQueryError } from '../src/query/query-runner.js';
-import { parseSourceCoverage, type SourceCoverageReader } from '../src/query/source-coverage.js';
+import { parseMapLayerCatalog } from '@melens/shared/contracts/map-contract';
+import { MapQueryError } from '@melens/shared/query/query-runner';
+import { parseSourceCoverage, type SourceCoverageReader } from '@melens/shared/query/source-coverage';
 import { createLayerCatalogService } from '../src/services/layer-catalog.js';
 
 const snapshot = parseSourceCoverage({ kind: 'complete', rows: [{

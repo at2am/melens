@@ -4,19 +4,19 @@ This Node.js 24 service returns bounded JSON/GeoJSON from admitted published Big
 
 ## Local commands
 
-Use Node.js `>=24 <25`. Dependencies match the existing ingestion package: TypeScript 5.9.3, Node types 24.19.0, BigQuery 9.1.0 and Zod 4.6.5. `package-lock.json` locks the dependency tree.
+Use Node.js `>=24 <25`. `cloud/` is an npm workspace: the shared query library (`cloud/shared`, [README](../shared/README.md)) and this service install from one `cloud/package-lock.json`. Dependencies match the ingestion package: TypeScript 5.9.3, Node types 24.19.0, BigQuery 9.1.0 and Zod 4.6.5.
 
 ```sh
-cd cloud/map
+cd cloud
 node --version
 npm ci
-npm run typecheck
-npm run build
-npm test
-npm run dev
+npm run typecheck --workspace map
+npm run build --workspace map
+npm run test --workspace map
+npm run dev --workspace map
 ```
 
-`dev` uses Node 24's native TypeScript support and watches the health-only entrypoint. It does not rebuild the shared `dist` directory. The compiler writes source and test output into `dist`; `test` builds once and runs compiled tests with Node's test runner. Parallel workers coordinate build/test runs because they share that directory.
+`build` and `typecheck` compile `cloud/shared` first (`prebuild`), because the compiler resolves `@melens/shared/…` to that package's `dist`. `dev` uses Node 24's native TypeScript support and watches the health-only entrypoint; it does not rebuild `dist`. The compiler writes source and test output into `dist`; `test` builds once and runs compiled tests with Node's test runner. Parallel workers coordinate build/test runs because they share that directory.
 
 The development server binds to `127.0.0.1:8081`, matching the app's local map URL. The agent service keeps port 8080. Set `PORT` to choose another port. `PORT=0` requests an ephemeral port, which the structured startup log reports. It accepts no map data, loads no query configuration and requires no Google credentials. Stop it with Ctrl-C.
 
@@ -42,18 +42,12 @@ Only an explicitly selected development sample repository may return sample data
 
 ## Code layout
 
+The contract, the query families, the query runner, the layer adapters, source coverage and the layer loaders live in `@melens/shared` ([cloud/shared/README.md](../shared/README.md)), because the agent service reads the same views under the same rules. This service keeps what only a map needs:
+
 | Module | Responsibility |
 | --- | --- |
 | `src/server.ts` | HTTP transport: route matching, CORS preflight, bounded bodies, concurrency, timeouts, error envelopes |
-| `src/map-service.ts` | Composition root that wires the modules below together |
-| `src/errors.ts` | The one error-code table (status, retryable) and the error classes |
-| `src/contracts/map-contract.ts` | Frozen contract v1 schemas, instant comparison and the stable item order |
-| `src/query/sql.ts` | SQL fragments shared by every query family: projections, filters, scan budgets |
-| `src/query/view-queries.ts`, `unlocated-queries.ts`, `public-record-queries.ts` | The three fixed query families, composed from those fragments |
-| `src/query/query-runner.ts`, `bigquery-adapter.ts` | Dry run, byte/row/time bounds and cancellation; the only BigQuery client |
-| `src/query/layer-adapters.ts` plus the per-layer adapter modules | Published rows to contract items; the registry drives every layer check |
-| `src/query/source-coverage.ts` | Source admission, publication and coverage assessment |
-| `src/services/layer-loaders.ts` | Viewport and unlocated layer loads over the runner |
+| `src/map-service.ts` | Composition root that wires the shared query modules and the services below together |
 | `src/services/public-records.ts` | Recheck that stored rows are still public before every snapshot read |
 | `src/services/viewport.ts`, `details.ts`, `unlocated.ts`, `page-budget.ts` | Snapshot-bound page services and the byte-budget page fitting they share |
 | `src/services/snapshot-store.ts` | Bounded in-memory snapshots and cursors |

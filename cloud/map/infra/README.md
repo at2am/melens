@@ -7,20 +7,23 @@ enable Firebase APIs or create a Hosting site.
 
 The integrator runs final server/client checks before building and applying the
 deployment. Use Node.js 24; the Docker image pins 24.21.0 and runs the T014
-`dist/src/server.js` entrypoint as an unprivileged user. Build this package as the
-container context. It contains only the reviewed public registry; credentials
-come from the dedicated Cloud Run runtime identity.
+`map/dist/src/server.js` entrypoint as an unprivileged user. Build from the `cloud/`
+directory as the container context, through `cloud/map/cloudbuild.yaml`, so the image
+includes the shared query library (`cloud/shared`). It contains only the reviewed
+public registry; credentials come from the dedicated Cloud Run runtime identity.
 
-The package `.gcloudignore` uploads only the Dockerfile, Docker ignore rules,
-locked package files, TypeScript configuration, source and public registry.
-Tests, dependencies, compiled output and credential/config files are excluded.
+`cloud/.gcloudignore` uploads only the Docker ignore rules, the locked workspace
+package files, TypeScript configuration, source and public registry of `cloud/shared`
+and `cloud/map`. Tests, dependencies, compiled output, `cloud/data` and
+credential/config files are excluded.
 
 ```sh
-gcloud builds submit cloud/map --project=melens-510012 \
+gcloud builds submit cloud --project=melens-510012 \
   --region=australia-southeast2 --timeout=600s \
   --gcs-source-staging-dir=gs://melens-510012_cloudbuild/map-preview/source \
   --gcs-log-dir=gs://melens-510012_cloudbuild/map-preview/logs \
-  --tag=australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map:dev-preview-20261001
+  --config=cloud/map/cloudbuild.yaml \
+  --substitutions=_IMAGE=australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map:dev-preview-20261001
 gcloud artifacts docker images describe \
   australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map:dev-preview-20261001 \
   --project=melens-510012 --format='value(image_summary.digest)'

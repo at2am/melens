@@ -1,0 +1,17 @@
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/test/
+data/
+.git/
+.dockerignore
+.gcloudignore
+**/Dockerfile*
+**/cloudbuild.yaml
+**/*.log*
+**/.env*
+**/*.key
+**/*.pem
+**/*service-account*.json
+**/*credentials*.json

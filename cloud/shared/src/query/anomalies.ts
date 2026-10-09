@@ -5,7 +5,7 @@ import {
   type MapItem, type TimeWindow, type ViewportQuery,
 } from '../contracts/map-contract.js';
 import { MapQueryError } from '../errors.js';
-import type { ViewportLayerLoader } from '../services/viewport.js';
+import type { ViewportLayerLoader } from './layer-loaders.js';
 import { publishedItemBatch, type PublishedItemBatch } from './adapter-common.js';
 import {
   assessLayerCoverage, compareSourceInstants, finalizeLayerResult, findPublicSource,

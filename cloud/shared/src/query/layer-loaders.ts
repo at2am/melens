@@ -1,13 +1,31 @@
-import type { LayerId } from '../contracts/map-contract.js';
+import type { LayerId, LayerResult, MapItem, UnlocatedQuery, ViewportQuery } from '../contracts/map-contract.js';
 import { MapServiceError } from '../errors.js';
-import { MapAdapterError, type PublicSourceResolver } from '../query/adapter-common.js';
+import { MapAdapterError, type PublicSourceResolver } from './adapter-common.js';
 import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, UNLOCATED_LAYERS, adaptContext, adaptLayerRows }
-  from '../query/layer-adapters.js';
-import type { ViewQueryResult } from '../query/query-runner.js';
+  from './layer-adapters.js';
+import type { ViewQueryResult } from './query-runner.js';
 import { assessLayerCoverage, finalizeLayerResult, sourceBelongsToLayer, type CoverageAreaResolver,
-  type SourceCoverageSnapshot } from '../query/source-coverage.js';
-import type { UnlocatedLayerLoader } from './unlocated.js';
-import type { ViewportLayerLoader } from './viewport.js';
+  type SourceCoverageSnapshot } from './source-coverage.js';
+import type { ApprovedUnlocatedScope } from './unlocated-queries.js';
+
+/** Members of one aggregate, kept with the layer so a detail read can list them without a second query. */
+export interface LoadedMemberGroup {
+  readonly aggregate: Extract<MapItem, { kind: 'aggregate' }>; readonly members: readonly MapItem[];
+}
+export interface LoadedViewportLayer {
+  readonly result: LayerResult; readonly groups?: readonly LoadedMemberGroup[];
+}
+/** Bounds every caller passes to a layer load: cancellation plus the row and byte budget it may spend. */
+export interface LayerExecution {
+  readonly signal?: AbortSignal; readonly rowLimit: number; readonly resultBudgetBytes: number;
+}
+export type ViewportLayerLoader = (request: ViewportQuery, layerId: LayerId,
+  coverage: SourceCoverageSnapshot, execution: LayerExecution) => Promise<LoadedViewportLayer>;
+export interface LoadedUnlocatedLayer {
+  readonly items: readonly MapItem[]; readonly completeness: 'complete' | 'partial'; readonly totalMatching: number | null;
+}
+export type UnlocatedLayerLoader = (query: UnlocatedQuery, layerId: LayerId,
+  coverage: SourceCoverageSnapshot, scope: ApprovedUnlocatedScope, execution: LayerExecution) => Promise<LoadedUnlocatedLayer>;
 
 export interface LayerLoaderDependencies {
   readonly runQuery: (input: unknown, execution: { readonly signal?: AbortSignal }) => Promise<ViewQueryResult>;

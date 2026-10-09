@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import {
   MAX_PAGE_ITEMS, MAX_RESPONSE_BYTES, bboxSchema, compareMapItems, mapItemSchema,
   normalizedInstant as canonicalInstant,
-} from '../contracts/map-contract.js';
-import type { Bbox, LayerResult, MapItem, TimeWindow } from '../contracts/map-contract.js';
+} from '@melens/shared/contracts/map-contract';
+import type { Bbox, LayerResult, MapItem, TimeWindow } from '@melens/shared/contracts/map-contract';
 import { deepFreeze, jsonBytes } from '../util.js';
 
 export type ZoomBand = 'overview' | 'district' | 'neighbourhood' | 'closeUp';

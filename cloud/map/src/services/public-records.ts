@@ -1,8 +1,8 @@
-import { MAX_PAGE_ITEMS } from '../contracts/map-contract.js';
-import type { PublicSourceResolver } from '../query/adapter-common.js';
-import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, adaptContext, adaptLayerRows } from '../query/layer-adapters.js';
-import type { ViewQueryResult } from '../query/query-runner.js';
-import type { SourceCoverageSnapshot } from '../query/source-coverage.js';
+import { MAX_PAGE_ITEMS } from '@melens/shared/contracts/map-contract';
+import type { PublicSourceResolver } from '@melens/shared/query/adapter-common';
+import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, adaptContext, adaptLayerRows } from '@melens/shared/query/layer-adapters';
+import type { ViewQueryResult } from '@melens/shared/query/query-runner';
+import type { SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { coverageRequest, type SnapshotAccess } from './viewport.js';
 
 export type PublicRecordChecker = NonNullable<SnapshotAccess['checkPublicRecords']>;

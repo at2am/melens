@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { loadMapConfig } from '../src/config.js';
-import { MAX_RESPONSE_BYTES, type MapItem, type ViewportResponse } from '../src/contracts/map-contract.js';
+import { loadMapConfig } from '@melens/shared/config';
+import { MAX_RESPONSE_BYTES, type MapItem, type ViewportResponse } from '@melens/shared/contracts/map-contract';
 import { createMapService } from '../src/map-service.js';
-import type { BigQueryViewAdapter, PreparedViewQuery } from '../src/query/bigquery-adapter.js';
-import { adaptPlanningRows } from '../src/query/planning.js';
-import { adaptEventRows } from '../src/query/events.js';
-import { parseSourceCoverage } from '../src/query/source-coverage.js';
+import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
+import { adaptPlanningRows } from '@melens/shared/query/planning';
+import { adaptEventRows } from '@melens/shared/query/events';
+import { parseSourceCoverage } from '@melens/shared/query/source-coverage';
 import { aggregateLayer } from '../src/services/aggregation.js';
 import { createSnapshotStore, MapServiceError } from '../src/services/snapshot-store.js';
 import { createViewportService } from '../src/services/viewport.js';

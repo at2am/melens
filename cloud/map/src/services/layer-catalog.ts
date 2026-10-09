@@ -1,9 +1,9 @@
 import {
   MAP_SCHEMA_VERSION, SERVICE_BBOX, parseMapLayerCatalog, parseViewportQuery,
   type MapLayerCatalog,
-} from '../contracts/map-contract.js';
-import { MapQueryError } from '../query/query-runner.js';
-import { assessLayerCoverage, type SourceCoverageReader } from '../query/source-coverage.js';
+} from '@melens/shared/contracts/map-contract';
+import { MapQueryError } from '@melens/shared/query/query-runner';
+import { assessLayerCoverage, type SourceCoverageReader } from '@melens/shared/query/source-coverage';
 
 type Registration = Pick<MapLayerCatalog['layers'][number],
   'id' | 'titleKey' | 'topic' | 'defaultEnabled' | 'supportedModes' | 'timeSemantics'>;
