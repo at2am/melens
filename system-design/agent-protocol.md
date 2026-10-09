@@ -1,6 +1,6 @@
 # Agent protocol
 
-**Status:** Draft. Revised 2026-10-09 for the agent service runtime (own Cloud Run service, TypeScript, map contract ids, sessions persisted per user). Plan task F3 (agent framework contract and result card format) finalises it.
+**Status:** Draft. Revised 2026-10-09 for the agent service runtime (own Cloud Run service, TypeScript, map contract ids, sessions persisted per user) and for streamed token usage. Plan task F3 (agent framework contract and result card format) finalises it.
 
 How the Flutter app talks to the agent service on Cloud Run. The app is an agent client: it sends context, renders streamed events, applies UI actions and renders cards. It never calls a language model itself; all reasoning, tools, keys and source checks stay on the server.
 
@@ -26,6 +26,7 @@ Flutter                                  Cloud Run: agent service (ADK, TypeScri
   │◀── text      streamed text               │
   │◀── ui_action focus_map / draw_route      │ when the agent calls a UI action tool
   │◀── card      {type: "plan", …}           │ only after source validation
+  │◀── usage     {call, turn}                │ after every model call
   │◀── done      {stop, usage}               │
 ```
 
@@ -66,8 +67,9 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 | `ui_action` | `action` (`show_layers`, `focus_map`, `draw_route`, `highlight_features`) and its arguments | The map controller applies it |
 | `card` | `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution | Renders the card widget for that type, with sources and Google Maps attribution |
 | `question` | `id`, `text`, `options`, `allowFreeText` | Shows the question with one button per option; a tap sends an `answer` input |
-| `done` | `stop` (`end`, `asked`, `budget`, `cancelled`), `usage` | Ends the turn |
-| `error` | `message`, `retryable` | Shows the error; the user may retry if `retryable` |
+| `usage` | `call` (one model call: `index`, `agent`, `model`, token counts, `durationMs`) and `turn` (running totals) | Updates the token counter of the turn in progress; see [Token usage](#token-usage) |
+| `done` | `stop` (`end`, `asked`, `budget`, `cancelled`), `usage` (the final `turn` totals plus `complete`) | Ends the turn |
+| `error` | `message`, `retryable`, `usage` (totals so far, `complete: false` when a model call was cut off) | Shows the error; the user may retry if `retryable` |
 
 ## Rules
 
@@ -78,6 +80,39 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 5. **Cancellation reaches the server.** When the user taps stop or leaves the screen, the app aborts the request. The server detects the disconnect and cancels the run, so it stops spending tokens and grounding calls.
 6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. Tapping an option sends an `answer` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
 
+## Token usage
+
+The app sees what a turn costs while it runs, not only at the end. The service sends one `usage` event per model call, as soon as that call's final response has arrived and before the tool calls it requested run, and repeats the final totals in `done`.
+
+```json
+{
+  "event": "usage", "turnId": "t_8f3c", "seq": 9,
+  "call": { "index": 3, "agent": "map_agent", "model": "gemini-3.8-flash",
+            "input": 6210, "cachedInput": 4096, "output": 182, "thoughts": 540,
+            "toolUseInput": 0, "total": 6932, "durationMs": 1870 },
+  "turn": { "calls": 3, "input": 15930, "cachedInput": 8192, "output": 410,
+            "thoughts": 1300, "toolUseInput": 0, "total": 17640 }
+}
+```
+
+| Field | Gemini `usageMetadata` field | Meaning |
+| --- | --- | --- |
+| `input` | `promptTokenCount` | The whole prompt of that call, cached part included |
+| `cachedInput` | `cachedContentTokenCount` | The part of `input` served from Gemini's cache, billed at the cache rate |
+| `output` | `candidatesTokenCount` | Answer text and function calls |
+| `thoughts` | `thoughtsTokenCount` | Thinking tokens, billed at the output rate |
+| `toolUseInput` | `toolUsePromptTokenCount` | Prompt tokens added by Gemini's built-in grounding tools |
+| `total` | `totalTokenCount` | Gemini's own total (documented as prompt, thoughts and candidates), copied, never recomputed |
+
+`call.index` counts the model calls of the turn from 1. `call.agent` names the caller: `map_agent`, a workflow (`workflow:area_brief`, `workflow:analyse_anomaly`) or a grounding sub-agent (`grounding:maps`, `grounding:search`). `turn` holds the running sums over every call so far, whoever made it. `done.usage` is the last `turn` object plus `complete`: `true` when every model call of the turn finished and reported usage, `false` when the turn was cancelled or failed while a model call was in flight, so that call's tokens are missing from the totals although Gemini may still bill them. `error` carries the same object.
+
+Rules that keep the numbers accurate:
+
+1. **Copied from Gemini, never estimated.** Every count is the `usageMetadata` Vertex AI returned for that call. The service never runs `countTokens`, a tokenizer or a character heuristic, and never fills a gap with a guess. A field Gemini did not return is `0`.
+2. **One reading per call, from the final response.** Streamed chunks may carry provisional counts; only the final, non-partial response of a call is authoritative. The service reads usage once from that response (`LlmResponse.usageMetadata` in `@google/adk`) and never adds chunk values together. A generation Gemini pauses and ADK resumes is one call, with the usage ADK sums across the resumed requests.
+3. **Every call counts, in full.** Loop calls, workflow generations and grounding sub-agent calls all report. Each call's prompt is counted whole, so `turn.input` grows with every call; that is the billed figure, not the size of the conversation.
+4. **Stream and store agree.** The `turn` object of the last `usage` event, `done.usage` and the `usage` stored in the turn document hold the same numbers; the eval compares them.
+
 ## Sessions
 
 Sessions are stored in Firestore in the project's agent database. Only the agent service reads or writes them, through the Admin SDK; client security rules deny all access, and the app never holds Firestore credentials.
@@ -85,7 +120,7 @@ Sessions are stored in Firestore in the project's agent database. Only the agent
 | Document | Fields |
 | --- | --- |
 | `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`) or null, `expiresAt` for the TTL policy |
-| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, row counts) and `usage` |
+| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, row counts) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
 
 Stored is what the app needs to redraw the conversation and what the model needs for the next turn: user input, answer text, cards, questions and answers, and the compact trace. The request `context` is not stored, and `userLocation` never is. Full tool results and grounding payloads are not stored with the session; grounding has its own cache.
 
@@ -102,7 +137,7 @@ Firebase Anonymous Auth gives every user, judges included, a uid without a sign-
 | Part | Responsibility |
 | --- | --- |
 | `AgentClient` | Transport, SSE parsing, cancellation |
-| `ChatController` | Conversation state, the turn in progress and any pending question; restores a session from `GET /v1/sessions/{sessionId}` |
+| `ChatController` | Conversation state, the turn in progress, any pending question and the turn's running token counter from `usage` events; restores a session from `GET /v1/sessions/{sessionId}` |
 | `SessionList` | Lists, switches, creates and deletes the user's sessions |
 | `MapActions` | Applies `ui_action` events to the map |
 | Card registry | One widget per card `type`, which maps to a use case |
