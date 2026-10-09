@@ -71,9 +71,15 @@ A 1 GB scan costs about USD 0.006 and is bounded by concurrency 8 on one instanc
 Fresh dry runs must still confirm the estimate before apply. The library's dynamic
 default remains 100,000,000 bytes; static/historical queries remain at 500,000,000 bytes.
 
-Follow-up (owner: data): partition or cluster `melens_ingest.geo_records` by topic and
-publication state so the current view's scan prunes to the requested topic, then lower
-the ceiling again. Until then it keeps climbing with every 15-minute news batch.
+Follow-up (owner: data, [issue #9](https://github.com/at2am/melens/issues/9)): on
+2026-10-09 `v_geo_records_current` estimated about 460,000,000 bytes with or without a topic
+filter, while `melens_ingest.geo_records` itself held 259,970,843 bytes. The view's window
+functions do not include `topic`, so the filter is not pushed down, and its GTFS/road
+membership CTEs read `source_records` and `geo_record_sources` in full on every query. The
+guard compares the dry-run estimate, which ignores cluster pruning, so clustering alone
+cannot lower it and BigQuery cannot partition on a string topic. The recommended fix is a
+publisher-maintained current table that the view and its dependants read; then lower the
+ceiling again. Until then the estimate keeps climbing with every 15-minute news batch.
 
 `dev-public-sources.json` contains only municipal boundary and development
 monitor references from their verified-open, active official manifests and
