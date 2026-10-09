@@ -34,7 +34,7 @@ Record the returned digest; use the immutable image for the plan and apply.
 ```sh
 cloud/map/infra/deploy.sh \
   --image australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map@sha256:DIGEST \
-  --allowed-origin http://localhost:8000 --dynamic-scan-bytes 400000000 --verify
+  --allowed-origin http://localhost:8000 --dynamic-scan-bytes 1000000000 --verify
 ```
 
 The script plans by default. `--verify` reads identity, project/dataset/bucket/
@@ -63,10 +63,17 @@ a development deployment, not a durable pagination store or a global monetary
 cap. Public invocation makes these approved reads reachable; CORS allows only
 the explicitly listed app origins and does not authenticate nonbrowser callers.
 
-The explicitly reviewed 400,000,000-byte dynamic ceiling accommodates the
-383,847,461-byte current-geo estimate observed on 2026-10-01. Fresh dry runs must
-still confirm the estimate before apply. The library's dynamic default remains
-100,000,000 bytes; static/historical queries remain at 500,000,000 bytes.
+Two dynamic ceilings are reviewed. 400,000,000 bytes accommodated the
+383,847,461-byte current-geo estimate observed on 2026-10-01. 1,000,000,000 bytes was
+reviewed on 2026-10-09 after that estimate grew to 481,467,396 bytes: every geo topic
+shares `v_geo_records_current`, so each new source raises every current query's scan.
+A 1 GB scan costs about USD 0.006 and is bounded by concurrency 8 on one instance.
+Fresh dry runs must still confirm the estimate before apply. The library's dynamic
+default remains 100,000,000 bytes; static/historical queries remain at 500,000,000 bytes.
+
+Follow-up (owner: data): partition or cluster `melens_ingest.geo_records` by topic and
+publication state so the current view's scan prunes to the requested topic, then lower
+the ceiling again. Until then it keeps climbing with every 15-minute news batch.
 
 `dev-public-sources.json` contains only municipal boundary and development
 monitor references from their verified-open, active official manifests and
@@ -103,18 +110,18 @@ startup is verified; treat that as a separate health-path limitation. The exact
 platform cause is unconfirmed. Do not infer application or BigQuery health from
 this intercepted path, or change working IAM/ingress to repair it.
 
-The 2026-10-09 deployment moved the service to revision `melens-dev-map-00002-g2p`,
-image digest `sha256:fd88fdb18b285b33312e258e7f6021d207ed02e6ddf14a475970c15cf73c017f`
-(the first `cloud/` workspace build carrying `@melens/shared`), with the same identity,
-runtime limits and `http://localhost:8000` origin. The audit's approved list grew to the
-25 views `cloud/data/sql` publishes. Catalog and CORS checks passed under the query
-identity. The current-mode planning viewport returned `unavailable`: its dry run now
-estimates 481,467,396 bytes against the 400,000,000-byte reviewed ceiling (383,847,461 on
-2026-10-01; council engagement rows joined the geo view on 2026-10-07), so the loader
-denies the layer. Historical mode (105,077,139 bytes) still runs. Raising the ceiling or
-partitioning the view is a separate decision; the previous revision would deny the same
-query. `/healthz` still returns the frontend 404. Rollback target:
-`melens-dev-map-00001-kq4`.
+The 2026-10-09 deployments moved the service to image digest
+`sha256:fd88fdb18b285b33312e258e7f6021d207ed02e6ddf14a475970c15cf73c017f` (the first
+`cloud/` workspace build carrying `@melens/shared`) with the same identity, runtime
+limits and `http://localhost:8000` origin. The audit's approved list grew to the 25 views
+`cloud/data/sql` publishes. Revision `melens-dev-map-00002-g2p` kept the 400,000,000-byte
+ceiling and denied current-mode planning, because that dry run had grown to 481,467,396
+bytes (383,847,461 on 2026-10-01; council engagement rows joined the geo view on
+2026-10-07). Revision `melens-dev-map-00003-nlr` raised the ceiling to 1,000,000,000
+bytes; the CBD planning viewport then returned 118 drawable items of 218 matching with
+`completeness: complete`, and catalog and CORS checks passed under the query identity.
+Historical mode (105,077,139 bytes) was unaffected. `/healthz` still returns the frontend
+404. Rollback target: `melens-dev-map-00001-kq4` (400 MB ceiling, pre-workspace image).
 
 Rollback uses the previously recorded Cloud Run revision and
 `gcloud run services update-traffic melens-dev-map --project=melens-510012

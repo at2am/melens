@@ -22,7 +22,7 @@ usage() {
 Usage: deploy.sh --image IMAGE@sha256:DIGEST --allowed-origin ORIGIN [options]
   --project melens-510012          Development project only
   --allowed-origin ORIGIN         Repeat for each reviewed exact origin
-  --dynamic-scan-bytes BYTES       100000000 default; 400000000 reviewed dev ceiling
+  --dynamic-scan-bytes BYTES       100000000 default; 400000000 or 1000000000 reviewed dev ceilings
   --verify                        Read-only cloud identity/publication audit
   --apply --confirm-project ID     Verify, deploy and read back; public map service
 No project/dataset/bucket/secret IAM grants, API enabling or Firebase setup.
@@ -48,7 +48,10 @@ while (($#)); do
   esac
 done
 [[ $project == melens-510012 ]] || fail 'Only the reviewed development project is allowed'
-[[ $dynamic_scan_bytes == 100000000 || $dynamic_scan_bytes == 400000000 ]] || fail 'Unreviewed dynamic scan ceiling'
+# 1000000000 was reviewed on 2026-10-09: the current geo view dry run had grown past 400000000
+# as more topics share the view. Partitioning that view is the lasting fix; see infra/README.md.
+[[ $dynamic_scan_bytes == 100000000 || $dynamic_scan_bytes == 400000000 || $dynamic_scan_bytes == 1000000000 ]] \
+  || fail 'Unreviewed dynamic scan ceiling'
 [[ $image =~ ^australia-southeast2-docker\.pkg\.dev/melens-510012/melens-data/map@sha256:[a-f0-9]{64}$ ]] || fail 'An immutable development map image digest is required'
 ((${#origins[@]} > 0)) || fail 'At least one reviewed app origin is required'
 if $apply; then
