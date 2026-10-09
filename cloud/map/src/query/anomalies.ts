@@ -1,19 +1,18 @@
 import { z } from 'zod';
 
 import {
-  MAX_PAGE_ITEMS, mapItemSchema, normalizedViewportIdentity, timeWindowSchema,
+  MAX_PAGE_ITEMS, identifierSchema as identifier, mapItemSchema, normalizedViewportIdentity, timeWindowSchema,
   type MapItem, type TimeWindow, type ViewportQuery,
 } from '../contracts/map-contract.js';
+import { MapQueryError } from '../errors.js';
 import type { ViewportLayerLoader } from '../services/viewport.js';
 import { publishedItemBatch, type PublishedItemBatch } from './adapter-common.js';
-import { MapQueryError } from './query-runner.js';
 import {
   assessLayerCoverage, compareSourceInstants, finalizeLayerResult, findPublicSource,
   type CoverageAreaResolver, type LayerCoverageAssessment, type SourceCoverageSnapshot,
 } from './source-coverage.js';
 
 export type AnomalyItem = Extract<MapItem, { kind: 'anomaly' }>;
-const identifier = z.string().min(1).max(256).regex(/^\S+$/);
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const distinctIds = z.array(identifier).min(1).max(MAX_PAGE_ITEMS)
   .refine((ids) => new Set(ids).size === ids.length);

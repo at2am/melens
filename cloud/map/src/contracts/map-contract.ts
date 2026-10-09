@@ -10,7 +10,9 @@ export const MAX_WINDOW_MS = 31 * 24 * 60 * 60 * 1_000;
 export const SERVICE_BBOX = [144, -39, 146.5, -37] satisfies [number, number, number, number];
 
 const nonemptyString = z.string().min(1).max(4_096).refine((value) => value.trim().length > 0, 'String must not be blank');
-const identifier = z.string().min(1).max(256).regex(/^\S+$/);
+/** Opaque ids on the wire: source ids, record ids, versions, request ids. */
+export const identifierSchema = z.string().min(1).max(256).regex(/^\S+$/);
+const identifier = identifierSchema;
 const count = z.number().int().nonnegative();
 const instant = z.iso.datetime({ offset: false }).regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/).refine(
   (value) => value.endsWith('Z') && Number.isFinite(Date.parse(value)),
@@ -29,7 +31,8 @@ function compareFractions(left: string, right: string): number {
   return paddedLeft === paddedRight ? 0 : paddedLeft < paddedRight ? -1 : 1;
 }
 
-function compareInstants(left: string, right: string): number {
+/** Compare validated UTC instants without losing BigQuery microseconds. */
+export function compareInstants(left: string, right: string): number {
   const a = instantParts(left);
   const b = instantParts(right);
   return Math.sign(a.wholeMilliseconds - b.wholeMilliseconds) || compareFractions(a.fraction, b.fraction);
@@ -43,7 +46,8 @@ function durationExceeds(window: TimeWindow, maximumMilliseconds: number): boole
     || (wholeDuration === maximumMilliseconds && compareFractions(end.fraction, start.fraction) > 0);
 }
 
-function normalizedInstant(value: string): string {
+/** Canonical text for one instant: no trailing fraction zeros, so equal instants compare as equal strings. */
+export function normalizedInstant(value: string): string {
   const parts = instantParts(value);
   const seconds = new Date(parts.wholeMilliseconds).toISOString().replace(/\.000Z$/, '');
   const fraction = parts.fraction.replace(/0+$/, '');
@@ -474,14 +478,19 @@ export const mapItemSchema = z.discriminatedUnion('kind', [
 });
 export type MapItem = z.infer<typeof mapItemSchema>;
 
+function compareStrings(left: string, right: string): number {
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
+/** The stable row order every page, snapshot and adapter uses: layerId, id, versionId. */
+export function compareMapItems(left: Pick<MapItem, 'layerId' | 'id' | 'versionId'>,
+  right: Pick<MapItem, 'layerId' | 'id' | 'versionId'>): number {
+  return compareStrings(left.layerId, right.layerId) || compareStrings(left.id, right.id)
+    || compareStrings(left.versionId, right.versionId);
+}
+
 function itemsAreOrdered(items: readonly MapItem[]): boolean {
-  return items.every((item, index) => {
-    const previous = items.at(index - 1);
-    if (index === 0 || previous === undefined) return true;
-    if (previous.layerId !== item.layerId) return previous.layerId < item.layerId;
-    if (previous.id !== item.id) return previous.id < item.id;
-    return previous.versionId < item.versionId;
-  });
+  return items.every((item, index) => index === 0 || compareMapItems(items[index - 1]!, item) < 0);
 }
 
 const freshnessSchema = z.enum(['current', 'late', 'stale', 'versioned', 'unknown']);

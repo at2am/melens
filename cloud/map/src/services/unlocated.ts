@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { MAX_PAGE_ITEMS, SERVICE_BBOX, normalizedViewportIdentity, parseMapItemPage, parseUnlocatedQuery,
-  parseViewportQuery, type LayerId, type MapItem, type MapItemPage, type UnlocatedQuery, type ViewportQuery }
-  from '../contracts/map-contract.js';
+import { MAX_PAGE_ITEMS, SERVICE_BBOX, compareMapItems, normalizedViewportIdentity, parseMapItemPage,
+  parseUnlocatedQuery, parseViewportQuery, type LayerId, type MapItem, type MapItemPage, type UnlocatedQuery,
+  type ViewportQuery } from '../contracts/map-contract.js';
 import { findPublicSource, sourceBelongsToLayer, type SourceCoverageSnapshot } from '../query/source-coverage.js';
 import { assertSnapshotPublic, sourceWatermarks, type SnapshotAccess } from './viewport.js';
 import { MapServiceError, type StoredSnapshot } from './snapshot-store.js';
@@ -97,8 +97,7 @@ export function createUnlocatedService(options: SnapshotAccess & {
         loaded.push(await options.loadLayer(query, layerId, coverage, approved,
           { ...execution, rowLimit, resultBudgetBytes }));
       }
-      const items = loaded.flatMap((entry) => [...entry.items]).sort((a, b) => a.layerId < b.layerId ? -1 : a.layerId > b.layerId ? 1
-        : a.id < b.id ? -1 : a.id > b.id ? 1 : a.versionId < b.versionId ? -1 : a.versionId > b.versionId ? 1 : 0);
+      const items = loaded.flatMap((entry) => [...entry.items]).sort(compareMapItems);
       const scope: MapItemPage['scope'] = 'areaRefs' in query.scope
         ? { kind: 'unlocated', areaRefs: [...query.scope.areaRefs].sort(), sourceJurisdiction: null }
         : { kind: 'unlocated', areaRefs: [], sourceJurisdiction: query.scope.sourceJurisdiction };
