@@ -15,6 +15,11 @@ import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_item_details.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../chat/ui/chat_panel.dart';
+import '../../events/data/user_event_models.dart';
+import '../../events/state/user_events_providers.dart';
+import '../../events/ui/user_event_markers.dart';
+import '../../events/ui/user_event_text.dart';
+import '../../events/ui/user_events_panel.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
 import '../state/map_actions.dart';
@@ -64,6 +69,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _regionReadFailed = false;
   bool _showUnlocated = false;
   bool _showChat = false;
+  bool _showEvents = false;
 
   /// A tapped card item with no map record, shown in the details pane.
   CardItem? _cardItem;
@@ -437,6 +443,70 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
+  /// Moves the camera to a user event's pin (UC-09), through the same focus
+  /// request the agent's `focus_map` uses.
+  void _showEventOnMap(AgentLatLng point) {
+    ref
+        .read(mapActionsControllerProvider.notifier)
+        .apply(
+          UiAction(
+            action: UiActionName.focusMap,
+            args: {
+              'target': {
+                'point': {'lat': point.lat, 'lng': point.lng},
+              },
+              'zoom': 16,
+            },
+          ),
+        );
+  }
+
+  Widget _eventsPanel({
+    VoidCallback? onClose,
+    ValueChanged<AgentLatLng>? onShowOnMap,
+  }) => UserEventsPanel(
+    key: const ValueKey('map-events-panel'),
+    onClose: onClose,
+    onShowOnMap: onShowOnMap ?? _showEventOnMap,
+  );
+
+  void _showEventsSheet(BuildContext context) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => PointerInterceptor(
+          child: SafeArea(
+            child: SizedBox(
+              height: math.min(
+                760,
+                MediaQuery.sizeOf(sheetContext).height * 0.9,
+              ),
+              child: _eventsPanel(
+                onClose: () => Navigator.of(sheetContext).pop(),
+                // The sheet covers the map, so showing a place closes it.
+                onShowOnMap: (point) {
+                  Navigator.of(sheetContext).pop();
+                  _showEventOnMap(point);
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A tapped user event pin opens the event in the panel.
+  void _openUserEvent(BuildContext context, bool wide, UserEvent event) {
+    ref.read(openUserEventProvider.notifier).open(event.id);
+    if (wide) {
+      if (!_showEvents) setState(() => _showEvents = true);
+    } else {
+      _showEventsSheet(context);
+    }
+  }
+
   /// The features the agent highlighted, as chips above the map. The surface
   /// highlights one selected item at a time, so a chip selects its feature.
   Widget? _highlightBar(List<MapItem> items, MapActionsState actions) {
@@ -544,30 +614,47 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final aggregate = selection.item is AggregateMapItem
         ? selection.item! as AggregateMapItem
         : null;
-    final map = AggregateRenderLayer(
-      items: items.whereType<AggregateMapItem>().toList(growable: false),
-      selectedItemId: selection.highlightedItemId,
-      onZoomToBounds: _zoomToBounds,
-      builder: (context, renderer) => MapSurface(
-        key: const ValueKey('map-screen-surface'),
-        layers: response?.layers ?? const [],
-        enabledLayers: layers.enabledLayers,
-        dataMode: response?.dataMode ?? viewport.dataMode,
+    final userEvents = ref.watch(
+      nearbyUserEventsControllerProvider.select((state) => state.events),
+    );
+    final clock = ref.watch(melbourneClockProvider);
+    final map = LayoutBuilder(
+      builder: (context, constraints) => AggregateRenderLayer(
+        items: items.whereType<AggregateMapItem>().toList(growable: false),
         selectedItemId: selection.highlightedItemId,
-        onItemSelected: _selectItem,
-        onAggregateSelected: _selectItem,
-        onCameraChanged: (camera) {
-          _zoom = camera.zoom;
-          _regionGeneration++;
-          ref.read(viewportControllerProvider.notifier).cameraMoving();
-        },
-        onCameraIdle: () => unawaited(_readVisibleRegion()),
-        onMapCreated: (controller) {
-          _map = controller;
-          unawaited(_readVisibleRegion());
-        },
-        mapBuilder: widget.mapBuilder,
-        aggregateRenderer: renderer,
+        onZoomToBounds: _zoomToBounds,
+        builder: (context, renderer) => MapSurface(
+          key: const ValueKey('map-screen-surface'),
+          layers: response?.layers ?? const [],
+          enabledLayers: layers.enabledLayers,
+          dataMode: response?.dataMode ?? viewport.dataMode,
+          selectedItemId: selection.highlightedItemId,
+          onItemSelected: _selectItem,
+          onAggregateSelected: _selectItem,
+          onCameraChanged: (camera) {
+            _zoom = camera.zoom;
+            _regionGeneration++;
+            ref.read(viewportControllerProvider.notifier).cameraMoving();
+          },
+          onCameraIdle: () => unawaited(_readVisibleRegion()),
+          onMapCreated: (controller) {
+            _map = controller;
+            unawaited(_readVisibleRegion());
+          },
+          mapBuilder: widget.mapBuilder,
+          aggregateRenderer: renderer,
+          overlay: userEvents.isEmpty
+              ? null
+              : userEventMarkers(
+                  events: userEvents,
+                  snippetOf: (event) => formatEventTime(clock, event.startAt),
+                  onTap: (event) => _openUserEvent(
+                    context,
+                    MediaQuery.sizeOf(context).width >= 1050,
+                    event,
+                  ),
+                ),
+        ),
       ),
     );
     final Widget? details;
@@ -641,6 +728,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 selectedIcon: const Icon(Icons.chat_bubble),
               ),
               IconButton(
+                key: const ValueKey('map-events-toggle'),
+                tooltip: wide && _showEvents
+                    ? strings.eventsClose
+                    : strings.eventsOpen,
+                isSelected: wide && _showEvents,
+                onPressed: () {
+                  if (wide) {
+                    setState(() => _showEvents = !_showEvents);
+                  } else {
+                    _showEventsSheet(context);
+                  }
+                },
+                icon: const Icon(Icons.event_outlined),
+                selectedIcon: const Icon(Icons.event),
+              ),
+              IconButton(
                 key: const ValueKey('map-layer-statuses'),
                 tooltip: strings.mapScreenStatuses,
                 onPressed: () => _showStatuses(context),
@@ -692,6 +795,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     Expanded(
                       child: MapDetailsLayout(map: map, details: details),
                     ),
+                    if (wide && _showEvents)
+                      SizedBox(
+                        width: 380,
+                        child: _eventsPanel(
+                          onClose: () => setState(() => _showEvents = false),
+                        ),
+                      ),
                     if (wide && _showChat)
                       SizedBox(
                         width: 380,

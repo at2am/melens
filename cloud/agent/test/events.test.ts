@@ -223,9 +223,18 @@ test('the routes publish, discover, join, list members and remove, with the erro
     assert.equal(created.status, 201);
     const { event } = await created.json() as { event: EventView };
     assert.ok(eventViewSchema.safeParse(event).success);
-    const query = new URLSearchParams({ north: '-37.80', south: '-37.83', east: '144.99', west: '144.95' });
+    // The query exactly as the app sends it: six-decimal coordinates and UTC instants with milliseconds.
+    const query = new URLSearchParams({ north: '-37.800000', south: '-37.830000', east: '144.990000', west: '144.950000',
+      from: '2026-10-10T07:40:00.000Z', to: '2026-10-24T07:40:00.000Z' });
     const found = await (await call(`/v1/events?${query}`, {}, 'token-b')).json() as { events: EventView[] };
     assert.deepEqual(found.events.map((item) => [item.id, item.viewer.isOwner]), [[event.id, false]]);
+    const appDraft = { ...draft, placeName: null, endAt: null, capacity: null, startAt: '2026-10-12T07:00:00.000Z' };
+    const explicitNulls = await call('/v1/events', { method: 'POST', body: JSON.stringify(appDraft) });
+    assert.equal(explicitNulls.status, 201, 'explicit nulls and UTC instants are a valid draft');
+    const secondId = ((await explicitNulls.json()) as { event: EventView }).event.id;
+    const emptyJoin = await call(`/v1/events/${secondId}/join`, { method: 'POST', body: '{}' }, 'token-b');
+    assert.equal(emptyJoin.status, 200);
+    assert.equal((await call(`/v1/events/${secondId}/join`, { method: 'DELETE' }, 'token-b')).status, 200);
     assert.equal((await call(`/v1/events/${event.id}`, {}, 'token-b')).status, 200);
     const joined = await call(`/v1/events/${event.id}/join`, { method: 'POST' }, 'token-b');
     assert.equal(joined.status, 200, 'a join needs no body');

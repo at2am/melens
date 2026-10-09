@@ -1954,6 +1954,540 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear highlights'**
   String get mapAgentHighlightsClear;
+
+  /// Tooltip of the toolbar button that opens the user events panel (UC-09).
+  ///
+  /// In en, this message translates to:
+  /// **'Open user events'**
+  String get eventsOpen;
+
+  /// Tooltip of the toolbar button that closes the user events panel.
+  ///
+  /// In en, this message translates to:
+  /// **'Close user events'**
+  String get eventsClose;
+
+  /// Title of the user events panel.
+  ///
+  /// In en, this message translates to:
+  /// **'User events'**
+  String get eventsPanelTitle;
+
+  /// Segment of the events panel listing events near the map's viewport.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby'**
+  String get eventsTabNearby;
+
+  /// Segment of the events panel listing the user's own and joined events.
+  ///
+  /// In en, this message translates to:
+  /// **'Mine'**
+  String get eventsTabMine;
+
+  /// Button that opens the form to publish a new event.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish event'**
+  String get eventsPublish;
+
+  /// Button that reloads the events list.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get eventsRefresh;
+
+  /// Button that retries a failed events request.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get eventsRetry;
+
+  /// Shown when the nearby list is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No user events here in the next two weeks. Publish the first one.'**
+  String get eventsNearbyEmpty;
+
+  /// Shown in the nearby list before the map has a viewport.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the map to an area to find events.'**
+  String get eventsNearbyNoViewport;
+
+  /// Shown when the user has no own or joined events.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not published or joined any events yet.'**
+  String get eventsMineEmpty;
+
+  /// Heading of the user's own events in the Mine segment.
+  ///
+  /// In en, this message translates to:
+  /// **'Published by you'**
+  String get eventsMineOwnedHeading;
+
+  /// Heading of the events the user joined in the Mine segment.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined'**
+  String get eventsMineJoinedHeading;
+
+  /// Shown when an events list failed to load. {reason} is the error text.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load events. {reason}'**
+  String eventsLoadFailed(String reason);
+
+  /// How many people joined an event without a capacity.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nobody going yet} =1{1 going} other{{count} going}}'**
+  String eventsGoing(int count);
+
+  /// How many people joined an event with a capacity.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {capacity} going'**
+  String eventsGoingOf(int count, int capacity);
+
+  /// Chip on an event the user joined.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re going'**
+  String get eventsYouAreGoing;
+
+  /// Chip on an event the user published.
+  ///
+  /// In en, this message translates to:
+  /// **'Yours'**
+  String get eventsYours;
+
+  /// Badge on a cancelled event.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get eventsCancelled;
+
+  /// Badge on an event whose capacity is reached.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get eventsFull;
+
+  /// Badge on an event that has ended.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get eventsEnded;
+
+  /// Badge on an event that shows only the number of people going.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous attendance'**
+  String get eventsAnonymousBadge;
+
+  /// Explains anonymous attendance under the badge and the form switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the number of people going is shown, never who.'**
+  String get eventsAnonymousExplainer;
+
+  /// Button that returns from an event's details to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the list'**
+  String get eventsBack;
+
+  /// Button that moves the map to the event's location.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on map'**
+  String get eventsShowOnMap;
+
+  /// Button that joins an event.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get eventsJoin;
+
+  /// Button that leaves an event the user joined.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get eventsLeave;
+
+  /// Label of the name field shown when joining an event.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name (optional)'**
+  String get eventsJoinNameLabel;
+
+  /// Helper text of the name field shown when joining an event.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown to the organiser only'**
+  String get eventsJoinNameHint;
+
+  /// Owner button that opens the event for editing.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get eventsEdit;
+
+  /// Owner button that cancels the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel event'**
+  String get eventsCancelEvent;
+
+  /// Owner button that removes the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove event'**
+  String get eventsRemoveEvent;
+
+  /// Title of the dialog confirming an event cancellation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this event?'**
+  String get eventsCancelConfirmTitle;
+
+  /// Body of the dialog confirming an event cancellation.
+  ///
+  /// In en, this message translates to:
+  /// **'It stays visible as cancelled and nobody can join.'**
+  String get eventsCancelConfirmBody;
+
+  /// Title of the dialog confirming an event removal.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this event?'**
+  String get eventsRemoveConfirmTitle;
+
+  /// Body of the dialog confirming an event removal.
+  ///
+  /// In en, this message translates to:
+  /// **'It disappears from the map for everyone. This cannot be undone.'**
+  String get eventsRemoveConfirmBody;
+
+  /// Dialog button that keeps the event as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it'**
+  String get eventsConfirmKeep;
+
+  /// Owner section listing the event's members.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get eventsMembers;
+
+  /// Heading of the members section with the count.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No members yet} =1{1 member} other{{count} members}}'**
+  String eventsMembersCount(int count);
+
+  /// Shown in the members section of an anonymous event instead of a list.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous attendance: names are not kept.'**
+  String get eventsMembersAnonymous;
+
+  /// Name shown for a member who gave none.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest'**
+  String get eventsMemberGuest;
+
+  /// Tooltip of the button that removes a member from the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove member'**
+  String get eventsMemberRemove;
+
+  /// When a member joined. {time} is a formatted Melbourne time.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined {time}'**
+  String eventsMemberJoinedAt(String time);
+
+  /// Label of the event's time in its details.
+  ///
+  /// In en, this message translates to:
+  /// **'When'**
+  String get eventsWhen;
+
+  /// Label of the event's place in its details.
+  ///
+  /// In en, this message translates to:
+  /// **'Where'**
+  String get eventsWhere;
+
+  /// An event's start and end, both formatted Melbourne times.
+  ///
+  /// In en, this message translates to:
+  /// **'{start} to {end}'**
+  String eventsTimeRange(String start, String end);
+
+  /// An event's coordinates when it has no place name, or under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned at {lat}, {lng}'**
+  String eventsPlacePin(String lat, String lng);
+
+  /// Title of the form publishing a new event.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish an event'**
+  String get eventsFormPublishTitle;
+
+  /// Title of the form editing an event.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit event'**
+  String get eventsFormEditTitle;
+
+  /// Label of the event title field.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get eventsFormTitle;
+
+  /// Label of the event description field.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get eventsFormDescription;
+
+  /// Label of the event place name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Place name (optional)'**
+  String get eventsFormPlaceName;
+
+  /// Label of the event start date and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts'**
+  String get eventsFormStart;
+
+  /// Label of the event end date and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends (optional)'**
+  String get eventsFormEnd;
+
+  /// Shown instead of an end time when none is set, and the button that clears it.
+  ///
+  /// In en, this message translates to:
+  /// **'No end time'**
+  String get eventsFormNoEnd;
+
+  /// Tooltip of the button that opens the date picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the date'**
+  String get eventsFormPickDate;
+
+  /// Tooltip of the button that opens the time picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the time'**
+  String get eventsFormPickTime;
+
+  /// Label of the switch that hides who joined.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous attendance'**
+  String get eventsFormAnonymous;
+
+  /// Label of the capacity field.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity (optional)'**
+  String get eventsFormCapacity;
+
+  /// Helper text of the capacity field.
+  ///
+  /// In en, this message translates to:
+  /// **'2 to 1000 people, or leave empty for no limit'**
+  String get eventsFormCapacityHint;
+
+  /// Label of the event location section of the form.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get eventsFormLocation;
+
+  /// Helper text under the location in the form.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the map to the place, then use its centre.'**
+  String get eventsFormLocationHint;
+
+  /// Button that sets the event location to the map's current centre.
+  ///
+  /// In en, this message translates to:
+  /// **'Use map centre'**
+  String get eventsFormUseMapCentre;
+
+  /// Submit button of the publish form.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get eventsFormSubmitPublish;
+
+  /// Submit button of the edit form.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get eventsFormSubmitSave;
+
+  /// Button that closes the form without saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get eventsFormCancel;
+
+  /// Validation message for an empty title.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the event a title.'**
+  String get eventsFormTitleRequired;
+
+  /// Validation message for a text field over its limit. {max} is the limit.
+  ///
+  /// In en, this message translates to:
+  /// **'At most {max} characters.'**
+  String eventsFormTooLong(int max);
+
+  /// Validation message for a start more than an hour in the past.
+  ///
+  /// In en, this message translates to:
+  /// **'The start can be at most an hour ago.'**
+  String get eventsFormStartTooEarly;
+
+  /// Validation message for a start more than a year ahead.
+  ///
+  /// In en, this message translates to:
+  /// **'The start must be within a year.'**
+  String get eventsFormStartTooLate;
+
+  /// Validation message for an end at or before the start.
+  ///
+  /// In en, this message translates to:
+  /// **'The end must be after the start.'**
+  String get eventsFormEndBeforeStart;
+
+  /// Validation message for an end more than 7 days after the start.
+  ///
+  /// In en, this message translates to:
+  /// **'An event lasts at most 7 days.'**
+  String get eventsFormDurationTooLong;
+
+  /// Validation message for a capacity outside its range.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity is 2 to 1000.'**
+  String get eventsFormCapacityRange;
+
+  /// Validation message for a location outside the service area.
+  ///
+  /// In en, this message translates to:
+  /// **'The location must be in the Melbourne service area.'**
+  String get eventsFormLocationOutside;
+
+  /// Shown when the edit form is submitted without changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changed.'**
+  String get eventsFormNoChanges;
+
+  /// Events error when the app has no token source.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in is not configured, so events are unavailable.'**
+  String get eventsErrorSignIn;
+
+  /// Events error for a network failure.
+  ///
+  /// In en, this message translates to:
+  /// **'The service is unreachable.'**
+  String get eventsErrorNetwork;
+
+  /// Events error for a timed-out request.
+  ///
+  /// In en, this message translates to:
+  /// **'The request timed out.'**
+  String get eventsErrorTimeout;
+
+  /// Events error on HTTP 429.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many changes in an hour. Try again later.'**
+  String get eventsErrorRateLimited;
+
+  /// Events error on HTTP 404.
+  ///
+  /// In en, this message translates to:
+  /// **'This event no longer exists.'**
+  String get eventsErrorNotFound;
+
+  /// Events error on HTTP 403.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the organiser can do that.'**
+  String get eventsErrorForbidden;
+
+  /// Events error on HTTP 400.
+  ///
+  /// In en, this message translates to:
+  /// **'The service rejected the event details.'**
+  String get eventsErrorInvalid;
+
+  /// Events error without a known cause.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong.'**
+  String get eventsErrorUnknown;
+
+  /// Join refused: the capacity is reached.
+  ///
+  /// In en, this message translates to:
+  /// **'This event is full.'**
+  String get eventsErrorEventFull;
+
+  /// Join refused: the user is already a member.
+  ///
+  /// In en, this message translates to:
+  /// **'You already joined this event.'**
+  String get eventsErrorAlreadyJoined;
+
+  /// Join refused: the event is cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'This event was cancelled.'**
+  String get eventsErrorEventCancelled;
+
+  /// Join refused: the event is over.
+  ///
+  /// In en, this message translates to:
+  /// **'This event has ended.'**
+  String get eventsErrorEventEnded;
+
+  /// Join refused: the user is the owner.
+  ///
+  /// In en, this message translates to:
+  /// **'You organise this event.'**
+  String get eventsErrorOwnEvent;
+
+  /// Leave refused: the user was not a member.
+  ///
+  /// In en, this message translates to:
+  /// **'You had not joined this event.'**
+  String get eventsErrorNotJoined;
 }
 
 class _AppLocalizationsDelegate

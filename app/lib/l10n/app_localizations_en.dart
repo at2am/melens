@@ -1107,4 +1107,313 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapAgentHighlightsClear => 'Clear highlights';
+
+  @override
+  String get eventsOpen => 'Open user events';
+
+  @override
+  String get eventsClose => 'Close user events';
+
+  @override
+  String get eventsPanelTitle => 'User events';
+
+  @override
+  String get eventsTabNearby => 'Nearby';
+
+  @override
+  String get eventsTabMine => 'Mine';
+
+  @override
+  String get eventsPublish => 'Publish event';
+
+  @override
+  String get eventsRefresh => 'Refresh';
+
+  @override
+  String get eventsRetry => 'Try again';
+
+  @override
+  String get eventsNearbyEmpty =>
+      'No user events here in the next two weeks. Publish the first one.';
+
+  @override
+  String get eventsNearbyNoViewport =>
+      'Move the map to an area to find events.';
+
+  @override
+  String get eventsMineEmpty =>
+      'You have not published or joined any events yet.';
+
+  @override
+  String get eventsMineOwnedHeading => 'Published by you';
+
+  @override
+  String get eventsMineJoinedHeading => 'Joined';
+
+  @override
+  String eventsLoadFailed(String reason) {
+    return 'Could not load events. $reason';
+  }
+
+  @override
+  String eventsGoing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count going',
+      one: '1 going',
+      zero: 'Nobody going yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String eventsGoingOf(int count, int capacity) {
+    return '$count of $capacity going';
+  }
+
+  @override
+  String get eventsYouAreGoing => 'You\'re going';
+
+  @override
+  String get eventsYours => 'Yours';
+
+  @override
+  String get eventsCancelled => 'Cancelled';
+
+  @override
+  String get eventsFull => 'Full';
+
+  @override
+  String get eventsEnded => 'Ended';
+
+  @override
+  String get eventsAnonymousBadge => 'Anonymous attendance';
+
+  @override
+  String get eventsAnonymousExplainer =>
+      'Only the number of people going is shown, never who.';
+
+  @override
+  String get eventsBack => 'Back to the list';
+
+  @override
+  String get eventsShowOnMap => 'Show on map';
+
+  @override
+  String get eventsJoin => 'Join';
+
+  @override
+  String get eventsLeave => 'Leave';
+
+  @override
+  String get eventsJoinNameLabel => 'Your name (optional)';
+
+  @override
+  String get eventsJoinNameHint => 'Shown to the organiser only';
+
+  @override
+  String get eventsEdit => 'Edit';
+
+  @override
+  String get eventsCancelEvent => 'Cancel event';
+
+  @override
+  String get eventsRemoveEvent => 'Remove event';
+
+  @override
+  String get eventsCancelConfirmTitle => 'Cancel this event?';
+
+  @override
+  String get eventsCancelConfirmBody =>
+      'It stays visible as cancelled and nobody can join.';
+
+  @override
+  String get eventsRemoveConfirmTitle => 'Remove this event?';
+
+  @override
+  String get eventsRemoveConfirmBody =>
+      'It disappears from the map for everyone. This cannot be undone.';
+
+  @override
+  String get eventsConfirmKeep => 'Keep it';
+
+  @override
+  String get eventsMembers => 'Members';
+
+  @override
+  String eventsMembersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count members',
+      one: '1 member',
+      zero: 'No members yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get eventsMembersAnonymous =>
+      'Anonymous attendance: names are not kept.';
+
+  @override
+  String get eventsMemberGuest => 'Guest';
+
+  @override
+  String get eventsMemberRemove => 'Remove member';
+
+  @override
+  String eventsMemberJoinedAt(String time) {
+    return 'Joined $time';
+  }
+
+  @override
+  String get eventsWhen => 'When';
+
+  @override
+  String get eventsWhere => 'Where';
+
+  @override
+  String eventsTimeRange(String start, String end) {
+    return '$start to $end';
+  }
+
+  @override
+  String eventsPlacePin(String lat, String lng) {
+    return 'Pinned at $lat, $lng';
+  }
+
+  @override
+  String get eventsFormPublishTitle => 'Publish an event';
+
+  @override
+  String get eventsFormEditTitle => 'Edit event';
+
+  @override
+  String get eventsFormTitle => 'Title';
+
+  @override
+  String get eventsFormDescription => 'Description';
+
+  @override
+  String get eventsFormPlaceName => 'Place name (optional)';
+
+  @override
+  String get eventsFormStart => 'Starts';
+
+  @override
+  String get eventsFormEnd => 'Ends (optional)';
+
+  @override
+  String get eventsFormNoEnd => 'No end time';
+
+  @override
+  String get eventsFormPickDate => 'Pick the date';
+
+  @override
+  String get eventsFormPickTime => 'Pick the time';
+
+  @override
+  String get eventsFormAnonymous => 'Anonymous attendance';
+
+  @override
+  String get eventsFormCapacity => 'Capacity (optional)';
+
+  @override
+  String get eventsFormCapacityHint =>
+      '2 to 1000 people, or leave empty for no limit';
+
+  @override
+  String get eventsFormLocation => 'Location';
+
+  @override
+  String get eventsFormLocationHint =>
+      'Move the map to the place, then use its centre.';
+
+  @override
+  String get eventsFormUseMapCentre => 'Use map centre';
+
+  @override
+  String get eventsFormSubmitPublish => 'Publish';
+
+  @override
+  String get eventsFormSubmitSave => 'Save';
+
+  @override
+  String get eventsFormCancel => 'Cancel';
+
+  @override
+  String get eventsFormTitleRequired => 'Give the event a title.';
+
+  @override
+  String eventsFormTooLong(int max) {
+    return 'At most $max characters.';
+  }
+
+  @override
+  String get eventsFormStartTooEarly => 'The start can be at most an hour ago.';
+
+  @override
+  String get eventsFormStartTooLate => 'The start must be within a year.';
+
+  @override
+  String get eventsFormEndBeforeStart => 'The end must be after the start.';
+
+  @override
+  String get eventsFormDurationTooLong => 'An event lasts at most 7 days.';
+
+  @override
+  String get eventsFormCapacityRange => 'Capacity is 2 to 1000.';
+
+  @override
+  String get eventsFormLocationOutside =>
+      'The location must be in the Melbourne service area.';
+
+  @override
+  String get eventsFormNoChanges => 'Nothing changed.';
+
+  @override
+  String get eventsErrorSignIn =>
+      'Sign-in is not configured, so events are unavailable.';
+
+  @override
+  String get eventsErrorNetwork => 'The service is unreachable.';
+
+  @override
+  String get eventsErrorTimeout => 'The request timed out.';
+
+  @override
+  String get eventsErrorRateLimited =>
+      'Too many changes in an hour. Try again later.';
+
+  @override
+  String get eventsErrorNotFound => 'This event no longer exists.';
+
+  @override
+  String get eventsErrorForbidden => 'Only the organiser can do that.';
+
+  @override
+  String get eventsErrorInvalid => 'The service rejected the event details.';
+
+  @override
+  String get eventsErrorUnknown => 'Something went wrong.';
+
+  @override
+  String get eventsErrorEventFull => 'This event is full.';
+
+  @override
+  String get eventsErrorAlreadyJoined => 'You already joined this event.';
+
+  @override
+  String get eventsErrorEventCancelled => 'This event was cancelled.';
+
+  @override
+  String get eventsErrorEventEnded => 'This event has ended.';
+
+  @override
+  String get eventsErrorOwnEvent => 'You organise this event.';
+
+  @override
+  String get eventsErrorNotJoined => 'You had not joined this event.';
 }

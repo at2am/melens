@@ -823,7 +823,14 @@ final class SessionDetail {
 enum AgentErrorCode {
   invalidRequest,
   unauthorized,
+
+  /// An owner-only user event route called by another user.
+  forbidden,
   notFound,
+
+  /// A user event action its state does not allow; the envelope's
+  /// `messageKey` names why (agent-protocol.md, User events, Rules 3).
+  conflict,
   turnInProgress,
   rateLimited,
   serviceUnavailable,

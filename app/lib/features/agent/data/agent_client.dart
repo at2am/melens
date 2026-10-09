@@ -78,16 +78,69 @@ final class AgentHttpException extends AgentClientException {
     required this.statusCode,
     required this.retryable,
     this.code,
+    this.reason,
   });
 
   final int statusCode;
   final AgentErrorCode? code;
 
+  /// The detail after the code in the envelope's `messageKey`, such as
+  /// `eventFull` in `agent.error.conflict.eventFull`; null when the key
+  /// carries none (agent-protocol.md, User events, Rules 3).
+  final String? reason;
+
   @override
   final bool retryable;
 
   @override
-  String toString() => 'AgentHttpException: HTTP $statusCode ${code?.name}';
+  String toString() =>
+      'AgentHttpException: HTTP $statusCode ${code?.name}'
+      '${reason == null ? '' : '.$reason'}';
+}
+
+/// The exception for a non-2xx answer of the agent service, from its JSON
+/// error envelope when the body carries one. Proxy and network errors may
+/// carry HTML; it is never exposed.
+AgentHttpException parseAgentHttpFailure(int statusCode, List<int> bytes) {
+  AgentErrorCode? code;
+  String? reason;
+  var retryable = {408, 429, 502, 503, 504}.contains(statusCode);
+  try {
+    final Object? json = jsonDecode(utf8.decode(bytes));
+    if (json is Map<String, dynamic>) {
+      final Object? error = json['error'];
+      if (error is Map<String, dynamic>) {
+        for (final candidate in AgentErrorCode.values) {
+          if (candidate.name == error['code']) {
+            code = candidate;
+            break;
+          }
+        }
+        if (code != null && error['retryable'] is bool) {
+          retryable = error['retryable'] as bool;
+        }
+        final Object? messageKey = error['messageKey'];
+        if (code != null && messageKey is String) {
+          final prefix = 'agent.error.${code.name}.';
+          if (messageKey.startsWith(prefix) &&
+              messageKey.length > prefix.length) {
+            final suffix = messageKey.substring(prefix.length);
+            if (RegExp(r'^[A-Za-z0-9_]{1,40}$').hasMatch(suffix)) {
+              reason = suffix;
+            }
+          }
+        }
+      }
+    }
+  } on FormatException {
+    // Not JSON: keep the status code alone.
+  }
+  return AgentHttpException(
+    statusCode: statusCode,
+    code: code,
+    reason: reason,
+    retryable: retryable,
+  );
 }
 
 final class AgentNetworkException extends AgentClientException {
@@ -400,32 +453,6 @@ final class HttpAgentClient implements AgentClient {
     }
   }
 
-  static AgentHttpException _httpFailure(int statusCode, Uint8List bytes) {
-    AgentErrorCode? code;
-    var retryable = {408, 429, 502, 503, 504}.contains(statusCode);
-    try {
-      final Object? json = jsonDecode(utf8.decode(bytes));
-      if (json is Map<String, dynamic>) {
-        final Object? error = json['error'];
-        if (error is Map<String, dynamic>) {
-          for (final candidate in AgentErrorCode.values) {
-            if (candidate.name == error['code']) {
-              code = candidate;
-              break;
-            }
-          }
-          if (code != null && error['retryable'] is bool) {
-            retryable = error['retryable'] as bool;
-          }
-        }
-      }
-    } on FormatException {
-      // Proxy and network errors may carry HTML; never expose it.
-    }
-    return AgentHttpException(
-      statusCode: statusCode,
-      code: code,
-      retryable: retryable,
-    );
-  }
+  static AgentHttpException _httpFailure(int statusCode, Uint8List bytes) =>
+      parseAgentHttpFailure(statusCode, bytes);
 }
