@@ -31,7 +31,10 @@ export interface StoredCursor {
   readonly aggregateId: string | null; readonly offset: number; readonly pageSize: number;
 }
 
-const token = () => randomBytes(24).toString('base64url');
+const TOKEN_BYTES = 24;
+const token = () => randomBytes(TOKEN_BYTES).toString('base64url');
+/** Same length as a real token, so a page can be measured before its cursor is issued. */
+export const CURSOR_PLACEHOLDER = 'x'.repeat(Buffer.alloc(TOKEN_BYTES).toString('base64url').length);
 
 /** Bounded in-process immutable pages; tokens contain no source or query contents. */
 export function createSnapshotStore(options: {
@@ -43,14 +46,24 @@ export function createSnapshotStore(options: {
   const maxCursors = options.maxCursors ?? 4_096;
   if (![maxSnapshots, maxBytes, maxCursors].every((n) => Number.isSafeInteger(n) && n > 0)) throw new TypeError('Invalid snapshot bounds');
   const snapshots = new Map<string, { snapshot: StoredSnapshot; bytes: number }>();
-  const cursors = new Map<string, StoredCursor>();
+  const cursors = new Map<string, { cursor: StoredCursor; bytes: number }>();
+  // Identical bindings share one token, and a snapshot releases its cursors without a scan.
+  const cursorIdsByBinding = new Map<string, string>();
+  const cursorIdsBySnapshot = new Map<string, Set<string>>();
   const expired = new Set<string>();
   let memoryBytes = 0;
   const now = () => (options.clock?.() ?? new Date()).getTime();
+  const bindingKey = (input: Omit<StoredCursor, 'id'>) => JSON.stringify([input.snapshotId, input.family,
+    input.identity, input.layerId, input.aggregateId, input.offset, input.pageSize]);
   function remove(id: string, markExpired: boolean) {
     const entry = snapshots.get(id);
     if (entry !== undefined) { memoryBytes -= entry.bytes; snapshots.delete(id); }
-    for (const [key, cursor] of cursors) if (cursor.snapshotId === id) { memoryBytes -= jsonBytes(cursor); cursors.delete(key); }
+    for (const cursorId of cursorIdsBySnapshot.get(id) ?? []) {
+      const stored = cursors.get(cursorId);
+      if (stored === undefined) continue;
+      memoryBytes -= stored.bytes; cursors.delete(cursorId); cursorIdsByBinding.delete(bindingKey(stored.cursor));
+    }
+    cursorIdsBySnapshot.delete(id);
     if (markExpired) {
       expired.add(id);
       while (expired.size > maxSnapshots * 2) expired.delete(expired.values().next().value!);
@@ -81,22 +94,26 @@ export function createSnapshotStore(options: {
       prune();
       this.read(input.snapshotId);
       // Repeated identical reads share one token and cannot exhaust memory.
-      for (const cursor of cursors.values()) {
-        const { id: _id, ...binding } = cursor;
-        if (JSON.stringify(binding) === JSON.stringify(input)) return cursor.id;
-      }
+      const key = bindingKey(input);
+      const existing = cursorIdsByBinding.get(key);
+      if (existing !== undefined) return existing;
       const cursor = deepFreeze({ ...input, id: token() });
-      if (cursors.size >= maxCursors || memoryBytes + jsonBytes(cursor) > maxBytes) throw new MapServiceError('rateLimited');
+      const bytes = jsonBytes(cursor);
+      if (cursors.size >= maxCursors || memoryBytes + bytes > maxBytes) throw new MapServiceError('rateLimited');
       // Cursor overhead is separately bounded by maxCursors; reserve it against total memory too.
-      cursors.set(cursor.id, cursor); memoryBytes += jsonBytes(cursor);
+      cursors.set(cursor.id, { cursor, bytes }); memoryBytes += bytes;
+      cursorIdsByBinding.set(key, cursor.id);
+      let ids = cursorIdsBySnapshot.get(input.snapshotId);
+      if (ids === undefined) { ids = new Set(); cursorIdsBySnapshot.set(input.snapshotId, ids); }
+      ids.add(cursor.id);
       return cursor.id;
     },
     readCursor(id: string): StoredCursor {
       prune();
-      const cursor = cursors.get(id);
-      if (cursor === undefined) throw new MapServiceError('cursorMismatch');
-      this.read(cursor.snapshotId);
-      return cursor;
+      const stored = cursors.get(id);
+      if (stored === undefined) throw new MapServiceError('cursorMismatch');
+      this.read(stored.cursor.snapshotId);
+      return stored.cursor;
     },
     discard(id: string) { remove(id, false); },
     stats() { prune(); return { snapshots: snapshots.size, cursors: cursors.size, memoryBytes }; },

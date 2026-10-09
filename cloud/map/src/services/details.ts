@@ -1,8 +1,10 @@
 import { MAX_PAGE_ITEMS, parseMapItemPage, parseMapItemResponse, parseMapReadContext,
   type MapItem, type MapItemPage, type MapItemResponse, type MapReadContext }
   from '../contracts/map-contract.js';
+import { jsonBytes } from '../util.js';
+import { fitPage } from './page-budget.js';
 import { assertSnapshotPublic, type SnapshotAccess } from './viewport.js';
-import { MapServiceError } from './snapshot-store.js';
+import { CURSOR_PLACEHOLDER, MapServiceError } from './snapshot-store.js';
 
 export function createDetailService(options: SnapshotAccess & { readonly maxResponseBytes?: number }) {
   const maxBytes = options.maxResponseBytes ?? 2 * 1024 * 1024;
@@ -25,7 +27,7 @@ export function createDetailService(options: SnapshotAccess & { readonly maxResp
       if (new Set(matches.map((item) => item.versionId)).size !== 1) throw new MapServiceError('cursorMismatch');
       await assertSnapshotPublic(snapshot, options, execution);
       const response = { ...base(request, snapshot.request.mode), item: matches[0]! };
-      if (Buffer.byteLength(JSON.stringify(response), 'utf8') > maxBytes) throw new MapServiceError('budgetExceeded');
+      if (jsonBytes(response) > maxBytes) throw new MapServiceError('budgetExceeded');
       return parseMapItemResponse(response, { production: true });
     },
     async members(id: string, value: unknown, execution: { readonly signal?: AbortSignal } = {}): Promise<MapItemPage> {
@@ -50,24 +52,17 @@ export function createDetailService(options: SnapshotAccess & { readonly maxResp
       const details = group.aggregate.details;
       const scope: MapItemPage['scope'] = { kind: 'aggregateMembers', aggregateId: id,
         bounds: details.bounds, window: details.window, unit: details.metric.unit };
-      let count = Math.min(pageSize, group.members.length - offset);
-      while (true) {
-        const items = group.members.slice(offset, offset + count);
-        const more = offset + count < group.members.length;
-        const complete = !more && details.resultRange.totalMatching !== null;
-        const draft = { ...base(request, snapshot.request.mode), items, scope,
-          completeness: complete ? 'complete' as const : 'partial' as const,
-          totalMatching: details.resultRange.totalMatching, nextCursor: more ? 'x'.repeat(32) : null };
-        if (Buffer.byteLength(JSON.stringify(draft), 'utf8') <= maxBytes) {
-          if (count === 0 && more) throw new MapServiceError('budgetExceeded');
-          const nextCursor = more ? options.store.cursor({ snapshotId: snapshot.id, family: 'aggregateMembers',
-            identity: snapshot.identity, layerId: group.aggregate.layerId, aggregateId: id,
-            offset: offset + count, pageSize }) : null;
-          return parseMapItemPage({ ...draft, nextCursor }, { production: true });
-        }
-        if (count === 0) throw new MapServiceError('budgetExceeded');
-        count -= 1;
-      }
+      const page = (items: readonly MapItem[], more: boolean, nextCursor: string | null) => ({
+        ...base(request, snapshot.request.mode), items, scope,
+        completeness: !more && details.resultRange.totalMatching !== null ? 'complete' as const : 'partial' as const,
+        totalMatching: details.resultRange.totalMatching, nextCursor });
+      const { slice, more } = fitPage({ items: group.members, offset, limit: pageSize, maxBytes,
+        build: (items, continues) => page(items, continues, continues ? CURSOR_PLACEHOLDER : null) });
+      if (slice.length === 0 && more) throw new MapServiceError('budgetExceeded');
+      const nextCursor = more ? options.store.cursor({ snapshotId: snapshot.id, family: 'aggregateMembers',
+        identity: snapshot.identity, layerId: group.aggregate.layerId, aggregateId: id,
+        offset: offset + slice.length, pageSize }) : null;
+      return parseMapItemPage(page(slice, more, nextCursor), { production: true });
     },
   };
 }
