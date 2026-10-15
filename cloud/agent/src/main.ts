@@ -15,6 +15,10 @@ import { createFirestoreUserEventStore } from './events/firestore-store.js';
 import { EVENT_LIMITS } from './events/schemas.js';
 import { UserEventService } from './events/service.js';
 import { InMemoryUserEventStore } from './events/store.js';
+import { createFirestoreFeedStore } from './feeds/firestore-store.js';
+import { FEED_LIMITS } from './feeds/schemas.js';
+import { FeedService } from './feeds/service.js';
+import { InMemoryFeedStore } from './feeds/store.js';
 import { createSharedFeatureReader } from './features/reader.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createRoutesClient } from './routes/routes-client.js';
@@ -49,7 +53,11 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
   const events = new UserEventService({ writeLimiter: createRateLimiter(EVENT_LIMITS.writesPerHour),
     store: development ? new InMemoryUserEventStore()
       : createFirestoreUserEventStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
-  const server = createAgentHttpServer({ store, verifier, runner, events, rateLimiter: createRateLimiter(config.turnsPerHour),
+  // Feed subscriptions (UC-14) likewise.
+  const feeds = new FeedService({ writeLimiter: createRateLimiter(FEED_LIMITS.writesPerHour),
+    store: development ? new InMemoryFeedStore()
+      : createFirestoreFeedStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
+  const server = createAgentHttpServer({ store, verifier, runner, events, feeds, rateLimiter: createRateLimiter(config.turnsPerHour),
     allowedOrigins: config.allowedOrigins, turnTimeoutMs: config.turnTimeoutMs });
   server.on('error', (error: NodeJS.ErrnoException) => {
     log({ severity: 'ERROR', event: 'agentServerFailed', reason: error.code ?? error.message, port });

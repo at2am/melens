@@ -58,6 +58,7 @@ Breaking one of these can disqualify the entry.
 - Import `package:material_ui/material_ui.dart`, never `package:flutter/material.dart`.
 - After changing annotated code, run `fvm dart run build_runner build` and commit the generated files with the change.
 - `fvm flutter analyze` and `fvm flutter test` pass before every commit.
+- The Feed tab (UC-14) is built from feeds the user creates: topics inside one scope (a framed map area, a named City of Melbourne area or all of Melbourne), stored per uid through `/v1/feeds`. Each topic of each feed is its own parallel request inside that scope. Do not go back to one city-wide request with layer switches; the project owner rejected it as too slow. Read the Notes in `use-cases/uc-14-personal-feed.md` before changing the feed.
 
 ## Working with use cases
 
@@ -79,7 +80,7 @@ Breaking one of these can disqualify the entry.
 - Product models are Gemini through Vertex AI. Do not add another model provider or a provider abstraction layer.
 - Services read BigQuery only through the published `melens_query` views, with fixed parameterized queries and `maximumBytesBilled`. No caller SQL and no raw-table access. That code lives in `@melens/shared` (`cloud/shared`): the contract, the query runner, the layer adapters and the layer loaders. A service imports it instead of copying query code.
 - HTTP servers use `node:http` directly, as `cloud/map` does; no web framework.
-- Firestore is written only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid; user events (UC-09) in `userEvents`. The only other reader is the `user_events` connector in `cloud/data`, which exports user events to BigQuery read-only; no other service reaches Firestore.
+- Firestore is written only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid; user events (UC-09) in `userEvents`; feed subscriptions (UC-14) per uid in `userFeeds/{uid}`, through the agent service's `/v1/feeds` routes. The only other reader is the `user_events` connector in `cloud/data`, which exports user events to BigQuery read-only; no other service reaches Firestore.
 - Deployment scripts plan by default, take an immutable image digest and audit the runtime identity, following `cloud/map/infra/deploy.sh`.
 - Live parking (UC-15) is a v1 layer. The sensor job collects the whole city; readers use only `v_parking_sensor_current`, which reads only the latest-snapshot table `parking_sensor_current`, never the append-only parking history. Retention runs one query per table. Read the Notes in `use-cases/uc-15-live-parking.md` before changing the parking pipeline, view, retention or layer.
 

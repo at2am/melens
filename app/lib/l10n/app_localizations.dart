@@ -2147,24 +2147,6 @@ abstract class AppLocalizations {
   /// **'Planning permits and projects'**
   String get feedTopicPlanningHint;
 
-  /// Feed message when no topic is subscribed.
-  ///
-  /// In en, this message translates to:
-  /// **'You are not following anything'**
-  String get feedEmptyNoTopics;
-
-  /// Feed message body when no topic is subscribed.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose topics and they show up here.'**
-  String get feedEmptyNoTopicsBody;
-
-  /// Button that opens the topic chooser.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose topics'**
-  String get feedChooseTopics;
-
   /// Feed message when subscribed topics have no items.
   ///
   /// In en, this message translates to:
@@ -2174,7 +2156,7 @@ abstract class AppLocalizations {
   /// Feed message body when subscribed topics have no items.
   ///
   /// In en, this message translates to:
-  /// **'Nothing is happening in the topics you follow. Try following more, or host something yourself.'**
+  /// **'Nothing is happening in your feeds right now. Try a wider area or more topics, or host something yourself.'**
   String get feedEmptyBody;
 
   /// Feed message when loading failed.
@@ -2188,18 +2170,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get feedRetry;
-
-  /// Title of the topic chooser sheet.
-  ///
-  /// In en, this message translates to:
-  /// **'What do you follow?'**
-  String get feedTopicsSheetTitle;
-
-  /// Body of the topic chooser sheet.
-  ///
-  /// In en, this message translates to:
-  /// **'Followed topics appear in your feed.'**
-  String get feedTopicsSheetBody;
 
   /// Button that opens the invite sheet.
   ///
@@ -2326,12 +2296,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get settingsSave;
-
-  /// Settings section for feed topics.
-  ///
-  /// In en, this message translates to:
-  /// **'Following'**
-  String get settingsFollowing;
 
   /// Settings section for map behaviour.
   ///
@@ -3106,6 +3070,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'On. Your position is sent with your questions while this is on, and never stored.'**
   String get settingsLocationOn;
+
+  /// Tooltip of the feed button that creates a feed, and title of the feed editor for a new feed.
+  ///
+  /// In en, this message translates to:
+  /// **'New feed'**
+  String get feedNew;
+
+  /// Title of the feed editor for an existing feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit feed'**
+  String get feedEdit;
+
+  /// Feed chip that shows the items of every feed.
+  ///
+  /// In en, this message translates to:
+  /// **'All feeds'**
+  String get feedChipAll;
+
+  /// Feed chip and button that open the feeds section in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage feeds'**
+  String get feedManage;
+
+  /// Title of the feed when the user has no feeds.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no feeds yet'**
+  String get feedEmptyNoFeeds;
+
+  /// Body of the feed when the user has no feeds.
+  ///
+  /// In en, this message translates to:
+  /// **'A feed follows a few topics in one part of Melbourne. Create one and what happens there shows up here.'**
+  String get feedEmptyNoFeedsBody;
+
+  /// Button that opens the feed editor from an empty feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a feed'**
+  String get feedCreate;
+
+  /// Title of the feed when every feed is paused.
+  ///
+  /// In en, this message translates to:
+  /// **'All your feeds are paused'**
+  String get feedAllPaused;
+
+  /// Body of the feed when every feed is paused.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn a feed back on in Settings.'**
+  String get feedAllPausedBody;
+
+  /// One failed feed source in the failure notice.
+  ///
+  /// In en, this message translates to:
+  /// **'{feed}: {topic}'**
+  String feedSourceName(String feed, String topic);
+
+  /// Label of the feed name field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get feedEditorName;
+
+  /// Hint of the feed name field; an empty name takes the area name.
+  ///
+  /// In en, this message translates to:
+  /// **'For example: Near the office'**
+  String get feedEditorNameHint;
+
+  /// Heading of the topic chips in the feed editor.
+  ///
+  /// In en, this message translates to:
+  /// **'What to follow'**
+  String get feedEditorTopics;
+
+  /// Shown when no topic is chosen in the feed editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least one topic.'**
+  String get feedEditorTopicsNone;
+
+  /// Heading of the scope choice in the feed editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Where'**
+  String get feedEditorWhere;
+
+  /// Scope option: a box the user frames on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Map area'**
+  String get feedScopeMap;
+
+  /// Scope option: one named City of Melbourne area.
+  ///
+  /// In en, this message translates to:
+  /// **'Named area'**
+  String get feedScopeArea;
+
+  /// Scope option and summary: the whole service area.
+  ///
+  /// In en, this message translates to:
+  /// **'All of Melbourne'**
+  String get feedScopeCity;
+
+  /// Hint under the whole-city scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything the map holds. The slowest to load. Community events stay within central Melbourne.'**
+  String get feedScopeCityHint;
+
+  /// Summary of a named area this app version no longer knows.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown area'**
+  String get feedScopeAreaUnknown;
+
+  /// Summary of a framed map area.
+  ///
+  /// In en, this message translates to:
+  /// **'Map area, {size}'**
+  String feedScopeMapSummary(String size);
+
+  /// Shown before the user frames a map area.
+  ///
+  /// In en, this message translates to:
+  /// **'No area framed yet'**
+  String get feedScopeMapNone;
+
+  /// Button that opens the area picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame on the map'**
+  String get feedScopeMapPick;
+
+  /// Button that reopens the area picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Change area'**
+  String get feedScopeMapChange;
+
+  /// Hint under the map-area scope.
+  ///
+  /// In en, this message translates to:
+  /// **'Smaller areas load faster.'**
+  String get feedScopeMapHint;
+
+  /// Switch that adds records with no location to the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Include reports without a place'**
+  String get feedEditorUnlocated;
+
+  /// Subtitle of the unlocated switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds reports that cover the whole city, such as a disruption to a whole tram line. These are not limited to the area.'**
+  String get feedEditorUnlocatedHint;
+
+  /// Heading of the community events time range.
+  ///
+  /// In en, this message translates to:
+  /// **'Community events ahead'**
+  String get feedEditorHorizon;
+
+  /// Community events range option.
+  ///
+  /// In en, this message translates to:
+  /// **'24 hours'**
+  String get feedHorizonToday;
+
+  /// Community events range option.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get feedHorizonWeek;
+
+  /// Community events range option.
+  ///
+  /// In en, this message translates to:
+  /// **'14 days'**
+  String get feedHorizonFortnight;
+
+  /// Button that saves the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get feedEditorSave;
+
+  /// Button that deletes the feed being edited.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete feed'**
+  String get feedEditorDelete;
+
+  /// Title of the dialog that confirms deleting a feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name}?'**
+  String feedEditorDeleteTitle(String name);
+
+  /// Body of the dialog that confirms deleting a feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Its items leave your feed.'**
+  String get feedEditorDeleteBody;
+
+  /// Confirm button of the delete-feed dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get feedEditorDeleteConfirm;
+
+  /// Cancel button of the delete-feed dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get feedEditorCancel;
+
+  /// Notice that saving the feeds failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your feeds could not be saved. Try again.'**
+  String get feedSaveFailed;
+
+  /// Notice that the feed limit is reached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can keep up to {count} feeds.'**
+  String feedLimitReached(int count);
+
+  /// Shown when the feed editor opens a feed that was deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'This feed no longer exists.'**
+  String get feedNotFound;
+
+  /// Title of the area picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame the area'**
+  String get feedAreaPickerTitle;
+
+  /// Hint of the area picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Move and zoom the map until the frame covers the area to follow.'**
+  String get feedAreaPickerHint;
+
+  /// Button that confirms the framed area.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this area'**
+  String get feedAreaPickerUse;
+
+  /// Notice that the framed area is outside the service area.
+  ///
+  /// In en, this message translates to:
+  /// **'That area is outside Melbourne. Move the map back.'**
+  String get feedAreaPickerOutside;
+
+  /// Settings section listing the user's feeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Feeds'**
+  String get settingsFeeds;
+
+  /// Settings row when the feeds failed to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Your feeds could not load.'**
+  String get settingsFeedsError;
+
+  /// Prefix of a paused feed's subtitle in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get settingsFeedPaused;
 }
 
 class _AppLocalizationsDelegate

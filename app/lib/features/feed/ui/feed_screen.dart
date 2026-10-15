@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -14,18 +12,20 @@ import '../../shell/state/shell_providers.dart';
 import '../data/feed_models.dart';
 import '../state/feed_providers.dart';
 import 'feed_labels.dart';
-import 'feed_topic_list.dart';
 
-/// The home tab: what is happening in the topics the user follows. Topics are
-/// chips under the title; the feed refreshes by pulling down.
+/// The home tab: what is happening in the user's feeds. A chip per feed
+/// narrows the list to one; the feed refreshes by pulling down.
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
   /// The feed and the sources it reads: they do not retry on their own, so
   /// a source that failed once keeps its error until it is invalidated too.
   static void _refresh(WidgetRef ref) {
+    if (ref.read(feedSubscriptionsProvider).hasError) {
+      ref.invalidate(feedSubscriptionsProvider);
+    }
     ref
-      ..invalidate(communityEventsProvider)
+      ..invalidate(feedCommunityEventsProvider)
       ..invalidate(mapFeedItemsProvider)
       ..invalidate(feedProvider);
   }
@@ -35,8 +35,14 @@ class FeedScreen extends ConsumerWidget {
     final strings = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final clock = ref.watch(melbourneClockProvider);
-    final subscribed = ref.watch(feedSubscriptionsProvider);
-    final feed = ref.watch(feedProvider);
+    final feeds = ref.watch(feedSubscriptionsProvider);
+    final enabled = [
+      for (final feed in feeds.value ?? const <FeedSubscription>[])
+        if (feed.enabled) feed,
+    ];
+    final picked = ref.watch(selectedFeedProvider);
+    // A paused or deleted feed's chip is gone; show every feed instead.
+    final selected = enabled.any((feed) => feed.id == picked) ? picked : null;
     final today = DateFormat('EEEE d MMMM', 'en_AU').format(clock.now());
 
     return SafeArea(
@@ -79,7 +85,7 @@ class FeedScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    IconButton.filledTonal(
+                    IconButton.outlined(
                       key: const ValueKey('feed-host-event'),
                       tooltip: strings.feedHostEvent,
                       onPressed: () {
@@ -88,40 +94,65 @@ class FeedScreen extends ConsumerWidget {
                             .startNewEvent();
                         context.go(AppRoutes.discover);
                       },
+                      icon: const Icon(Icons.event_outlined),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton.filledTonal(
+                      key: const ValueKey('feed-new'),
+                      tooltip: strings.feedNew,
+                      onPressed: feeds.hasValue
+                          ? () => context.push(AppRoutes.newFeed)
+                          : null,
                       icon: const Icon(Icons.add),
                     ),
                   ],
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 64,
-                child: ListView(
-                  key: const ValueKey('feed-topic-chips'),
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  children: [
-                    for (final topic in FeedTopic.values) ...[
-                      FilterChip(
-                        key: ValueKey('feed-chip-${topic.name}'),
-                        avatar: Icon(feedTopicIcon(topic), size: 18),
-                        label: Text(feedTopicTitle(strings, topic)),
-                        selected: subscribed.contains(topic),
+            if (enabled.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 64,
+                  child: ListView(
+                    key: const ValueKey('feed-chips'),
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    children: [
+                      ChoiceChip(
+                        key: const ValueKey('feed-chip-all'),
+                        label: Text(strings.feedChipAll),
+                        selected: selected == null,
                         onSelected: (_) => ref
-                            .read(feedSubscriptionsProvider.notifier)
-                            .toggle(topic),
+                            .read(selectedFeedProvider.notifier)
+                            .select(null),
                       ),
                       const SizedBox(width: 8),
+                      for (final feed in enabled) ...[
+                        ChoiceChip(
+                          key: ValueKey('feed-chip-${feed.id}'),
+                          avatar: Icon(feedScopeIcon(feed.scope), size: 18),
+                          label: Text(feed.name),
+                          selected: selected == feed.id,
+                          onSelected: (_) => ref
+                              .read(selectedFeedProvider.notifier)
+                              .select(feed.id),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      ActionChip(
+                        key: const ValueKey('feed-manage'),
+                        avatar: const Icon(Icons.tune, size: 18),
+                        label: Text(strings.feedManage),
+                        onPressed: () => context.go(AppRoutes.settings),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            ..._body(context, ref, feed, subscribed),
+            ..._body(context, ref, feeds, enabled, selected),
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
@@ -132,127 +163,147 @@ class FeedScreen extends ConsumerWidget {
   List<Widget> _body(
     BuildContext context,
     WidgetRef ref,
-    AsyncValue<FeedResult> feed,
-    Set<FeedTopic> subscribed,
+    AsyncValue<List<FeedSubscription>> feeds,
+    List<FeedSubscription> enabled,
+    String? selected,
   ) {
     final strings = AppLocalizations.of(context);
-    if (subscribed.isEmpty) {
+    Widget fill(Widget child) =>
+        SliverFillRemaining(hasScrollBody: false, child: child);
+    const spinner = Center(child: CircularProgressIndicator());
+
+    final list = feeds.value;
+    if (list == null) {
       return [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: _Message(
-            icon: Icons.tune,
-            title: strings.feedEmptyNoTopics,
-            body: strings.feedEmptyNoTopicsBody,
-            actionLabel: strings.feedChooseTopics,
-            onAction: () => _showTopics(context),
+        if (feeds.hasError)
+          fill(
+            _Message(
+              icon: Icons.cloud_off,
+              title: strings.feedError,
+              actionLabel: strings.feedRetry,
+              onAction: () => _refresh(ref),
+            ),
+          )
+        else
+          fill(spinner),
+      ];
+    }
+    if (list.isEmpty) {
+      return [
+        fill(
+          _Message(
+            icon: Icons.dynamic_feed_outlined,
+            title: strings.feedEmptyNoFeeds,
+            body: strings.feedEmptyNoFeedsBody,
+            actionLabel: strings.feedCreate,
+            onAction: () => context.push(AppRoutes.newFeed),
           ),
         ),
       ];
     }
-    // A source arriving rebuilds the feed; it keeps showing what it has.
-    return feed.when(
-      skipLoadingOnReload: true,
-      loading: () => [
-        const SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ],
-      error: (error, stack) => [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: _Message(
-            icon: Icons.cloud_off,
-            title: strings.feedError,
-            actionLabel: strings.feedRetry,
-            onAction: () => _refresh(ref),
+    if (enabled.isEmpty) {
+      return [
+        fill(
+          _Message(
+            icon: Icons.pause_circle_outline,
+            title: strings.feedAllPaused,
+            body: strings.feedAllPausedBody,
+            actionLabel: strings.feedManage,
+            onAction: () => context.go(AppRoutes.settings),
           ),
         ),
-      ],
-      data: (result) {
-        final failed = result.failedTopics;
-        final loading = result.loadingTopics.isNotEmpty;
-        return [
-          if (loading && result.items.isNotEmpty)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: LinearProgressIndicator(
-                  key: ValueKey('feed-source-loading'),
-                ),
-              ),
-            ),
-          if (failed.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: Text(
-                  strings.feedSourceFailed(
-                    failed.map((t) => feedTopicTitle(strings, t)).join(', '),
-                  ),
-                  key: const ValueKey('feed-source-failed'),
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            ),
-          if (result.items.isEmpty && loading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (result.items.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _Message(
-                icon: Icons.nightlight_outlined,
-                title: strings.feedEmpty,
-                body: strings.feedEmptyBody,
-                actionLabel: strings.feedChooseTopics,
-                onAction: () => _showTopics(context),
-              ),
-            )
-          else
-            SliverList.separated(
-              itemCount: result.items.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: FeedCard(item: result.items[index]),
-              ),
-            ),
-        ];
-      },
-    );
-  }
+      ];
+    }
 
-  void _showTopics(BuildContext context) {
-    final strings = AppLocalizations.of(context);
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) => SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  strings.feedTopicsSheetTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(strings.feedTopicsSheetBody),
-                const SizedBox(height: 8),
-                const FeedTopicList(),
-              ],
+    final names = {for (final feed in enabled) feed.id: feed.name};
+    bool shown(String feedId) => selected == null || selected == feedId;
+    // A source arriving rebuilds the feed; it keeps showing what it has.
+    return ref
+        .watch(feedProvider)
+        .when(
+          skipLoadingOnReload: true,
+          loading: () => [fill(spinner)],
+          error: (error, stack) => [
+            fill(
+              _Message(
+                icon: Icons.cloud_off,
+                title: strings.feedError,
+                actionLabel: strings.feedRetry,
+                onAction: () => _refresh(ref),
+              ),
             ),
-          ),
-        ),
-      ),
-    );
+          ],
+          data: (result) {
+            final items = [
+              for (final item in result.items)
+                if (item.feedIds.any(shown)) item,
+            ];
+            final failed = [
+              for (final source in result.failedSources)
+                if (shown(source.feedId))
+                  strings.feedSourceName(
+                    names[source.feedId] ?? '',
+                    feedTopicTitle(strings, source.topic),
+                  ),
+            ];
+            final loading = result.loadingSources.any(
+              (source) => shown(source.feedId),
+            );
+            return [
+              if (loading && items.isNotEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: LinearProgressIndicator(
+                      key: ValueKey('feed-source-loading'),
+                    ),
+                  ),
+                ),
+              if (failed.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Text(
+                      strings.feedSourceFailed(failed.join(', ')),
+                      key: const ValueKey('feed-source-failed'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ),
+              if (items.isEmpty && loading)
+                fill(spinner)
+              else if (items.isEmpty)
+                fill(
+                  _Message(
+                    icon: Icons.nightlight_outlined,
+                    title: strings.feedEmpty,
+                    body: strings.feedEmptyBody,
+                    actionLabel: strings.feedManage,
+                    onAction: () => context.go(AppRoutes.settings),
+                  ),
+                )
+              else
+                SliverList.separated(
+                  itemCount: items.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: FeedCard(
+                      item: items[index],
+                      // Which feed an item is from matters only when the
+                      // list mixes feeds.
+                      feedNames: selected == null && enabled.length > 1
+                          ? [for (final id in items[index].feedIds) ?names[id]]
+                          : const [],
+                    ),
+                  ),
+                ),
+            ];
+          },
+        );
   }
 }
 
@@ -307,9 +358,12 @@ class _Message extends StatelessWidget {
 /// One feed entry. A community event opens its page; a map item opens on the
 /// map, through the same request the chat's card items use.
 class FeedCard extends ConsumerWidget {
-  const FeedCard({required this.item, super.key});
+  const FeedCard({required this.item, this.feedNames = const [], super.key});
 
   final FeedItem item;
+
+  /// The feeds the item came from, named beside its topic.
+  final List<String> feedNames;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -360,11 +414,18 @@ class FeedCard extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    feedTopicTitle(strings, item.topic),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+                  Flexible(
+                    child: Text(
+                      [
+                        feedTopicTitle(strings, item.topic),
+                        ...feedNames,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   if (item.isSample) ...[

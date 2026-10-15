@@ -16,7 +16,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | [UC-13](uc-13-general-chat.md) | General chat assistant | P0 | Haoyuan Tang | map_agent | in-progress |
 | [UC-15](uc-15-live-parking.md) | Live parking bays | P0 | Haoyuan Tang | map_agent | in-progress |
 | [UC-06](uc-06-local-news.md) | Local news by area | P1 | Alex Gao | extraction | planned |
-| [UC-14](uc-14-personal-feed.md) | Personal feed and topic subscriptions | P1 | Haoyuan Tang | none (app) | in-progress |
+| [UC-14](uc-14-personal-feed.md) | Personal feeds (topics in one area, stored per user) | P1 | Haoyuan Tang | none (app) | in-progress |
 | [UC-07](uc-07-byo-data-sources.md) | Bring your own data sources | P1 | Haoyuan Tang | extraction | planned |
 | [UC-08](uc-08-local-history.md) | Local history | P1 | Haoyuan Tang | map_agent | planned |
 | [UC-09](uc-09-user-events.md) | Publish and join user events | P2 | Haoyuan Tang | none (app) | in-progress |

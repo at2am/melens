@@ -19,7 +19,7 @@ flowchart TB
     Jobs["Scheduled ingestion: Cloud Run jobs, one per source, cloud/data"]
     BQ[("BigQuery: admitted published query views + history")]
     Storage[("GCS: permitted batch staging")]
-    FS[("Firestore: chat sessions per user, grounding cache, rate-limit counters")]
+    FS[("Firestore: chat sessions, user events and feed subscriptions per user, grounding cache, rate-limit counters")]
     Auth["Firebase Auth: anonymous uid"]
     AI["Vertex AI: Gemini, Search and Maps grounding"]
     Maps["Maps Platform: Routes API, map rendering"]
@@ -50,7 +50,7 @@ The map app does not query BigQuery directly and has no Firestore map listener. 
 | Ingestion | Cloud Run jobs, Cloud Scheduler, cloud/data | Source admission, normalization, publication and provenance |
 | BigQuery | Google Cloud | Published query views and historical facts; the anomaly detector (a cloud/data job) publishes anomaly results here |
 | GCS | Google Cloud | Permitted NDJSON batch staging; not the client wire format |
-| Firestore | Google Cloud | Agent-only store, reached only by the agent service: chat sessions per user, grounding cache and rate-limit counters. Not a map data store |
+| Firestore | Google Cloud | Agent-only store, reached only by the agent service: chat sessions per user, user events (`userEvents`), feed subscriptions per user (`userFeeds/{uid}`), grounding cache and rate-limit counters. Not a map data store |
 | Firebase Auth | Google Cloud | Anonymous uid for every user; the agent service verifies the ID token |
 | Vertex AI | Google Cloud | Gemini models and Search/Maps grounding, called with the agent service identity |
 | Maps Platform | Google Cloud | Routes API for `draw_route`; map rendering and grounding attribution in the app |

@@ -2,11 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
+import 'package:melens/features/feed/data/feed_models.dart';
+import 'package:melens/features/feed/state/feed_providers.dart';
 import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/map/state/viewport_controller.dart';
 import 'package:melens/features/shell/state/shell_providers.dart';
 
 import '../../support/app_harness.dart';
+import '../feed/fake_feeds_client.dart';
 
 Finder key(String name) => find.byKey(ValueKey(name));
 
@@ -52,7 +55,7 @@ void main() {
     expect(container.read(userEventDisplayNameProvider), isNull);
   });
 
-  testWidgets('location sharing and map search are the only switches', (
+  testWidgets('location sharing and map search are the app switches', (
     tester,
   ) async {
     final container = appContainer();
@@ -60,8 +63,7 @@ void main() {
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    expect(find.byType(Switch), findsNWidgets(2));
-    expect(key('feed-topic-news'), findsNothing);
+    expect(find.byType(SwitchListTile), findsNWidgets(2));
   });
 
   testWidgets('the map waits for Search this area unless auto-search is on', (
@@ -130,5 +132,108 @@ void main() {
       Theme.of(tester.element(key('settings-list'))).brightness,
       Brightness.light,
     );
+  });
+
+  group('feeds', () {
+    final feeds = [
+      const FeedSubscription(
+        id: 'work',
+        name: 'Work',
+        topics: {FeedTopic.events, FeedTopic.disruptions},
+        scope: AreaFeedScope('docklands'),
+      ),
+      const FeedSubscription(
+        id: 'city',
+        name: 'Whole city',
+        topics: {FeedTopic.planning},
+        scope: CityFeedScope(),
+      ),
+    ];
+
+    testWidgets('settings lists the feeds with their topics and area', (
+      tester,
+    ) async {
+      final container = appContainer(feeds: FakeFeedsClient(feeds));
+      addTearDown(container.dispose);
+      await pumpApp(tester, container, size: const Size(390, 1600));
+      await openSettings(tester);
+
+      expect(find.text('Work'), findsOneWidget);
+      expect(find.text('Events, Disruptions · Docklands'), findsOneWidget);
+      expect(find.text('Planning · All of Melbourne'), findsOneWidget);
+      expect(key('settings-feed-new'), findsOneWidget);
+    });
+
+    testWidgets('pausing a feed saves it and takes it off the feed', (
+      tester,
+    ) async {
+      final client = FakeFeedsClient(feeds);
+      final container = appContainer(feeds: client);
+      addTearDown(container.dispose);
+      await pumpApp(tester, container, size: const Size(390, 1600));
+      expect(key('feed-chip-work'), findsOneWidget);
+      await openSettings(tester);
+
+      await tester.tap(key('settings-feed-switch-work'));
+      await tester.pumpAndSettle();
+      expect(client.saves.single.first.enabled, isFalse);
+      expect(find.textContaining('Paused · '), findsOneWidget);
+
+      await tester.tap(key('tab-feed'));
+      await tester.pumpAndSettle();
+      expect(key('feed-chip-work'), findsNothing);
+      expect(key('feed-chip-city'), findsOneWidget);
+    });
+
+    testWidgets('a feed opens in the editor and can be deleted', (
+      tester,
+    ) async {
+      final client = FakeFeedsClient(feeds);
+      final container = appContainer(feeds: client);
+      addTearDown(container.dispose);
+      await pumpApp(tester, container, size: const Size(390, 1600));
+      await openSettings(tester);
+
+      await tester.tap(find.text('Work'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit feed'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Work'), findsOneWidget);
+
+      await tester.tap(key('feed-delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete Work?'), findsOneWidget);
+      await tester.tap(key('feed-delete-confirm'));
+      await tester.pumpAndSettle();
+
+      expect(key('settings-list'), findsOneWidget);
+      expect(find.text('Work'), findsNothing);
+      expect(client.saves.single.map((feed) => feed.id), ['city']);
+      expect(
+        container.read(feedSubscriptionsProvider).value!.single.id,
+        'city',
+      );
+    });
+
+    testWidgets('editing a feed keeps its id and saves the change', (
+      tester,
+    ) async {
+      final client = FakeFeedsClient(feeds);
+      final container = appContainer(feeds: client);
+      addTearDown(container.dispose);
+      await pumpApp(tester, container, size: const Size(390, 1600));
+      await openSettings(tester);
+
+      await tester.tap(find.text('Whole city'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Everywhere');
+      await tester.tap(key('feed-save'));
+      await tester.pumpAndSettle();
+
+      final saved = client.saves.single;
+      expect(saved.map((feed) => feed.id), ['work', 'city']);
+      expect(saved.last.name, 'Everywhere');
+      expect(saved.last.scope, const CityFeedScope());
+      expect(find.text('Everywhere'), findsOneWidget);
+    });
   });
 }

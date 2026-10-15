@@ -6,6 +6,8 @@ import { staticVerifier } from '../src/auth/verifier.js';
 import { eventViewSchema, membersViewSchema, type EventView } from '../src/events/schemas.js';
 import { UserEventService, memberIdOf } from '../src/events/service.js';
 import { InMemoryUserEventStore } from '../src/events/store.js';
+import { FeedService } from '../src/feeds/service.js';
+import { InMemoryFeedStore } from '../src/feeds/store.js';
 import { AgentServiceError, zeroUsage } from '../src/protocol/schemas.js';
 import { createRateLimiter } from '../src/rate-limit.js';
 import { createAgentHttpServer, type TurnRunner } from '../src/server.js';
@@ -205,7 +207,8 @@ async function start() {
       uiActions: [], question: null, stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
   } };
   const { events } = service();
-  const server = createAgentHttpServer({ store: new InMemorySessionStore(), runner, events, verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }),
+  const feeds = new FeedService({ store: new InMemoryFeedStore(), writeLimiter: createRateLimiter(100) });
+  const server = createAgentHttpServer({ store: new InMemorySessionStore(), runner, events, feeds, verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }),
     rateLimiter: createRateLimiter(100), allowedOrigins: [ORIGIN], turnTimeoutMs: 5_000 });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
