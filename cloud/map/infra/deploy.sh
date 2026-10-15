@@ -93,7 +93,8 @@ reviewed = {
     'ticketmaster.events': ('restricted', 'developer.ticketmaster.com'),
     'gdelt.news': ('verified_open', 'www.gdeltproject.org'),
     'victoria.council.engagement_news': ('restricted', None),
-    'user.events': ('restricted', None),
+    # 'user.events' (UC-09) returns here once the user_events export publishes into v_source_coverage; until then the
+    # audit below cannot pass with it listed, and the app reads community events from the agent service instead.
     # The labelled replay of a historical day (UC-04): derived from City of Melbourne CC BY counts, registered
     # 2026-10-15 without the live-source admission gates; the team has yet to review it.
     'melens.anomaly.replay': ('verified_open', 'data.melbourne.vic.gov.au'),
