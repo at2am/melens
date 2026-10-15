@@ -224,14 +224,18 @@ final class MapFeedItemsFamily extends $Family
 
 /// The feed: the community events and what is on now in each subscribed map
 /// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed.
+/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
+/// slower than the events, so the feed does not wait for them: it lists them
+/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
 
 @ProviderFor(feed)
 final feedProvider = FeedProvider._();
 
 /// The feed: the community events and what is on now in each subscribed map
 /// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed.
+/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
+/// slower than the events, so the feed does not wait for them: it lists them
+/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
 
 final class FeedProvider
     extends
@@ -243,7 +247,9 @@ final class FeedProvider
     with $FutureModifier<FeedResult>, $FutureProvider<FeedResult> {
   /// The feed: the community events and what is on now in each subscribed map
   /// layer, upcoming first. A source that fails is reported in
-  /// [FeedResult.failedTopics] instead of failing the feed.
+  /// [FeedResult.failedTopics] instead of failing the feed. The map layers are
+  /// slower than the events, so the feed does not wait for them: it lists them
+  /// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
   FeedProvider._()
     : super(
         from: null,
@@ -269,4 +275,4 @@ final class FeedProvider
   }
 }
 
-String _$feedHash() => r'ace230947b572f41011ed6190f70dc9a046ab655';
+String _$feedHash() => r'ed130ab8fa189f9b7f5d36033ec1eaf07bff6e88';
