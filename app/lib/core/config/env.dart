@@ -63,6 +63,7 @@ final class Env {
     required Uri mapBaseUrl,
     MapDataMode mapDataMode = MapDataMode.live,
     String? googleMapsWebApiKey,
+    String? googleMapsIosApiKey,
     String? googleMapsMapId,
     String? agentDevToken,
     String? firebaseProjectId,
@@ -103,6 +104,7 @@ final class Env {
       mapBaseUrl: mapBaseUrl,
       mapDataMode: mapDataMode,
       googleMapsWebApiKey: (googleMapsWebApiKey ?? '').trim(),
+      googleMapsIosApiKey: (googleMapsIosApiKey ?? '').trim(),
       googleMapsMapId: (googleMapsMapId ?? '').trim(),
       agentDevToken: devToken,
       firebase: firebase,
@@ -115,6 +117,7 @@ final class Env {
     required this.mapBaseUrl,
     required this.mapDataMode,
     required this.googleMapsWebApiKey,
+    required this.googleMapsIosApiKey,
     required this.googleMapsMapId,
     required this.agentDevToken,
     required this.firebase,
@@ -145,6 +148,9 @@ final class Env {
     ),
     googleMapsWebApiKey: const String.fromEnvironment(
       'GOOGLE_MAPS_WEB_API_KEY',
+    ),
+    googleMapsIosApiKey: const String.fromEnvironment(
+      'GOOGLE_MAPS_IOS_API_KEY',
     ),
     googleMapsMapId: const String.fromEnvironment('GOOGLE_MAPS_MAP_ID'),
     agentDevToken: const String.fromEnvironment('AGENT_DEV_TOKEN'),
@@ -180,6 +186,10 @@ final class Env {
   /// A browser-restricted Maps JavaScript API key. Never log this value.
   final String googleMapsWebApiKey;
 
+  /// A Maps SDK for iOS key restricted to the app's bundle id. The native SDK
+  /// takes it at runtime through `NativeMapsKey`. Never log this value.
+  final String googleMapsIosApiKey;
+
   /// Optional for the base 2D map. Required for advanced markers and 3D.
   final String googleMapsMapId;
 
@@ -201,6 +211,8 @@ final class Env {
   bool get usesSampleMapData => mapDataMode == MapDataMode.sample;
 
   bool get hasGoogleMapsWebApiKey => googleMapsWebApiKey.isNotEmpty;
+
+  bool get hasGoogleMapsIosApiKey => googleMapsIosApiKey.isNotEmpty;
 
   String get name => environment.name;
 

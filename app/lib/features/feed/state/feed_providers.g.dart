@@ -269,4 +269,4 @@ final class FeedProvider
   }
 }
 
-String _$feedHash() => r'ad87d36f9ef3cd77365e39e24e1adcfd445add63';
+String _$feedHash() => r'ace230947b572f41011ed6190f70dc9a046ab655';

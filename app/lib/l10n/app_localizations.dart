@@ -487,7 +487,7 @@ abstract class AppLocalizations {
   /// Missing Web key state; sample data must not imply a working base map.
   ///
   /// In en, this message translates to:
-  /// **'Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.'**
+  /// **'Base map unavailable: configure an authorized Google Maps API key for this platform. Data remains available in the object list.'**
   String get mapSurfaceMissingKey;
 
   /// Native SDK setup has not been accepted; Web readiness does not certify native rendering.

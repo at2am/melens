@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/config/env.dart';
 import '../../../core/config/maps_web_loader.dart';
+import '../../../core/config/native_maps_key.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/map_models.dart';
 import 'map_status.dart';
@@ -23,15 +25,26 @@ Duration? _manualMapRetry(int retryCount, Object error) => null;
 @Riverpod(keepAlive: true)
 GoogleMapsWebApiLoader mapSurfaceApiLoader(Ref ref) => GoogleMapsWebApiLoader();
 
-/// One app-scoped SDK request precedes all Web platform-map construction.
-/// Failed readiness remains explicit until the user requests a retry.
+@Riverpod(keepAlive: true)
+NativeMapsKey nativeMapsKey(Ref ref) => const NativeMapsKey();
+
+/// One app-scoped SDK request precedes all platform-map construction: the
+/// JavaScript API on the Web, the native key on iOS. Failed readiness remains
+/// explicit until the user requests a retry.
 @Riverpod(keepAlive: true, retry: _manualMapRetry)
 Future<MapSurfaceReadiness> mapSurfaceReadiness(Ref ref) async {
   final env = ref.watch(envProvider);
-  if (!kIsWeb) return MapSurfaceReadiness.unsupportedPlatform;
-  if (!env.hasGoogleMapsWebApiKey) return MapSurfaceReadiness.missingKey;
-  await ref.watch(mapSurfaceApiLoaderProvider).load(env);
-  return MapSurfaceReadiness.ready;
+  if (kIsWeb) {
+    if (!env.hasGoogleMapsWebApiKey) return MapSurfaceReadiness.missingKey;
+    await ref.watch(mapSurfaceApiLoaderProvider).load(env);
+    return MapSurfaceReadiness.ready;
+  }
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    if (!env.hasGoogleMapsIosApiKey) return MapSurfaceReadiness.missingKey;
+    await ref.watch(nativeMapsKeyProvider).provide(env.googleMapsIosApiKey);
+    return MapSurfaceReadiness.ready;
+  }
+  return MapSurfaceReadiness.unsupportedPlatform;
 }
 
 typedef MapSurfaceBuilder = Widget Function(
@@ -252,9 +265,8 @@ class MapLegend extends StatelessWidget {
         if (enabledLayers.contains(MapLayerId.pedestrian))
           Text(
             strings.mapSurfaceCountLegend(
-              NumberFormat.decimalPattern(
-                'en_AU',
-              ).format(passageCircleAreaSquareMeters),
+              NumberFormat.decimalPattern('en_AU')
+                  .format(passageCircleAreaSquareMeters),
             ),
           ),
       ],

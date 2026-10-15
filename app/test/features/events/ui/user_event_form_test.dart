@@ -396,18 +396,17 @@ void main() {
   });
 }
 
-Map<String, dynamic> _fixture(String name) =>
-    jsonDecode(
-          File(
-            '../specs/002-map-data-presentation/contracts/examples/$name.sample.json',
-          ).readAsStringSync(),
-        )
-        as Map<String, dynamic>;
+Map<String, dynamic> _fixture(String name) => jsonDecode(
+  File(
+    '../specs/002-map-data-presentation/contracts/examples/$name.sample.json',
+  ).readAsStringSync(),
+) as Map<String, dynamic>;
 
 /// A sensor with a point geometry from the map contract's sample viewport.
-MapItem _pointRecord() => ViewportResponse.fromJson(_fixture('viewport')).layers
-    .expand((layer) => layer.items)
-    .firstWhere((item) => item.id == 'sample.sensor.A');
+MapItem _pointRecord() =>
+    ViewportResponse.fromJson(_fixture('viewport')).layers
+        .expand((layer) => layer.items)
+        .firstWhere((item) => item.id == 'sample.sensor.A');
 
 /// A selection controller that already holds one selected record.
 final class _SelectedRecord extends SelectionController {

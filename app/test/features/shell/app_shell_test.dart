@@ -55,7 +55,11 @@ void main() {
     for (final name in ['feed', 'discover', 'settings']) {
       await tester.tap(tab(name));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('chat-fab')), findsOneWidget, reason: name);
+      expect(
+        find.byKey(const ValueKey('chat-fab')),
+        findsOneWidget,
+        reason: name,
+      );
     }
   });
 

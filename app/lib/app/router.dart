@@ -46,7 +46,8 @@ GoRouter router(Ref ref) {
           // another while the router is being built.
           if (id != null) {
             Future.microtask(
-              () => ref.read(eventsPanelRequestsProvider.notifier).openEvent(id),
+              () =>
+                  ref.read(eventsPanelRequestsProvider.notifier).openEvent(id),
             );
           }
           return AppRoutes.discover;
