@@ -20,6 +20,7 @@ import { createVertexStructuredModel } from '../dist/src/agent/structured.js';
 import { createMemoryCache } from '../dist/src/cache.js';
 import { loadAgentConfig } from '../dist/src/config.js';
 import { createSharedFeatureReader } from '../dist/src/features/reader.js';
+import type { StoredTurn } from '../dist/src/protocol/schemas.js';
 import { collectingSink } from '../dist/src/protocol/sse.js';
 import { createRoutesClient } from '../dist/src/routes/routes-client.js';
 
@@ -44,7 +45,11 @@ interface Case {
   readonly forbid?: readonly string[];
   readonly expectCard?: boolean;
   readonly expectQuestion?: boolean;
+  /** The turn must be answered in plain text: no tool call, no card, no question. */
+  readonly noTools?: boolean;
   readonly layers?: string[];
+  /** Earlier messages in the same session, run live first; the checks apply to the last turn only. */
+  readonly before?: readonly string[];
 }
 
 const CASES: readonly Case[] = [
@@ -60,6 +65,16 @@ const CASES: readonly Case[] = [
   { id: 10, use: 'UC-13', input: { kind: 'text', text: 'What time does the free tram zone end?' }, expect: ['search_grounding'] },
   { id: 11, use: 'UC-08', input: { kind: 'text', text: "What's the history of Flinders Street Station?" }, expect: ['search_grounding'], expectCard: true },
   { id: 13, use: 'UC-04', input: { kind: 'analyse', featureId: 'anomaly:replay-161-2025092702' }, expect: ['analyse_anomaly'], expectCard: true },
+  { id: 14, use: 'UC-13', input: { kind: 'text', text: 'hi' }, expect: [], noTools: true },
+  { id: 15, use: 'UC-13', input: { kind: 'text', text: 'Thanks, that was helpful!' }, expect: [], noTools: true },
+  { id: 16, use: 'UC-13', input: { kind: 'text', text: 'What can you do?' }, expect: [], noTools: true },
+  { id: 17, use: 'UC-13', input: { kind: 'text', text: 'Tell me a joke about trams.' }, expect: [], noTools: true },
+  { id: 18, use: 'UC-13', input: { kind: 'text', text: 'What is the capital of Victoria?' }, expect: [], noTools: true },
+  // Multi-turn: thanks after a tool-heavy answer must stay plain text; thanks with a new request must still search.
+  { id: 19, use: 'UC-13', before: ['What can I do after 7 PM tonight?'], input: { kind: 'text', text: 'Thanks!' }, expect: [], noTools: true },
+  { id: 20, use: 'UC-13', before: ['Take me to Fitzroy Gardens.'], input: { kind: 'text', text: 'Great, thanks a lot.' }, expect: [], noTools: true },
+  { id: 21, use: 'UC-13', before: ["What's the history of Flinders Street Station?"], input: { kind: 'text', text: 'Cool, thank you, that was interesting.' }, expect: [], noTools: true },
+  { id: 22, use: 'UC-13', before: ['What can I do after 7 PM tonight?'], input: { kind: 'text', text: 'Thanks! Anything on tomorrow night too?' }, expect: ['search_features'] },
   { id: 12, use: 'UC-04', input: { kind: 'text', text: 'Why is it so busy here right now?' }, expect: ['nearby_context'], layers: ['event', 'disruption', 'news', 'pedestrian', 'anomaly'] },
 ];
 
@@ -95,11 +110,18 @@ for (const testCase of CASES) {
   let calls = 0;
   let cards = 0;
   let text = '';
-  try {
-    const stored = await runner.run({ uid: 'eval', turnId, seq: 1, startedAt: new Date(), signal: AbortSignal.timeout(280_000), sink,
+  const runTurn = (id: string, seq: number, input: Case['input'], history: StoredTurn[], pendingQuestion: StoredTurn['question']) =>
+    runner.run({ uid: 'eval', turnId: id, seq, startedAt: new Date(), signal: AbortSignal.timeout(280_000), sink: id === turnId ? sink : collectingSink(id),
       session: { id: `s_eval_${testCase.id}`, uid: 'eval', title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        turnCount: 0, pendingQuestion: null, activeTurn: null, expiresAt: new Date(Date.now() + 864e5).toISOString() },
-      request: { input: testCase.input, context: context(testCase.layers) } as never, images: [], history: [], historyImages: new Map() });
+        turnCount: history.length, pendingQuestion, activeTurn: null, expiresAt: new Date(Date.now() + 864e5).toISOString() },
+      request: { input, context: context(testCase.layers) } as never, images: [], history, historyImages: new Map() });
+  try {
+    const history: StoredTurn[] = [];
+    for (const [index, earlier] of (testCase.before ?? []).entries()) {
+      history.push(await runTurn(`${turnId}_${index}`, index + 1, { kind: 'text', text: earlier }, history.slice(), null));
+    }
+    const stored = await runTurn(turnId, history.length + 1, testCase.input, history, history.at(-1)?.question ?? null);
+    if (history.length > 0) console.log(`#${testCase.id} earlier: ${history.map((turn) => turn.trace.map((entry) => entry.tool).join(' → ') || 'none').join(' | ')}`);
     tools = stored.trace.map((entry) => entry.tool);
     usageTotal = stored.usage.total;
     calls = stored.usage.calls;
@@ -108,6 +130,8 @@ for (const testCase of CASES) {
     if (args.includes('--show')) for (const card of stored.cards) console.log(JSON.stringify(card, null, 1));
     for (const tool of testCase.expect) if (!tools.includes(tool)) verdict.push(`missing ${tool}`);
     for (const tool of testCase.forbid ?? []) if (tools.includes(tool)) verdict.push(`unexpected ${tool}`);
+    if (testCase.noTools === true && (tools.length > 0 || cards > 0 || stored.question !== null)) verdict.push(`expected plain text, got ${tools.join(',') || 'a card'}`);
+    if (testCase.noTools === true && text.trim() === '') verdict.push('no answer text');
     if (testCase.expectCard === true && cards === 0) verdict.push('no card');
     if (testCase.expectQuestion === true && stored.question === null) verdict.push('no question');
     const failed = stored.trace.filter((entry) => entry.error !== null && entry.error !== 'upstream_unavailable').map((entry) => `${entry.tool}:${entry.error}`);
@@ -118,7 +142,8 @@ for (const testCase of CASES) {
     verdict = [`error ${error instanceof Error ? error.message.slice(0, 80) : 'unknown'}`];
   }
   if (verdict.length > 0) failures += 1;
-  const input = testCase.input.kind === 'text' ? testCase.input.text : testCase.input.kind === 'analyse' ? `Analyse ${testCase.input.featureId}` : `map tap at ${testCase.input.lat}, ${testCase.input.lng}`;
+  const last = testCase.input.kind === 'text' ? testCase.input.text : testCase.input.kind === 'analyse' ? `Analyse ${testCase.input.featureId}` : `map tap at ${testCase.input.lat}, ${testCase.input.lng}`;
+  const input = [...(testCase.before ?? []).map((earlier) => `${earlier} ⟶`), last].join(' ');
   rows.push(`| ${testCase.id} | ${testCase.use} | ${input.replace(/\|/g, '/')} | ${tools.join(' → ') || 'none'} | ${cards} | ${calls} / ${usageTotal} | ${Math.round((Date.now() - startedAt) / 1000)} s | ${verdict.length === 0 ? 'pass' : `**FAIL** ${verdict.join('; ')}`} |`);
   console.log(`#${testCase.id} ${verdict.length === 0 ? 'pass' : `FAIL ${verdict.join('; ')}`} | ${tools.join(' → ')} | cards ${cards} | ${text.slice(0, 100).replace(/\n/g, ' ')}`);
 }
