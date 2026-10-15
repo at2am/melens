@@ -79,7 +79,7 @@ Breaking one of these can disqualify the entry.
 - Product models are Gemini through Vertex AI. Do not add another model provider or a provider abstraction layer.
 - Services read BigQuery only through the published `melens_query` views, with fixed parameterized queries and `maximumBytesBilled`. No caller SQL and no raw-table access. That code lives in `@melens/shared` (`cloud/shared`): the contract, the query runner, the layer adapters and the layer loaders. A service imports it instead of copying query code.
 - HTTP servers use `node:http` directly, as `cloud/map` does; no web framework.
-- Firestore is reached only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid.
+- Firestore is written only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid; user events (UC-09) in `userEvents`. The only other reader is the `user_events` connector in `cloud/data`, which exports user events to BigQuery read-only; no other service reaches Firestore.
 - Deployment scripts plan by default, take an immutable image digest and audit the runtime identity, following `cloud/map/infra/deploy.sh`.
 
 ## Documentation conventions

@@ -1639,168 +1639,6 @@
   "@feedTopicsSheetBody": {
     "description": "Body of the topic chooser sheet."
   },
-  "eventNewTitle": "Host an event",
-  "@eventNewTitle": {
-    "description": "Title of the event editor."
-  },
-  "eventPublish": "Publish",
-  "@eventPublish": {
-    "description": "Button that publishes the event."
-  },
-  "eventFieldTitle": "Title",
-  "@eventFieldTitle": {
-    "description": "Event title field label."
-  },
-  "eventFieldDescription": "What is the plan?",
-  "@eventFieldDescription": {
-    "description": "Event description field label."
-  },
-  "eventFieldCategory": "Category",
-  "@eventFieldCategory": {
-    "description": "Event category label."
-  },
-  "eventFieldWhen": "When",
-  "@eventFieldWhen": {
-    "description": "Event time label."
-  },
-  "eventFieldEnds": "Ends",
-  "@eventFieldEnds": {
-    "description": "Prefix of the event end time chip."
-  },
-  "eventFieldPlace": "Where",
-  "@eventFieldPlace": {
-    "description": "Event place label."
-  },
-  "eventFieldCapacity": "Guest limit (optional)",
-  "@eventFieldCapacity": {
-    "description": "Event capacity field label."
-  },
-  "eventFieldVisibility": "Who can find it",
-  "@eventFieldVisibility": {
-    "description": "Event visibility label."
-  },
-  "eventVisibilityPublic": "Public",
-  "@eventVisibilityPublic": {
-    "description": "Visibility option: everyone."
-  },
-  "eventVisibilityLinkOnly": "Link only",
-  "@eventVisibilityLinkOnly": {
-    "description": "Visibility option: only people with the link."
-  },
-  "eventVisibilityPublicHint": "Shown on the map and in the feed of people who follow community events.",
-  "@eventVisibilityPublicHint": {
-    "description": "Explains the public visibility."
-  },
-  "eventVisibilityLinkOnlyHint": "Hidden from the map and feed. Only people you send the link to can open it.",
-  "@eventVisibilityLinkOnlyHint": {
-    "description": "Explains the link-only visibility."
-  },
-  "eventTitleRequired": "Give your event a title",
-  "@eventTitleRequired": {
-    "description": "Validation message for an empty title."
-  },
-  "eventStartPast": "The event must start in the future",
-  "@eventStartPast": {
-    "description": "Validation message for a start in the past."
-  },
-  "eventEndBeforeStart": "The event must end after it starts",
-  "@eventEndBeforeStart": {
-    "description": "Validation message for an end before the start."
-  },
-  "eventCapacityInvalid": "Enter a number from 2 to 500, or leave it empty",
-  "@eventCapacityInvalid": {
-    "description": "Validation message for the guest limit."
-  },
-  "eventCategoryMusic": "Music",
-  "@eventCategoryMusic": {
-    "description": "Event category."
-  },
-  "eventCategoryArts": "Arts",
-  "@eventCategoryArts": {
-    "description": "Event category."
-  },
-  "eventCategoryFood": "Food and drink",
-  "@eventCategoryFood": {
-    "description": "Event category."
-  },
-  "eventCategorySport": "Sport",
-  "@eventCategorySport": {
-    "description": "Event category."
-  },
-  "eventCategoryOutdoors": "Outdoors",
-  "@eventCategoryOutdoors": {
-    "description": "Event category."
-  },
-  "eventCategoryCommunity": "Community",
-  "@eventCategoryCommunity": {
-    "description": "Event category."
-  },
-  "eventCategoryOther": "Other",
-  "@eventCategoryOther": {
-    "description": "Event category."
-  },
-  "eventNotFound": "This event is not available",
-  "@eventNotFound": {
-    "description": "Message on the event page for an unknown event."
-  },
-  "eventHostedBy": "Hosted by {name}",
-  "@eventHostedBy": {
-    "description": "Who hosts the event.",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "eventYouHost": "You are hosting",
-  "@eventYouHost": {
-    "description": "Shown to the host of the event."
-  },
-  "eventGoing": "{count, plural, =0{No one is going yet} =1{1 person going} other{{count} people going}}",
-  "@eventGoing": {
-    "description": "Number of guests.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "eventGoingOf": "{count} of {capacity} going",
-  "@eventGoingOf": {
-    "description": "Guests against the limit.",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "capacity": {
-        "type": "int"
-      }
-    }
-  },
-  "eventLinkOnlyNote": "Link only: not on the map or in the feed",
-  "@eventLinkOnlyNote": {
-    "description": "Note on a link-only event."
-  },
-  "eventJoin": "Join",
-  "@eventJoin": {
-    "description": "Button that joins the event."
-  },
-  "eventLeave": "Leave",
-  "@eventLeave": {
-    "description": "Button that leaves the event."
-  },
-  "eventFull": "Full",
-  "@eventFull": {
-    "description": "Disabled join button of a full event."
-  },
-  "eventCancelled": "Cancelled",
-  "@eventCancelled": {
-    "description": "State of a cancelled event."
-  },
-  "eventEnded": "This event has ended",
-  "@eventEnded": {
-    "description": "State of a finished event."
-  },
   "eventInvite": "Invite people",
   "@eventInvite": {
     "description": "Button that opens the invite sheet."
@@ -1809,7 +1647,7 @@
   "@eventInviteHint": {
     "description": "Invite sheet body."
   },
-  "eventInviteNoLink": "This build has no public link yet. Send this message; people can find the event under Community events.",
+  "eventInviteNoLink": "This build has no public link yet. Send this message; people can find the event on the Discover tab under Events.",
   "@eventInviteNoLink": {
     "description": "Invite sheet body without a link."
   },
@@ -1824,42 +1662,6 @@
   "eventInviteCopied": "Copied",
   "@eventInviteCopied": {
     "description": "Snackbar after copying."
-  },
-  "eventShowOnMap": "Show on map",
-  "@eventShowOnMap": {
-    "description": "Button that shows the event on the map."
-  },
-  "eventCancelAction": "Cancel event",
-  "@eventCancelAction": {
-    "description": "Button that cancels the event."
-  },
-  "eventCancelConfirmTitle": "Cancel this event?",
-  "@eventCancelConfirmTitle": {
-    "description": "Title of the cancel confirmation."
-  },
-  "eventCancelConfirmBody": "Guests will see it as cancelled.",
-  "@eventCancelConfirmBody": {
-    "description": "Body of the cancel confirmation."
-  },
-  "eventKeep": "Keep it",
-  "@eventKeep": {
-    "description": "Dialog button that keeps the event."
-  },
-  "eventFullNotice": "This event is full",
-  "@eventFullNotice": {
-    "description": "Snackbar when joining a full event."
-  },
-  "eventUnavailableNotice": "This event is no longer open",
-  "@eventUnavailableNotice": {
-    "description": "Snackbar when joining a closed event."
-  },
-  "eventActionFailed": "That did not work. Try again.",
-  "@eventActionFailed": {
-    "description": "Snackbar when an event action failed."
-  },
-  "eventSampleNote": "A sample event for development. It is not real.",
-  "@eventSampleNote": {
-    "description": "Note on a sample event."
   },
   "mapCommunityLayer": "Community events",
   "@mapCommunityLayer": {
@@ -1877,7 +1679,7 @@
   "@settingsProfile": {
     "description": "Settings section and dialog title for the profile."
   },
-  "settingsProfileHint": "Shown to guests of events you host",
+  "settingsProfileHint": "Shown to the organiser when you join an event",
   "@settingsProfileHint": {
     "description": "Subtitle under the profile name."
   },
@@ -1942,10 +1744,6 @@
       }
     }
   },
-  "eventOpen": "Open event",
-  "@eventOpen": {
-    "description": "Button in the map preview that opens the event page."
-  },
   "mapUnlocatedAction": "Items without a location",
   "@mapUnlocatedAction": {
     "description": "Row in the layers sheet that lists map items that have no place on the map."
@@ -1953,5 +1751,458 @@
   "mapLayersSheetTitle": "Layers and time",
   "@mapLayersSheetTitle": {
     "description": "Title of the sheet that holds the map's layers, time window and results."
+  },
+  "eventsOpen": "Open user events",
+  "@eventsOpen": {
+    "description": "Tooltip of the toolbar button that opens the user events panel (UC-09)."
+  },
+  "eventsClose": "Close user events",
+  "@eventsClose": {
+    "description": "Tooltip of the toolbar button that closes the user events panel."
+  },
+  "eventsPanelTitle": "User events",
+  "@eventsPanelTitle": {
+    "description": "Title of the user events panel."
+  },
+  "eventsTabNearby": "Nearby",
+  "@eventsTabNearby": {
+    "description": "Segment of the events panel listing events near the map's viewport."
+  },
+  "eventsTabMine": "Mine",
+  "@eventsTabMine": {
+    "description": "Segment of the events panel listing the user's own and joined events."
+  },
+  "eventsPublish": "Publish event",
+  "@eventsPublish": {
+    "description": "Button that opens the form to publish a new event."
+  },
+  "eventsFormPickOnMap": "Pick on the map",
+  "@eventsFormPickOnMap": {
+    "description": "Button in the event form: the next tap on the map places the event pin."
+  },
+  "eventsFormPickBanner": "Tap the map to place the event pin",
+  "@eventsFormPickBanner": {
+    "description": "Banner above the map while the user picks the event pin."
+  },
+  "eventsFormPickStop": "Stop picking",
+  "@eventsFormPickStop": {
+    "description": "Button on the pin-picking banner that returns to the form without a new pin."
+  },
+  "eventsFormUseSelected": "Use {title}",
+  "@eventsFormUseSelected": {
+    "description": "Button in the event form that pins the event at the map record the user selected.",
+    "placeholders": {
+      "title": {
+        "type": "String",
+        "example": "Hamer Hall"
+      }
+    }
+  },
+  "eventsFormSearchPlace": "Search an address or place",
+  "@eventsFormSearchPlace": {
+    "description": "Label of the address search field in the event form."
+  },
+  "eventsFormSearchHint": "Google Places, greater Melbourne",
+  "@eventsFormSearchHint": {
+    "description": "Helper text under the address search field."
+  },
+  "eventsFormSearchNoResults": "No place matches",
+  "@eventsFormSearchNoResults": {
+    "description": "Shown under the address search field when the search returned nothing."
+  },
+  "eventsFormSearchUnavailable": "Address search is not available: {reason}",
+  "@eventsFormSearchUnavailable": {
+    "description": "Shown under the address search field when Google Places refused or is not set up.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "This API project is not authorized to use this API."
+      }
+    }
+  },
+  "eventsRefresh": "Refresh",
+  "@eventsRefresh": {
+    "description": "Button that reloads the events list."
+  },
+  "eventsRetry": "Try again",
+  "@eventsRetry": {
+    "description": "Button that retries a failed events request."
+  },
+  "eventsNearbyEmpty": "No user events here in the next two weeks. Publish the first one.",
+  "@eventsNearbyEmpty": {
+    "description": "Shown when the nearby list is empty."
+  },
+  "eventsNearbyNoViewport": "Move the map to an area to find events.",
+  "@eventsNearbyNoViewport": {
+    "description": "Shown in the nearby list before the map has a viewport."
+  },
+  "eventsMineEmpty": "You have not published or joined any events yet.",
+  "@eventsMineEmpty": {
+    "description": "Shown when the user has no own or joined events."
+  },
+  "eventsMineOwnedHeading": "Published by you",
+  "@eventsMineOwnedHeading": {
+    "description": "Heading of the user's own events in the Mine segment."
+  },
+  "eventsMineJoinedHeading": "Joined",
+  "@eventsMineJoinedHeading": {
+    "description": "Heading of the events the user joined in the Mine segment."
+  },
+  "eventsLoadFailed": "Could not load events. {reason}",
+  "@eventsLoadFailed": {
+    "description": "Shown when an events list failed to load. {reason} is the error text.",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "eventsGoing": "{count, plural, =0{Nobody going yet} =1{1 going} other{{count} going}}",
+  "@eventsGoing": {
+    "description": "How many people joined an event without a capacity.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eventsGoingOf": "{count} of {capacity} going",
+  "@eventsGoingOf": {
+    "description": "How many people joined an event with a capacity.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "capacity": {
+        "type": "int"
+      }
+    }
+  },
+  "eventsYouAreGoing": "You're going",
+  "@eventsYouAreGoing": {
+    "description": "Chip on an event the user joined."
+  },
+  "eventsYours": "Yours",
+  "@eventsYours": {
+    "description": "Chip on an event the user published."
+  },
+  "eventsCancelled": "Cancelled",
+  "@eventsCancelled": {
+    "description": "Badge on a cancelled event."
+  },
+  "eventsFull": "Full",
+  "@eventsFull": {
+    "description": "Badge on an event whose capacity is reached."
+  },
+  "eventsEnded": "Ended",
+  "@eventsEnded": {
+    "description": "Badge on an event that has ended."
+  },
+  "eventsAnonymousBadge": "Anonymous attendance",
+  "@eventsAnonymousBadge": {
+    "description": "Badge on an event that shows only the number of people going."
+  },
+  "eventsAnonymousExplainer": "Only the number of people going is shown, never who.",
+  "@eventsAnonymousExplainer": {
+    "description": "Explains anonymous attendance under the badge and the form switch."
+  },
+  "eventsBack": "Back to the list",
+  "@eventsBack": {
+    "description": "Button that returns from an event's details to the list."
+  },
+  "eventsShowOnMap": "Show on map",
+  "@eventsShowOnMap": {
+    "description": "Button that moves the map to the event's location."
+  },
+  "eventsJoin": "Join",
+  "@eventsJoin": {
+    "description": "Button that joins an event."
+  },
+  "eventsLeave": "Leave",
+  "@eventsLeave": {
+    "description": "Button that leaves an event the user joined."
+  },
+  "eventsJoinNameLabel": "Your name (optional)",
+  "@eventsJoinNameLabel": {
+    "description": "Label of the name field shown when joining an event."
+  },
+  "eventsJoinNameHint": "Shown to the organiser only",
+  "@eventsJoinNameHint": {
+    "description": "Helper text of the name field shown when joining an event."
+  },
+  "eventsEdit": "Edit",
+  "@eventsEdit": {
+    "description": "Owner button that opens the event for editing."
+  },
+  "eventsCancelEvent": "Cancel event",
+  "@eventsCancelEvent": {
+    "description": "Owner button that cancels the event."
+  },
+  "eventsRemoveEvent": "Remove event",
+  "@eventsRemoveEvent": {
+    "description": "Owner button that removes the event."
+  },
+  "eventsCancelConfirmTitle": "Cancel this event?",
+  "@eventsCancelConfirmTitle": {
+    "description": "Title of the dialog confirming an event cancellation."
+  },
+  "eventsCancelConfirmBody": "It stays visible as cancelled and nobody can join.",
+  "@eventsCancelConfirmBody": {
+    "description": "Body of the dialog confirming an event cancellation."
+  },
+  "eventsRemoveConfirmTitle": "Remove this event?",
+  "@eventsRemoveConfirmTitle": {
+    "description": "Title of the dialog confirming an event removal."
+  },
+  "eventsRemoveConfirmBody": "It disappears from the map for everyone. This cannot be undone.",
+  "@eventsRemoveConfirmBody": {
+    "description": "Body of the dialog confirming an event removal."
+  },
+  "eventsConfirmKeep": "Keep it",
+  "@eventsConfirmKeep": {
+    "description": "Dialog button that keeps the event as it is."
+  },
+  "eventsMembers": "Members",
+  "@eventsMembers": {
+    "description": "Owner section listing the event's members."
+  },
+  "eventsMembersCount": "{count, plural, =0{No members yet} =1{1 member} other{{count} members}}",
+  "@eventsMembersCount": {
+    "description": "Heading of the members section with the count.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eventsMembersAnonymous": "Anonymous attendance: names are not kept.",
+  "@eventsMembersAnonymous": {
+    "description": "Shown in the members section of an anonymous event instead of a list."
+  },
+  "eventsMemberGuest": "Guest",
+  "@eventsMemberGuest": {
+    "description": "Name shown for a member who gave none."
+  },
+  "eventsMemberRemove": "Remove member",
+  "@eventsMemberRemove": {
+    "description": "Tooltip of the button that removes a member from the event."
+  },
+  "eventsMemberJoinedAt": "Joined {time}",
+  "@eventsMemberJoinedAt": {
+    "description": "When a member joined. {time} is a formatted Melbourne time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "eventsWhen": "When",
+  "@eventsWhen": {
+    "description": "Label of the event's time in its details."
+  },
+  "eventsWhere": "Where",
+  "@eventsWhere": {
+    "description": "Label of the event's place in its details."
+  },
+  "eventsTimeRange": "{start} to {end}",
+  "@eventsTimeRange": {
+    "description": "An event's start and end, both formatted Melbourne times.",
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "eventsPlacePin": "Pinned at {lat}, {lng}",
+  "@eventsPlacePin": {
+    "description": "An event's coordinates when it has no place name, or under it.",
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      }
+    }
+  },
+  "eventsFormPublishTitle": "Publish an event",
+  "@eventsFormPublishTitle": {
+    "description": "Title of the form publishing a new event."
+  },
+  "eventsFormEditTitle": "Edit event",
+  "@eventsFormEditTitle": {
+    "description": "Title of the form editing an event."
+  },
+  "eventsFormTitle": "Title",
+  "@eventsFormTitle": {
+    "description": "Label of the event title field."
+  },
+  "eventsFormDescription": "Description",
+  "@eventsFormDescription": {
+    "description": "Label of the event description field."
+  },
+  "eventsFormPlaceName": "Place name (optional)",
+  "@eventsFormPlaceName": {
+    "description": "Label of the event place name field."
+  },
+  "eventsFormStart": "Starts",
+  "@eventsFormStart": {
+    "description": "Label of the event start date and time."
+  },
+  "eventsFormEnd": "Ends (optional)",
+  "@eventsFormEnd": {
+    "description": "Label of the event end date and time."
+  },
+  "eventsFormNoEnd": "No end time",
+  "@eventsFormNoEnd": {
+    "description": "Shown instead of an end time when none is set, and the button that clears it."
+  },
+  "eventsFormPickDate": "Pick the date",
+  "@eventsFormPickDate": {
+    "description": "Tooltip of the button that opens the date picker."
+  },
+  "eventsFormPickTime": "Pick the time",
+  "@eventsFormPickTime": {
+    "description": "Tooltip of the button that opens the time picker."
+  },
+  "eventsFormAnonymous": "Anonymous attendance",
+  "@eventsFormAnonymous": {
+    "description": "Label of the switch that hides who joined."
+  },
+  "eventsFormCapacity": "Capacity (optional)",
+  "@eventsFormCapacity": {
+    "description": "Label of the capacity field."
+  },
+  "eventsFormCapacityHint": "2 to 1000 people, or leave empty for no limit",
+  "@eventsFormCapacityHint": {
+    "description": "Helper text of the capacity field."
+  },
+  "eventsFormLocation": "Location",
+  "@eventsFormLocation": {
+    "description": "Label of the event location section of the form."
+  },
+  "eventsFormLocationHint": "Tap the map, use its centre or a selected record, or search an address.",
+  "@eventsFormLocationHint": {
+    "description": "Helper text under the location in the form."
+  },
+  "eventsFormUseMapCentre": "Use map centre",
+  "@eventsFormUseMapCentre": {
+    "description": "Button that sets the event location to the map's current centre."
+  },
+  "eventsFormSubmitPublish": "Publish",
+  "@eventsFormSubmitPublish": {
+    "description": "Submit button of the publish form."
+  },
+  "eventsFormSubmitSave": "Save",
+  "@eventsFormSubmitSave": {
+    "description": "Submit button of the edit form."
+  },
+  "eventsFormCancel": "Cancel",
+  "@eventsFormCancel": {
+    "description": "Button that closes the form without saving."
+  },
+  "eventsFormTitleRequired": "Give the event a title.",
+  "@eventsFormTitleRequired": {
+    "description": "Validation message for an empty title."
+  },
+  "eventsFormTooLong": "At most {max} characters.",
+  "@eventsFormTooLong": {
+    "description": "Validation message for a text field over its limit. {max} is the limit.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "eventsFormStartTooEarly": "The start can be at most an hour ago.",
+  "@eventsFormStartTooEarly": {
+    "description": "Validation message for a start more than an hour in the past."
+  },
+  "eventsFormStartTooLate": "The start must be within a year.",
+  "@eventsFormStartTooLate": {
+    "description": "Validation message for a start more than a year ahead."
+  },
+  "eventsFormEndBeforeStart": "The end must be after the start.",
+  "@eventsFormEndBeforeStart": {
+    "description": "Validation message for an end at or before the start."
+  },
+  "eventsFormDurationTooLong": "An event lasts at most 7 days.",
+  "@eventsFormDurationTooLong": {
+    "description": "Validation message for an end more than 7 days after the start."
+  },
+  "eventsFormCapacityRange": "Capacity is 2 to 1000.",
+  "@eventsFormCapacityRange": {
+    "description": "Validation message for a capacity outside its range."
+  },
+  "eventsFormLocationOutside": "The location must be in the Melbourne service area.",
+  "@eventsFormLocationOutside": {
+    "description": "Validation message for a location outside the service area."
+  },
+  "eventsFormNoChanges": "Nothing changed.",
+  "@eventsFormNoChanges": {
+    "description": "Shown when the edit form is submitted without changes."
+  },
+  "eventsErrorSignIn": "Sign-in is not configured, so events are unavailable.",
+  "@eventsErrorSignIn": {
+    "description": "Events error when the app has no token source."
+  },
+  "eventsErrorNetwork": "The service is unreachable.",
+  "@eventsErrorNetwork": {
+    "description": "Events error for a network failure."
+  },
+  "eventsErrorTimeout": "The request timed out.",
+  "@eventsErrorTimeout": {
+    "description": "Events error for a timed-out request."
+  },
+  "eventsErrorRateLimited": "Too many changes in an hour. Try again later.",
+  "@eventsErrorRateLimited": {
+    "description": "Events error on HTTP 429."
+  },
+  "eventsErrorNotFound": "This event no longer exists.",
+  "@eventsErrorNotFound": {
+    "description": "Events error on HTTP 404."
+  },
+  "eventsErrorForbidden": "Only the organiser can do that.",
+  "@eventsErrorForbidden": {
+    "description": "Events error on HTTP 403."
+  },
+  "eventsErrorInvalid": "The service rejected the event details.",
+  "@eventsErrorInvalid": {
+    "description": "Events error on HTTP 400."
+  },
+  "eventsErrorUnknown": "Something went wrong.",
+  "@eventsErrorUnknown": {
+    "description": "Events error without a known cause."
+  },
+  "eventsErrorEventFull": "This event is full.",
+  "@eventsErrorEventFull": {
+    "description": "Join refused: the capacity is reached."
+  },
+  "eventsErrorAlreadyJoined": "You already joined this event.",
+  "@eventsErrorAlreadyJoined": {
+    "description": "Join refused: the user is already a member."
+  },
+  "eventsErrorEventCancelled": "This event was cancelled.",
+  "@eventsErrorEventCancelled": {
+    "description": "Join refused: the event is cancelled."
+  },
+  "eventsErrorEventEnded": "This event has ended.",
+  "@eventsErrorEventEnded": {
+    "description": "Join refused: the event is over."
+  },
+  "eventsErrorOwnEvent": "You organise this event.",
+  "@eventsErrorOwnEvent": {
+    "description": "Join refused: the user is the owner."
+  },
+  "eventsErrorNotJoined": "You had not joined this event.",
+  "@eventsErrorNotJoined": {
+    "description": "Leave refused: the user was not a member."
+  },
+  "settingsNameUnset": "Add your name",
+  "@settingsNameUnset": {
+    "description": "Settings row title when no display name is set."
   }
 }

@@ -87,7 +87,7 @@ class MapSurface extends ConsumerWidget {
     this.onMapTap,
     this.mapBuilder,
     this.aggregateRenderer,
-    this.extraMarkers = const {},
+    this.overlay,
     this.compact = false,
     super.key,
   });
@@ -106,8 +106,9 @@ class MapSurface extends ConsumerWidget {
   final MapSurfaceBuilder? mapBuilder;
   final MapAggregateRenderer? aggregateRenderer;
 
-  /// Markers the app adds to the map's own results, such as community events.
-  final Set<Marker> extraMarkers;
+  /// Objects drawn over the layers, such as the user events near the
+  /// viewport (UC-09); they are not map records and are never selected.
+  final CoreRenderPlan? overlay;
 
   /// Draws only the map and a data-mode label. The caller supplies the legend
   /// ([MapLegend]) and the object list ([MapObjectList]) elsewhere, so the map
@@ -149,9 +150,7 @@ class MapSurface extends ConsumerWidget {
         aggregateRenderer!(context, aggregates, selectedItemId, select),
       );
     }
-    if (extraMarkers.isNotEmpty) {
-      plan = plan.merge(CoreRenderPlan(markers: extraMarkers));
-    }
+    if (overlay != null) plan = plan.merge(overlay!);
     final configuration = MapSurfaceConfiguration(
       initialCameraPosition: initialCameraPosition,
       renderPlan: plan,

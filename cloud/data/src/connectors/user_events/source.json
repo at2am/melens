@@ -1,0 +1,65 @@
+{
+  "source_id": "user.events",
+  "legacy_ids": [],
+  "provider": "Melens users",
+  "dataset_title": "User-published events (UC-09)",
+  "landing_url": "https://melens-510012.web.app/",
+  "topic": "event",
+  "scope": "greater_melbourne",
+  "coverage_area_refs": [
+    "service_bbox:map_contract_v1"
+  ],
+  "coverage_from": "2026-10-10T00:00:00.000Z",
+  "coverage_to": null,
+  "cadence_seconds": 300,
+  "check_interval_seconds": 300,
+  "requires_monitoring": true,
+  "license_status": "restricted",
+  "access_status": "ready",
+  "record_granularity": "user_event_version",
+  "connector_owner": "Haoyuan Tang (UC-09)",
+  "admission_evidence": {
+    "dataset_url": "https://melens-510012.web.app/",
+    "native_record_key": "userEvents/{eventId}.id",
+    "completeness_rule": "One Firestore query returns every userEvents document whose updatedAt lies in the half-open window; no paging, no sampling",
+    "quota_requests_per_day": 300,
+    "secret_names": [],
+    "allowed_fields": [
+      "id",
+      "title",
+      "description",
+      "point",
+      "placeName",
+      "startAt",
+      "endAt",
+      "timezone",
+      "anonymousAttendance",
+      "capacity",
+      "status",
+      "visibility",
+      "attendeeUids (exported as a count only)",
+      "createdAt",
+      "updatedAt",
+      "version",
+      "activeUntil"
+    ],
+    "raw_retention_days": 0,
+    "staging_retention_days": 1,
+    "license_evidence_url": "https://melens-510012.web.app/",
+    "reviewed_at": "2026-10-10T00:00:00Z"
+  },
+  "retention_policy": {
+    "content_cache_seconds": null,
+    "cleanup_interval_seconds": null,
+    "cleanup_age_seconds": null,
+    "takedown_max_seconds": 300,
+    "raw_response_retained": false,
+    "attribution": "Published by a Melens user",
+    "direct_event_link_required": false,
+    "publication_requires": [
+      "a removed or hidden event exports a withdrawn version within one schedule interval",
+      "no owner or attendee uid in any exported row"
+    ]
+  },
+  "notes": "Content users publish in Melens itself (title, description, pin, times, attendance count), written by the agent service to Firestore and exported here as event versions. The publisher grants Melens the right to show the event on the map; the owner can edit, cancel or remove it at any time, and the export withdraws a removed or moderated event on its next run. No external publisher and no original link: the record is published in the app. The connector's identity needs Firestore read access (roles/datastore.viewer) on the project; it uses no secret. access_status becomes active when the identity and schedule are provisioned (infra/schedules.json)."
+}

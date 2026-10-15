@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/config/env.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../events/state/event_providers.dart';
+import '../../events/state/user_events_providers.dart';
 import '../../feed/ui/feed_topic_list.dart';
 import '../../shell/state/shell_providers.dart';
 
@@ -16,7 +16,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final profile = ref.watch(currentProfileProvider);
+    final name = ref.watch(userEventDisplayNameProvider);
     final choice = ref.watch(appThemeSettingProvider);
     final env = ref.watch(envProvider);
 
@@ -38,12 +38,14 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             key: const ValueKey('settings-profile'),
             leading: CircleAvatar(
-              child: Text(profile.displayName.characters.first.toUpperCase()),
+              child: name == null
+                  ? const Icon(Icons.person_outline)
+                  : Text(name.characters.first.toUpperCase()),
             ),
-            title: Text(profile.displayName),
+            title: Text(name ?? strings.settingsNameUnset),
             subtitle: Text(strings.settingsProfileHint),
             trailing: const Icon(Icons.edit_outlined),
-            onTap: () => _rename(context, ref, profile.displayName),
+            onTap: () => _rename(context, ref, name ?? ''),
           ),
           const SizedBox(height: 16),
           _Section(strings.settingsFollowing),
@@ -100,7 +102,9 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) => _RenameDialog(initial: current),
     );
-    if (name != null) ref.read(currentProfileProvider.notifier).rename(name);
+    if (name != null) {
+      ref.read(userEventDisplayNameProvider.notifier).remember(name.trim());
+    }
   }
 }
 

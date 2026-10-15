@@ -3,21 +3,22 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
-import '../../../app/router.dart';
 import '../../../core/network/public_source_opener.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_item_details.dart';
-import '../../events/data/user_event.dart';
-import '../../events/state/event_providers.dart';
-import '../../events/ui/event_preview_card.dart';
+import '../../events/data/user_event_models.dart';
+import '../../events/state/event_view_providers.dart';
+import '../../events/state/user_events_providers.dart';
+import '../../events/ui/user_event_markers.dart';
+import '../../events/ui/user_event_text.dart';
+import '../../events/ui/user_events_panel.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
@@ -67,7 +68,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _usesVisibleRegion = false;
   bool _regionReadFailed = false;
   bool _showUnlocated = false;
-  String? _communityEventId;
+  bool _showEvents = false;
+  int _eventsPanelNonce = 0;
+  String? _panelEventId;
+  bool _panelNewEvent = false;
+  bool _holdingNearby = false;
+
+  /// Kept for [dispose], where `ref` is no longer safe to use.
+  late final NearbyUserEventsController _nearby;
   MapFocusRequest? _pendingFocus;
   CardItem? _awaitingItem;
 
@@ -83,6 +91,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _nearby = ref.read(nearbyUserEventsControllerProvider.notifier);
     ref.listenManual(layerControllerProvider, (previous, next) {
       ref
           .read(viewportControllerProvider.notifier)
@@ -117,12 +126,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listenManual(cardItemRequestsProvider, (previous, next) {
       if (next != null) _takeCardItemRequest(next);
     });
+    ref.listenManual(eventsPanelRequestsProvider, (previous, next) {
+      if (next != null) _takeEventsPanelRequest(next);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // The agent or an event page may have asked for the map before it was
       // built: take what is waiting.
       final waiting = ref.read(cardItemRequestsProvider);
       if (waiting != null) _takeCardItemRequest(waiting);
+      final panel = ref.read(eventsPanelRequestsProvider);
+      if (panel != null) _takeEventsPanelRequest(panel);
+      _syncNearbyLoading(ref.read(communityLayerEnabledProvider));
       _pendingFocus = ref.read(mapActionsControllerProvider).focus;
       final viewport = ref.read(viewportControllerProvider.notifier);
       viewport.setLayers(ref.read(layerControllerProvider).enabledLayerIds);
@@ -520,6 +535,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   void dispose() {
+    if (_holdingNearby) _nearby.setActive(false);
     _regionGeneration++;
     _map = null;
     super.dispose();
@@ -533,12 +549,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final catalog = ref.watch(mapLayerCatalogProvider);
     final actions = ref.watch(mapActionsControllerProvider);
     final communityOn = ref.watch(communityLayerEnabledProvider);
-    final List<UserEvent> communityEvents = communityOn
-        ? ref.watch(publicUpcomingEventsProvider)
+    final userEvents = communityOn
+        ? ref.watch(
+            nearbyUserEventsControllerProvider.select((state) => state.events),
+          )
         : const <UserEvent>[];
-    final communityEvent = _communityEventId == null
-        ? null
-        : ref.watch(userEventByIdProvider(_communityEventId!));
+    final pickingPin = ref.watch(
+      userEventPinPickerProvider.select((state) => state.active),
+    );
+    final clock = ref.watch(melbourneClockProvider);
     final unlocated = _unlocatedQuery(catalog.value, viewport);
     final response = viewport.response;
     final items =
@@ -563,22 +582,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         selectedItemId: selection.highlightedItemId,
         onItemSelected: _selectItem,
         onAggregateSelected: _selectItem,
-        extraMarkers: {
-          for (final event in communityEvents)
-            Marker(
-              markerId: MarkerId('user-event:${event.id}'),
-              position: LatLng(event.place.latitude, event.place.longitude),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueViolet,
+        onMapTap: pickingPin
+            ? (position) => _placeEventPin(context, position)
+            : null,
+        overlay: userEvents.isEmpty
+            ? null
+            : userEventMarkers(
+                events: userEvents,
+                snippetOf: (event) => formatEventTime(clock, event.startAt),
+                onTap: _openUserEvent,
               ),
-              infoWindow: InfoWindow(
-                title: event.title,
-                snippet: event.place.name,
-              ),
-              zIndexInt: 3,
-              onTap: () => _selectCommunityEvent(event.id),
-            ),
-        },
         onCameraChanged: (camera) {
           _zoom = camera.zoom;
           _regionGeneration++;
@@ -632,12 +645,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 onOpenSource: _sourceOpener,
                 onRefreshSnapshot: () => unawaited(_refreshAggregateSnapshot()),
               ),
-      );
-    } else if (communityEvent != null) {
-      details = EventPreviewCard(
-        event: communityEvent,
-        onClose: () => setState(() => _communityEventId = null),
-        onOpen: () => context.go(AppRoutes.event(communityEvent.id)),
       );
     } else if (_cardItem case final cardItem?) {
       details = CardItemDetails(
@@ -701,6 +708,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ),
                 ?highlights,
+                if (pickingPin) _pinPickingBanner(),
               ],
             ),
           ),
@@ -740,6 +748,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 ),
               Expanded(child: MapDetailsLayout(map: stage, details: details)),
+              if (wide && _showEvents)
+                SizedBox(
+                  width: 380,
+                  child: _eventsPanel(
+                    onClose: () => setState(() => _showEvents = false),
+                  ),
+                ),
             ],
           ),
         );
@@ -747,13 +762,148 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _selectCommunityEvent(String id) {
-    ref.read(selectionControllerProvider.notifier).clear();
-    setState(() {
-      _showUnlocated = false;
-      _cardItem = null;
-      _communityEventId = id;
-    });
+  // ---- User events (UC-09) ----
+
+  /// The community layer switch also decides whether the nearby events load
+  /// while the panel is closed, so their pins stay on the map.
+  void _setCommunity(bool on) {
+    ref.read(communityLayerEnabledProvider.notifier).set(enabled: on);
+    _syncNearbyLoading(on);
+  }
+
+  void _syncNearbyLoading(bool on) {
+    if (on == _holdingNearby) return;
+    _holdingNearby = on;
+    _nearby.setActive(on);
+  }
+
+  /// Moves the camera to a user event's pin, through the same focus request
+  /// the agent's `focus_map` uses.
+  void _showEventOnMap(AgentLatLng point) =>
+      ref.read(mapActionsControllerProvider.notifier).focusPoint(
+        point.lat,
+        point.lng,
+      );
+
+  Widget _eventsPanel({
+    VoidCallback? onClose,
+    ValueChanged<AgentLatLng>? onShowOnMap,
+    VoidCallback? onPickOnMap,
+  }) => UserEventsPanel(
+    key: ValueKey('map-events-panel-$_eventsPanelNonce'),
+    initialEventId: _panelEventId,
+    startWithForm: _panelNewEvent,
+    onClose: onClose,
+    onShowOnMap: onShowOnMap ?? _showEventOnMap,
+    onPickOnMap: onPickOnMap,
+  );
+
+  void _showEventsSheet() {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => PointerInterceptor(
+          child: SizedBox(
+            height: math.min(760, MediaQuery.sizeOf(sheetContext).height * 0.9),
+            child: _eventsPanel(
+              onClose: () => Navigator.of(sheetContext).pop(),
+              // The sheet covers the map, so showing a place closes it.
+              onShowOnMap: (point) {
+                Navigator.of(sheetContext).pop();
+                _showEventOnMap(point);
+              },
+              // Picking a pin needs the map; the tap reopens the sheet.
+              onPickOnMap: () => Navigator.of(sheetContext).pop(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Opens the panel on an event or on the new-event form, once.
+  void _openEventsPanel({String? eventId, bool newEvent = false}) {
+    _panelEventId = eventId;
+    _panelNewEvent = newEvent;
+    _eventsPanelNonce++;
+    if (MediaQuery.sizeOf(context).width >= 1050) {
+      setState(() => _showEvents = true);
+    } else {
+      _showEventsSheet();
+    }
+  }
+
+  void _takeEventsPanelRequest(EventsPanelRequest request) {
+    ref.read(eventsPanelRequestsProvider.notifier).consume(request.sequence);
+    _openEventsPanel(eventId: request.eventId, newEvent: request.newEvent);
+  }
+
+  /// The tap that places the event pin while the form is picking one; the
+  /// panel comes back so the form shows the point.
+  void _placeEventPin(BuildContext context, LatLng position) {
+    ref
+        .read(userEventPinPickerProvider.notifier)
+        .place(AgentLatLng(lat: position.latitude, lng: position.longitude));
+    _returnToEventForm();
+  }
+
+  void _returnToEventForm() {
+    // The form's draft is kept; the panel reads it when it comes back.
+    _panelEventId = null;
+    _panelNewEvent = false;
+    if (MediaQuery.sizeOf(context).width >= 1050) {
+      if (!_showEvents) setState(() => _showEvents = true);
+    } else {
+      _showEventsSheet();
+    }
+  }
+
+  /// Shown above the map while the event form waits for a tap.
+  Widget _pinPickingBanner() {
+    final strings = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Material(
+        key: const ValueKey('map-pin-picking-banner'),
+        color: colors.tertiaryContainer,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.add_location_alt_outlined,
+                color: colors.onTertiaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  strings.eventsFormPickBanner,
+                  style: TextStyle(color: colors.onTertiaryContainer),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('map-pin-picking-stop'),
+                onPressed: () {
+                  ref.read(userEventPinPickerProvider.notifier).cancel();
+                  _returnToEventForm();
+                },
+                child: Text(strings.eventsFormPickStop),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A tapped user event pin opens the event in the panel.
+  void _openUserEvent(UserEvent event) {
+    ref.read(openUserEventProvider.notifier).open(event.id);
+    _openEventsPanel(eventId: event.id);
   }
 
   /// The layers as chips: filled and ticked when on, outlined when off, so
@@ -808,11 +958,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   key: const ValueKey('map-chip-community'),
                   label: strings.mapCommunityLayer,
                   on: communityOn,
-                  onChanged: (on) => ref
-                      .read(communityLayerEnabledProvider.notifier)
-                      .set(enabled: on),
+                  onChanged: _setCommunity,
                 ),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: IconButton.filledTonal(
+              key: const ValueKey('map-events-toggle'),
+              tooltip: wide && _showEvents
+                  ? strings.eventsClose
+                  : strings.eventsOpen,
+              isSelected: wide && _showEvents,
+              onPressed: () => wide
+                  ? setState(() => _showEvents = !_showEvents)
+                  : _showEventsSheet(),
+              icon: const Icon(Icons.event_outlined),
+              selectedIcon: const Icon(Icons.event),
             ),
           ),
           if (!wide)
@@ -865,7 +1028,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ? () {
                   afterAction?.call();
                   setState(() {
-                    _communityEventId = null;
                     _showUnlocated = true;
                   });
                 }

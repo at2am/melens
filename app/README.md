@@ -51,7 +51,7 @@ Three bottom tabs, one `StatefulShellRoute` in `lib/app/router.dart`: **Feed** (
 
 The agent chat belongs to the shell (`features/shell/ui/app_shell.dart`), not to a tab: its floating button is on every tab and the conversation survives tab changes. A card item tapped in the chat, and an agent `focus_map` or `highlight_features`, bring the Discover tab forward (`cardItemRequestsProvider`, `mapActionsControllerProvider`).
 
-Discover is a full-bleed map. Layers are chips along the top: ticked and filled when on, outlined when off. The app's own "Community events" layer (UC-09) sits beside the contract layers because the map contract has no layer for it. The layers button opens the full panel: topics, availability, the time window, statuses, the legend and the text list of results; from 1050 px wide the panel docks on the left.
+Discover is a full-bleed map. Layers are chips along the top: ticked and filled when on, outlined when off. The app's own "Community events" layer (UC-09) sits beside the contract layers because the map contract has no layer for it; its switch also keeps the nearby user events loaded so their pins stay on the map. The events button opens the Events panel (a sheet on phones, docked from 1050 px); the feed's add button and a tapped community event open it from the Feed tab (`eventsPanelRequestsProvider`), and an invite link `/events/:id` opens it on one event. The layers button opens the full panel: topics, availability, the time window, statuses, the legend and the text list of results; from 1050 px wide the panel docks on the left.
 
 The look is minimal: white (or near-black) surfaces, one teal accent, flat tonal cards, 20 px radii, no shadows except the floating button. It is all in `lib/app/theme.dart`.
 
@@ -74,7 +74,7 @@ lib/
   features/feed/        the Feed tab: topic subscriptions and the feed (UC-14)
   features/map/         the Discover tab: the map screen, its state and MapActions
   features/settings/    the Settings tab: profile, topics, theme
-  features/events/      user events: model, in-memory repository, editor, event page, invites (UC-09)
+  features/events/      user events (UC-09): the service client, the panel with its form, details and pin picker, invites
   features/agent/       the agent protocol: models and the SSE client
   features/chat/        the chat panel: controller, session list, turn views
   features/cards/       the card registry, one widget per card type
@@ -190,6 +190,5 @@ Sources: [Maps Flutter plugin](https://pub.dev/packages/google_maps_flutter), [e
 
 | Item | Why it waits | Already decided |
 | --- | --- | --- |
-| Shared user events and subscriptions | The agent service has no publish, join or subscription endpoint, and the app never reaches Firestore itself. Events and subscriptions live in memory for the app run behind `UserEventRepository` and `FeedSubscriptions` | The seam is the repository interface; the identity becomes the Firebase uid |
-| Map picker for event places | The editor offers Melbourne landmarks | Coordinates are WGS84 on `EventPlace` |
+| Subscriptions that survive a restart | The agent service has no subscription endpoint and the app never reaches Firestore itself, so `FeedSubscriptions` lives in memory for the app run | The seam is the provider; the identity is the Firebase uid |
 | Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Dependency and Web loader are prepared; 2D surface integration is T015, native setup is separate |

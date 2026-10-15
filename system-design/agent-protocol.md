@@ -135,6 +135,75 @@ The prompt for a turn carries the last 20 turns; older turns remain available to
 
 The chat panel shows the user's session list. The user can switch to an earlier session, start a new one and delete one; switching restores that conversation from `GET /v1/sessions/{sessionId}`.
 
+## User events
+
+User-published events (UC-09) are served by the same service on `/v1/events`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; the `user.events` connector in `cloud/data` exports published events to BigQuery as `event` records, so they reach the map's event layer and the agent's `search_features` like Ticketmaster's ([uc-09](use-cases/uc-09-user-events.md), Design).
+
+| Method and path | Purpose |
+| --- | --- |
+| `POST /v1/events` | Publish an event; the body is a draft. `201` with `{ "event": … }` |
+| `GET /v1/events?north&south&east&west&from&to` | Discover: published and cancelled events inside the box (at most 10 km per side) that take place at some point in `[from, to)`. `from` defaults to now, `to` to 14 days later. At most 200, soonest first: `{ "events": […] }` |
+| `GET /v1/events/mine` | The caller's events, soonest first: `{ "owned": […], "joined": […] }` |
+| `GET /v1/events/{eventId}` | One event: `{ "event": … }` |
+| `PATCH /v1/events/{eventId}` | Owner only: any subset of the draft fields; `version` increments |
+| `POST /v1/events/{eventId}/cancel` | Owner only: the event stays visible as `cancelled` and nobody can join |
+| `DELETE /v1/events/{eventId}` | Owner only: the event disappears (`404` afterwards, `204` now); the export withdraws it |
+| `POST /v1/events/{eventId}/join` | Join, with an optional `{ "displayName": "Sam" }`; `{ "event": … }` |
+| `DELETE /v1/events/{eventId}/join` | Leave; `{ "event": … }` |
+| `GET /v1/events/{eventId}/members` | Owner only: `{ "count": 12, "members": [ { "memberId", "displayName", "joinedAt" } ] }`; `members` is null for an anonymous event |
+| `DELETE /v1/events/{eventId}/members/{memberId}` | Owner only: remove one member; `204` |
+
+A draft, the body of `POST` (every field) and `PATCH` (any subset; `endAt`, `placeName` and `capacity` may be set to null):
+
+```json
+{
+  "title": "Sunset run along the Yarra",
+  "description": "Easy 5 km, all paces welcome. Meet at the boathouse steps.",
+  "point": { "lat": -37.8206, "lng": 144.9775 },
+  "placeName": "Boathouse Drive steps",
+  "startAt": "2026-10-12T18:00:00+11:00",
+  "endAt": "2026-10-12T19:00:00+11:00",
+  "anonymousAttendance": true,
+  "capacity": 20
+}
+```
+
+An event, as every route returns it:
+
+```json
+{
+  "id": "ue_k3Qm…",
+  "title": "Sunset run along the Yarra",
+  "description": "Easy 5 km, all paces welcome. Meet at the boathouse steps.",
+  "point": { "lat": -37.8206, "lng": 144.9775 },
+  "placeName": "Boathouse Drive steps",
+  "startAt": "2026-10-12T07:00:00.000Z",
+  "endAt": "2026-10-12T08:00:00.000Z",
+  "timezone": "Australia/Melbourne",
+  "anonymousAttendance": true,
+  "capacity": 20,
+  "status": "published",
+  "attendeeCount": 3,
+  "createdAt": "2026-10-10T02:15:00.000Z",
+  "updatedAt": "2026-10-10T02:15:00.000Z",
+  "version": 1,
+  "viewer": { "isOwner": false, "joined": true }
+}
+```
+
+Rules:
+
+1. **Limits.** Title 1 to 120 characters; description at most 2000; `placeName` at most 120; `point` inside the service area (map contract `SERVICE_BBOX`); `startAt` at most 1 hour in the past and at most 1 year ahead when published; `endAt` after `startAt` and at most 7 days later, or null; `capacity` 2 to 1000, or null for no limit; `displayName` at most 40 characters. Times are accepted with any offset and returned in UTC; `timezone` is always `Australia/Melbourne`.
+2. **Anonymous attendance.** With `anonymousAttendance` true, everyone including the owner sees only `attendeeCount`: `members` is null and no member can be removed. The viewer always knows whether they joined themselves.
+3. **Joining** needs `status` `published`, a free place and not having joined already; the owner cannot join their own event. Otherwise `409 conflict`, with `messageKey` `agent.error.conflict.eventFull`, `.alreadyJoined`, `.eventCancelled`, `.eventEnded` or `.ownEvent`; leaving an event not joined is `.notJoined`. Owner routes on another user's event answer `403 forbidden`. Unknown and removed events answer `404 notFound`.
+4. **Identity.** A member is named to the owner by `memberId`, a per-event hash; a uid never leaves the service. The display name given when joining is stored on that membership only, and a member without one is shown as a guest. The publisher is not named at all.
+5. **Rate.** Writes count against a per-uid limit of 60 per hour (`429 rateLimited`); reads are not limited.
+
+| Document | Fields |
+| --- | --- |
+| `userEvents/{eventId}` | The event fields above plus `ownerUid`, `visibility` (`visible`, or `hidden` for moderation), `attendeeUids` (who joined, in join order: the count, the viewer's `joined` flag and `GET /v1/events/mine` read it), `activeUntil` (`endAt`, or `startAt` plus 3 hours) and `expiresAtTs` (90 days after `activeUntil`, the TTL policy). `status` is `published`, `cancelled` or `removed`; a removed event stays until the TTL so the export can withdraw it. `version` increments on every change, joins included |
+| `userEvents/{eventId}/attendees/{uid}` | `uid`, `memberId`, `displayName` or null, `joinedAt`; written and deleted with the membership |
+
 ## Authentication
 
 Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header. The Cloud Run service allows unauthenticated invocation at the platform level, because a browser cannot obtain an IAM token; the service itself verifies the Firebase ID token on every request and rejects a missing or invalid token before any model or tool call. This ties sessions to users and allows per-uid rate limiting, with counters in Firestore, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.

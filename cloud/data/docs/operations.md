@@ -34,6 +34,8 @@ Cloud Scheduler 的资源位置是 `australia-southeast1`，与采集任务、Bi
 
 本地运行 `npm run ingest` 时，Node.js 24 会从仓库根目录可选加载 `.env`。Ticketmaster Discovery API 连接器读取 `TICKETMASTER_DISCOVERY_API_KEY`。`.env` 已由 Git 忽略，只用于本机开发；Cloud Run 镜像不复制 `.env`，部署脚本继续把 Secret Manager 中的 `ticketmaster_discovery_api_key` 注入同名进程环境变量。
 
+用户活动连接器 `user.events`（UC-09）不用密钥：它用运行身份通过 `@google-cloud/firestore` 读取 `GOOGLE_CLOUD_PROJECT` 项目的 Firestore `userEvents` 集合（可用 `MELENS_USER_EVENTS_DATABASE` 指定非默认数据库），所以该身份需要 `roles/datastore.viewer`；`MELENS_APP_BASE_URL`（默认 `https://melens-510012.web.app`）决定导出记录的 `original_url`，即 app 内该活动的页面。只支持时间窗模式，见 [source-policies/user-events.md](source-policies/user-events.md)。
+
 ```bash
 # 环境变量配置示例（通过 loadConfig() 严格校验）：
 export GOOGLE_CLOUD_PROJECT="melens-dev-project"

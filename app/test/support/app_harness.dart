@@ -5,19 +5,55 @@ import 'package:melens/app/app.dart';
 import 'package:melens/core/config/env.dart';
 import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/agent/state/agent_providers.dart';
+import 'package:melens/features/events/data/user_event_models.dart';
+import 'package:melens/features/events/state/user_events_providers.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/ui/map_surface.dart';
 
 import '../features/agent/fake_agent_client.dart';
+import '../features/events/fake_user_events_client.dart';
 
 /// 18 Oct 2026, 11:00 Melbourne time, a Sunday.
 final harnessNow = DateTime.utc(2026, 10, 18);
 
-/// The whole app on sample data, a fake agent and a fixed clock.
+/// Events the harness's fake service holds: near the city centre, after
+/// [harnessNow].
+List<UserEvent> harnessEvents() => [
+  fakeEvent(
+    'ue_sketch',
+    title: 'Sunset sketching on the river',
+    description: 'Bring a notebook and a pencil.',
+    placeName: 'Birrarung Marr',
+    startAt: DateTime.utc(2026, 10, 19, 7),
+    capacity: 12,
+    attendeeCount: 3,
+  ),
+  fakeEvent(
+    'ue_laneway',
+    title: 'Laneway acoustic night',
+    description: 'Three local players, no stage, one lane.',
+    placeName: 'Federation Square',
+    startAt: DateTime.utc(2026, 10, 20, 8),
+    attendeeCount: 8,
+  ),
+  fakeEvent(
+    'ue_mine',
+    title: 'Rooftop jam',
+    placeName: 'Carlton Gardens',
+    startAt: DateTime.utc(2026, 10, 21, 8),
+    isOwner: true,
+    joined: true,
+    attendeeCount: 1,
+  ),
+];
+
+/// The whole app on sample data, a fake agent, a fake events service and a
+/// fixed clock.
 ProviderContainer appContainer({
   FakeAgentClient? agent,
+  FakeUserEventsClient? events,
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
   MapRepository? mapRepository,
@@ -28,6 +64,9 @@ ProviderContainer appContainer({
     ),
     mapSurfaceReadinessProvider.overrideWith((ref) async => readiness),
     agentClientProvider.overrideWithValue(agent ?? FakeAgentClient()),
+    userEventsClientProvider.overrideWithValue(
+      events ?? FakeUserEventsClient(harnessEvents()),
+    ),
     melbourneClockProvider.overrideWithValue(
       MelbourneClock(now: () => harnessNow),
     ),

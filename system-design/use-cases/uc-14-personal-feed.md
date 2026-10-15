@@ -22,7 +22,7 @@ The home tab: what is happening in the topics the user chose to follow. Added 20
 ## Behaviour
 
 1. The app has three bottom tabs: Feed (home), Discover (the map, UC-01 and UC-02) and Settings. A floating button on every tab opens the agent chat (UC-13).
-2. A topic is a source of feed items: community events (UC-09) or one map layer (events, disruptions, news, anomalies, planning). The user follows a topic with its chip on the feed, or with its switch in Settings; both change the same subscription.
+2. A topic is a source of feed items: community events (UC-09, read from the agent service's `/v1/events` around central Melbourne for the next 14 days) or one map layer (events, disruptions, news, anomalies, planning). The user follows a topic with its chip on the feed, or with its switch in Settings; both change the same subscription.
 3. The feed lists the items of followed topics: coming up first, soonest first, then what has happened, latest first. A map item opens on the map; a community event opens its page.
 4. Map topics are read from the map service for the whole service area for the current window, through the same contract as the map. A source that fails is named in the feed and never hides the others.
 5. New users follow community events, events and disruptions.

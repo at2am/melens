@@ -34,5 +34,11 @@
     "url": null,
     "attribution": "Greater Melbourne councils — community engagement news (facts and links only)",
     "versionRef": null
+  },
+  {
+    "sourceId": "user.events",
+    "url": null,
+    "attribution": "Published by a Melens user",
+    "versionRef": null
   }
 ]

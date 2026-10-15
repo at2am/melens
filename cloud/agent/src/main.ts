@@ -9,6 +9,10 @@ import { createMapAgentRunner } from './agent/map-agent.js';
 import { createVertexGrounding } from './agent/grounding.js';
 import { createFirebaseVerifier, staticVerifier } from './auth/verifier.js';
 import { loadAgentConfig } from './config.js';
+import { createFirestoreUserEventStore } from './events/firestore-store.js';
+import { EVENT_LIMITS } from './events/schemas.js';
+import { UserEventService } from './events/service.js';
+import { InMemoryUserEventStore } from './events/store.js';
 import { createSharedFeatureReader } from './features/reader.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createAgentHttpServer } from './server.js';
@@ -35,7 +39,11 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     : createFirestoreSessionStore({ projectId: config.projectId, databaseId: config.firestoreDatabase });
   const verifier = development && env.AGENT_DEVELOPMENT_TOKEN !== undefined
     ? staticVerifier({ [env.AGENT_DEVELOPMENT_TOKEN]: 'dev-user' }) : createFirebaseVerifier(config.projectId);
-  const server = createAgentHttpServer({ store, verifier, runner, rateLimiter: createRateLimiter(config.turnsPerHour),
+  // User events (UC-09) share the database and the development mode of the sessions.
+  const events = new UserEventService({ writeLimiter: createRateLimiter(EVENT_LIMITS.writesPerHour),
+    store: development ? new InMemoryUserEventStore()
+      : createFirestoreUserEventStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
+  const server = createAgentHttpServer({ store, verifier, runner, events, rateLimiter: createRateLimiter(config.turnsPerHour),
     allowedOrigins: config.allowedOrigins, turnTimeoutMs: config.turnTimeoutMs });
   server.on('error', (error: NodeJS.ErrnoException) => {
     log({ severity: 'ERROR', event: 'agentServerFailed', reason: error.code ?? error.message, port });

@@ -100,6 +100,7 @@ connectors' `source.json` manifests and source-policy records:
 | `ticketmaster.events` (event) | `restricted` ([release record](../../data/docs/validation/events-release-2026-10-01.md)); 24-hour visibility, direct event link required | Discovery API page | Event information provided by Ticketmaster |
 | `gdelt.news` (news) | `verified_open` with attribution to The GDELT Project | gdeltproject.org | News metadata from The GDELT Project |
 | `victoria.council.engagement_news` (news) | `restricted`, facts and links only | none; every record carries its council news link | Greater Melbourne councils — community engagement news |
+| `user.events` (event) | `restricted`: content users publish in the app under its terms ([policy](../../data/docs/source-policies/user-events.md)), added 2026-10-10 for UC-09 | none; the records are published in Melens itself | Published by a Melens user |
 
 `deploy.sh` checks the registry against this reviewed table (source set, licence
 status reported by `v_source_coverage`, reference host) before any plan or apply.

@@ -2,7 +2,7 @@ import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/time/melbourne_time.dart';
-import '../../events/state/event_providers.dart';
+import '../../events/state/event_view_providers.dart';
 import '../../map/data/map_models.dart';
 import '../../map/data/map_repository.dart';
 import '../../map/state/map_providers.dart';
@@ -87,20 +87,23 @@ Future<FeedResult> feed(Ref ref) async {
   final failed = <FeedTopic>{};
 
   if (topics.contains(FeedTopic.community)) {
-    for (final event in ref.watch(publicUpcomingEventsProvider)) {
-      items.add(
-        FeedItem(
-          id: event.id,
-          topic: FeedTopic.community,
-          title: event.title,
-          summary: event.description,
-          when: event.startAt,
-          place: event.place.name,
-          sourceLabel: event.hostName,
-          userEventId: event.id,
-          isSample: event.isSample,
-        ),
-      );
+    try {
+      for (final event in await ref.watch(communityEventsProvider.future)) {
+        items.add(
+          FeedItem(
+            id: event.id,
+            topic: FeedTopic.community,
+            title: event.title,
+            summary: event.description.isEmpty ? null : event.description,
+            when: event.startAt,
+            place: event.placeName,
+            userEventId: event.id,
+          ),
+        );
+      }
+    } on Object catch (error, stack) {
+      _log.warning('Community events failed', error, stack);
+      failed.add(FeedTopic.community);
     }
   }
 
@@ -108,7 +111,7 @@ Future<FeedResult> feed(Ref ref) async {
   if (layerNames.isNotEmpty) {
     try {
       items.addAll(await ref.watch(mapFeedItemsProvider(layerNames).future));
-    } on Exception catch (error, stack) {
+    } on Object catch (error, stack) {
       _log.warning('Map feed failed', error, stack);
       failed.addAll(topics.where((topic) => topic.layer != null));
     }

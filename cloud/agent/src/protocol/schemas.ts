@@ -183,7 +183,10 @@ export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export const AGENT_ERROR_CODES = {
   invalidRequest: { status: 400, retryable: false },
   unauthorized: { status: 401, retryable: false },
+  forbidden: { status: 403, retryable: false },
   notFound: { status: 404, retryable: false },
+  /** A user event action the event's state refuses; the `messageKey` suffix says why (agent-protocol.md, User events). */
+  conflict: { status: 409, retryable: false },
   turnInProgress: { status: 409, retryable: true },
   rateLimited: { status: 429, retryable: true },
   serviceUnavailable: { status: 503, retryable: true },
@@ -192,8 +195,9 @@ export const AGENT_ERROR_CODES = {
 export type AgentErrorCode = keyof typeof AGENT_ERROR_CODES;
 
 export class AgentServiceError extends Error {
-  constructor(readonly code: AgentErrorCode) {
-    super(`Agent request failed: ${code}`);
+  /** `reason` becomes the `messageKey` suffix: `agent.error.<code>.<reason>`. */
+  constructor(readonly code: AgentErrorCode, readonly reason: string | null = null) {
+    super(`Agent request failed: ${code}${reason === null ? '' : ` (${reason})`}`);
     this.name = 'AgentServiceError';
   }
 }

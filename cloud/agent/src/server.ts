@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import type { IdTokenVerifier } from './auth/verifier.js';
+import type { UserEventService } from './events/service.js';
 import { decodeImages, type TurnImage } from './protocol/attachments.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
   type AgentErrorCode, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
@@ -42,12 +43,41 @@ type Route =
   | { readonly kind: 'session'; readonly method: 'GET' | 'DELETE'; readonly sessionId: string }
   | { readonly kind: 'turn'; readonly sessionId: string }
   | { readonly kind: 'cancel'; readonly sessionId: string }
-  | { readonly kind: 'attachment'; readonly sessionId: string; readonly attachmentId: string };
+  | { readonly kind: 'attachment'; readonly sessionId: string; readonly attachmentId: string }
+  | { readonly kind: 'events'; readonly method: 'GET' | 'POST' }
+  | { readonly kind: 'eventsMine' }
+  | { readonly kind: 'event'; readonly method: 'GET' | 'PATCH' | 'DELETE'; readonly eventId: string }
+  | { readonly kind: 'eventCancel'; readonly eventId: string }
+  | { readonly kind: 'eventJoin'; readonly method: 'POST' | 'DELETE'; readonly eventId: string }
+  | { readonly kind: 'eventMembers'; readonly eventId: string }
+  | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
+/** The user events routes (agent-protocol.md, User events); `mine` is matched before an event id. */
+function matchEventRoute(method: string, pathname: string): Route | null {
+  if (pathname === '/v1/events' && (method === 'GET' || method === 'POST')) return { kind: 'events', method };
+  if (pathname === '/v1/events/mine' && method === 'GET') return { kind: 'eventsMine' };
+  const event = /^\/v1\/events\/([^/]+)$/.exec(pathname);
+  if (event !== null && ID.test(event[1]!) && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) {
+    return { kind: 'event', method, eventId: event[1]! };
+  }
+  const cancel = /^\/v1\/events\/([^/]+)\/cancel$/.exec(pathname);
+  if (cancel !== null && ID.test(cancel[1]!) && method === 'POST') return { kind: 'eventCancel', eventId: cancel[1]! };
+  const join = /^\/v1\/events\/([^/]+)\/join$/.exec(pathname);
+  if (join !== null && ID.test(join[1]!) && (method === 'POST' || method === 'DELETE')) return { kind: 'eventJoin', method, eventId: join[1]! };
+  const members = /^\/v1\/events\/([^/]+)\/members$/.exec(pathname);
+  if (members !== null && ID.test(members[1]!) && method === 'GET') return { kind: 'eventMembers', eventId: members[1]! };
+  const member = /^\/v1\/events\/([^/]+)\/members\/([^/]+)$/.exec(pathname);
+  if (member !== null && ID.test(member[1]!) && ID.test(member[2]!) && method === 'DELETE') {
+    return { kind: 'eventMember', eventId: member[1]!, memberId: member[2]! };
+  }
+  return null;
+}
+
 function matchRoute(method: string, pathname: string): Route | null {
   if (pathname === '/healthz' && method === 'GET') return { kind: 'health' };
+  if (pathname.startsWith('/v1/events')) return matchEventRoute(method, pathname);
   if (pathname === '/v1/sessions' && (method === 'GET' || method === 'POST')) return { kind: 'sessions', method };
   const session = /^\/v1\/sessions\/([^/]+)$/.exec(pathname);
   if (session !== null && ID.test(session[1]!) && (method === 'GET' || method === 'DELETE')) {
@@ -84,8 +114,15 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   catch { throw new AgentServiceError('invalidRequest'); }
 }
 
-function errorCodeOf(error: unknown): AgentErrorCode {
-  return error instanceof AgentServiceError ? error.code : 'serviceUnavailable';
+/** A body that may be absent: a route like `join` takes options but needs none. */
+async function readOptionalJsonBody(request: IncomingMessage): Promise<unknown> {
+  const declared = request.headers['content-length'];
+  if (declared === '0' || (declared === undefined && request.headers['content-type'] === undefined)) return {};
+  return readJsonBody(request);
+}
+
+function errorOf(error: unknown): { readonly code: AgentErrorCode; readonly reason: string | null } {
+  return error instanceof AgentServiceError ? { code: error.code, reason: error.reason } : { code: 'serviceUnavailable', reason: null };
 }
 
 function writeJson(response: ServerResponse, status: number, body: unknown): void {
@@ -94,9 +131,15 @@ function writeJson(response: ServerResponse, status: number, body: unknown): voi
   response.end(JSON.stringify(body));
 }
 
-function writeError(response: ServerResponse, code: AgentErrorCode): void {
+function writeNoContent(response: ServerResponse): void {
+  if (response.writableEnded || response.destroyed) return;
+  response.writeHead(204);
+  response.end();
+}
+
+function writeError(response: ServerResponse, code: AgentErrorCode, reason: string | null = null): void {
   const body = errorResponseSchema.parse({ schemaVersion: 1,
-    error: { code, messageKey: `agent.error.${code}`, retryable: AGENT_ERROR_CODES[code].retryable } });
+    error: { code, messageKey: `agent.error.${code}${reason === null ? '' : `.${reason}`}`, retryable: AGENT_ERROR_CODES[code].retryable } });
   if (response.writableEnded || response.destroyed) return;
   response.writeHead(AGENT_ERROR_CODES[code].status, { 'Content-Type': 'application/json; charset=utf-8', Connection: 'close' });
   response.end(JSON.stringify(body));
@@ -107,6 +150,8 @@ export interface AgentServerOptions {
   readonly verifier: IdTokenVerifier;
   readonly runner: TurnRunner;
   readonly rateLimiter: RateLimiter;
+  /** User events (UC-09), with their own write limit. */
+  readonly events: UserEventService;
   /** Exact origins the Web app is served from; the agent additionally allows the Authorization header. */
   readonly allowedOrigins: readonly string[];
   readonly turnTimeoutMs: number;
@@ -254,7 +299,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     if (method === 'OPTIONS') {
       const requested = request.headers['access-control-request-method'];
       if (request.headers.origin === undefined || requested === undefined) { writeError(response, 'invalidRequest'); return; }
-      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '600' });
       response.end();
       return;
@@ -304,9 +349,43 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           response.end(image.data);
           return;
         }
+        case 'events': {
+          if (route.method === 'POST') {
+            writeJson(response, 201, { event: await options.events.publish(uid, await readJsonBody(request)) });
+          } else {
+            writeJson(response, 200, { events: await options.events.discover(uid, Object.fromEntries(url.searchParams)) });
+          }
+          return;
+        }
+        case 'eventsMine':
+          writeJson(response, 200, await options.events.mine(uid));
+          return;
+        case 'event': {
+          if (route.method === 'GET') writeJson(response, 200, { event: await options.events.get(uid, route.eventId) });
+          else if (route.method === 'PATCH') writeJson(response, 200, { event: await options.events.update(uid, route.eventId, await readJsonBody(request)) });
+          else { await options.events.remove(uid, route.eventId); writeNoContent(response); }
+          return;
+        }
+        case 'eventCancel':
+          writeJson(response, 200, { event: await options.events.cancel(uid, route.eventId) });
+          return;
+        case 'eventJoin': {
+          const event = route.method === 'POST' ? await options.events.join(uid, route.eventId, await readOptionalJsonBody(request))
+            : await options.events.leave(uid, route.eventId);
+          writeJson(response, 200, { event });
+          return;
+        }
+        case 'eventMembers':
+          writeJson(response, 200, await options.events.members(uid, route.eventId));
+          return;
+        case 'eventMember':
+          await options.events.removeMember(uid, route.eventId, route.memberId);
+          writeNoContent(response);
+          return;
       }
     } catch (error) {
-      writeError(response, errorCodeOf(error));
+      const { code, reason } = errorOf(error);
+      writeError(response, code, reason);
     }
   }
 

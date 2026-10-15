@@ -33,6 +33,8 @@ String chatErrorText(AppLocalizations strings, ChatError error) =>
         AgentErrorCode.serviceUnavailable => strings.chatErrorUnavailable,
         AgentErrorCode.timeout => strings.chatErrorTimeout,
         AgentErrorCode.invalidRequest => strings.chatErrorInvalidRequest,
+        AgentErrorCode.forbidden ||
+        AgentErrorCode.conflict ||
         null => strings.chatErrorHttp,
       },
       ChatErrorKind.protocol => strings.chatErrorProtocol,

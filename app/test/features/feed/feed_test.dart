@@ -7,6 +7,7 @@ import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/state/selection_controller.dart';
 
 import '../../support/app_harness.dart';
+import '../events/fake_user_events_client.dart';
 import '../map/t017_test_support.dart';
 
 Finder key(String name) => find.byKey(ValueKey(name));
@@ -28,10 +29,13 @@ void main() {
     addTearDown(container.dispose);
     await pumpApp(tester, container);
 
-    expect(find.text('Sunset sketching on the river'), findsOneWidget);
-    expect(find.text('Laneway acoustic night'), findsOneWidget);
-    // Sample content says so.
-    expect(find.text('Sample'), findsWidgets);
+    final sketch = tester.getTopLeft(
+      find.text('Sunset sketching on the river'),
+    );
+    final laneway = tester.getTopLeft(find.text('Laneway acoustic night'));
+    expect(sketch.dy, lessThan(laneway.dy));
+    expect(find.text('Birrarung Marr'), findsNothing); // inside the meta line
+    expect(find.textContaining('Birrarung Marr'), findsOneWidget);
   });
 
   testWidgets('unfollowing a topic removes its items', (tester) async {
@@ -72,10 +76,7 @@ void main() {
     expect(find.text('What do you follow?'), findsOneWidget);
     await tester.tap(key('feed-topic-news'));
     await tester.pumpAndSettle();
-    expect(
-      container.read(feedSubscriptionsProvider),
-      {FeedTopic.news},
-    );
+    expect(container.read(feedSubscriptionsProvider), {FeedTopic.news});
   });
 
   testWidgets('map layers feed from the map service', (tester) async {
@@ -88,10 +89,18 @@ void main() {
     await pumpApp(tester, container);
 
     final queried = repository.queries.map((q) => q.query);
-    final feedQuery = queried.firstWhere((q) => q.requestId.startsWith('feed-'));
-    expect(feedQuery.layers, containsAll(['event', 'disruption'].map(
-      (name) => FeedTopic.values.firstWhere((t) => t.layer?.name == name).layer,
-    )));
+    final feedQuery = queried.firstWhere(
+      (q) => q.requestId.startsWith('feed-'),
+    );
+    expect(
+      feedQuery.layers,
+      containsAll(
+        ['event', 'disruption'].map(
+          (name) =>
+              FeedTopic.values.firstWhere((t) => t.layer?.name == name).layer,
+        ),
+      ),
+    );
     expect(feedQuery.layers.length, 2);
   });
 
@@ -100,7 +109,10 @@ void main() {
   ) async {
     final repository = T017Repository(autoComplete: true)
       ..nextViewportError = const MapNetworkException();
-    final container = appContainer(mapRepository: repository);
+    final container = appContainer(
+      mapRepository: repository,
+      sampleData: false,
+    );
     addTearDown(container.dispose);
     await pumpApp(tester, container);
 
@@ -110,15 +122,63 @@ void main() {
     expect(find.text('Laneway acoustic night'), findsOneWidget);
   });
 
-  testWidgets('tapping a community event opens its page', (tester) async {
+  testWidgets('a failing events service is reported by topic', (tester) async {
+    final events = FakeUserEventsClient(harnessEvents())
+      ..failure = StateError('down')
+      ..failOn = 'discover';
+    final container = appContainer(events: events);
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    expect(key('feed-source-failed'), findsOneWidget);
+    expect(find.textContaining('Community events'), findsWidgets);
+    expect(find.text('Laneway acoustic night'), findsNothing);
+  });
+
+  testWidgets('community events are searched around the city centre', (
+    tester,
+  ) async {
+    final events = FakeUserEventsClient(harnessEvents());
+    final container = appContainer(events: events);
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    final bounds = events.lastBounds!;
+    expect(bounds.contains(144.9631, -37.8136), isTrue);
+    // The discover route's 10 km limit.
+    expect((bounds.north - bounds.south) * 111.32, lessThan(10));
+    expect(
+      events.lastTo!.difference(events.lastFrom!),
+      const Duration(days: 14),
+    );
+  });
+
+  testWidgets('tapping a community event opens its details on the map tab', (
+    tester,
+  ) async {
     final container = appContainer();
     addTearDown(container.dispose);
     await pumpApp(tester, container);
 
     await tester.tap(find.text('Laneway acoustic night'));
     await tester.pumpAndSettle();
-    expect(find.text('Hosted by Jordan'), findsOneWidget);
+    expect(key('map-layer-chips'), findsOneWidget);
+    expect(key('event-details-when'), findsOneWidget);
+    expect(find.text('Federation Square'), findsOneWidget);
     expect(container.read(selectionControllerProvider).hasSelection, isFalse);
     expect(container.read(mapRepositoryProvider), isNotNull);
+  });
+
+  testWidgets('the add button opens the new-event form on the map tab', (
+    tester,
+  ) async {
+    final container = appContainer();
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    await tester.tap(key('feed-host-event'));
+    await tester.pumpAndSettle();
+    expect(key('map-layer-chips'), findsOneWidget);
+    expect(key('event-form-new'), findsOneWidget);
   });
 }

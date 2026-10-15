@@ -84,7 +84,8 @@ with open(registry_path) as handle:
     registry = json.load(handle)
 # The reviewed development sources (infra/README.md, 2026-10-09 admission): the licence status
 # v_source_coverage must report and the official host of the reference URL. A null URL is
-# reviewed only where every published record carries its own original link.
+# reviewed only where every published record carries its own original link, or where the
+# records are published in the app itself (user.events, UC-09) and have no external publisher.
 reviewed = {
     'melbourne.municipal_boundary': ('verified_open', 'data.melbourne.vic.gov.au'),
     'melbourne.development_monitor': ('verified_open', 'data.melbourne.vic.gov.au'),
@@ -92,6 +93,7 @@ reviewed = {
     'ticketmaster.events': ('restricted', 'developer.ticketmaster.com'),
     'gdelt.news': ('verified_open', 'www.gdeltproject.org'),
     'victoria.council.engagement_news': ('restricted', None),
+    'user.events': ('restricted', None),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:

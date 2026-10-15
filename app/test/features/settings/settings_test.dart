@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:melens/features/events/state/event_providers.dart';
+import 'package:melens/features/events/state/user_events_providers.dart';
 import 'package:melens/features/feed/data/feed_models.dart';
 import 'package:melens/features/feed/state/feed_providers.dart';
 import 'package:melens/features/shell/state/shell_providers.dart';
@@ -23,12 +23,12 @@ void main() {
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    expect(find.text('You'), findsOneWidget);
+    expect(find.text('Add your name'), findsOneWidget);
     expect(key('feed-topic-community'), findsOneWidget);
     expect(find.text('Sample data for development'), findsOneWidget);
   });
 
-  testWidgets('renaming yourself changes who hosts your events', (
+  testWidgets('the name you set is the one events show when you join', (
     tester,
   ) async {
     final container = appContainer();
@@ -42,15 +42,16 @@ void main() {
     await tester.tap(key('settings-name-save'));
     await tester.pumpAndSettle();
 
-    expect(container.read(currentProfileProvider).displayName, 'Hana');
+    expect(container.read(userEventDisplayNameProvider), 'Hana');
     expect(find.text('Hana'), findsOneWidget);
   });
 
-  testWidgets('a blank name is ignored', (tester) async {
+  testWidgets('a blank name clears it', (tester) async {
     final container = appContainer();
     addTearDown(container.dispose);
-    container.read(currentProfileProvider.notifier).rename('   ');
-    expect(container.read(currentProfileProvider).displayName, 'You');
+    container.read(userEventDisplayNameProvider.notifier).remember('Hana');
+    container.read(userEventDisplayNameProvider.notifier).remember('   ');
+    expect(container.read(userEventDisplayNameProvider), isNull);
   });
 
   testWidgets('topic switches follow and unfollow', (tester) async {

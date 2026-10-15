@@ -3,8 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../features/events/ui/event_detail_screen.dart';
-import '../features/events/ui/event_editor_screen.dart';
+import '../features/events/state/event_view_providers.dart';
 import '../features/feed/ui/feed_screen.dart';
 import '../features/map/ui/map_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
@@ -22,7 +21,6 @@ abstract final class AppRoutes {
   static const feed = '/';
   static const discover = '/discover';
   static const settings = '/settings';
-  static const newEvent = '/events/new';
   static const eventPattern = '/events/:id';
 
   static String event(String id) => '/events/${Uri.encodeComponent(id)}';
@@ -33,13 +31,27 @@ abstract final class AppRoutes {
 ///
 /// The three tabs are branches of one stateful shell, so each keeps its scroll
 /// position and the map keeps its camera while the user is elsewhere. Event
-/// pages sit under the feed branch, inside the shell, so the chat button stays
-/// reachable on them.
+/// links (`/events/:id`, the address an invite carries) open that event in the
+/// events panel on the Discover tab.
 @Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
   final router = GoRouter(
     debugLogDiagnostics: kDebugMode,
     routes: [
+      GoRoute(
+        path: AppRoutes.eventPattern,
+        redirect: (context, state) {
+          final id = state.pathParameters['id'];
+          // Not during the redirect itself: a provider must not change
+          // another while the router is being built.
+          if (id != null) {
+            Future.microtask(
+              () => ref.read(eventsPanelRequestsProvider.notifier).openEvent(id),
+            );
+          }
+          return AppRoutes.discover;
+        },
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(navigationShell: shell),
         branches: [
@@ -48,18 +60,6 @@ GoRouter router(Ref ref) {
               GoRoute(
                 path: AppRoutes.feed,
                 builder: (context, state) => const FeedScreen(),
-                routes: [
-                  // `new` precedes `:id` so it is not read as an event id.
-                  GoRoute(
-                    path: 'events/new',
-                    builder: (context, state) => const EventEditorScreen(),
-                  ),
-                  GoRoute(
-                    path: 'events/:id',
-                    builder: (context, state) =>
-                        EventDetailScreen(eventId: state.pathParameters['id']!),
-                  ),
-                ],
               ),
             ],
           ),

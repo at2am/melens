@@ -9,6 +9,7 @@ import '../../../app/router.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
+import '../../events/state/event_view_providers.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/feed_models.dart';
 import '../state/feed_providers.dart';
@@ -72,7 +73,12 @@ class FeedScreen extends ConsumerWidget {
                     IconButton.filledTonal(
                       key: const ValueKey('feed-host-event'),
                       tooltip: strings.feedHostEvent,
-                      onPressed: () => context.push(AppRoutes.newEvent),
+                      onPressed: () {
+                        ref
+                            .read(eventsPanelRequestsProvider.notifier)
+                            .startNewEvent();
+                        context.go(AppRoutes.discover);
+                      },
                       icon: const Icon(Icons.add),
                     ),
                   ],
@@ -294,7 +300,8 @@ class FeedCard extends ConsumerWidget {
     void open() {
       final eventId = item.userEventId;
       if (eventId != null) {
-        unawaited(context.push(AppRoutes.event(eventId)));
+        ref.read(eventsPanelRequestsProvider.notifier).openEvent(eventId);
+        context.go(AppRoutes.discover);
         return;
       }
       final featureId = item.mapFeatureId;
