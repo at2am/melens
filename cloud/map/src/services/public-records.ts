@@ -35,9 +35,11 @@ export function createPublicRecordChecker(options: {
         }, execution);
         const actual = adaptLayerRows(layerId, result.rows, adaptContext(snapshot.request, options.resolveSource(coverage), asOf));
         // The stored item must come back byte for byte; a changed version is a withdrawn right.
-        // A parking item's reading is derived from the read time (current, then late), so it is matched on
-        // its published identity and version: same batch, same record version, still public.
-        const key = (item: MapItem) => layerId === 'parking' ? JSON.stringify([item.id, item.versionId]) : JSON.stringify(item);
+        // Parking is the exception. Its snapshot is replaced every 2 minutes, so a new batch can land between the
+        // first read and this recheck, and its reading is derived from the read time. A newer publication is not a
+        // withdrawn right; a withdrawal (source not public, record inactive, rights changed) removes the row from
+        // the view. So a parking sensor passes while the public view still returns it.
+        const key = (item: MapItem) => layerId === 'parking' ? item.id : JSON.stringify(item);
         const published = new Set([...actual.items, ...actual.unlocatedItems].map(key));
         if (!expected.every((item) => published.has(key(item)))) return false;
       }

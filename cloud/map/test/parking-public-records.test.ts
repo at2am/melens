@@ -6,6 +6,7 @@ import { adaptParkingRow } from '@melens/shared/query/parking';
 import type { ViewQueryResult, ViewRow } from '@melens/shared/query/query-runner';
 import type { SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { createPublicRecordChecker } from '../src/services/public-records.js';
+import { assertSnapshotPublic } from '../src/services/viewport.js';
 
 const source = { sourceId: 'melbourne.parking.sensors', url: 'https://data.melbourne.vic.gov.au/',
   attribution: 'City of Melbourne', versionRef: null };
@@ -46,12 +47,56 @@ test('a reading that moved from current to late is still the same published reco
   assert.equal(call.recordKeys[0]?.sensorId, 'kerbside:9344');
 });
 
-test('a newer publication or a withdrawn sensor no longer proves the stored record', async () => {
-  assert.equal(await checker([row({ batch_id: 'batch-2' })]).check([stored], snapshot, coverage, {}), false,
-    'A new snapshot is a new version');
-  assert.equal(await checker([row({ version_id: 'v2' })]).check([stored], snapshot, coverage, {}), false,
-    'A changed source record is a new version');
+// The snapshot is replaced every 2 minutes. Requiring the same batch made about 1 in 7 viewport requests fail
+// with notAvailable when a swap landed between the first read and this recheck (measured 2026-10-15).
+test('a newer publication of a still-public sensor is not a withdrawal', async () => {
+  assert.equal(await checker([row({ batch_id: 'batch-2' })]).check([stored], snapshot, coverage, {}), true,
+    'A routine 2-minute publication must not fail the request');
+  assert.equal(await checker([row({ version_id: 'v2', occupied: true })]).check([stored], snapshot, coverage, {}), true);
+});
+
+test('a sensor the public view no longer returns is withdrawn', async () => {
   assert.equal(await checker([]).check([stored], snapshot, coverage, {}), false, 'A sensor gone from the view is withdrawn');
+  assert.equal(await checker([row({ sensor_id: 'kerbside:1' })]).check([stored], snapshot, coverage, {}), false,
+    'Another sensor does not prove this one');
+  assert.equal(await checker([row({ source_id: 'other.source' })]).check([stored], snapshot, coverage, {}), false,
+    'A row from an unpublished source fails closed');
   assert.equal(await checker([row({ may_park_now: 'yes' })]).check([stored], snapshot, coverage, {}), false,
     'A row claiming permission fails closed');
+});
+
+function published(sourceId: string, batchId: string, publishedAt = '2026-10-15T10:30:00Z') {
+  return { sourceId, topic: 'parking', scope: 'city_of_melbourne', coverageAreaRefs: [], coverageFrom: null,
+    coverageTo: null, licenseStatus: 'verified_open' as const, accessStatus: 'active' as const, admitted: true,
+    healthState: 'current' as const, publishedBatchId: batchId, publishedAt, publishedWindow: null,
+    publishedOutputCount: 6324, evidenceState: 'unknown' as const };
+}
+
+function storedSnapshot(sourceId: string) {
+  return { id: 's', family: 'viewport', identity: 'i', request, selectedLayers: ['parking'], createdAt: 0, expiresAt: 0,
+    sourceWatermarks: [{ sourceId, batchId: 'batch-1', publishedAt: '2026-10-15T10:28:00Z' }],
+    layers: [{ items: [stored] }], listItems: [], listCompleteness: 'complete', listTotal: null, listScope: null,
+    groups: [] } as never;
+}
+
+function access(sources: ReturnType<typeof published>[], recordsPublic: boolean) {
+  return { store: undefined as never, readCoverage: async () => ({ sources, completeness: 'complete' as const }),
+    checkPublicRecords: async () => recordsPublic };
+}
+
+test('a routine parking publication between reads does not fail the request or a later detail read', async () => {
+  await assertSnapshotPublic(storedSnapshot(source.sourceId), access([published(source.sourceId, 'batch-2')], true));
+});
+
+test('parking still fails closed when the source is withdrawn or a record is no longer public', async () => {
+  await assert.rejects(assertSnapshotPublic(storedSnapshot(source.sourceId), access([], true)));
+  await assert.rejects(assertSnapshotPublic(storedSnapshot(source.sourceId),
+    access([published(source.sourceId, 'batch-2')], false)));
+});
+
+test('other sources keep the strict same-batch rule', async () => {
+  const other = 'melbourne.development_monitor';
+  await assert.rejects(assertSnapshotPublic(storedSnapshot(other), access([published(other, 'batch-2')], true)));
+  await assertSnapshotPublic(storedSnapshot(other),
+    access([published(other, 'batch-1', '2026-10-15T10:28:00Z')], true));
 });
