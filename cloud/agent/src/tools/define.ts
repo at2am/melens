@@ -165,7 +165,8 @@ export async function runTool<S extends z.ZodObject>(spec: ToolSpec<S>, turn: Tu
   try {
     result = await spec.run(args, turn, { id: stepId });
   } catch (error) {
-    turn.turn.log?.({ severity: 'WARNING', event: 'toolFailed', turnId: turn.turn.turnId, tool: spec.name, reason: error instanceof Error ? error.name : 'unknown' });
+    turn.turn.log?.({ severity: 'WARNING', event: 'toolFailed', turnId: turn.turn.turnId, tool: spec.name, reason: error instanceof Error ? error.name : 'unknown',
+      ...(typeof (error as { code?: unknown } | null)?.code === 'string' ? { code: (error as { code: string }).code } : {}) });
     result = toolError('upstream_unavailable', 'The data source or Google API did not answer; answer with what you have and say what is missing.');
   }
   const durationMs = Math.max(0, turn.now().getTime() - startedAt);
