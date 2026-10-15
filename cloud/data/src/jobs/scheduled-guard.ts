@@ -3,6 +3,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Storage } from '@google-cloud/storage';
 import { z } from 'zod';
 
+import { acquireExpiringLease } from '../core/gcs.js';
+
 const sourceId = z.string().regex(/^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/);
 const utcDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const positiveCount = z.number().int().positive();
@@ -16,6 +18,14 @@ function httpCode(error: unknown): number | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null;
   const code = error.code;
   return typeof code === 'number' ? code : typeof code === 'string' ? Number(code) : null;
+}
+
+/** Another execution of the same source still holds a live lease. */
+export class ScheduledRunInProgress extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ScheduledRunInProgress';
+  }
 }
 
 export class RequestCapReached extends Error {
@@ -32,7 +42,12 @@ export interface ScheduledRequestStore {
 
 /** GCS preconditions serialize both execution and each daily quota increment. */
 export class GcsScheduledRequestStore implements ScheduledRequestStore {
-  constructor(private readonly storage: Storage, private readonly bucketName: string) {}
+  /**
+   * The lease must outlive the Cloud Run task timeout: after that the holder is
+   * certainly stopped, and a lock it left behind may be taken over.
+   */
+  constructor(private readonly storage: Storage, private readonly bucketName: string,
+    private readonly leaseMs = 45 * 60_000) {}
 
   private get bucket() {
     return this.storage.bucket(this.bucketName);
@@ -40,24 +55,13 @@ export class GcsScheduledRequestStore implements ScheduledRequestStore {
 
   async withSourceLease<T>(id: string, work: () => Promise<T>): Promise<T> {
     const canonicalId = sourceId.parse(id);
-    const file = this.bucket.file(`locks/scheduled/${canonicalId}.json`);
-    try {
-      await file.save(JSON.stringify({ startedAt: new Date().toISOString() }), {
-        resumable: false,
-        contentType: 'application/json',
-        preconditionOpts: { ifGenerationMatch: 0 },
-      });
-    } catch (error) {
-      if (httpCode(error) !== 412) throw error;
-      throw new Error(`Scheduled source is already running: ${canonicalId}`);
-    }
-    const [metadata] = await file.getMetadata();
-    if (!metadata.generation) throw new Error('Missing scheduled lease generation');
+    const name = `locks/scheduled/${canonicalId}.json`;
+    const generation = await acquireExpiringLease(this.bucket, name, this.leaseMs,
+      () => new ScheduledRunInProgress(`Scheduled source is already running: ${canonicalId}`));
     try {
       return await work();
     } finally {
-      await this.bucket.file(file.name, { generation: String(metadata.generation) })
-        .delete({ ignoreNotFound: false });
+      await this.bucket.file(name, { generation }).delete({ ignoreNotFound: false });
     }
   }
 

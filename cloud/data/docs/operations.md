@@ -327,7 +327,8 @@ npm run verify -- --source melbourne.pedestrian.minute --batch batch_f10a8b9c...
    ```text
    Error: Batch publication is already in progress; inspect the job before clearing a stale lease
    ```
-4. **运维排障与死锁清理 SOP**：
+4. **租约过期接管**：Cloud Run 在任务超时时直接终止容器，`finally` 不会执行，锁会残留。新任务读取残留锁的 `leaseUntil`，仅在其已过期时按 generation 条件删除该锁并重新加锁；未过期或无法判定时间的锁仍按冲突处理。
+5. **运维排障与死锁清理 SOP**（仅在需要提前于租约到期恢复时）：
    - **禁止直接盲目删除锁文件！**
    - **排查步骤**：
      1. 前往 Cloud Run Jobs 列表，检查是否存在正在运行的该数据源采集容器；
@@ -368,7 +369,9 @@ npm run verify -- --source melbourne.pedestrian.minute --batch batch_f10a8b9c...
 
 `scheduled.js` 在发起每次上游 HTTP 请求（包括失败后的重试）之前，将当天 UTC 计数写入 `request-limits/<source_id>/<YYYY-MM-DD>.json`。跨实例写入使用 GCS generation 前置条件；计数达到 `MELENS_REQUEST_CAP_PER_DAY`、单次执行达到 `MELENS_MAX_REQUESTS_PER_EXECUTION`，或账本不可读写时，本次抓取停止。每日额度按 UTC 日计算，不能用本地午夜来重置。查询作业另受 `BQ_MAXIMUM_BYTES_BILLED` 控制；该参数不限制 GCS 存储或 BigQuery Load Job 费用。
 
-来源级定时锁位于 `locks/scheduled/<source_id>.json`。它没有自动过期：容器崩溃或锁的元数据读取失败可能留下锁，后续调度会失败关闭。值班人员须先暂停对应 Scheduler，确认没有该来源的运行中 Cloud Run 执行，检查锁的 generation 和相关日志，再按 generation 条件删除该锁并恢复单次验证。不得因等待一段时间就自动删除锁，也不得重置请求账本来绕过上限。
+来源级定时锁位于 `locks/scheduled/<source_id>.json`，写入 `leaseUntil`，租期为部署时的任务超时（`MELENS_TASK_TIMEOUT_SECONDS`）再加 60 秒；未配置时为 45 分钟。任务超时后容器必然已停止，因此下一次调度可以按 generation 条件接管过期的锁，而不是永久失败。旧格式只含 `startedAt` 的锁按 `startedAt` 加租期判定。锁仍有效时，重叠触发记录 `state: skipped` 并正常退出：正在运行的执行负责发布本次快照。不得重置请求账本来绕过上限。
+
+停车传感器每 2 分钟为每个传感器写一行 `parking_sensor_memberships`，而当前视图对该表的读取无法按批次裁剪。每次发布成功后，采集任务删除已被取代、超过 1 小时的快照成员行（仅限近 2 天分区）；`source-retention` 任务按天分区逐个删除更早的成员行、超过保留期且不再被最新快照引用的事实行，以及超过 2 小时仍未发布的批次留下的行。每次删除只扫描一天的分区，积压不会超出 `BQ_MAXIMUM_BYTES_BILLED`；单天失败不会阻止其余清理。
 
 ---
 
