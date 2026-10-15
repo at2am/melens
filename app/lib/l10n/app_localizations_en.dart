@@ -246,7 +246,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapSurfaceMissingKey =>
-      'Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.';
+      'Base map unavailable: configure an authorized Google Maps API key for this platform. Data remains available in the object list.';
 
   @override
   String get mapSurfaceNativeUnavailable =>

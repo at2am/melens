@@ -5,6 +5,7 @@
   "MAP_BASE_URL": "http://localhost:8081",
   "MAP_DATA_MODE": "sample",
   "GOOGLE_MAPS_WEB_API_KEY": "",
+  "GOOGLE_MAPS_IOS_API_KEY": "",
   "GOOGLE_MAPS_MAP_ID": "",
   "FIREBASE_PROJECT_ID": "",
   "FIREBASE_MESSAGING_SENDER_ID": "",

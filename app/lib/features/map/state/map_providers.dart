@@ -32,44 +32,32 @@ MapRequestCancellation _requestCancellation(Ref ref) {
 Duration? _manualRetry(int retryCount, Object error) => null;
 
 @Riverpod(retry: _manualRetry)
-Future<MapLayerCatalog> mapLayerCatalog(Ref ref) =>
-    ref.watch(mapRepositoryProvider).getLayers(
-      cancellation: _requestCancellation(ref),
-    );
+Future<MapLayerCatalog> mapLayerCatalog(Ref ref) => ref
+    .watch(mapRepositoryProvider)
+    .getLayers(cancellation: _requestCancellation(ref));
 
 /// Each query owns its cancellation handle; changing a family key releases it.
 @Riverpod(retry: _manualRetry)
-Future<ViewportResponse> mapViewport(Ref ref, ViewportQuery query) =>
-    ref.watch(mapRepositoryProvider).queryViewport(
-      query,
-      cancellation: _requestCancellation(ref),
-    );
+Future<ViewportResponse> mapViewport(Ref ref, ViewportQuery query) => ref
+    .watch(mapRepositoryProvider)
+    .queryViewport(query, cancellation: _requestCancellation(ref));
 
 @Riverpod(retry: _manualRetry)
-Future<MapItemResponse> mapItem(
-  Ref ref,
-  String id,
-  MapReadContext context,
-) => ref.watch(mapRepositoryProvider).getItem(
-  id,
-  context,
-  cancellation: _requestCancellation(ref),
-);
+Future<MapItemResponse> mapItem(Ref ref, String id, MapReadContext context) =>
+    ref
+        .watch(mapRepositoryProvider)
+        .getItem(id, context, cancellation: _requestCancellation(ref));
 
 @Riverpod(retry: _manualRetry)
-Future<MapItemPage> mapUnlocated(Ref ref, UnlocatedQuery query) =>
-    ref.watch(mapRepositoryProvider).getUnlocated(
-      query,
-      cancellation: _requestCancellation(ref),
-    );
+Future<MapItemPage> mapUnlocated(Ref ref, UnlocatedQuery query) => ref
+    .watch(mapRepositoryProvider)
+    .getUnlocated(query, cancellation: _requestCancellation(ref));
 
 @Riverpod(retry: _manualRetry)
 Future<MapItemPage> mapAggregateMembers(
   Ref ref,
   String id,
   AggregateMembersQuery query,
-) => ref.watch(mapRepositoryProvider).getAggregateMembers(
-  id,
-  query,
-  cancellation: _requestCancellation(ref),
-);
+) => ref
+    .watch(mapRepositoryProvider)
+    .getAggregateMembers(id, query, cancellation: _requestCancellation(ref));

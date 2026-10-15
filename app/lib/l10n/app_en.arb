@@ -352,7 +352,7 @@
       }
     }
   },
-  "mapSurfaceMissingKey": "Base map unavailable: configure an authorized Google Maps Web API key. Data remains available in the object list.",
+  "mapSurfaceMissingKey": "Base map unavailable: configure an authorized Google Maps API key for this platform. Data remains available in the object list.",
   "@mapSurfaceMissingKey": {
     "description": "Missing Web key state; sample data must not imply a working base map."
   },

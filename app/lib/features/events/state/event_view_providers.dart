@@ -71,7 +71,12 @@ Uri? inviteOrigin(Ref ref) {
 /// Melbourne, cut to the discover route's size limit. The feed has no map
 /// viewport of its own.
 final _feedBounds = clampSearchBounds(
-  const MapBounds(west: 144.8631, south: -37.9136, east: 145.0631, north: -37.7136),
+  const MapBounds(
+    west: 144.8631,
+    south: -37.9136,
+    east: 145.0631,
+    north: -37.7136,
+  ),
 );
 
 /// The published, upcoming community events near the city centre, for the

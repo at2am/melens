@@ -26,9 +26,8 @@ class EventInviteSheet extends ConsumerWidget {
       await Clipboard.setData(ClipboardData(text: text));
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.eventInviteCopied)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(strings.eventInviteCopied)));
     }
 
     return SafeArea(

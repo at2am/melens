@@ -373,7 +373,9 @@ void main() {
       ),
     );
     await openLayers(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('map-show-unlocated')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('map-show-unlocated')),
+    );
     await tester.tap(find.byKey(const ValueKey('map-show-unlocated')));
     await tester.pumpAndSettle();
     expect(repository.unlocatedQueries, hasLength(1));
