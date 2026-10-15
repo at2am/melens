@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { loadConfig } from '../core/config.js';
 import { loadSourceRegistry } from '../core/registry.js';
 import { ingest } from './ingest.js';
-import { GcsScheduledRequestStore, withScheduledIngestionGuard } from './scheduled-guard.js';
+import { GcsScheduledRequestStore, ScheduledRunInProgress,
+  withScheduledIngestionGuard } from './scheduled-guard.js';
 
 const sourceId = z.string().regex(/^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/);
 const positiveSeconds = z.coerce.number().int().positive().max(31_536_000);
@@ -94,14 +95,32 @@ export async function scheduledRun(env: NodeJS.ProcessEnv = process.env, now = n
   if (cloud.maxBytesBilled === null) {
     throw new Error(`Scheduled BigQuery query ceiling is missing: ${config.sourceId}`);
   }
-  const store = new GcsScheduledRequestStore(new Storage({ projectId: cloud.projectId }), cloud.bucketName);
+  // A task stopped at its timeout leaves its lock behind; it expires a minute
+  // after the deployed timeout so the next trigger recovers on its own.
+  const taskTimeout = z.coerce.number().int().positive().max(86_400).optional()
+    .parse(env.MELENS_TASK_TIMEOUT_SECONDS);
+  const store = new GcsScheduledRequestStore(new Storage({ projectId: cloud.projectId }), cloud.bucketName,
+    taskTimeout === undefined ? undefined : (taskTimeout + 60) * 1000);
   const run = async (args: readonly string[]): Promise<void> => withScheduledIngestionGuard(store, {
       sourceId: config.sourceId,
       dailyCap: config.dailyRequestCap,
       executionCap: config.executionRequestCap,
     }, collect => ingest(args, collect, env));
+  try {
+    await runWindow(config, source.coverage_from, now, run);
+  } catch (error) {
+    // A trigger that overlaps a live run is not a failure: the running
+    // execution publishes the snapshot, and the next trigger continues.
+    if (!(error instanceof ScheduledRunInProgress)) throw error;
+    process.stdout.write(JSON.stringify({ source_id: config.sourceId, state: 'skipped',
+      reason: 'previous_run_in_progress' }) + '\n');
+  }
+}
+
+async function runWindow(config: ScheduledJobConfig, coverageFrom: string | null, now: Date,
+  run: (args: readonly string[]) => Promise<void>): Promise<void> {
   if (config.mode === 'time') {
-    if (source.coverage_from === null) {
+    if (coverageFrom === null) {
       throw new Error(`Time source requires a reviewed initial cursor: ${config.sourceId}`);
     }
     const window = scheduledWindow(now, config.intervalSeconds, config.overlapSeconds);

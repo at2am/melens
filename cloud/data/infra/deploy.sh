@@ -281,7 +281,7 @@ while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes
   gcloud iam service-accounts describe "$runtime_account" --project="$project" >/dev/null
   secret_names=""
   if [[ "$secrets" != '-' ]]; then secret_names="$secrets"; fi
-  env_vars="GOOGLE_CLOUD_PROJECT=${project},GCP_REGION=${RUN_REGION},GCS_BUCKET=${bucket},BQ_INGEST_DATASET=melens_ingest,BQ_QUERY_DATASET=melens_query,MELENS_SOURCE_ID=${source},MELENS_SCHEDULE_MODE=${mode},SECRET_NAMES=${secret_names},MELENS_REQUEST_CAP_PER_DAY=${cap},MELENS_MAX_REQUESTS_PER_EXECUTION=${max_requests},BQ_MAXIMUM_BYTES_BILLED=${max_bytes}"
+  env_vars="GOOGLE_CLOUD_PROJECT=${project},GCP_REGION=${RUN_REGION},GCS_BUCKET=${bucket},BQ_INGEST_DATASET=melens_ingest,BQ_QUERY_DATASET=melens_query,MELENS_SOURCE_ID=${source},MELENS_SCHEDULE_MODE=${mode},SECRET_NAMES=${secret_names},MELENS_REQUEST_CAP_PER_DAY=${cap},MELENS_MAX_REQUESTS_PER_EXECUTION=${max_requests},BQ_MAXIMUM_BYTES_BILLED=${max_bytes},MELENS_TASK_TIMEOUT_SECONDS=${timeout}"
   if [[ "$mode" == time ]]; then
     env_vars+=",MELENS_INTERVAL_SECONDS=${interval},MELENS_OVERLAP_SECONDS=${overlap}"
   else
