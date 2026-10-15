@@ -104,6 +104,30 @@ void main() {
     expect(feedQuery.layers.length, 2);
   });
 
+  testWidgets('community events show before the map layers answer', (
+    tester,
+  ) async {
+    final repository = T017Repository();
+    final container = appContainer(
+      mapRepository: repository,
+      sampleData: false,
+    );
+    addTearDown(container.dispose);
+    await pumpApp(tester, container, settle: false);
+
+    final feedQuery = repository.queries.firstWhere(
+      (pending) => pending.query.requestId.startsWith('feed-'),
+    );
+    expect(feedQuery.result.isCompleted, isFalse);
+    expect(find.text('Laneway acoustic night'), findsOneWidget);
+    expect(key('feed-source-loading'), findsOneWidget);
+
+    feedQuery.result.complete(t017Response(feedQuery.query));
+    await tester.pumpAndSettle();
+    expect(key('feed-source-loading'), findsNothing);
+    expect(find.text('Laneway acoustic night'), findsOneWidget);
+  });
+
   testWidgets('a failing map service is reported without hiding other topics', (
     tester,
   ) async {
@@ -133,6 +157,25 @@ void main() {
     expect(key('feed-source-failed'), findsOneWidget);
     expect(find.textContaining('Community events'), findsWidgets);
     expect(find.text('Laneway acoustic night'), findsNothing);
+  });
+
+  testWidgets('pulling to refresh retries a failed events service', (
+    tester,
+  ) async {
+    final events = FakeUserEventsClient(harnessEvents())
+      ..failure = StateError('down')
+      ..failOn = 'discover';
+    final container = appContainer(events: events);
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+    expect(key('feed-source-failed'), findsOneWidget);
+
+    events.failure = null;
+    await tester.fling(key('feed-scroll'), const Offset(0, 400), 1000);
+    await tester.pumpAndSettle();
+
+    expect(key('feed-source-failed'), findsNothing);
+    expect(find.text('Laneway acoustic night'), findsOneWidget);
   });
 
   testWidgets('community events are searched around the city centre', (

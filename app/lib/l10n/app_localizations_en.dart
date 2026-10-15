@@ -1261,10 +1261,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapCommunityLayer => 'Community events';
 
   @override
-  String get mapLayersButton => 'Layers';
+  String get mapTimeNow => 'Now';
+
+  @override
+  String get mapTimePastHour => 'Past hour';
+
+  @override
+  String get mapTimePastDay => 'Past 24 hours';
+
+  @override
+  String get mapTimePastWeek => 'Past 7 days';
+
+  @override
+  String get mapTimePastMonth => 'Past 31 days';
 
   @override
   String get mapResultsButton => 'Results';
+
+  @override
+  String get mapDataStatus => 'Data status';
+
+  @override
+  String get mapLayersButton => 'Layers';
 
   @override
   String get settingsProfile => 'Your name';

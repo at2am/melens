@@ -38,6 +38,13 @@ Flexible:
 - "Should I bring an umbrella for tonight's walk?"
 - "What time does the free tram zone end?"
 
+Chat (check that no tool was called; plain text only):
+
+- "hi", "Thanks, that was helpful!", "What can you do?"
+- "Tell me a joke about trams.", "What is the capital of Victoria?"
+- After a tool-heavy answer ("What can I do after 7 PM tonight?", "Take me to Fitzroy Gardens.", "What's the history of Flinders Street Station?"), "Thanks!" Expect no tool call.
+- "What can I do after 7 PM tonight?", then "Thanks! Anything on tomorrow night too?" Expect `search_features` again.
+
 Precise (also check the tool trace):
 
 - "Only show live music tonight." Expect `show_layers` and `search_features` with a time filter.
@@ -65,6 +72,7 @@ Multi-turn chain:
 ## Acceptance criteria (Draft)
 
 - [ ] Random questions outside our data get a useful answer, using Search or Maps grounding when facts are needed.
+- [ ] Greetings, thanks, small talk and questions about the assistant get a short plain-text reply with no tool call, no card and no question. A real request in the same chat still gets the right tools.
 - [ ] Map requests ("only show…", "take me to…") change the map through UI action tools.
 - [ ] Requests a workflow covers call that workflow.
 - [ ] Specific facts and recommendations appear in cards with sources. General advice may be plain text but never presents live data without a tool result from the same turn.

@@ -4,7 +4,7 @@ import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { loadMapConfig } from '@melens/shared/config';
 import { parseViewportQuery, parseMapItem, type ViewportResponse, type MapItemPage } from '@melens/shared/contracts/map-contract';
-import { createMapService } from '../src/map-service.js';
+import { COVERAGE_CACHE_TTL_MS, createMapService } from '../src/map-service.js';
 import { createMapHttpServer } from '../src/server.js';
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
 import { aggregateLayer } from '../src/services/aggregation.js';
@@ -141,10 +141,22 @@ test('detail, continuation and member reads recheck current admission and public
   assert.equal(members.items[0]!.id, f.rows[0]!.geo_record_id); assert.equal(members.mode, 'historical'); assert.ok(members.nextCursor);
   await assert.rejects(f.service.getMembers('different-aggregate', { ...context, cursor: members.nextCursor }), (e: unknown) => e instanceof MapServiceError && e.code === 'cursorMismatch');
   f.metadata[0]!.access_status = 'paused';
+  // The registry read is shared for its cache window, so a revocation applies once that window has passed.
+  f.advance(COVERAGE_CACHE_TTL_MS);
   await assert.rejects(f.service.getItem(aggregate.id, { requestId: 'detail', snapshotId: first.snapshotId }), (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
   await assert.rejects(f.service.getMembers(aggregate.id, { ...context, cursor: members.nextCursor }), (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
   f.metadata[0]!.access_status = 'active'; f.metadata[0]!.latest_published_batch_id = 'batch-2';
+  f.advance(COVERAGE_CACHE_TTL_MS);
   await assert.rejects(f.service.getItem(aggregate.id, { requestId: 'detail', snapshotId: first.snapshotId }), (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+});
+
+test('requests inside the cache window share one source registry read', async () => {
+  const f = fixture();
+  const registryReads = () => f.queries.filter((query) => query.query.includes('v_source_coverage')).length;
+  await f.service.getCatalog(); await f.service.queryViewport(base); await f.service.queryViewport({ ...base, requestId: 'again' });
+  assert.equal(registryReads(), 1);
+  f.advance(COVERAGE_CACHE_TTL_MS); await f.service.queryViewport({ ...base, requestId: 'later' });
+  assert.equal(registryReads(), 2);
 });
 
 test('unlocated approves actual associations or exact jurisdiction and binds its own stored pages', async () => {
