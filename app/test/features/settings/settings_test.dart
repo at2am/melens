@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
-import 'package:melens/features/feed/data/feed_models.dart';
-import 'package:melens/features/feed/state/feed_providers.dart';
 import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/shell/state/shell_providers.dart';
 
@@ -17,16 +15,13 @@ Future<void> openSettings(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('settings shows the profile, topics and data source', (
-    tester,
-  ) async {
+  testWidgets('settings shows the profile and data source', (tester) async {
     final container = appContainer();
     addTearDown(container.dispose);
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
     expect(find.text('Add your name'), findsOneWidget);
-    expect(key('feed-topic-community'), findsOneWidget);
     expect(find.text('Sample data for development'), findsOneWidget);
   });
 
@@ -56,21 +51,14 @@ void main() {
     expect(container.read(userEventDisplayNameProvider), isNull);
   });
 
-  testWidgets('topic switches follow and unfollow', (tester) async {
+  testWidgets('location sharing is the only switch', (tester) async {
     final container = appContainer();
     addTearDown(container.dispose);
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    await tester.tap(key('feed-topic-news'));
-    await tester.pump();
-    expect(container.read(feedSubscriptionsProvider), contains(FeedTopic.news));
-    await tester.tap(key('feed-topic-community'));
-    await tester.pump();
-    expect(
-      container.read(feedSubscriptionsProvider),
-      isNot(contains(FeedTopic.community)),
-    );
+    expect(find.byType(Switch), findsOneWidget);
+    expect(key('feed-topic-news'), findsNothing);
   });
 
   testWidgets('the location switch shares the position only while on', (

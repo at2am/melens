@@ -76,8 +76,8 @@ Future<ProviderContainer> showScreen(
   return container;
 }
 
-/// Opens the layers sheet, which holds the time window, the layer statuses and
-/// the text list of results on a narrow screen.
+/// Opens the results sheet: the legend, the text list of results and, folded
+/// away, the layer statuses.
 Future<void> openLayers(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('map-layers-button')));
   await tester.pumpAndSettle();
@@ -163,6 +163,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('map-layer-chips')), findsOneWidget);
     expect(find.text('The map goes here (UC-01).'), findsNothing);
+    await openLayers(tester);
     expect(find.text('Sample sensor A'), findsOneWidget);
     expect(find.text('Sample data — illustrative only'), findsWidgets);
     expect(find.byKey(const ValueKey('fake-map')), findsOneWidget);
@@ -175,13 +176,9 @@ void main() {
       container.read(viewportControllerProvider).bbox!.toJson(),
       t017Region.toJson(),
     );
-    expect(
-      tester
-          .widget<ChoiceChip>(find.byKey(const ValueKey('topic-nearbyNews')))
-          .onSelected,
-      isNull,
-    );
-    expect(find.textContaining('AEST'), findsWidgets);
+    // One control per thing: layers are chips and the map has no switches.
+    expect(find.byType(Switch), findsNothing);
+    expect(find.text('Now'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -323,13 +320,12 @@ void main() {
       final repository = T017Repository(autoComplete: true);
       final container = await showScreen(tester, repository);
       await pickFromList(tester, 'Sample sensor A');
-      await openLayers(tester);
       repository.nextViewportError = const MapNetworkException();
-      await tester.tap(find.byKey(const ValueKey('map-time-historical')));
+      await tester.tap(find.byKey(const ValueKey('map-time-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Past hour'));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
-      // Back to the map: the failure notice and its retry live there.
-      await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
       expect(
         container.read(viewportControllerProvider).response!.mode,
@@ -452,6 +448,8 @@ void main() {
       await container.read(viewportControllerProvider.notifier).refresh();
       await tester.pump();
       await openLayers(tester);
+      await tester.tap(find.byKey(const ValueKey('map-data-status')));
+      await tester.pumpAndSettle();
       expect(
         container.read(viewportControllerProvider).response,
         same(original),

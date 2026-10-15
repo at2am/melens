@@ -6,7 +6,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/config/env.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../events/state/user_events_providers.dart';
-import '../../feed/ui/feed_topic_list.dart';
 import '../../location/data/device_location.dart';
 import '../../location/state/user_location.dart';
 import '../../shell/state/shell_providers.dart';
@@ -51,9 +50,6 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.edit_outlined),
             onTap: () => _rename(context, ref, name ?? ''),
           ),
-          const SizedBox(height: 16),
-          _Section(strings.settingsFollowing),
-          const FeedTopicList(),
           const SizedBox(height: 16),
           _Section(strings.settingsLocation),
           _LocationSwitch(),

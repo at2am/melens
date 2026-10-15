@@ -469,47 +469,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _onCardItemTap(item);
   }
 
-  /// The features the agent highlighted, as chips above the map. The surface
-  /// highlights one selected item at a time, so a chip selects its feature.
-  Widget _locationChip() {
-    final strings = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final location = ref.watch(userLocationProvider);
-    final on = location.status == UserLocationStatus.on;
-    final locating = location.status == UserLocationStatus.locating;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        key: const ValueKey('map-chip-my-location'),
-        avatar: locating
-            ? const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(
-                on ? Icons.my_location : Icons.location_searching,
-                size: 18,
-                color: on ? scheme.primary : scheme.outline,
-              ),
-        label: Text(
-          locating ? strings.mapMyLocationLocating : strings.mapMyLocation,
-        ),
-        selected: on,
-        backgroundColor: scheme.surface,
-        onSelected: locating
-            ? null
-            : (value) {
-                final controller = ref.read(userLocationProvider.notifier);
-                if (value) {
-                  unawaited(controller.enable());
-                } else {
-                  controller.disable();
-                }
-              },
-      ),
-    );
-  }
-
   /// Why My location did not work; nothing is shown otherwise.
   Widget? _locationMessage() {
     final failure = ref.watch(userLocationProvider.select((s) => s.failure));
@@ -840,10 +799,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _layerChips(layers, communityOn, wide: wide),
+                _layerChips(layers, communityOn),
+                _timePill(viewport),
                 if (viewport.isLoading)
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: LinearProgressIndicator(
                       minHeight: 3,
                       borderRadius: BorderRadius.all(Radius.circular(2)),
@@ -891,38 +851,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           children: [
             Positioned.fill(child: map),
             Positioned(left: 0, right: 0, top: 0, child: overlay),
+            // Above the chat button, which the app frame floats at the
+            // bottom right.
+            Positioned(
+              right: 16,
+              bottom: 88,
+              child: PointerInterceptor(
+                child: _mapButtons(
+                  wide: wide,
+                  catalog: catalog,
+                  viewport: viewport,
+                  enabledLayers: layers.enabledLayers,
+                  items: items,
+                  selectedItemId: selection.highlightedItemId,
+                  hasUnlocated: unlocated != null,
+                ),
+              ),
+            ),
           ],
         );
         return Scaffold(
           body: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (wide)
-                SizedBox(
-                  width: 320,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        right: BorderSide(
-                          color: theme.colorScheme.outlineVariant,
-                        ),
-                      ),
-                    ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: SingleChildScrollView(
-                        child: _sheetContent(
-                          catalog,
-                          viewport,
-                          enabledLayers: layers.enabledLayers,
-                          items: items,
-                          selectedItemId: selection.highlightedItemId,
-                          hasUnlocated: unlocated != null,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               Expanded(
                 child: MapDetailsLayout(map: stage, details: details),
               ),
@@ -1082,14 +1033,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _openEventsPanel(eventId: event.id);
   }
 
-  /// The layers as chips: filled and ticked when on, outlined when off, so
-  /// what the map shows is readable at a glance. The community layer sits
-  /// beside the contract layers; the tune button opens the full panel.
-  Widget _layerChips(
-    LayerSelectionState layers,
-    bool communityOn, {
-    required bool wide,
-  }) {
+  /// One chip per layer, community events included: filled when on, plain
+  /// when off. Tapping a chip is the only way to turn a layer on or off.
+  Widget _layerChips(LayerSelectionState layers, bool communityOn) {
     final strings = AppLocalizations.of(context);
     final controller = ref.read(layerControllerProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
@@ -1102,77 +1048,130 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         key: key,
-        avatar: Icon(
-          on ? Icons.check_circle : Icons.circle_outlined,
-          size: 18,
-          color: on ? scheme.primary : scheme.outline,
-        ),
         label: Text(label),
         selected: on,
+        showCheckmark: false,
+        elevation: 2,
+        shadowColor: Colors.black54,
         backgroundColor: scheme.surface,
+        selectedColor: scheme.primary,
+        labelStyle: TextStyle(
+          color: on ? scheme.onPrimary : scheme.onSurface,
+          fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+        ),
+        side: BorderSide.none,
         onSelected: onChanged,
       ),
     );
     return SizedBox(
       height: 56,
-      child: Row(
+      child: ListView(
+        key: const ValueKey('map-layer-chips'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         children: [
-          Expanded(
-            child: ListView(
-              key: const ValueKey('map-layer-chips'),
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-              children: [
-                _locationChip(),
-                for (final layer in layers.availableLayers)
-                  chip(
-                    key: ValueKey('map-chip-${layer.name}'),
-                    label: layerTitle(strings, layer),
-                    on: layers.isLayerEnabled(layer),
-                    onChanged: (on) => controller.setLayerEnabled(layer, on),
-                  ),
-                chip(
-                  key: const ValueKey('map-chip-community'),
-                  label: strings.mapCommunityLayer,
-                  on: communityOn,
-                  onChanged: _setCommunity,
-                ),
-              ],
+          for (final layer in layers.availableLayers)
+            chip(
+              key: ValueKey('map-chip-${layer.name}'),
+              label: layerTitle(strings, layer),
+              on: layers.isLayerEnabled(layer),
+              onChanged: (on) => controller.setLayerEnabled(layer, on),
             ),
+          chip(
+            key: const ValueKey('map-chip-community'),
+            label: strings.mapCommunityLayer,
+            on: communityOn,
+            onChanged: _setCommunity,
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: IconButton.filledTonal(
-              key: const ValueKey('map-events-toggle'),
-              tooltip: wide && _showEvents
-                  ? strings.eventsClose
-                  : strings.eventsOpen,
-              isSelected: wide && _showEvents,
-              onPressed: () => wide
-                  ? setState(() => _showEvents = !_showEvents)
-                  : _showEventsSheet(),
-              icon: const Icon(Icons.event_outlined),
-              selectedIcon: const Icon(Icons.event),
-            ),
-          ),
-          if (!wide)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: IconButton.filled(
-                key: const ValueKey('map-layers-button'),
-                tooltip: strings.mapLayersButton,
-                onPressed: _showLayersSheet,
-                icon: const Icon(Icons.layers_outlined),
-              ),
-            ),
         ],
       ),
     );
   }
 
-  /// The full panel: topics, every layer with its availability, the time
-  /// window, layer statuses, the legend and the text list of results.
-  Widget _sheetContent(
+  /// My location, events and the results list: the three things the map
+  /// offers beyond its layers, as round buttons in one column.
+  Widget _mapButtons({
+    required bool wide,
+    required AsyncValue<MapLayerCatalog> catalog,
+    required ViewportState viewport,
+    required Set<MapLayerId> enabledLayers,
+    required List<MapItem> items,
+    required String? selectedItemId,
+    required bool hasUnlocated,
+  }) {
+    final strings = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final location = ref.watch(userLocationProvider);
+    final on = location.status == UserLocationStatus.on;
+    final locating = location.status == UserLocationStatus.locating;
+    Widget button({
+      required Key key,
+      required String tooltip,
+      required Widget icon,
+      required VoidCallback? onPressed,
+      bool active = false,
+    }) => Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: FloatingActionButton.small(
+        key: key,
+        heroTag: null,
+        tooltip: tooltip,
+        elevation: 2,
+        backgroundColor: active ? scheme.primary : scheme.surface,
+        foregroundColor: active ? scheme.onPrimary : scheme.onSurface,
+        onPressed: onPressed,
+        child: icon,
+      ),
+    );
+    final eventsOpen = wide && _showEvents;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        button(
+          key: const ValueKey('map-events-toggle'),
+          tooltip: eventsOpen ? strings.eventsClose : strings.eventsOpen,
+          active: eventsOpen,
+          onPressed: () => wide
+              ? setState(() => _showEvents = !_showEvents)
+              : _showEventsSheet(),
+          icon: const Icon(Icons.event_outlined),
+        ),
+        button(
+          key: const ValueKey('map-layers-button'),
+          tooltip: strings.mapResultsButton,
+          onPressed: () => _showResultsSheet(wide: wide),
+          icon: const Icon(Icons.format_list_bulleted),
+        ),
+        button(
+          key: const ValueKey('map-chip-my-location'),
+          tooltip: locating
+              ? strings.mapMyLocationLocating
+              : strings.mapMyLocation,
+          active: on,
+          onPressed: locating
+              ? null
+              : () {
+                  final controller = ref.read(userLocationProvider.notifier);
+                  if (on) {
+                    controller.disable();
+                  } else {
+                    unawaited(controller.enable());
+                  }
+                },
+          icon: locating
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(on ? Icons.my_location : Icons.location_searching),
+        ),
+      ],
+    );
+  }
+
+  /// What the map shows right now, as a list: the legend, the records, the
+  /// ones without a place and, folded away, how fresh each layer's data is.
+  Widget _resultsContent(
     AsyncValue<MapLayerCatalog> catalog,
     ViewportState viewport, {
     required Set<MapLayerId> enabledLayers,
@@ -1190,8 +1189,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _timeControls(viewport),
-        _controls(catalog, viewport),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: MapLegend(enabledLayers: enabledLayers),
@@ -1218,16 +1215,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onSelected: select,
           ),
         ),
+        ExpansionTile(
+          key: const ValueKey('map-data-status'),
+          title: Text(strings.mapDataStatus),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: _layerStatuses(viewport),
+        ),
       ],
     );
   }
 
-  void _showLayersSheet() {
+  void _showResultsSheet({required bool wide}) {
     unawaited(
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
+        constraints: const BoxConstraints(maxWidth: 560),
         builder: (sheetContext) => PointerInterceptor(
           child: SizedBox(
             height: math.min(
@@ -1249,7 +1253,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         .toList() ??
                     const <MapItem>[];
                 return SingleChildScrollView(
-                  child: _sheetContent(
+                  child: _resultsContent(
                     catalog,
                     viewport,
                     enabledLayers: layers.enabledLayers,
@@ -1264,32 +1268,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _controls(
-    AsyncValue<MapLayerCatalog> catalog,
-    ViewportState viewport,
-  ) {
-    final strings = AppLocalizations.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          LayerPanel(catalog: catalog.value),
-          if (catalog.isLoading) Text(strings.mapScreenCatalogLoading),
-          if (catalog.hasError) ...[
-            Text(strings.mapScreenCatalogError),
-            TextButton(
-              onPressed: () => ref.invalidate(mapLayerCatalogProvider),
-              child: Text(strings.mapRetry),
-            ),
-          ],
-          const SizedBox(height: 16),
-          ..._layerStatuses(viewport),
-        ],
       ),
     );
   }
@@ -1402,24 +1380,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (state.hasPartialResults) Text(strings.mapPartialScope),
       if (state.response != null && !state.matchesResponseWindow)
         Text(strings.mapScreenPreviousWindow),
-      if (catalog.hasError && state.bbox == null)
+      if (catalog.hasError) ...[
+        Text(strings.mapScreenCatalogError),
         TextButton(
           onPressed: () => ref.invalidate(mapLayerCatalogProvider),
           child: Text(strings.mapScreenRetryCatalog),
         ),
+      ],
     ];
   }
 
-  Widget _timeControls(ViewportState state) {
+  /// The time the map shows, as one pill with a menu: now, or a past range
+  /// ending now, plus a refresh.
+  Widget _timePill(ViewportState state) {
     final strings = AppLocalizations.of(context);
     final clock = ref.watch(melbourneClockProvider);
     final controller = ref.read(viewportControllerProvider.notifier);
-    String local(DateTime value) {
-      final time = clock.toMelbourne(value);
-      return '${DateFormat.yMMMd('en_AU').format(time)}, ${DateFormat.Hm('en_AU').format(time)} ${time.timeZoneName}';
-    }
+    final scheme = Theme.of(context).colorScheme;
+    final ranges = {
+      const Duration(hours: 1): strings.mapTimePastHour,
+      const Duration(days: 1): strings.mapTimePastDay,
+      const Duration(days: 7): strings.mapTimePastWeek,
+      const Duration(days: 31): strings.mapTimePastMonth,
+    };
+    final span = state.window.to.difference(state.window.from);
+    final label = state.mode == MapQueryMode.current
+        ? strings.mapTimeNow
+        : ranges[span] ?? strings.mapScreenHistorical;
 
-    void historical(Duration duration) {
+    void now() => controller.setWindow(
+      MapQueryMode.current,
+      currentViewportWindow(clock),
+    );
+
+    void past(Duration duration) {
       final end = currentViewportWindow(clock).to;
       controller.setWindow(
         MapQueryMode.historical,
@@ -1427,119 +1421,70 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
     }
 
-    void shift(int direction) {
-      final duration = state.window.to.difference(state.window.from);
-      controller.setWindow(
-        MapQueryMode.historical,
-        TimeWindow(
-          from: state.window.from.add(duration * direction),
-          to: state.window.to.add(duration * direction),
-        ),
-      );
+    void refresh() {
+      if (state.mode == MapQueryMode.current) {
+        final window = currentViewportWindow(clock);
+        if (window.from != state.window.from || window.to != state.window.to) {
+          controller.setWindow(MapQueryMode.current, window, debounce: false);
+          return;
+        }
+      }
+      unawaited(controller.refresh());
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ChoiceChip(
-                key: const ValueKey('map-time-current'),
-                label: Text(strings.mapScreenCurrent),
-                selected: state.mode == MapQueryMode.current,
-                onSelected: (_) => controller.setWindow(
-                  MapQueryMode.current,
-                  currentViewportWindow(clock),
-                ),
+      padding: const EdgeInsets.only(left: 16),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: PopupMenuButton<Duration>(
+          key: const ValueKey('map-time-menu'),
+          tooltip: strings.mapScreenHistoryRange,
+          position: PopupMenuPosition.under,
+          // Zero stands for "now": a menu entry needs a non-null value.
+          onSelected: (value) => value == Duration.zero ? now() : past(value),
+          itemBuilder: (context) => [
+            CheckedPopupMenuItem<Duration>(
+              key: const ValueKey('map-time-current'),
+              value: Duration.zero,
+              checked: state.mode == MapQueryMode.current,
+              child: Text(strings.mapTimeNow),
+            ),
+            for (final entry in ranges.entries)
+              CheckedPopupMenuItem<Duration>(
+                value: entry.key,
+                checked:
+                    state.mode == MapQueryMode.historical && span == entry.key,
+                child: Text(entry.value),
               ),
-              ChoiceChip(
-                key: const ValueKey('map-time-historical'),
-                label: Text(strings.mapScreenHistorical),
-                selected: state.mode == MapQueryMode.historical,
-                onSelected: (_) => historical(const Duration(hours: 1)),
-              ),
-              if (state.mode == MapQueryMode.historical) ...[
-                PopupMenuButton<Duration>(
-                  key: const ValueKey('map-history-duration'),
-                  tooltip: strings.mapScreenHistoryRange,
-                  onSelected: historical,
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: const Duration(hours: 1),
-                      child: Text(strings.mapScreenOneHour),
-                    ),
-                    PopupMenuItem(
-                      value: const Duration(days: 1),
-                      child: Text(strings.mapScreenOneDay),
-                    ),
-                    PopupMenuItem(
-                      value: const Duration(days: 7),
-                      child: Text(strings.mapScreenSevenDays),
-                    ),
-                    PopupMenuItem(
-                      value: const Duration(days: 31),
-                      child: Text(strings.mapScreenThirtyOneDays),
-                    ),
-                  ],
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(strings.mapScreenHistoryRange),
+          ],
+          child: Material(
+            color: scheme.surface,
+            elevation: 2,
+            shape: const StadiumBorder(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.schedule, size: 18, color: scheme.primary),
+                  const SizedBox(width: 6),
+                  Text(label, style: Theme.of(context).textTheme.labelLarge),
+                  const Icon(Icons.arrow_drop_down),
+                  IconButton(
+                    key: const ValueKey('map-refresh'),
+                    tooltip: strings.mapScreenRefresh,
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 18,
+                    onPressed: state.canQuery && !state.isLoading
+                        ? refresh
+                        : null,
+                    icon: const Icon(Icons.refresh),
                   ),
-                ),
-                IconButton(
-                  key: const ValueKey('map-time-previous'),
-                  tooltip: strings.mapScreenPrevious,
-                  onPressed: () => shift(-1),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                IconButton(
-                  key: const ValueKey('map-time-next'),
-                  tooltip: strings.mapScreenNext,
-                  onPressed:
-                      state.window.to
-                          .add(state.window.to.difference(state.window.from))
-                          .isAfter(clock.now().toUtc())
-                      ? null
-                      : () => shift(1),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-              TextButton.icon(
-                key: const ValueKey('map-refresh'),
-                onPressed: state.canQuery && !state.isLoading
-                    ? () {
-                        if (state.mode == MapQueryMode.current) {
-                          final window = currentViewportWindow(clock);
-                          if (window.from != state.window.from ||
-                              window.to != state.window.to) {
-                            controller.setWindow(
-                              MapQueryMode.current,
-                              window,
-                              debounce: false,
-                            );
-                            return;
-                          }
-                        }
-                        unawaited(controller.refresh());
-                      }
-                    : null,
-                icon: const Icon(Icons.refresh),
-                label: Text(strings.mapScreenRefresh),
+                ],
               ),
-            ],
-          ),
-          Text(
-            strings.mapScreenWindow(
-              local(state.window.from),
-              local(state.window.to),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

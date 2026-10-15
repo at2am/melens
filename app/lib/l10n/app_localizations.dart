@@ -2159,17 +2159,53 @@ abstract class AppLocalizations {
   /// **'Community events'**
   String get mapCommunityLayer;
 
-  /// Button that opens the layers sheet.
+  /// The time pill on the map while it shows current data.
   ///
   /// In en, this message translates to:
-  /// **'Layers'**
-  String get mapLayersButton;
+  /// **'Now'**
+  String get mapTimeNow;
+
+  /// Time pill menu entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Past hour'**
+  String get mapTimePastHour;
+
+  /// Time pill menu entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 24 hours'**
+  String get mapTimePastDay;
+
+  /// Time pill menu entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 7 days'**
+  String get mapTimePastWeek;
+
+  /// Time pill menu entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 31 days'**
+  String get mapTimePastMonth;
 
   /// Button that opens the list of map results.
   ///
   /// In en, this message translates to:
   /// **'Results'**
   String get mapResultsButton;
+
+  /// Folded section in the results sheet with each layer's freshness and coverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Data status'**
+  String get mapDataStatus;
+
+  /// Button that opens the layers sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get mapLayersButton;
 
   /// Settings section and dialog title for the profile.
   ///

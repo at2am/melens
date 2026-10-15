@@ -1663,6 +1663,34 @@
   "@mapCommunityLayer": {
     "description": "Map layer chip for user events."
   },
+  "mapTimeNow": "Now",
+  "@mapTimeNow": {
+    "description": "The time pill on the map while it shows current data."
+  },
+  "mapTimePastHour": "Past hour",
+  "@mapTimePastHour": {
+    "description": "Time pill menu entry."
+  },
+  "mapTimePastDay": "Past 24 hours",
+  "@mapTimePastDay": {
+    "description": "Time pill menu entry."
+  },
+  "mapTimePastWeek": "Past 7 days",
+  "@mapTimePastWeek": {
+    "description": "Time pill menu entry."
+  },
+  "mapTimePastMonth": "Past 31 days",
+  "@mapTimePastMonth": {
+    "description": "Time pill menu entry."
+  },
+  "mapResultsButton": "Results and legend",
+  "@mapResultsButton": {
+    "description": "Tooltip of the map button that lists what the map shows."
+  },
+  "mapDataStatus": "Data status",
+  "@mapDataStatus": {
+    "description": "Folded section in the results sheet with each layer's freshness and coverage."
+  },
   "mapLayersButton": "Layers",
   "@mapLayersButton": {
     "description": "Button that opens the layers sheet."
