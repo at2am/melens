@@ -24,6 +24,7 @@ String layerTitle(AppLocalizations strings, MapLayerId layer) =>
       MapLayerId.news => strings.mapLayerNews,
       MapLayerId.rent => strings.mapLayerRent,
       MapLayerId.census => strings.mapLayerCensus,
+      MapLayerId.parking => strings.mapLayerParking,
     };
 
 String _availabilityText(

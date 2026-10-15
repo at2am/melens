@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   MapContractError, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, SERVICE_BBOX,
-  areaFilterSchema, bboxSchema, cursorBindingSchema, errorResponseSchema, geometrySchema,
+  REGISTERED_LAYER_COUNT, areaFilterSchema, bboxSchema, cursorBindingSchema, errorResponseSchema, geometrySchema, layerIdSchema,
   mapItemSchema, mapReadContextSchema, normalizedViewportIdentity, parseMapItem,
   parseMapItemPage, parseMapItemResponse, parseMapLayerCatalog, parseViewportQuery,
   parseViewportQueryJson, parseViewportResponse, snapshotBindingSchema, unlocatedQuerySchema,
@@ -44,8 +44,8 @@ test('all seven frozen viewport envelopes parse with source/time and measured ze
   assert.equal(zero.time.sourceTimezone, null);
 });
 
-test('catalog, detail, nine variants and scoped list/member envelopes agree with frozen examples', () => {
-  assert.equal(parseMapLayerCatalog(fixture('catalog')).layers.length, 9);
+test('catalog, detail, ten variants and scoped list/member envelopes agree with frozen examples', () => {
+  assert.equal(parseMapLayerCatalog(fixture('catalog')).layers.length, 10);
   assert.equal(parseMapItemResponse(fixture('item')).item.kind, 'pedestrian');
   const unlocated = parseMapItemPage(fixture('unlocated'));
   const missingSensor = unlocated.items.at(0);
@@ -57,7 +57,8 @@ test('catalog, detail, nine variants and scoped list/member envelopes agree with
   const variants = fixture('item-variants');
   assert.ok(Array.isArray(variants));
   assert.deepEqual(variants.map((value: unknown) => parseMapItem(value).kind),
-    ['pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'boundary', 'news', 'areaIndicator', 'aggregate']);
+    ['pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'parking', 'boundary', 'news', 'areaIndicator',
+      'aggregate']);
   const error = errorResponseSchema.parse(fixture('error'));
   assert.equal(error.error.requestId, 'sample-request');
   assert.equal(errorResponseSchema.parse({ ...error, error: { ...error.error, requestId: null } }).error.requestId, null);
@@ -67,7 +68,7 @@ test('request identity, layers, coordinates, finite zoom and current/historical 
   const base = request();
   for (const changes of [
     { requestId: '' }, { requestId: 'has space' }, { requestId: ' '.repeat(2) },
-    { layers: [] }, { layers: ['pedestrian', 'pedestrian'] }, { layers: ['parking'] },
+    { layers: [] }, { layers: ['pedestrian', 'pedestrian'] }, { layers: ['telepathy'] },
     { zoom: Number.NaN }, { zoom: Number.POSITIVE_INFINITY }, { zoom: -0.1 }, { zoom: 22.1 },
     { mode: 'realtime' }, { bbox: [-37.8, 144.9, -37.7, 145] },
     { bbox: [144, -39, 146.5001, -37] }, { bbox: [145, -38, 144, -37] },
@@ -76,6 +77,42 @@ test('request identity, layers, coordinates, finite zoom and current/historical 
   ]) assert.throws(() => parseViewportQuery({ ...base, ...changes }));
   assert.deepEqual(parseViewportQuery({ ...base, bbox: SERVICE_BBOX, zoom: 22, mode: 'historical' }).bbox, SERVICE_BBOX);
   assert.equal(parseViewportQuery({ ...base, zoom: 0 }).zoom, 0);
+});
+
+// `parking` is a registered v1 layer (UC-15). An earlier revision of this test rejected it as an
+// unregistered id; do not reintroduce that, or the live parking layer stops working.
+test('parking is a registered layer and the contract counts ten layers', () => {
+  const base = request();
+  assert.deepEqual(parseViewportQuery({ ...base, layers: ['parking'] }).layers, ['parking']);
+  assert.equal(layerIdSchema.options.length, REGISTERED_LAYER_COUNT);
+  assert.equal(REGISTERED_LAYER_COUNT, 10);
+  assert.ok(layerIdSchema.options.includes('parking'));
+});
+
+test('a parking item is drawable only as a sensor point and never claims legal parking', () => {
+  const variants = fixture('item-variants');
+  assert.ok(Array.isArray(variants));
+  const item = parseMapItem(variants.find((value: { kind?: string }) => value.kind === 'parking'));
+  assert.equal(item.kind, 'parking');
+  if (item.kind !== 'parking') return;
+  const raw = JSON.parse(JSON.stringify(item)) as Record<string, any>;
+  const rejects = (change: (copy: Record<string, any>) => void, why: string) => {
+    const copy = JSON.parse(JSON.stringify(raw)) as Record<string, any>;
+    change(copy);
+    assert.throws(() => parseMapItem(copy), Error, why);
+  };
+  rejects(copy => { copy.details.legalParking = 'yes'; }, 'legal permission is never claimed');
+  rejects(copy => { copy.geometry = null; copy.location = { precision: 'unlocated', role: 'unknown', evidence: null }; },
+    'an unlocated sensor cannot be a parking item');
+  rejects(copy => { copy.geometry = { type: 'Polygon', coordinates: [[[144, -37], [145, -37], [145, -38], [144, -37]]] };
+    copy.location.precision = 'area'; }, 'a sensor is drawn only as its point');
+  rejects(copy => { copy.details.state = 'noData'; copy.details.noDataReason = null; }, 'noData needs a reason');
+  rejects(copy => { copy.details.noDataReason = 'notReporting'; }, 'only noData carries a reason');
+  rejects(copy => { copy.details.reading = 'stale'; }, 'a stale reading cannot be drawn as vacant');
+  rejects(copy => { copy.details.reading = 'unknown'; copy.details.state = 'occupied'; }, 'an unknown reading cannot be occupied');
+  const silent = JSON.parse(JSON.stringify(raw)) as Record<string, any>;
+  silent.details.state = 'noData'; silent.details.noDataReason = 'notReporting'; silent.details.reading = 'stale';
+  assert.equal(parseMapItem(silent).kind, 'parking', 'a sensor that stopped reporting is a valid noData item');
 });
 
 test('request windows use true UTC ordered half-open intervals and exactly 31 days is permitted', () => {

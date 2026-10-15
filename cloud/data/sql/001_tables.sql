@@ -230,6 +230,34 @@ CREATE TABLE IF NOT EXISTS `melens_ingest.parking_sensor_memberships` (
 PARTITION BY DATE(fetched_at)
 CLUSTER BY source_id, batch_id, sensor_id, business_version_id;
 
+-- The latest complete sensor snapshot, replaced whole in one transaction after each
+-- published batch (src/core/parking-sensor-current.ts). The map and agents read only this
+-- table (through v_parking_sensor_current), so their cost stays at a few MB however much
+-- append-only history the other parking tables hold. One row per sensor; never append.
+CREATE TABLE IF NOT EXISTS `melens_ingest.parking_sensor_current` (
+  sensor_id STRING NOT NULL,
+  source_id STRING NOT NULL,
+  batch_id STRING NOT NULL,
+  schema_version INT64 NOT NULL,
+  fetched_at TIMESTAMP NOT NULL,
+  source_record_id STRING NOT NULL,
+  version_id STRING NOT NULL,
+  source_updated_at TIMESTAMP NOT NULL,
+  observed_at TIMESTAMP,
+  occupied BOOL,
+  status_description STRING,
+  zone_number INT64,
+  marker_id STRING,
+  bay_id STRING,
+  latitude FLOAT64,
+  longitude FLOAT64,
+  geometry_geojson STRING,
+  original_url STRING NOT NULL,
+  record_status STRING NOT NULL,
+  rights_status STRING NOT NULL
+)
+CLUSTER BY source_id, sensor_id;
+
 CREATE TABLE IF NOT EXISTS `melens_ingest.parking_rules` (
   rule_id STRING NOT NULL,
   version_id STRING NOT NULL,

@@ -188,6 +188,7 @@ const _$MapLayerIdEnumMap = {
   MapLayerId.news: 'news',
   MapLayerId.rent: 'rent',
   MapLayerId.census: 'census',
+  MapLayerId.parking: 'parking',
 };
 
 const _$MapQueryModeEnumMap = {
@@ -738,6 +739,96 @@ Map<String, dynamic> _$PlanningDetailsToJson(PlanningDetails instance) =>
       'projectStatus': instance.projectStatus,
       'permitId': instance.permitId,
     };
+
+ParkingDetails _$ParkingDetailsFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('ParkingDetails', json, ($checkedConvert) {
+      $checkKeys(
+        json,
+        requiredKeys: const [
+          'sensorId',
+          'state',
+          'noDataReason',
+          'reading',
+          'lastReportedAt',
+          'statusChangedAt',
+          'zoneNumber',
+          'legalParking',
+          'mayBeObstructed',
+        ],
+      );
+      final val = ParkingDetails(
+        sensorId: $checkedConvert('sensorId', (v) => v as String),
+        state: $checkedConvert(
+          'state',
+          (v) => $enumDecode(_$ParkingStateEnumMap, v),
+        ),
+        noDataReason: $checkedConvert(
+          'noDataReason',
+          (v) => $enumDecodeNullable(_$ParkingNoDataReasonEnumMap, v),
+        ),
+        reading: $checkedConvert(
+          'reading',
+          (v) => $enumDecode(_$ParkingReadingEnumMap, v),
+        ),
+        lastReportedAt: $checkedConvert(
+          'lastReportedAt',
+          (v) => _$JsonConverterFromJson<String, DateTime>(
+            v,
+            const UtcInstantConverter().fromJson,
+          ),
+        ),
+        statusChangedAt: $checkedConvert(
+          'statusChangedAt',
+          (v) => _$JsonConverterFromJson<String, DateTime>(
+            v,
+            const UtcInstantConverter().fromJson,
+          ),
+        ),
+        zoneNumber: $checkedConvert('zoneNumber', (v) => (v as num?)?.toInt()),
+        legalParking: $checkedConvert('legalParking', (v) => v as String),
+        mayBeObstructed: $checkedConvert('mayBeObstructed', (v) => v as bool),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$ParkingDetailsToJson(ParkingDetails instance) =>
+    <String, dynamic>{
+      'sensorId': instance.sensorId,
+      'state': _$ParkingStateEnumMap[instance.state]!,
+      'noDataReason': _$ParkingNoDataReasonEnumMap[instance.noDataReason],
+      'reading': _$ParkingReadingEnumMap[instance.reading]!,
+      'lastReportedAt': _$JsonConverterToJson<String, DateTime>(
+        instance.lastReportedAt,
+        const UtcInstantConverter().toJson,
+      ),
+      'statusChangedAt': _$JsonConverterToJson<String, DateTime>(
+        instance.statusChangedAt,
+        const UtcInstantConverter().toJson,
+      ),
+      'zoneNumber': instance.zoneNumber,
+      'legalParking': instance.legalParking,
+      'mayBeObstructed': instance.mayBeObstructed,
+    };
+
+const _$ParkingStateEnumMap = {
+  ParkingState.occupied: 'occupied',
+  ParkingState.vacant: 'vacant',
+  ParkingState.noData: 'noData',
+};
+
+const _$ParkingNoDataReasonEnumMap = {
+  ParkingNoDataReason.notReporting: 'notReporting',
+  ParkingNoDataReason.publicHoliday: 'publicHoliday',
+  ParkingNoDataReason.holidayUnknown: 'holidayUnknown',
+  ParkingNoDataReason.noStatus: 'noStatus',
+};
+
+const _$ParkingReadingEnumMap = {
+  ParkingReading.current: 'current',
+  ParkingReading.late: 'late',
+  ParkingReading.stale: 'stale',
+  ParkingReading.unknown: 'unknown',
+};
 
 BoundaryDetails _$BoundaryDetailsFromJson(Map<String, dynamic> json) =>
     $checkedCreate('BoundaryDetails', json, ($checkedConvert) {
@@ -2321,6 +2412,92 @@ PlanningMapItem _$PlanningMapItemFromJson(Map<String, dynamic> json) =>
     }, fieldKeyMap: const {r'$type': 'kind'});
 
 Map<String, dynamic> _$PlanningMapItemToJson(PlanningMapItem instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'versionId': instance.versionId,
+      'layerId': _$MapLayerIdEnumMap[instance.layerId]!,
+      'title': instance.title,
+      'geometry': instance.geometry?.toJson(),
+      'location': instance.location.toJson(),
+      'assertionKind': _$MapAssertionKindEnumMap[instance.assertionKind]!,
+      'lifecycle': _$MapLifecycleEnumMap[instance.lifecycle]!,
+      'time': instance.time.toJson(),
+      'sources': instance.sources.map((e) => e.toJson()).toList(),
+      'details': instance.details.toJson(),
+      'geometryPresentation': ?instance.geometryPresentation?.toJson(),
+      'kind': instance.$type,
+    };
+
+ParkingMapItem _$ParkingMapItemFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('ParkingMapItem', json, ($checkedConvert) {
+      $checkKeys(
+        json,
+        requiredKeys: const [
+          'id',
+          'versionId',
+          'layerId',
+          'title',
+          'geometry',
+          'location',
+          'assertionKind',
+          'lifecycle',
+          'time',
+          'sources',
+          'details',
+        ],
+      );
+      final val = ParkingMapItem(
+        id: $checkedConvert('id', (v) => v as String),
+        versionId: $checkedConvert('versionId', (v) => v as String),
+        layerId: $checkedConvert(
+          'layerId',
+          (v) => $enumDecode(_$MapLayerIdEnumMap, v),
+        ),
+        title: $checkedConvert('title', (v) => v as String),
+        geometry: $checkedConvert(
+          'geometry',
+          (v) => v == null
+              ? null
+              : GeoJsonGeometry.fromJson(v as Map<String, dynamic>),
+        ),
+        location: $checkedConvert(
+          'location',
+          (v) => MapLocation.fromJson(v as Map<String, dynamic>),
+        ),
+        assertionKind: $checkedConvert(
+          'assertionKind',
+          (v) => $enumDecode(_$MapAssertionKindEnumMap, v),
+        ),
+        lifecycle: $checkedConvert(
+          'lifecycle',
+          (v) => $enumDecode(_$MapLifecycleEnumMap, v),
+        ),
+        time: $checkedConvert(
+          'time',
+          (v) => MapItemTime.fromJson(v as Map<String, dynamic>),
+        ),
+        sources: $checkedConvert(
+          'sources',
+          (v) => (v as List<dynamic>)
+              .map((e) => MapSource.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
+        details: $checkedConvert(
+          'details',
+          (v) => ParkingDetails.fromJson(v as Map<String, dynamic>),
+        ),
+        geometryPresentation: $checkedConvert(
+          'geometryPresentation',
+          (v) => v == null
+              ? null
+              : GeometryPresentation.fromJson(v as Map<String, dynamic>),
+        ),
+        $type: $checkedConvert('kind', (v) => v as String?),
+      );
+      return val;
+    }, fieldKeyMap: const {r'$type': 'kind'});
+
+Map<String, dynamic> _$ParkingMapItemToJson(ParkingMapItem instance) =>
     <String, dynamic>{
       'id': instance.id,
       'versionId': instance.versionId,

@@ -2,7 +2,7 @@
 
 What Melens does, in build order. Each file starts with YAML frontmatter that agents and scripts can parse, followed by the user stories, the behaviour, example queries and acceptance criteria.
 
-**Source:** the team's Notion use-case table (15 rows, exported 2026-09-27, kept verbatim in [`_source/`](_source/notion-use-cases-2026-09-27.csv)). The 2026-09-27 plan merged these into UC-01 to UC-12; UC-13 was added on 2026-09-28 and UC-14 on 2026-10-15. Priorities are the plan's proposal and still need team confirmation.
+**Source:** the team's Notion use-case table (15 rows, exported 2026-09-27, kept verbatim in [`_source/`](_source/notion-use-cases-2026-09-27.csv)). The 2026-09-27 plan merged these into UC-01 to UC-12; UC-13 was added on 2026-09-28, UC-14 on 2026-10-15 and UC-15 (live parking, a v1 requirement) on 2026-10-15. Priorities are the plan's proposal and still need team confirmation.
 
 Together the P0 use cases make one demo story: open the map, see an anomaly, ask the AI why, then plan tonight.
 
@@ -14,12 +14,13 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | [UC-04](uc-04-pedestrian-anomaly.md) | Pedestrian anomaly detection and analysis | P0 | Alex Gao | analyse_anomaly, map_agent | in-progress |
 | [UC-05](uc-05-transport-disruption.md) | Tram and traffic disruption | P0 | unassigned | none (connector) | planned |
 | [UC-13](uc-13-general-chat.md) | General chat assistant | P0 | Haoyuan Tang | map_agent | in-progress |
+| [UC-15](uc-15-live-parking.md) | Live parking bays | P0 | Haoyuan Tang | map_agent | in-progress |
 | [UC-06](uc-06-local-news.md) | Local news by area | P1 | Alex Gao | extraction | planned |
 | [UC-14](uc-14-personal-feed.md) | Personal feed and topic subscriptions | P1 | Haoyuan Tang | none (app) | in-progress |
 | [UC-07](uc-07-byo-data-sources.md) | Bring your own data sources | P1 | Haoyuan Tang | extraction | planned |
 | [UC-08](uc-08-local-history.md) | Local history | P1 | Haoyuan Tang | map_agent | planned |
 | [UC-09](uc-09-user-events.md) | Publish and join user events | P2 | Haoyuan Tang | none (app) | in-progress |
-| [UC-10](uc-10-parking-prediction.md) | Parking availability prediction | P2 | Wasabii | to be decided | planned |
+| [UC-10](uc-10-parking-prediction.md) | Parking availability prediction (live bays are UC-15) | P2 | Wasabii | to be decided | planned |
 | [UC-11](uc-11-local-deals.md) | Local deals | out-of-scope | Haoyuan Tang | none | dropped |
 | [UC-12](uc-12-protest-map.md) | Protest map | out-of-scope | Haoyuan Tang | none | dropped |
 
@@ -28,7 +29,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 | Priority | Meaning |
 | --- | --- |
 | P0 | Must work end to end by 2026-10-12 |
-| P1 | Built 2026-10-13 to 2026-10-15, only once P0 works |
+| P1 | Built from 2026-10-13, only once P0 works. There is no feature freeze; see `AGENTS.md` |
 | P2 | Minimal version only, after P1 |
 | out-of-scope | Do not build; the file records why |
 

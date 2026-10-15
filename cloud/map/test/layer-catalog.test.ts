@@ -29,9 +29,14 @@ test('live catalog registers exact frozen v1 layers without admitting candidates
   assert.equal(catalog.schemaVersion, 1);
   assert.equal(catalog.generatedAt, '2026-10-01T01:00:00.000Z');
   assert.deepEqual(catalog.layers.map((layer) => layer.id),
-    ['pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'boundary', 'news', 'rent', 'census']);
+    ['pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'parking', 'boundary', 'news', 'rent', 'census']);
   assert.deepEqual(catalog.layers.filter((layer) => layer.defaultEnabled).map((layer) => layer.id),
     ['pedestrian', 'anomaly', 'disruption']);
+  // UC-15: parking is registered but opt-in, and has no historical read.
+  const parking = catalog.layers.find((layer) => layer.id === 'parking')!;
+  assert.deepEqual(parking.supportedModes, ['current']);
+  assert.equal(parking.defaultEnabled, false);
+  assert.equal(parking.topic, 'cityActivity');
   const planning = catalog.layers.find((layer) => layer.id === 'planning')!;
   assert.equal(planning.availability, 'available');
   assert.equal(planning.coverage.state, 'verified');

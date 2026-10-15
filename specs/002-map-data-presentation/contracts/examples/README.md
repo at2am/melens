@@ -1,9 +1,9 @@
 # Synthetic v1 map examples
 
-Every record here is an illustrative development fixture, never an upstream fact. Successful response envelopes use dataMode=sample. `item-variants.sample.json` is a development-only list of nine Sample-titled items, not an endpoint envelope.
+Every record here is an illustrative development fixture, never an upstream fact. Successful response envelopes use dataMode=sample. `item-variants.sample.json` is a development-only list of ten Sample-titled items, not an endpoint envelope.
 
 - Seven state envelopes: viewport (available; measured 12 and measured zero), no-matching, not-covered, unavailable, unknown, historical and partial.
-- viewport-query: exact request shape; catalog: all nine registered descriptors.
+- viewport-query: exact request shape; catalog: all ten registered descriptors (parking, current mode only, was added on 2026-10-15 for UC-15).
 - item, unlocated, members and error: endpoint response shapes.
 - item-variants: one of every MapItem kind, including suppressed/unmatched area values and an area-associated unlocated news item.
 

@@ -4,6 +4,7 @@ import type { PublishedItemBatch, PublicSourceResolver } from './adapter-common.
 import { adaptBoundaryRows } from './boundaries.js';
 import { adaptDisruptionRows } from './disruptions.js';
 import { adaptEventRows } from './events.js';
+import { adaptParkingRows } from './parking.js';
 import { adaptPedestrianRows } from './pedestrian.js';
 import { adaptPlanningRows } from './planning.js';
 import type { ViewRow } from './query-runner.js';
@@ -28,6 +29,7 @@ const LAYER_ADAPTERS = {
   pedestrian: (rows, { resolveSource, mode }) => adaptPedestrianRows(rows, { resolveSource, mode }),
   disruption: (rows, { resolveSource, mode, asOf }) => adaptDisruptionRows(rows, { resolveSource, mode, asOf }),
   event: (rows, { resolveSource, mode, asOf }) => adaptEventRows(rows, { resolveSource, mode, asOf }),
+  parking: (rows, { resolveSource, mode }) => adaptParkingRows(rows, { resolveSource, mode }),
 } satisfies Partial<Record<LayerId, LayerAdapter>>;
 
 export type AdaptedLayerId = keyof typeof LAYER_ADAPTERS;

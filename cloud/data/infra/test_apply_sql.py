@@ -15,7 +15,8 @@ SPEC.loader.exec_module(apply_sql)
 class ApplySqlTest(unittest.TestCase):
     def test_reviewed_sql_has_expected_objects_and_raw_view_allowlist(self):
         planned = apply_sql.plan_sql()
-        self.assertEqual(sum(kind == "table" for _, kind, _, _ in planned), 14)
+        # 15 with parking_sensor_current, the latest-snapshot table the map reads.
+        self.assertEqual(sum(kind == "table" for _, kind, _, _ in planned), 15)
         self.assertEqual(sum(kind == "view" for _, kind, _, _ in planned), 26)
         self.assertEqual(len(apply_sql.AUTHORIZED_RAW_VIEWS), 14)
 

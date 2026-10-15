@@ -37,6 +37,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapLayerPlanning => 'Development projects';
 
   @override
+  String get mapLayerParking => 'Parking sensors';
+
+  @override
   String get mapLayerBoundary => 'Area boundaries';
 
   @override
@@ -399,6 +402,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapDetailPlan => 'Plan';
+
+  @override
+  String get mapDetailParkingVacant => 'Vacant now (live sensor)';
+
+  @override
+  String get mapDetailParkingOccupied => 'Occupied (live sensor)';
+
+  @override
+  String get mapDetailParkingNoData => 'No current reading';
+
+  @override
+  String get mapDetailParkingNotReporting =>
+      'This sensor has stopped reporting, so its last status is not shown.';
+
+  @override
+  String get mapDetailParkingPublicHoliday =>
+      'Bay sensors do not operate on public holidays.';
+
+  @override
+  String get mapDetailParkingHolidayUnknown =>
+      'Today\'s public holiday status is not known, so sensor readings are not shown.';
+
+  @override
+  String get mapDetailParkingNoStatus => 'This sensor has no status.';
+
+  @override
+  String get mapDetailParkingLate => 'This reading is a few minutes old.';
+
+  @override
+  String get mapDetailParkingLastReported => 'Sensor last reported';
+
+  @override
+  String get mapDetailParkingStatusChanged => 'Status last changed';
+
+  @override
+  String get mapDetailParkingZone => 'Parking zone';
+
+  @override
+  String get mapDetailParkingNotLegal =>
+      'A vacant sensor only means no car is detected. It does not mean you may park here now: check the signs for limits, permits and fees.';
+
+  @override
+  String get mapDetailParkingObstruction =>
+      'Works or construction can block a bay that still reads vacant.';
 
   @override
   String get mapDetailDirectionsUncalibrated =>

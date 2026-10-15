@@ -189,15 +189,9 @@ test('GCP parking retention protects old latest references, restores runtime and
       assert.equal(cleaned.tablesChecked, 5);
       assert.equal(cleaned.deletedObjects, 0);
       expectCounts(await counts(), [2, 1, 1, 1, 1]);
-      const current = await query(`SELECT sensor_id, business_batch_id, source_freshness,
-        may_park_now, occupied, geometry_geojson FROM ${view('v_parking_sensor_current')}`);
-      assert.equal(current.length, 1);
-      assert.equal(current[0]?.sensor_id, 'kerbside:42');
-      assert.equal(current[0]?.business_batch_id, 'business-old');
-      assert.equal(current[0]?.source_freshness, 'stale', 'Protected outage history must not claim fresh occupancy');
-      assert.equal(current[0]?.may_park_now, 'unknown');
-      assert.equal(current[0]?.occupied, false);
-      assert.equal(current[0]?.geometry_geojson, first.geoRecords[0]?.geometry_geojson);
+      // The map no longer reads this history: v_parking_sensor_current serves only the latest
+      // snapshot table (see parking-sensor-current-view.test.ts). Retention still has to keep
+      // the exact references the ingest recovery restores.
       const proof = await query(`SELECT source_record_id, version_id FROM ${table('source_records')}
         WHERE batch_id = 'snapshot-latest'`);
       assert.deepEqual(proof, [{ source_record_id: latest.sourceRecords[0]?.source_record_id,
@@ -219,8 +213,6 @@ test('GCP parking retention protects old latest references, restores runtime and
         first.parkingSensorMemberships[0]?.business_version_id);
       await query(`UPDATE ${table('data_sources')} SET access_status = 'candidate' WHERE source_id = @source`,
         { source: SOURCE_ID });
-      const hidden = await query(`SELECT COUNT(*) AS n FROM ${view('v_parking_sensor_current')}`);
-      assert.equal(hidden[0]?.n, 0);
       queryJobs += 2;
       const privateRestore = await withPublishedParkingState(fresh, config, bigquery);
       assert.equal(privateRestore.geoRecords.length, 0);
@@ -240,8 +232,6 @@ test('GCP parking retention protects old latest references, restores runtime and
       const remaining = await query(`SELECT source_record_id, version_id, batch_id FROM ${table('source_records')}`);
       assert.deepEqual(remaining, [{ source_record_id: empty.sourceRecords[0]?.source_record_id,
         version_id: empty.sourceRecords[0]?.version_id, batch_id: 'snapshot-empty' }]);
-      const current = await query(`SELECT COUNT(*) AS n FROM ${view('v_parking_sensor_current')}`);
-      assert.equal(current[0]?.n, 0, 'Empty latest membership cannot revive an older sensor');
       queryJobs += 2;
       const reappeared = await withPublishedParkingState(await collect([{ ...row, lastupdated: now.toISOString() }],
         now.toISOString(), 'restart-after-empty'), config, bigquery);

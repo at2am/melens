@@ -19,6 +19,10 @@ export const LAYER_REGISTRATIONS: readonly Registration[] = [
     supportedModes: ['current', 'historical'], timeSemantics: 'effectiveInterval' },
   { id: 'planning', titleKey: 'mapLayerPlanning', topic: 'cityActivity', defaultEnabled: false,
     supportedModes: ['current', 'historical'], timeSemantics: 'effectiveInterval' },
+  // UC-15. Off by default and current-only: the warehouse keeps just the latest sensor snapshot,
+  // so there is no historical parking read. The reading's own report time is its observation window.
+  { id: 'parking', titleKey: 'mapLayerParking', topic: 'cityActivity', defaultEnabled: false,
+    supportedModes: ['current'], timeSemantics: 'observationWindow' },
   { id: 'boundary', titleKey: 'mapLayerBoundary', topic: 'context', defaultEnabled: false,
     supportedModes: ['current', 'historical'], timeSemantics: 'boundaryVintage' },
   { id: 'news', titleKey: 'mapLayerNews', topic: 'nearbyNews', defaultEnabled: false,

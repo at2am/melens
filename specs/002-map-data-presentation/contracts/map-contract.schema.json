@@ -41,7 +41,8 @@
         "boundary",
         "news",
         "rent",
-        "census"
+        "census",
+        "parking"
       ]
     },
     "Mode": {
@@ -209,7 +210,7 @@
             "$ref": "#/$defs/LayerId"
           },
           "minItems": 1,
-          "maxItems": 9,
+          "maxItems": 10,
           "uniqueItems": true
         },
         "mode": {
@@ -1181,6 +1182,104 @@
         "summary",
         "projectStatus",
         "permitId"
+      ],
+      "additionalProperties": false
+    },
+    "ParkingDetails": {
+      "type": "object",
+      "properties": {
+        "sensorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\s]+$"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "occupied",
+            "vacant",
+            "noData"
+          ]
+        },
+        "noDataReason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "notReporting",
+                "publicHoliday",
+                "holidayUnknown",
+                "noStatus"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reading": {
+          "type": "string",
+          "enum": [
+            "current",
+            "late",
+            "stale",
+            "unknown"
+          ]
+        },
+        "lastReportedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "statusChangedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zoneNumber": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legalParking": {
+          "type": "string",
+          "const": "unknown"
+        },
+        "mayBeObstructed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sensorId",
+        "state",
+        "noDataReason",
+        "reading",
+        "lastReportedAt",
+        "statusChangedAt",
+        "zoneNumber",
+        "legalParking",
+        "mayBeObstructed"
       ],
       "additionalProperties": false
     },
@@ -2195,6 +2294,97 @@
               "$ref": "#/$defs/GeometryPresentation"
             },
             "kind": {
+              "const": "parking"
+            },
+            "details": {
+              "$ref": "#/$defs/ParkingDetails"
+            }
+          },
+          "required": [
+            "id",
+            "versionId",
+            "layerId",
+            "title",
+            "geometry",
+            "location",
+            "assertionKind",
+            "lifecycle",
+            "time",
+            "sources",
+            "kind",
+            "details"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\s]+$"
+            },
+            "versionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^\\s]+$"
+            },
+            "layerId": {
+              "$ref": "#/$defs/LayerId"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "geometry": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Geometry"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "location": {
+              "$ref": "#/$defs/Location"
+            },
+            "assertionKind": {
+              "type": "string",
+              "enum": [
+                "observation",
+                "report",
+                "plan",
+                "prediction"
+              ]
+            },
+            "lifecycle": {
+              "type": "string",
+              "enum": [
+                "active",
+                "planned",
+                "cancelled",
+                "resolved",
+                "withdrawn"
+              ]
+            },
+            "time": {
+              "$ref": "#/$defs/ItemTime"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SourceReference"
+              },
+              "minItems": 1
+            },
+            "geometryPresentation": {
+              "$ref": "#/$defs/GeometryPresentation"
+            },
+            "kind": {
               "const": "boundary"
             },
             "details": {
@@ -2654,7 +2844,7 @@
             "$ref": "#/$defs/LayerResult"
           },
           "minItems": 1,
-          "maxItems": 9
+          "maxItems": 10
         }
       },
       "required": [
@@ -2792,8 +2982,8 @@
           "items": {
             "$ref": "#/$defs/LayerDescriptor"
           },
-          "minItems": 9,
-          "maxItems": 9
+          "minItems": 10,
+          "maxItems": 10
         }
       },
       "required": [
@@ -2902,7 +3092,7 @@
             "$ref": "#/$defs/LayerId"
           },
           "minItems": 1,
-          "maxItems": 9,
+          "maxItems": 10,
           "uniqueItems": true
         },
         "mode": {

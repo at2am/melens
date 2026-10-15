@@ -101,6 +101,7 @@ erDiagram
 - `ParkingObservation`：`sensor_id`、`bay_id`、`observed_at`、`occupied`（true／false／null）、`fetched_at`、`source_record_id`。传感器通过 `bay_id` 关联规则。
 - `ParkingRule`：`bay_id`、星期／时段、节假日适用、类别、时长、豁免、有效期、`source_record_id`。同一车位允许不重叠的多条时段规则。
 - 查询结果的 `may_park_now` 不从占用状态单独推断；规则缺失、冲突或过期时只能为 `unknown`。
+- `ParkingSensorCurrent`（`melens_ingest.parking_sensor_current`，2026-10-15 起，UC-15）：最新一次完整传感器快照，每个传感器一行（位置、占用、`status_timestamp`、各自的 `lastupdated`、区号、权利状态）。每个批次发布后在一个事务内整表替换，是唯一不追加的摄取表。地图和 agent 只经 `v_parking_sensor_current` 读它，按视口过滤；不得改回读取 `parking_sensor_memberships`／`source_records`／`geo_records` 等追加历史（那样每次读取扫描 165 MB，且随保留的快照增长）。传感器自己的 `lastupdated` 是心跳：过旧即显示"无数据"，不显示为空位。
 
 ### SensorLocation, PedestrianObservation
 

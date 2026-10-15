@@ -82,7 +82,7 @@ const readUrl = (url: string, id: string, snapshotId: string) => `${url}/v1/map/
 test('all frozen HTTP routes produce validated live envelopes; details preserve snapshot historical context', async () => {
   await withServer(async (url, f) => {
     const catalog = await fetch(`${url}/v1/map/layers`);
-    assert.equal(catalog.status, 200); assert.equal((await catalog.json() as { layers: unknown[] }).layers.length, 9);
+    assert.equal(catalog.status, 200); assert.equal((await catalog.json() as { layers: unknown[] }).layers.length, 10);
     const initial = await viewport(url); assert.equal(initial.status, 200);
     const layer = initial.body.layers[0]!; assert.equal(layer.items.length, 1); assert.ok(layer.nextCursor);
     assert.equal(initial.body.dataMode, 'live'); assert.equal(initial.body.mode, 'historical');

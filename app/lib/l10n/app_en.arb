@@ -36,6 +36,10 @@
   "@mapLayerPlanning": {
     "description": "Layer title for development monitor records."
   },
+  "mapLayerParking": "Parking sensors",
+  "@mapLayerParking": {
+    "description": "Layer title for live on-street parking bay sensors (UC-15)."
+  },
   "mapLayerBoundary": "Area boundaries",
   "@mapLayerBoundary": {
     "description": "Layer title for geographic context polygons."
@@ -566,6 +570,58 @@
   "mapDetailPlan": "Plan",
   "@mapDetailPlan": {
     "description": "Explicit planned assertion label independent of colour."
+  },
+  "mapDetailParkingVacant": "Vacant now (live sensor)",
+  "@mapDetailParkingVacant": {
+    "description": "A parking sensor whose own current reading detects no car."
+  },
+  "mapDetailParkingOccupied": "Occupied (live sensor)",
+  "@mapDetailParkingOccupied": {
+    "description": "A parking sensor whose own current reading detects a car."
+  },
+  "mapDetailParkingNoData": "No current reading",
+  "@mapDetailParkingNoData": {
+    "description": "A parking sensor whose reading cannot be shown; never presented as vacant."
+  },
+  "mapDetailParkingNotReporting": "This sensor has stopped reporting, so its last status is not shown.",
+  "@mapDetailParkingNotReporting": {
+    "description": "Why a parking sensor has no current reading: its own last report is too old."
+  },
+  "mapDetailParkingPublicHoliday": "Bay sensors do not operate on public holidays.",
+  "@mapDetailParkingPublicHoliday": {
+    "description": "Why parking sensors have no current reading on a public holiday."
+  },
+  "mapDetailParkingHolidayUnknown": "Today's public holiday status is not known, so sensor readings are not shown.",
+  "@mapDetailParkingHolidayUnknown": {
+    "description": "Why parking sensors have no current reading when the holiday calendar is not known."
+  },
+  "mapDetailParkingNoStatus": "This sensor has no status.",
+  "@mapDetailParkingNoStatus": {
+    "description": "Why a parking sensor has no current reading: the source gives no status."
+  },
+  "mapDetailParkingLate": "This reading is a few minutes old.",
+  "@mapDetailParkingLate": {
+    "description": "A parking reading that is late but still shown."
+  },
+  "mapDetailParkingLastReported": "Sensor last reported",
+  "@mapDetailParkingLastReported": {
+    "description": "Label for the sensor's own last report time."
+  },
+  "mapDetailParkingStatusChanged": "Status last changed",
+  "@mapDetailParkingStatusChanged": {
+    "description": "Label for when the sensor's occupied/vacant status last changed."
+  },
+  "mapDetailParkingZone": "Parking zone",
+  "@mapDetailParkingZone": {
+    "description": "Label for the City of Melbourne parking zone number of a sensor."
+  },
+  "mapDetailParkingNotLegal": "A vacant sensor only means no car is detected. It does not mean you may park here now: check the signs for limits, permits and fees.",
+  "@mapDetailParkingNotLegal": {
+    "description": "Always shown with a parking sensor: occupancy is never legal permission."
+  },
+  "mapDetailParkingObstruction": "Works or construction can block a bay that still reads vacant.",
+  "@mapDetailParkingObstruction": {
+    "description": "Always shown with a parking sensor: a vacant reading can be a blocked bay."
   },
   "mapDetailDirectionsUncalibrated": "Directions A and B are source channels; geographic headings are not known.",
   "@mapDetailDirectionsUncalibrated": {
