@@ -1,6 +1,6 @@
 # Tools
 
-**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. Implemented in `cloud/agent` on 2026-10-09: `search_features`, `get_feature`, `nearby_context`, `show_layers`, `focus_map`, `highlight_features`, `show_card`, `ask_user`, `maps_grounding` and `search_grounding` (the Zod schemas in `cloud/agent/src/tools/catalog.ts` are now their source of truth); the other tools remain this contract until they exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
+**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. Implemented in `cloud/agent` on 2026-10-09: `search_features`, `get_feature`, `nearby_context`, `show_layers`, `focus_map`, `highlight_features`, `show_card`, `ask_user`, `maps_grounding` and `search_grounding`; on 2026-10-15: `get_anomaly`, `draw_route`, `area_brief` and `analyse_anomaly` (the Zod schemas in `cloud/agent/src/tools/catalog.ts` and `cloud/agent/src/workflows/workflows.ts` are now their source of truth); `heritage_lookup` and `pedestrian_pattern` remain this contract until they exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
 
 These are the tools of the chat agent `map_agent`. The two workflow tools run the same code as the app's map-tap and Analyse entry points. How the loop uses the tools is in [agent-design.md](agent-design.md); the events they send to the app are in [agent-protocol.md](agent-protocol.md).
 
@@ -114,7 +114,7 @@ Status line: "Reading the details". Cost: one BigQuery query.
 | --- | --- | --- |
 | `id` | `FeatureId` | Yes |
 
-Returns the full map item (map contract v1 MapItem: id, version, layer, geometry, time, sources and kind-specific details). Geometry is simplified to at most 200 points. Errors: `not_found`. The first version serves features that a search returned earlier in the same turn; a lookup by id alone over the views is a later task.
+Returns the full map item (map contract v1 MapItem: id, version, layer, geometry, time, sources and kind-specific details). Geometry is simplified to at most 200 points. Errors: `not_found`. A feature that this turn has not searched for is resolved by one search over the request's viewport (the features a user can select are on screen), not by a lookup-by-id query; `get_anomaly`, `focus_map`, `highlight_features`, `draw_route` and `analyse_anomaly` resolve ids the same way.
 
 ### `heritage_lookup`
 
@@ -221,7 +221,7 @@ Status lines: "Looking around this area", then the lines of the tools it runs. C
 | `point` | `LatLng` | Yes | |
 | `radius_m` | integer | No | 200–1500, default 600 |
 
-Returns `{ "card_id": "…", "summary": "…" }`. The summary is at most 500 characters and names the recommended places and activities with their ids. Sends a `card` event of type `area_brief`.
+Returns `{ "card_id": "…", "summary": "…" }`; `card_id` is null, with no card, when nothing with a source was found. The summary is at most 500 characters and names the recommended places and activities with their ids. Sends a `card` event of type `area_brief`: the intro is the neighbourhood character, the items are places (no time) then activities (with a time), each citing a feature id or a URL from this turn. Implementation: parallel layer search and Search-grounded answer, one JSON-schema generation, then code drops every item whose numbered source reference was not fetched in this turn; cached by area cell, radius and date.
 
 ### `analyse_anomaly`
 
@@ -233,7 +233,7 @@ Status lines: "Analysing the pedestrian anomaly", then the lines of the tools it
 | --- | --- | --- | --- |
 | `feature_id` | `FeatureId` | Yes | A feature in the `anomaly` layer |
 
-Returns `{ "card_id": "…", "summary": "…" }` with the causes and their confidence. Sends a `card` event of type `anomaly_analysis`. Errors: `not_found`, `not_an_anomaly`.
+Returns `{ "card_id": "…", "summary": "…" }` with the causes and their confidence. Sends a `card` event of type `anomaly_analysis`: the intro is the headline, each item is one possible cause with `Confidence low|medium|high.` leading its summary and a source from this turn; with no cause the card says "No clear cause found" at low confidence and cites the anomaly itself. Errors: `not_found`, `not_an_anomaly`.
 
 ## Grounding tools
 
@@ -323,9 +323,9 @@ Status line: "Working out the route". Cost: one Routes API call.
 | `mode` | `"walk"` or `"transit"` | Yes | |
 | `draw` | boolean | No | Default `true` |
 
-Returns `{ "distance_m": 3400, "duration_min": 46, "legs": [{ "from": 0, "to": 1, "duration_min": 8 }] }`. When drawn, the `ui_action` carries the encoded polyline. Errors: `route_not_found`, `invalid_arguments`.
+Returns `{ "distance_m": 3400, "duration_min": 46, "legs": [{ "from": 0, "to": 1, "duration_min": 8 }] }`. When drawn, the `ui_action` carries the encoded polyline. Errors: `route_not_found`, `invalid_arguments`, `not_found` (a `feature_id` waypoint this turn did not return).
 
-The route is computed by the Routes API on the server, so the model never assembles geometry. The limit of 13 waypoints is our cap from the plan; the API allows more.
+The route is computed by the Routes API on the server with the service identity's OAuth token, so the model never assembles geometry or sees the polyline. The drawn route's `ui_action` carries `{ polyline, mode, distance_m, duration_min, waypoints: [{ lat, lng, label? }] }`; with `draw: false` nothing is sent. The limit of 13 waypoints is our cap from the plan; the API allows more.
 
 ### `highlight_features`
 

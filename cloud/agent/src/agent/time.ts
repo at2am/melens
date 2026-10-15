@@ -31,3 +31,8 @@ export function melbourneDayOfWeek(date: Date): 'mon' | 'tue' | 'wed' | 'thu' | 
   const name = new Intl.DateTimeFormat('en-AU', { timeZone: MELBOURNE, weekday: 'short' }).format(date).toLowerCase().slice(0, 3);
   return name as 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 }
+
+/** The Melbourne calendar date, `2026-10-10`; the key a day's cached answers share. */
+export function melbourneDate(date: Date): string {
+  return localParts(date).text.slice(0, 10);
+}

@@ -159,14 +159,14 @@ Streamed text carries explanations and transitions only; recommendations appear 
 
 Detection runs before the workflow and involves no model: a scheduled cloud/data job writes pedestrian counts to BigQuery every hour, compares each sensor with the same hour over the past 7 days (upgrade: BigQuery `AI.DETECT_ANOMALIES`), and publishes sensors beyond the threshold to the BigQuery anomaly view that the map service's `anomaly` layer serves. The detector does not exist yet and has its own owner.
 
-1. On Analyse, the workflow fetches in parallel: the anomaly and baseline, and nearby news, events and transport disruptions.
-2. One generation with Search grounding writes possible causes, a confidence level and sources.
+1. On Analyse, the workflow fetches in parallel: the anomaly and baseline, nearby news, events and transport disruptions (1.5 km, from 12 hours before the observation to 6 hours after), and a Search-grounded answer.
+2. One structured generation writes possible causes, a confidence level and sources, each citing a numbered source from step 1.
 3. Items without a source are dropped, and the `anomaly_analysis` card is sent.
 
 ### `area_brief` (UC-02)
 
 1. The app sends the selected point, the current time and the enabled layers.
-2. The workflow fetches in parallel: layer features and heritage records within a radius, and Maps grounding for place details.
+2. The workflow fetches in parallel: layer features within a radius and a Search-grounded answer about the area (heritage records join once `heritage_lookup` exists; Maps grounding stays out of the workflow because one call takes up to 110 s).
 3. One generation fills the fixed card: neighbourhood character, recommended places, upcoming activities.
 4. Items without a source are dropped, and the `area_brief` card is sent.
 5. Follow-up questions go to `map_agent`.
@@ -202,3 +202,4 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 ## Open questions
 
 - Result compaction for long tool results (rows shortened, first N kept) is still to be implemented; the first version caps list sizes instead.
+- Rate-limit counters are still in memory per instance; the grounding cache and the workflow cards moved to Firestore (`agentCache`) on 2026-10-15.

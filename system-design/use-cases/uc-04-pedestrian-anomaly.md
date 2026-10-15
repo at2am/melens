@@ -2,11 +2,11 @@
 id: UC-04
 title: Pedestrian anomaly detection and analysis
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Alex Gao
 trigger: proactive
 agents: [analyse_anomaly, map_agent]
-tools: [get_anomaly, nearby_context, search_grounding]
+tools: [get_anomaly, analyse_anomaly, nearby_context, search_grounding]
 data_sources: [pedestrian-live, pedestrian-history, news-rss, events-ticketmaster, ptv-gtfs-realtime, road-disruptions, search-grounding]
 source_rows: [Abnormal detection & analysis]
 ---
@@ -47,6 +47,10 @@ Translated from the original Chinese in the Notion table:
 - Live counts carry no coordinates; join them with the sensor locations table (134 sensors). Live data lags by about 15–30 minutes.
 - News arrives without coordinates; it is placed by the UC-06 extraction pipeline, which this use case shares.
 - The biggest demo risk is having no real anomaly on the day, so replay mode is part of P0.
+
+## Status
+
+- 2026-10-15: the `analyse_anomaly` workflow, `get_anomaly` and the Analyse button are built and tested against fixture anomalies. The hourly pedestrian ingestion, the detector and the `anomaly` layer's producer do not exist yet (the pedestrian and road-disruption jobs are `enabled: false` in `cloud/data/infra/schedules.json`), so no real marker appears on the map and replay mode is open. This is the largest gap in the demo story.
 
 ## Open questions
 

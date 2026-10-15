@@ -2,11 +2,11 @@
 id: UC-02
 title: Map discovery
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Wasabii
 trigger: query
 agents: [area_brief, map_agent]
-tools: [search_features, heritage_lookup, maps_grounding, search_grounding, focus_map, highlight_features, show_card]
+tools: [area_brief, search_features, heritage_lookup, maps_grounding, search_grounding, focus_map, highlight_features, show_card]
 data_sources: [heritage-vhd, events-ticketmaster, maps-grounding, search-grounding]
 source_rows: [Map Discovery (current area), Map Discovery (selected location)]
 ---

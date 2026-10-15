@@ -72,11 +72,21 @@ export const CONTEXT: RequestContext = { viewport: { north: -37.80, south: -37.8
   userLocation: { lat: -37.8136, lng: 144.9631 }, layers: ['event'], localTime: '2026-10-10T18:40:00+11:00' };
 
 export function turnContext(text: string, options: { pendingQuestion?: SessionRecord['pendingQuestion']; history?: TurnContext['history']; signal?: AbortSignal;
-  images?: TurnContext['images']; historyImages?: TurnContext['historyImages'] } = {}): TurnContext {
-  const request: TurnRequest = { input: { kind: 'text', text }, context: CONTEXT };
+  images?: TurnContext['images']; historyImages?: TurnContext['historyImages']; input?: TurnRequest['input'] } = {}): TurnContext {
+  const request: TurnRequest = { input: options.input ?? { kind: 'text', text }, context: CONTEXT };
   const session: SessionRecord = { id: 's_test', uid: 'u_test', title: '', createdAt: '2026-10-10T07:00:00.000Z', updatedAt: '2026-10-10T07:00:00.000Z',
     turnCount: 0, pendingQuestion: options.pendingQuestion ?? null, activeTurn: null, expiresAt: '2026-11-09T07:00:00.000Z' };
   return { uid: 'u_test', session, turnId: 't_test', seq: 1, request, images: options.images ?? [], history: options.history ?? [],
     historyImages: options.historyImages ?? new Map(), sink: collectingSink('t_test'),
     signal: options.signal ?? new AbortController().signal, startedAt: new Date('2026-10-10T07:40:00Z') };
+}
+
+export function anomalyItem(id: string, title: string, lng: number, lat: number): MapItem {
+  return { id, versionId: 'v1', layerId: 'anomaly', kind: 'anomaly', title,
+    geometry: { type: 'Point', coordinates: [lng, lat] }, location: { precision: 'point', role: 'sensor', evidence: null },
+    assertionKind: 'observation', lifecycle: 'active',
+    time: { observedAt: '2026-10-10T07:00:00.000Z', reportedAt: null, validFrom: null, validTo: null, periodLabel: null, fetchedAt: null, sourceTimeText: null, sourceTimezone: null },
+    sources: [{ sourceId: 'pedestrian', url: null, attribution: 'City of Melbourne', versionRef: null }],
+    details: { resultId: 'r1', sensorId: '41', observationId: 'o1', window: { from: '2026-10-10T07:00:00.000Z', to: '2026-10-10T08:00:00.000Z' },
+      baselineDefinitionId: 'same-hour-7d', baselineValue: 1830, observedValue: 4210, delta: 2380, direction: 'higher', eligibility: 'eligible', classification: 'anomalous' } } as MapItem;
 }
