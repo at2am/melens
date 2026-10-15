@@ -6,9 +6,9 @@
 
 ## Registered layers and topics
 
-V1 registers exactly pedestrian, anomaly, disruption, event, planning, boundary, news, rent and census. Catalog registration does not imply source admission or coverage. City activity defaults to pedestrian/anomaly/disruption; event/planning are optional. Nearby news uses news. Area comparison chooses rent or census as its only filled metric. Boundary is context, at one level/vintage.
+V1 registers exactly pedestrian, anomaly, disruption, event, planning, boundary, news, rent, census and parking. Parking (UC-15) was added additively on 2026-10-15 by the project owner: live on-street bay sensors, current mode only. Catalog registration does not imply source admission or coverage. City activity defaults to pedestrian/anomaly/disruption; event/planning/parking are optional. Nearby news uses news. Area comparison chooses rent or census as its only filled metric. Boundary is context, at one level/vintage.
 
-Catalog topic values are cityActivity, nearbyNews, areaComparison and context. Employment/crime/parking require an additive catalog/contract decision plus admitted data; they are not accepted v1 request ids.
+Catalog topic values are cityActivity, nearbyNews, areaComparison and context. Employment/crime require an additive catalog/contract decision plus admitted data; they are not accepted v1 request ids. Parking had that decision on 2026-10-15 and is accepted.
 
 ## Routes and envelope names
 
@@ -64,7 +64,9 @@ Coverage, freshness and completeness are separate dimensions. See the schema enu
 
 All known instants are UTC and displayed in Australia/Melbourne. Every instant uses the schema pattern `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$`: seconds required, optional 1–6 fractional digits, and a literal `Z`; valid calendar/clock values are separately enforced at runtime. Values finer than microseconds are rejected rather than silently truncated. Comparison and snapshot normalization retain microseconds; equivalent trailing-zero spellings denote the same instant. ItemTime fields are required and nullable, including sourceTimeText/sourceTimezone. Unknown-clock original text is retained in sourceTimeText, and no inferred UTC value is supplied. Source date-only/statistical labels stay periods. Source freshness cannot turn historical readings into current facts.
 
-MapItem.kind discriminates details; there is no details.runtimeType. V1 has nine kinds: pedestrian, anomaly, disruption, event, planning, boundary, news, areaIndicator and aggregate. layerId=rent|census uses kind=areaIndicator; aggregates retain the represented layer. Other ordinary kinds match their same-named layer. Every item includes sources and public attribution; no private provider response or untrusted HTML.
+MapItem.kind discriminates details; there is no details.runtimeType. V1 has ten kinds: pedestrian, anomaly, disruption, event, planning, parking, boundary, news, areaIndicator and aggregate. layerId=rent|census uses kind=areaIndicator; aggregates retain the represented layer. Other ordinary kinds match their same-named layer.
+
+A parking item is one sensor at its own point (location.role sensor). details.state is what may be drawn: occupied or vacant only while details.reading is current or late, otherwise noData with noDataReason (notReporting, publicHoliday, holidayUnknown, noStatus). details.legalParking is always unknown and details.mayBeObstructed is true: a sensor shows whether a car is on the bay, never that parking there is allowed. There is no historical parking read and no unlocated parking list. Parking aggregates count vacant sensors (metric vacantSensorCount) and are not formed close up (zoom 17 and above), where each bay is drawn. Every item includes sources and public attribution; no private provider response or untrusted HTML.
 
 Missing counts/values remain null; measured zero remains zero. Area values with missing/suppressed valueState have value=null. Only matched same-vintage area boundaries are drawable. Pedestrian location must be effective over the observation window; ambiguous/inactive/unlocated locations have null geometry. A/B directions have no geographic heading. Anomaly results require producer-owned baseline/result evidence; this contract supplies no detector. News mention/area association is never promoted to an event-site point.
 

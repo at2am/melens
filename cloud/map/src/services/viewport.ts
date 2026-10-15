@@ -29,6 +29,14 @@ export function coverageRequest(snapshot: StoredSnapshot): ViewportQuery {
   const { scope: _scope, cursor: _cursor, snapshotId: _snapshotId, ...request } = snapshot.request;
   return parseViewportQuery({ ...request, bbox: [144, -39, 146.5, -37], zoom: 0 });
 }
+/**
+ * Sources that publish a new complete snapshot every few minutes as routine (UC-15 parking, every 2 minutes).
+ * A newer batch of these is not a withdrawal: their records are rechecked one by one against the current public
+ * view instead, so a request or a detail read that spans a routine publication still succeeds. Requiring the same
+ * batch failed about 1 in 14 viewport requests and every detail read made after the next publication (2026-10-15).
+ */
+export const ROUTINELY_REPUBLISHED_SOURCES: ReadonlySet<string> = new Set(['melbourne.parking.sensors']);
+
 export async function assertSnapshotPublic(snapshot: StoredSnapshot, access: SnapshotAccess,
   execution: { readonly signal?: AbortSignal } = {}): Promise<void> {
   const coverage = await access.readCoverage(coverageRequest(snapshot), execution);
@@ -36,7 +44,9 @@ export async function assertSnapshotPublic(snapshot: StoredSnapshot, access: Sna
   // A publication change cannot prove that a stored old version remains public.
   for (const mark of snapshot.sourceWatermarks) {
     const current = findPublicSource(coverage, mark.sourceId);
-    if (current === null || current.publishedBatchId !== mark.batchId || current.publishedAt !== mark.publishedAt) throw new MapServiceError('notAvailable');
+    if (current === null) throw new MapServiceError('notAvailable');
+    if (ROUTINELY_REPUBLISHED_SOURCES.has(mark.sourceId)) continue;
+    if (current.publishedBatchId !== mark.batchId || current.publishedAt !== mark.publishedAt) throw new MapServiceError('notAvailable');
   }
   const records = [...snapshot.layers.flatMap((layer) => layer.items), ...snapshot.listItems,
     ...snapshot.groups.flatMap((group) => [...group.members])].filter((item) => item.kind !== 'aggregate');

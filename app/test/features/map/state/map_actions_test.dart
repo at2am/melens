@@ -59,13 +59,26 @@ void main() {
       const UiAction(
         action: UiActionName.showLayers,
         args: <String, dynamic>{
-          'layers': ['parking'],
+          'layers': ['telepathy'],
         },
       ),
     );
     expect(unknown.outcome, MapActionOutcome.ignored);
-    expect(unknown.skipped, ['parking']);
+    expect(unknown.skipped, ['telepathy']);
     expect(enabled(), {MapLayerId.pedestrian});
+
+    // `parking` (UC-15) is a v1 layer of the city activity topic; an earlier
+    // revision of this test used it as the unknown layer.
+    final parking = actions.apply(
+      const UiAction(
+        action: UiActionName.showLayers,
+        args: <String, dynamic>{
+          'layers': ['parking'],
+        },
+      ),
+    );
+    expect(parking.outcome, MapActionOutcome.applied);
+    expect(enabled(), {MapLayerId.pedestrian, MapLayerId.parking});
   });
 
   test('focus_map records a numbered request for a point or a box', () {

@@ -157,6 +157,18 @@ CoreRenderPlan buildGeometryRenderPlan({
   );
 }
 
+/// Ground radius of a parking bay dot; about one bay width, so neighbours stay apart.
+const double parkingBayDotRadiusMeters = 4;
+
+/// The colour of a parking sensor dot. A sensor with no current reading is
+/// neutral, never the vacant colour; the details panel always says why.
+Color parkingStateColor(ParkingState state, ColorScheme colors) =>
+    switch (state) {
+      ParkingState.vacant => const Color(0xFF2E7D32),
+      ParkingState.occupied => colors.error,
+      ParkingState.noData => colors.outline,
+    };
+
 /// Point identities remain visible when a measured count is zero or unknown.
 /// Count circles contain no inferred readings; exact counts live in the list.
 /// Aggregate styling belongs to the separate aggregate renderer.
@@ -179,6 +191,34 @@ CoreRenderPlan buildCoreRenderPlan({
             _ => colors.primary,
           };
     final onTap = onSelected == null ? null : () => onSelected(item);
+    // Hundreds of bays fit a street view, so each sensor is a small dot coloured
+    // by its own reading rather than a pin.
+    if (item case ParkingMapItem(
+      geometry: GeoJsonPoint(:final coordinates),
+      :final details,
+    )) {
+      final fill = parkingStateColor(details.state, colors);
+      plan = plan.merge(
+        CoreRenderPlan(
+          circles: {
+            Circle(
+              circleId: CircleId('${item.id}:bay'),
+              center: _position(coordinates),
+              radius: selected
+                  ? parkingBayDotRadiusMeters * 1.5
+                  : parkingBayDotRadiusMeters,
+              fillColor: fill,
+              strokeColor: selected ? colors.secondary : fill,
+              strokeWidth: selected ? 3 : 1,
+              consumeTapEvents: onTap != null,
+              onTap: onTap,
+              zIndex: selected ? 2 : 1,
+            ),
+          },
+        ),
+      );
+      continue;
+    }
     plan = plan.merge(
       buildGeometryRenderPlan(
         id: item.id,

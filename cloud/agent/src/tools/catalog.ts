@@ -13,13 +13,19 @@ import { analyseAnomalyTool, areaBriefTool } from '../workflows/workflows.js';
 import { defineTool, isToolError, toolError, type ToolError, type ToolSpec, type TurnRegistry } from './define.js';
 
 /** The layers the agent can search: the point-feature layers of map contract v1 (tools.md, Shared types). */
-export const toolLayerSchema = z.enum(['pedestrian', 'anomaly', 'disruption', 'event', 'news', 'planning']);
+export const toolLayerSchema = z.enum(['pedestrian', 'anomaly', 'disruption', 'event', 'news', 'planning', 'parking']);
 export type ToolLayer = z.infer<typeof toolLayerSchema>;
+/**
+ * Searched when neither the call nor the map names a layer. Parking (UC-15) is left out on purpose: a few
+ * hundred sensors sit near any central point and would crowd every other result out of a nearest-first list.
+ * The model asks for it by name for parking questions.
+ */
 const DEFAULT_LAYERS: readonly ToolLayer[] = ['event', 'disruption', 'news', 'planning', 'pedestrian', 'anomaly'];
 
 /** How a layer reads in a step's argument summary. */
 const LAYER_LABELS: Record<ToolLayer, string> = {
   pedestrian: 'pedestrian counts', anomaly: 'anomalies', disruption: 'disruptions', event: 'events', news: 'news', planning: 'planning',
+  parking: 'parking sensors',
 };
 export function layerList(layers: readonly ToolLayer[]): string { return layers.map((layer) => LAYER_LABELS[layer]).join(', '); }
 export function distanceLabel(metres: number): string { return metres >= 1_000 ? `${(metres / 1_000).toFixed(1).replace(/\.0$/, '')} km` : `${metres} m`; }
@@ -117,18 +123,22 @@ export async function searchArea(deps: ToolDependencies, turn: TurnRegistry, are
 function searchLayers(requested: readonly ToolLayer[] | undefined, turn: TurnRegistry): readonly ToolLayer[] {
   if (requested !== undefined) return requested;
   const contextLayers = turn.turn.request.context.layers.filter((layer): layer is ToolLayer => toolLayerSchema.safeParse(layer).success);
-  return contextLayers.length > 0 ? contextLayers : DEFAULT_LAYERS;
+  // A visible parking layer would crowd a general search; it is searched by name, or when it is all the map shows.
+  const general = contextLayers.filter((layer) => layer !== 'parking');
+  return general.length > 0 ? general : contextLayers.length > 0 ? contextLayers : DEFAULT_LAYERS;
 }
 
 const searchFeatures = (deps: ToolDependencies) => defineTool({
   name: 'search_features',
-  description: 'Find map features (events, transport disruptions, news, planning applications, pedestrian sensors, anomalies) in an area, '
-    + 'optionally filtered by layer, time window and keywords. Use it before recommending or describing anything on the map, and cite the ids it returns.',
+  description: 'Find map features (events, transport disruptions, news, planning applications, pedestrian sensors, anomalies, live parking bay sensors) in an area, '
+    + 'optionally filtered by layer, time window and keywords. Use it before recommending or describing anything on the map, and cite the ids it returns. '
+    + 'For parking, pass layers ["parking"] with a small radius (about 300 m): each result is one on-street bay sensor that reads Vacant, Occupied '
+    + 'or No data. A vacant reading does not mean parking there is legal or allowed now; say so, and do not state rules, limits or prices from it.',
   status: 'Searching the map',
   readOnly: true,
   schema: z.strictObject({
     area: areaSchema,
-    layers: z.array(toolLayerSchema).min(1).max(6).optional().describe('Defaults to the layers visible on the map'),
+    layers: z.array(toolLayerSchema).min(1).max(7).optional().describe('Defaults to the layers visible on the map'),
     time: timeWindowSchema.optional().describe('Keeps features valid at some point in the window; Melbourne local time with offset'),
     query: z.string().max(100).optional().describe('Keyword match on title and summary'),
     sort: z.enum(['distance', 'time']).optional().describe('Default distance from the area centre'),
@@ -257,7 +267,7 @@ const showLayers = defineTool({
   status: 'Updating the map layers',
   readOnly: false,
   schema: z.strictObject({
-    layers: z.array(toolLayerSchema).min(1).max(6),
+    layers: z.array(toolLayerSchema).min(1).max(7),
     mode: z.enum(['only', 'add', 'remove']).optional().describe('Default add; only hides every other layer'),
     filter: z.strictObject({ categories: z.array(z.string().min(1).max(40)).max(10).optional(), time: timeWindowSchema.optional() }).optional(),
   }),

@@ -43,6 +43,7 @@ String _layerTitle(AppLocalizations strings, MapLayerId layer) =>
       MapLayerId.news => strings.mapLayerNews,
       MapLayerId.rent => strings.mapLayerRent,
       MapLayerId.census => strings.mapLayerCensus,
+      MapLayerId.parking => strings.mapLayerParking,
     };
 
 String _stateText(AppLocalizations strings, MapLayerState state) =>

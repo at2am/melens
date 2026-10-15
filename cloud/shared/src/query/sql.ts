@@ -11,7 +11,7 @@ import type { ViewQueryId } from './view-queries.js';
  */
 
 export type ViewName = 'v_geo_records_current' | 'v_geo_records_history' | 'v_pedestrian_observations'
-  | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage' | 'v_anomaly_current';
+  | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage' | 'v_anomaly_current' | 'v_parking_sensor_current';
 export type QueryMode = 'current' | 'historical';
 
 export interface QueryBindings {
@@ -43,6 +43,11 @@ export const PEDESTRIAN_COLUMNS = `p.source_id, p.batch_id, p.sensor_id, p.obser
 export const ANOMALY_COLUMNS = `a.result_id, a.source_id, a.batch_id, a.sensor_id, a.sensor_name, a.lat, a.lon,
   a.window_from, a.window_to, a.observation_id, a.baseline_definition_id, a.baseline_value, a.observed_value,
   a.delta, a.direction, a.classification, a.is_replay, a.replay_label, a.location_evidence, a.published_at`;
+/** The latest-snapshot sensor view (UC-15). It never exposes a rule or "may park" claim beyond `may_park_now`. */
+export const PARKING_COLUMNS = `s.source_id, s.batch_id, s.sensor_id, s.source_record_id, s.version_id,
+  s.occupied, s.reported_status, s.zone_number, s.status_changed_at, s.source_updated_at, s.fetched_at,
+  s.source_freshness, s.occupancy_freshness, s.latitude, s.longitude, s.availability_note, s.may_park_now,
+  s.original_url`;
 export const BOUNDARY_COLUMNS = `b.boundary_id, b.version_id, b.scheme, b.code, b.name,
   b.vintage, b.geometry_geojson, b.valid_from, b.valid_to, b.source_record_id, b.source_id,
   b.batch_id, b.fetched_at`;
@@ -53,6 +58,7 @@ export const recordProjection = (columns: string): string => `SELECT TO_JSON_STR
 export const GEO_ORDER = 'ORDER BY g.geo_record_id, g.version_id LIMIT @resultLimit';
 export const PEDESTRIAN_ORDER = 'ORDER BY p.source_id, p.sensor_id, p.observed_at, p.batch_id LIMIT @resultLimit';
 export const BOUNDARY_ORDER = 'ORDER BY b.boundary_id, b.version_id LIMIT @resultLimit';
+export const PARKING_ORDER = 'ORDER BY s.sensor_id LIMIT @resultLimit';
 
 /** One lookahead row tells the runner whether the page is partial. */
 export const resultLimit = (pageSize: number): QueryBindings =>

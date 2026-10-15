@@ -253,6 +253,56 @@
     }
   },
   {
+    "id": "sample.parking.A",
+    "versionId": "sample-v1",
+    "layerId": "parking",
+    "kind": "parking",
+    "title": "Sample parking sensor A",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        144.967,
+        -37.818
+      ]
+    },
+    "location": {
+      "precision": "point",
+      "role": "sensor",
+      "evidence": "Synthetic development fixture"
+    },
+    "assertionKind": "observation",
+    "lifecycle": "active",
+    "time": {
+      "observedAt": "2026-10-01T00:55:00Z",
+      "reportedAt": "2026-10-01T00:59:30Z",
+      "validFrom": null,
+      "validTo": null,
+      "periodLabel": null,
+      "fetchedAt": "2026-10-01T01:00:00Z",
+      "sourceTimeText": null,
+      "sourceTimezone": null
+    },
+    "sources": [
+      {
+        "sourceId": "sample.parking",
+        "url": null,
+        "attribution": "Illustrative sample data",
+        "versionRef": "sample-v1"
+      }
+    ],
+    "details": {
+      "sensorId": "sample.A",
+      "state": "vacant",
+      "noDataReason": null,
+      "reading": "current",
+      "lastReportedAt": "2026-10-01T00:59:30Z",
+      "statusChangedAt": "2026-10-01T00:55:00Z",
+      "zoneNumber": 7,
+      "legalParking": "unknown",
+      "mayBeObstructed": true
+    }
+  },
+  {
     "id": "sample.boundary",
     "versionId": "sample-v1",
     "layerId": "boundary",

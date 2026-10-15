@@ -3,7 +3,8 @@ import type { MapConfig } from '../config.js';
 import { identifierSchema as id, type ViewportQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
-  BOUNDARY_COLUMNS, BOUNDARY_ORDER, GEO_COLUMNS, GEO_ORDER, PEDESTRIAN_COLUMNS, PEDESTRIAN_ORDER,
+  BOUNDARY_COLUMNS, BOUNDARY_ORDER, GEO_COLUMNS, GEO_ORDER, PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS,
+  PEDESTRIAN_ORDER,
   bind, geoView, isGeoQuery, queryDefaults, recordProjection, recordStatusFilter, resultLimit, viewPath,
 } from './sql.js';
 import type { ViewQueryId } from './view-queries.js';
@@ -43,6 +44,16 @@ export function preparePublicRecordQuery(options: {
         WHERE JSON_VALUE(k, '$.sourceId') = p.source_id AND JSON_VALUE(k, '$.sensorId') = p.sensor_id
           AND p.observed_at = SAFE_CAST(JSON_VALUE(k, '$.observedAt') AS TIMESTAMP))
       ${PEDESTRIAN_ORDER}` };
+  }
+  if (queryId === 'parking') {
+    // The latest snapshot holds one row per sensor; the source and sensor identify it. The caller then
+    // compares the published version (batch and record version), not the read-time freshness.
+    return { ...defaults, ...bindings,
+      query: `${recordProjection(PARKING_COLUMNS)}
+      FROM ${viewPath(config, 'v_parking_sensor_current')} s WHERE EXISTS (
+        SELECT 1 FROM UNNEST(JSON_QUERY_ARRAY(@publicRecordKeysJson)) k
+        WHERE JSON_VALUE(k, '$.sourceId') = s.source_id AND JSON_VALUE(k, '$.sensorId') = s.sensor_id)
+      ${PARKING_ORDER}` };
   }
   if (!isGeoQuery(queryId) || queryId === 'news') throw new RangeError('Public record verifier unavailable');
   return { ...defaults, ...bindings,

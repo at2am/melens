@@ -102,13 +102,14 @@ connectors' `source.json` manifests and source-policy records:
 | `victoria.council.engagement_news` (news) | `restricted`, facts and links only | none; every record carries its council news link | Greater Melbourne councils — community engagement news |
 | `user.events` (event), **withdrawn from the registry 2026-10-15** | `restricted`: content users publish in the app under its terms ([policy](../../data/docs/source-policies/user-events.md)), added 2026-10-10 for UC-09. It was not published in `v_source_coverage`, which stopped the deployment audit; add it back to `dev-public-sources.json` and `deploy.sh` once the `user_events` export publishes | none; the records are published in Melens itself | Published by a Melens user |
 | `melens.anomaly.replay` (anomaly) | `verified_open`: a derived replay of City of Melbourne pedestrian counts (CC BY 4.0), added 2026-10-15 for UC-04 and registered by `cloud/data/scripts/anomaly_replay.py` without the live-source admission gates, **awaiting team review** | the City of Melbourne counts dataset page | Melens replay of City of Melbourne pedestrian counts (CC BY 4.0), then the replayed day |
+| `melbourne.parking.sensors` (parking) | `verified_open` (CC BY 4.0), added 2026-10-15 for UC-15; published `current` in `v_source_coverage` that day. Only the live sensor feed is public: the static bay points and restriction rules are not, and no reading is legal permission | the City of Melbourne on-street parking bay sensors dataset page | City of Melbourne — On-street parking bay sensors (CC BY 4.0) |
 
 `deploy.sh` checks the registry against this reviewed table (source set, licence
 status reported by `v_source_coverage`, reference host) before any plan or apply.
 Still absent: pedestrian, road and transit disruption sources are not published
 in `v_source_coverage` at all (`notCovered`), anomalies need a wired producer
-(`unavailable`), and parking, crime statistics, rent and census references wait
-for their own review.
+(`unavailable`), and the parking bay and restriction references, crime statistics,
+rent and census references wait for their own review.
 
 The current boundary/pedestrian views do not prove latest record rights after
 withdrawal, so production composition rejects those record families without a

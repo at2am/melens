@@ -98,6 +98,9 @@ reviewed = {
     # The labelled replay of a historical day (UC-04): derived from City of Melbourne CC BY counts, registered
     # 2026-10-15 without the live-source admission gates; the team has yet to review it.
     'melens.anomaly.replay': ('verified_open', 'data.melbourne.vic.gov.au'),
+    # The live parking layer (UC-15), added 2026-10-15: City of Melbourne on-street sensors, CC BY 4.0. Only the
+    # sensor feed is public; the static bay points and restriction rules stay unpublished references.
+    'melbourne.parking.sensors': ('verified_open', 'data.melbourne.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:

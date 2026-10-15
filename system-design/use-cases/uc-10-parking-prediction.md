@@ -15,6 +15,8 @@ source_rows: [Personalized Discovery (parking)]
 
 P2 because it needs a model built on historical sensor data, predictions must be clearly separated from live data, and that cannot be done well in 3 weeks.
 
+This use case is only the **prediction**. Showing which bays are free right now is [UC-15](uc-15-live-parking.md), a v1 (P0) layer since 2026-10-15; do not treat live parking as P2 because of this file. A prediction would also need history the warehouse does not keep: the map reads only the latest sensor snapshot.
+
 ## User stories
 
 > As a driver, I'd like to know whether parking is likely to be available near my destination when I arrive, so I can plan ahead and spend less time searching for a space.

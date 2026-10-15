@@ -61,7 +61,7 @@ The map app does not query BigQuery directly and has no Firestore map listener. 
 
 Typed MapItem values contain stable id/version/layer, GeoJSON geometry or null, spatial precision/evidence, assertion/lifecycle, known-or-unknown time, public sources and kind-specific details. Coverage, freshness and result completeness are separate. Known times are UTC; clients display Australia/Melbourne. Unknown values/times/locations remain unknown. Predictions use assertionKind=prediction and separate styling.
 
-V1 registers nine layers: pedestrian, anomaly, disruption, event, planning, boundary, news, rent and census. Registration does not imply available data. No unlocated fact gets a guessed point; no sparse sensors become claimed full-city population density.
+V1 registers ten layers: pedestrian, anomaly, disruption, event, planning, boundary, news, rent, census and parking (live bay sensors, UC-15, added 2026-10-15). Registration does not imply available data. No unlocated fact gets a guessed point; no sparse sensors become claimed full-city population density.
 
 Agent tools and cards use the same identity: a `featureId` in [tools.md](tools.md) is a MapItem `id`, so the app can match cards and UI actions to items it loaded from the map service.
 

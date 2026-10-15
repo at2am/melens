@@ -153,6 +153,9 @@ export function sourceBelongsToLayer(source: PublicSourceCoverage, layerId: Laye
     case 'disruption': return (source.topic === 'road_disruption' || source.topic === 'transport')
       && source.sourceId !== 'victoria.transport.gtfs_static'
       && source.sourceId !== 'melbourne.transport.activity_counts';
+    // Only the live sensor feed is drawn. The static bay points and restriction rules share the
+    // topic but are references, not readings, and no crosswalk to the sensors is admitted.
+    case 'parking': return source.sourceId === 'melbourne.parking.sensors' && source.topic === 'parking';
     case 'rent': return source.sourceId === 'homes_victoria.rents' && source.topic === 'housing';
     case 'census': return source.sourceId === 'abs.census' && source.topic === 'demographics';
     default: return source.topic === layerId;

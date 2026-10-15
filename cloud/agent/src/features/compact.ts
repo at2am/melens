@@ -53,8 +53,22 @@ function summaryOf(item: MapItem): string | null {
     case 'pedestrian': return item.details.totalCount === null ? null : `${item.details.totalCount} people counted`;
     case 'anomaly': return item.details.observedValue === null || item.details.baselineValue === null ? null
       : `${item.details.observedValue} observed against a usual ${item.details.baselineValue}`;
+    case 'parking': return parkingSummary(item);
     default: return null;
   }
+}
+
+const NO_DATA: Record<NonNullable<Extract<MapItem, { kind: 'parking' }>['details']['noDataReason']>, string> = {
+  notReporting: 'the sensor is not reporting', publicHoliday: 'sensors do not operate on public holidays',
+  holidayUnknown: 'holiday status unknown', noStatus: 'the sensor has no status',
+};
+
+/** One line the model can relay. It never implies legal parking; the sensor proves only whether a car is on the bay. */
+function parkingSummary(item: Extract<MapItem, { kind: 'parking' }>): string {
+  const { state, noDataReason, lastReportedAt } = item.details;
+  if (state === 'noData') return `No data: ${noDataReason === null ? 'no current reading' : NO_DATA[noDataReason]}`;
+  const reported = lastReportedAt === null ? '' : `, sensor reported ${local(lastReportedAt)}`;
+  return `${state === 'vacant' ? 'Vacant' : 'Occupied'} (live sensor${reported}); legal parking and time limits are not known`;
 }
 
 function shorten(text: string | null, limit: number): string | null {

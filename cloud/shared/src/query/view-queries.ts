@@ -5,13 +5,14 @@ import type { ViewportQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
   ANOMALY_COLUMNS, BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, GEO_ORDER, NO_BINDINGS,
-  PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoTimeFilter,
+  PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoTimeFilter,
   geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection, recordStatusFilter,
   resultLimit, spatialFilter, timeWindow, topicFilter, usesTimeWindow, viewPath, type ViewName,
 } from './sql.js';
 
 export const viewQueryIdSchema = z.enum([
   'planning', 'disruption', 'event', 'news', 'pedestrian', 'anomaly', 'boundary', 'rent', 'census', 'sourceCoverage',
+  'parking',
 ]);
 export type ViewQueryId = z.infer<typeof viewQueryIdSchema>;
 export type IndicatorFilter = NonNullable<ViewportQuery['areaFilter']>;
@@ -65,6 +66,16 @@ export function prepareViewQuery(options: {
           FROM ${path('v_anomaly_current')} a
           WHERE a.lat BETWEEN @south AND @north AND a.lon BETWEEN @west AND @east ${admitted('a.source_id')}
           ORDER BY a.window_to DESC, a.result_id LIMIT @resultLimit`,
+        ...bind(base),
+      };
+    case 'parking':
+      // One small current snapshot, so the scan does not grow with history. Only the viewport's
+      // sensors are read; a sensor with no coordinates cannot match the box and is never drawn.
+      return { ...defaults,
+        query: `${recordProjection(PARKING_COLUMNS)}
+          FROM ${path('v_parking_sensor_current')} s
+          WHERE s.latitude BETWEEN @south AND @north AND s.longitude BETWEEN @west AND @east ${admitted('s.source_id')}
+          ${PARKING_ORDER}`,
         ...bind(base),
       };
     case 'boundary': {

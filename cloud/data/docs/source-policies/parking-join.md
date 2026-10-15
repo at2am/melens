@@ -42,3 +42,23 @@ For `melbourne.parking.sensors`, the normalizer now returns unknown occupancy fr
 - Cadence must be finite and positive. A successful source check older than the reported observation does not prove current data. Bay identity/version and nonempty marker/crosswalk keys must match.
 
 The targeted normalization tests exercise these behaviors with synthetic reviewed-crosswalk inputs. Node.js 24.21.0 passed all 24 normalization tests, the full TypeScript type check, and the changed-file whitespace check on 2026-10-01. These are development checks. They do not meet the 30 real complete-bay and 10 anomaly samples required by SC-005. No real row in this investigation was promoted to legal parking permission.
+
+## Live map layer verification (2026-10-15, UC-15)
+
+Read-only full exports of the official sensor and bay datasets at 08:13–08:16 UTC:
+
+| Check | Result |
+| --- | --- |
+| Refresh | The export refreshed every 2 minutes (`lastupdated` 08:12:49 → 08:14:49); 140 sensors changed state in one cycle. |
+| Heartbeat | Each sensor's `lastupdated` is its own last report. 5,284 sensors equalled the snapshot time; 1,040 had not reported for over a day, 963 for over 30 days, and none of the 140 changes came from them. `status_timestamp` is only the last occupancy change. |
+| Positions | All 6,324 sensors have coordinates inside the service envelope. |
+| `kerbsideid` to bay points | 4,825 sensors (76%) match a bay point, at a median 1.6 m from the sensor, so the bay point adds nothing; 14 matches are over 25 m apart (the largest 3.5 km). The bay export stores `kerbsideid` as a string and the sensor export as a number. |
+| ArcGIS `ParkingBays` polygons | 24,807 polygons. `SensorID` is an empty string on nearly every row and matches one sensor. Point-in-polygon puts 3,843 sensors (61%) inside exactly one polygon and 2,481 outside any; 332 polygons hold more than one sensor. The layer's licence is not reviewed. |
+
+Decisions:
+
+- The layer draws each sensor at its own coordinates. Bay polygons wait for the ArcGIS licence review.
+- The map reads only `melens_ingest.parking_sensor_current`, the latest complete snapshot that the ingest job replaces in one transaction after each published batch, through `v_parking_sensor_current`. That view had read the append-only history and scanned 165 MB per read against the 100 MB dynamic ceiling; the probe of the new view with real source tables billed 21 MB, mostly minimum billing on the two small tables. Do not point it back at the history tables.
+- A sensor whose own last report is older than four cadences is `stale` and is drawn as no data (`sensor_not_reporting`), never as vacant.
+
+Outage found the same day: the sensor job failed from 2026-10-01 18:00 to 2026-10-15 08:38 UTC on its 500 MB billed-byte ceiling (`recover-published-parking-business-state` needed 506 MB), while the retention job failed on the 500 MB ceiling its multi-statement script shared, so `parking_sensor_memberships` grew to 961,248 rows and was never cleaned. After a manual cleanup of old membership rows and two retention runs the job published again at 08:38 UTC. Retention now issues one query per table, cleans membership first and keeps one hour of membership (`src/core/source-retention.ts`).

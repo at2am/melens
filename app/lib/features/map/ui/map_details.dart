@@ -289,6 +289,40 @@ class MapDetails extends ConsumerWidget {
       _fact(strings, strings.mapDetailProjectStatus, details.projectStatus),
       _fact(strings, strings.mapDetailPermit, details.permitId),
     ],
+    ParkingMapItem(:final details) => [
+      Text(switch (details.state) {
+        ParkingState.vacant => strings.mapDetailParkingVacant,
+        ParkingState.occupied => strings.mapDetailParkingOccupied,
+        ParkingState.noData => strings.mapDetailParkingNoData,
+      }),
+      if (details.noDataReason case final reason?)
+        Text(switch (reason) {
+          ParkingNoDataReason.notReporting =>
+            strings.mapDetailParkingNotReporting,
+          ParkingNoDataReason.publicHoliday =>
+            strings.mapDetailParkingPublicHoliday,
+          ParkingNoDataReason.holidayUnknown =>
+            strings.mapDetailParkingHolidayUnknown,
+          ParkingNoDataReason.noStatus => strings.mapDetailParkingNoStatus,
+        }),
+      if (details.state != ParkingState.noData &&
+          details.reading == ParkingReading.late)
+        Text(strings.mapDetailParkingLate),
+      _fact(
+        strings,
+        strings.mapDetailParkingLastReported,
+        _time(clock, details.lastReportedAt),
+      ),
+      _fact(
+        strings,
+        strings.mapDetailParkingStatusChanged,
+        _time(clock, details.statusChangedAt),
+      ),
+      _fact(strings, strings.mapDetailParkingZone, _number(details.zoneNumber)),
+      // Shown with every sensor: occupancy is never legal permission.
+      Text(strings.mapDetailParkingNotLegal),
+      if (details.mayBeObstructed) Text(strings.mapDetailParkingObstruction),
+    ],
     BoundaryMapItem(:final details) => [
       _fact(strings, strings.mapDetailBoundary, details.boundaryId),
       _fact(

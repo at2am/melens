@@ -26,6 +26,8 @@ const layerTopicPresets = [
       MapLayerId.disruption,
       MapLayerId.event,
       MapLayerId.planning,
+      // UC-15, opt-in: shows live bay sensors for the area being viewed.
+      MapLayerId.parking,
       MapLayerId.boundary,
     ],
     defaultLayers: {

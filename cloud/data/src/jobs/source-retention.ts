@@ -27,29 +27,39 @@ export async function sourceRetention(args: readonly string[], env = process.env
     return;
   }
   if (args.length) throw new Error('Expected no arguments or --withdraw-source ticketmaster.events');
+  // One source failing must not stop the others from being cleaned, or a backlog in one
+  // source lets every later source grow. The job still exits non-zero at the end.
+  const failures: string[] = [];
   for (const source of Object.keys(SOURCE_RETENTION)) {
     const lease = `source_${createHash('sha256').update(source).digest('hex')}`;
-    let result;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        result = await gcs.withBatchLease(lease,
-          () => cleanupSourceContent(config, bigquery, gcs, source));
-        break;
-      } catch (error) {
-        if (!(error instanceof Error)
-          || error.message !== 'Batch publication is already in progress; inspect the job before clearing a stale lease'
-          || attempt === 4) throw error;
-        await setTimeout(30_000);
+    try {
+      let result;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          result = await gcs.withBatchLease(lease,
+            () => cleanupSourceContent(config, bigquery, gcs, source));
+          break;
+        } catch (error) {
+          if (!(error instanceof Error)
+            || error.message !== 'Batch publication is already in progress; inspect the job before clearing a stale lease'
+            || attempt === 4) throw error;
+          await setTimeout(30_000);
+        }
       }
+      if (!result) throw new Error('Retention lease could not be acquired');
+      process.stdout.write(JSON.stringify({ action: 'retention_checked', ...result }) + '\n');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'retention failed';
+      process.stderr.write(JSON.stringify({ action: 'retention_failed', source_id: source, message }) + '\n');
+      failures.push(source);
     }
-    if (!result) throw new Error('Retention lease could not be acquired');
-    process.stdout.write(JSON.stringify({ action: 'retention_checked', ...result }) + '\n');
   }
+  if (failures.length) throw new Error(`Retention failed for: ${failures.join(', ')}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   sourceRetention(process.argv.slice(2)).catch(() => {
-    process.stderr.write('Source content retention failed; inspect the job and query metadata\n');
+    process.stderr.write('Source content retention failed; the per-source retention_failed lines above name the tables\n');
     process.exitCode = 1;
   });
 }
