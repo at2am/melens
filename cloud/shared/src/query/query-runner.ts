@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { validateMapConfig, type MapConfig } from '../config.js';
 import { identifierSchema, parseUnlocatedQuery, parseViewportQuery } from '../contracts/map-contract.js';
 import { MapQueryError } from '../errors.js';
-import type { AdapterQueryJob, BigQueryViewAdapter } from './bigquery-adapter.js';
+import type { AdapterQueryJob, BigQueryViewAdapter, PreparedViewQuery } from './bigquery-adapter.js';
 import { publicRecordKeysSchema, preparePublicRecordQuery } from './public-record-queries.js';
 import { approvedUnlocatedScopeSchema, prepareUnlocatedQuery } from './unlocated-queries.js';
 import { prepareViewQuery, viewQueryIdSchema, type IndicatorFilter } from './view-queries.js';
@@ -68,7 +68,7 @@ async function boundedCancel(job: AdapterQueryJob, timeoutMs: number): Promise<v
   catch { /* Cancellation is best effort; the server job also has jobTimeoutMs. */ }
 }
 
-function boundedRows(value: unknown, options: {
+export function boundedRows(value: unknown, options: {
   readonly pageSize: number; readonly byteBudget: number; readonly hasMore: boolean;
 }): ViewQueryResult {
   const sourceRows = z.array(queryRowSchema).max(options.pageSize + 1).parse(value);
@@ -109,6 +109,46 @@ export function createViewQueryRunner(options: {
 }) {
   const config = validateMapConfig(options.config);
   const maximumResultBudget = config.maxResponseBytes - config.responseEnvelopeReserveBytes;
+
+  /** Run one server-owned prepared query under the configured deadlines, cancellation and budgets. */
+  async function execute(query: PreparedViewQuery, bounds: { readonly pageSize: number; readonly byteBudget: number },
+    execution: { readonly signal?: AbortSignal }): Promise<ViewQueryResult> {
+    if (execution.signal?.aborted) throw new MapQueryError('queryTimeout');
+    if (config.dryRunPreflight) {
+      try {
+        const estimate = await withinDeadline(options.adapter.dryRun(query), config.dryRunTimeoutMs,
+          execution.signal);
+        if (typeof estimate.bytesProcessed !== 'bigint' || estimate.bytesProcessed < 0n) {
+          throw new MapQueryError('serviceUnavailable');
+        }
+        if (estimate.bytesProcessed > BigInt(query.maximumBytesBilled)) {
+          throw new MapQueryError('budgetExceeded');
+        }
+      } catch (error) { throw safeQueryError(error); }
+      if (execution.signal?.aborted) throw new MapQueryError('queryTimeout');
+    }
+    let job: AdapterQueryJob | null = null;
+    let abandoned = false;
+    try {
+      const started = options.adapter.startQuery(query).then((created) => {
+        if (abandoned) {
+          void boundedCancel(created, config.cancelTimeoutMs);
+          throw new MapQueryError('queryTimeout');
+        }
+        job = created;
+        return created;
+      });
+      const page = await withinDeadline(started.then((created) => created.readPage({
+        maxRows: bounds.pageSize + 1, timeoutMs: config.queryTimeoutMs,
+      })), config.queryTimeoutMs, execution.signal);
+      if (!page.complete) throw new MapQueryError('queryTimeout');
+      return boundedRows(page.rows, { pageSize: bounds.pageSize, byteBudget: bounds.byteBudget, hasMore: page.hasMore });
+    } catch (error) {
+      abandoned = true;
+      if (job !== null) await boundedCancel(job, config.cancelTimeoutMs);
+      throw safeQueryError(error);
+    }
+  }
 
   return {
     async run(input: unknown, execution: { readonly signal?: AbortSignal } = {}): Promise<ViewQueryResult> {
@@ -156,40 +196,10 @@ export function createViewQueryRunner(options: {
         : prepareViewQuery({ queryId: parsed.queryId, request: request as ReturnType<typeof parseViewportQuery>, config, pageSize,
           ...(parsed.publicSourceIds === undefined ? {} : { publicSourceIds: parsed.publicSourceIds }) }); }
       catch { throw new MapQueryError('invalidRequest'); }
-      if (execution.signal?.aborted) throw new MapQueryError('queryTimeout');
-      try {
-        const estimate = await withinDeadline(options.adapter.dryRun(query), config.dryRunTimeoutMs,
-          execution.signal);
-        if (typeof estimate.bytesProcessed !== 'bigint' || estimate.bytesProcessed < 0n) {
-          throw new MapQueryError('serviceUnavailable');
-        }
-        if (estimate.bytesProcessed > BigInt(query.maximumBytesBilled)) {
-          throw new MapQueryError('budgetExceeded');
-        }
-      } catch (error) { throw safeQueryError(error); }
-
-      if (execution.signal?.aborted) throw new MapQueryError('queryTimeout');
-      let job: AdapterQueryJob | null = null;
-      let abandoned = false;
-      try {
-        const started = options.adapter.startQuery(query).then((created) => {
-          if (abandoned) {
-            void boundedCancel(created, config.cancelTimeoutMs);
-            throw new MapQueryError('queryTimeout');
-          }
-          job = created;
-          return created;
-        });
-        const page = await withinDeadline(started.then((created) => created.readPage({
-          maxRows: pageSize + 1, timeoutMs: config.queryTimeoutMs,
-        })), config.queryTimeoutMs, execution.signal);
-        if (!page.complete) throw new MapQueryError('queryTimeout');
-        return boundedRows(page.rows, { pageSize, byteBudget, hasMore: page.hasMore });
-      } catch (error) {
-        abandoned = true;
-        if (job !== null) await boundedCancel(job, config.cancelTimeoutMs);
-        throw safeQueryError(error);
-      }
+      return execute(query, { pageSize, byteBudget }, execution);
     },
+    /** For server-built queries only (the current-layer cache's loads); callers own the SQL. */
+    runPrepared: execute,
   };
 }
+export type ViewQueryRunner = ReturnType<typeof createViewQueryRunner>;

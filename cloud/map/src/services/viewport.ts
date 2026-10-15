@@ -103,28 +103,28 @@ export function createViewportService(options: SnapshotAccess & {
       }
       const coverage = await options.readCoverage(request, execution);
       if (coverage.completeness !== 'complete') throw new MapServiceError('serviceUnavailable');
-      const loaded: LoadedViewportLayer[] = [];
       const { rowLimit, resultBudgetBytes } = layerBudgets(request.layers.length, maxBytes,
         options.resultEnvelopeReserveBytes ?? 64 * 1024);
-      // Sequential bounded queries avoid multiplying the per-request concurrency/scan allowance.
-      for (const layerId of request.layers) {
+      // Layers load together: each keeps its own row and byte allowance, and most are answered from the
+      // in-memory current-layer cache, so waiting for them one after another only added their latencies.
+      const loaded: LoadedViewportLayer[] = await Promise.all(request.layers.map(async (layerId) => {
         const entry = await options.loadLayer(request, layerId, coverage,
           { ...execution, rowLimit, resultBudgetBytes });
         const originalIds = new Set([...entry.result.items.filter((item) => item.kind !== 'aggregate'),
           ...(entry.groups ?? []).flatMap((group) => [...group.members])]
           .map((item) => JSON.stringify([item.layerId, item.id, item.versionId])));
         if (originalIds.size > rowLimit) throw new MapServiceError('budgetExceeded');
-        if (options.aggregateLayer === undefined) { loaded.push(entry); continue; }
+        if (options.aggregateLayer === undefined) return entry;
         // Group only after the original-row and result-byte budgets were applied.
         // Keep original versioned members for details and current public-rights checks.
         try {
           const grouped = options.aggregateLayer(entry.result, { zoom: request.zoom, bounds: request.bbox });
-          loaded.push({ result: { ...entry.result, items: [...grouped.items] },
-            groups: [...(entry.groups ?? []), ...grouped.groups.values()] });
+          return { result: { ...entry.result, items: [...grouped.items] },
+            groups: [...(entry.groups ?? []), ...grouped.groups.values()] };
         } catch (error) {
           throw new MapServiceError(error instanceof RangeError ? 'budgetExceeded' : 'serviceUnavailable');
         }
-      }
+      }));
       const layers = loaded.map((entry) => entry.result);
       const groups = loaded.flatMap((entry) => entry.groups ?? []);
       const rowSourceIds = [...layers.flatMap((layer) => layer.items), ...groups.flatMap((group) => group.members)]

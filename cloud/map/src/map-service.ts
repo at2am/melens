@@ -2,6 +2,7 @@ import type { MapConfig } from '@melens/shared/config';
 import { parseMapLayerCatalog, sourceReferenceSchema } from '@melens/shared/contracts/map-contract';
 import type { PublicSourceReference, PublicSourceResolver } from '@melens/shared/query/adapter-common';
 import { createBigQueryViewAdapter, type BigQueryViewAdapter } from '@melens/shared/query/bigquery-adapter';
+import { createCurrentLayerCache } from '@melens/shared/query/current-layer-cache';
 import { createAnomalyLayerLoader, consumeVerifiedAnomalyBatch, failSoftAnomalyLayerLoader } from '@melens/shared/query/anomalies';
 import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createUnlocatedLayerLoader, createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
@@ -19,6 +20,8 @@ import { createViewportService, type ViewportLayerAggregator, type ViewportLayer
 
 /** The source registry changes per ingest batch, minutes apart; one read serves the requests of this window. */
 export const COVERAGE_CACHE_TTL_MS = 30_000;
+/** After that, requests keep the last registry read for this long while one background read replaces it. */
+export const COVERAGE_STALE_MS = 120_000;
 
 /** Composition root: wires the query runner, layer loaders, rights checker and page services. */
 export function createMapService(options: {
@@ -33,6 +36,10 @@ export function createMapService(options: {
   readonly aggregateLayer?: ViewportLayerAggregator;
   /** How long requests share one source registry read; 0 reads it on every use. */
   readonly coverageCacheTtlMs?: number;
+  /** How long an expired registry read is still served while a background read replaces it. */
+  readonly coverageStaleMs?: number;
+  /** Serve current planning, disruption, event, news, parking and anomaly reads from memory per publication (default on). */
+  readonly currentLayerCache?: boolean;
 }) {
   const clock = options.clock ?? (() => new Date());
   const references = new Map((options.publicSources ?? []).map((source) => {
@@ -41,9 +48,14 @@ export function createMapService(options: {
   }));
   const runner = createViewQueryRunner({ config: options.config,
     adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
-  const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) => runner.run(input, execution);
   const readCoverage = cacheSourceCoverage(createSourceCoverageReader({ runner }).read, {
-    ttlMs: options.coverageCacheTtlMs ?? COVERAGE_CACHE_TTL_MS, clock });
+    ttlMs: options.coverageCacheTtlMs ?? COVERAGE_CACHE_TTL_MS, staleMs: options.coverageStaleMs ?? COVERAGE_STALE_MS, clock });
+  // Current layers change only when a source publishes, so each is loaded once per publication and every
+  // viewport read and public-record recheck is answered from memory; everything else runs its fixed query.
+  const layerCache = options.currentLayerCache === false ? null
+    : createCurrentLayerCache({ config: options.config, runner, readCoverage, clock });
+  const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) =>
+    layerCache === null ? runner.run(input, execution) : layerCache.runQuery(input, execution);
   const store = options.snapshotStore ?? createSnapshotStore({ clock });
   // A source is public only while it is admitted and published and has a reviewed reference.
   const resolveSource = (coverage: SourceCoverageSnapshot): PublicSourceResolver => (id) =>

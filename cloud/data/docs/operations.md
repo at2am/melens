@@ -373,6 +373,14 @@ npm run verify -- --source melbourne.pedestrian.minute --batch batch_f10a8b9c...
 
 停车传感器每 2 分钟为每个传感器写一行 `parking_sensor_memberships`，而当前视图对该表的读取无法按批次裁剪。每次发布成功后，采集任务删除已被取代、超过 1 小时的快照成员行（仅限近 2 天分区）；`source-retention` 任务按天分区逐个删除更早的成员行、超过保留期且不再被最新快照引用的事实行，以及超过 2 小时仍未发布的批次留下的行。每次删除只扫描一天的分区，积压不会超出 `BQ_MAXIMUM_BYTES_BILLED`；单天失败不会阻止其余清理。
 
+地图的规划、交通、活动和新闻图层读取 `geo_records_current`（经 `v_geo_records_current_served`），不再在每次请求时从全部历史重建“当前”（2026-10-15 实测约 500 MB、4 秒/次）。刷新方式（`src/core/geo-records-current.ts`）：
+- 快照来源（开发监测、Ticketmaster、议会参与等）发布后，用 `002_core_views.sql` 中视图本身的 SQL 重建该来源的行。该 SQL 在运行时从文件读取，所以副本与视图不会分叉。小分区里各来源的行混在同一块中，重建仍会读取约 0.5 GB，因此重建使用独立上限 `GEO_CURRENT_REBUILD_MAX_BYTES`（1.5 GB），每天只运行几次。
+- 追加来源（GDELT、user.events）只应用新发布的批次，只读最近两天的分区（约 60 MB/次）。没有状态记录时自动改为重建。
+- `source-retention` 每 6 小时用视图 SQL 重建全部地图来源，所以增量路径与视图之间的任何偏差最多保持一个周期。
+- `geo_records_current_state` 记录每个来源副本对应的已发布批次。地图服务据此判断副本是否落后于来源注册表；落后的副本只服务当次请求，5 秒后重新加载。
+- 刷新失败不会使已发布的批次失败：作业记录 `geo_current_refresh_failed`，下一次发布或保留任务会补上。
+- 新增地图图层的来源必须加入 `GEO_CURRENT_SOURCES`；测试会读取各连接器的 `source.json` 检查这一点。
+
 ---
 
 ## 5. BigQuery 成本、配额与预算告警 (Cost, Quota & Budget Management)

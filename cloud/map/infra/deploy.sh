@@ -169,11 +169,13 @@ approved = {
     'v_road_disruptions_history', 'v_source_abnormal_delay', 'v_source_coverage', 'v_source_health',
     'v_street_observations', 'v_transport_changes_current',
     'v_anomaly_current',  # 009: anomaly results of published batches, the detector's or the labelled replay (UC-04)
+    'v_geo_records_current_served', 'v_geo_records_current_state',  # 010: the refreshed current geo copy the map reads
 }
 views = read([bq, 'ls', '--max_results=1000', '--format=prettyjson', project + ':melens_query'])
 if any(table.get('type') != 'VIEW' or table['tableReference']['tableId'] not in approved for table in views):
     raise SystemExit('Query dataset contains an unreviewed resource')
-required = {'v_source_coverage', 'v_boundaries', 'v_geo_records_current', 'v_geo_records_history', 'v_pedestrian_observations'}
+required = {'v_source_coverage', 'v_boundaries', 'v_geo_records_current_served', 'v_geo_records_current_state',
+    'v_geo_records_history', 'v_pedestrian_observations'}
 if not required.issubset({table['tableReference']['tableId'] for table in views}):
     raise SystemExit('Required public query views are missing')
 for secret in gc('secrets', 'list'):

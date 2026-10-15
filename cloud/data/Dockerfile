@@ -14,5 +14,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules/
 COPY --from=build --chown=node:node /app/dist ./dist/
+# The geo current refresh reads the reviewed view SQL, so the copy and the view cannot drift.
+COPY --chown=node:node sql/002_core_views.sql ./sql/
 USER node
 CMD ["node", "dist/src/jobs/ingest.js"]

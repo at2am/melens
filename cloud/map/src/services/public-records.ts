@@ -25,7 +25,9 @@ export function createPublicRecordChecker(options: {
     const { cursor: _cursor, snapshotId: _snapshotId, ...context } = coverageRequest(snapshot);
     const asOf = new Date(snapshot.createdAt).toISOString();
     try {
-      for (const layerId of new Set(unique.filter((item) => ADAPTED_LAYERS.has(item.layerId)).map((item) => item.layerId))) {
+      const layerIds = [...new Set(unique.filter((item) => ADAPTED_LAYERS.has(item.layerId)).map((item) => item.layerId))];
+      // Each layer's recheck is independent; most are answered from the in-memory current-layer cache.
+      const results = await Promise.all(layerIds.map(async (layerId) => {
         const expected = unique.filter((item) => item.layerId === layerId);
         const result = await options.runQuery({ family: 'publicRecords', queryId: layerId,
           request: { ...context, pageSize: MAX_PAGE_ITEMS },
@@ -41,9 +43,9 @@ export function createPublicRecordChecker(options: {
         // the view. So a parking sensor passes while the public view still returns it.
         const key = (item: MapItem) => layerId === 'parking' ? item.id : JSON.stringify(item);
         const published = new Set([...actual.items, ...actual.unlocatedItems].map(key));
-        if (!expected.every((item) => published.has(key(item)))) return false;
-      }
-      return true;
+        return expected.every((item) => published.has(key(item)));
+      }));
+      return results.every(Boolean);
     } catch { return false; }
   };
 }

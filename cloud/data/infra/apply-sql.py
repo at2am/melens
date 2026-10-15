@@ -24,6 +24,7 @@ FILES = tuple(SQL_DIR / f"{number:03d}_{name}.sql" for number, name in (
     (1, "tables"), (2, "core_views"), (3, "parking_views"),
     (4, "street_views"), (5, "news_views"), (6, "area_views"),
     (7, "changes_views"), (8, "health_views"), (9, "anomaly_views"),
+    (10, "serving_views"),
 ))
 PROJECT_ID = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]\Z")
 TABLE_DDL = re.compile(
@@ -53,6 +54,8 @@ AUTHORIZED_RAW_VIEWS = frozenset({
     "v_source_health",
     "v_source_coverage",
     "v_anomaly_current",
+    "v_geo_records_current_served",
+    "v_geo_records_current_state",
 })
 
 

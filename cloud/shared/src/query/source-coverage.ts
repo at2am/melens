@@ -110,18 +110,39 @@ export function createSourceCoverageReader(options: { readonly runner: CoverageQ
 /**
  * The registry read is the same query for every request, so requests share one result for [ttlMs] and concurrent
  * requests share one query. A failure is not kept. The shared query runs without any caller's signal, so one
- * abandoned request cannot fail the others; each caller still stops waiting when its own signal aborts. Access
- * changes in the registry reach the map within [ttlMs].
+ * abandoned request cannot fail the others; each caller still stops waiting when its own signal aborts.
+ * For a further [staleMs] after [ttlMs], requests get the last result at once while one background read replaces
+ * it, so a request after a quiet spell does not wait about a second for the registry. Access changes in the
+ * registry reach the map within [ttlMs] + [staleMs].
  */
 export function cacheSourceCoverage(read: SourceCoverageReader, options: {
-  readonly ttlMs: number; readonly clock?: () => Date;
+  readonly ttlMs: number; readonly staleMs?: number; readonly clock?: () => Date;
 }): SourceCoverageReader {
   const clock = options.clock ?? (() => new Date());
-  let cached: { readonly snapshot: Promise<SourceCoverageSnapshot>; readonly startedAt: number } | null = null;
+  const staleMs = options.staleMs ?? 0;
+  type Entry = { readonly snapshot: Promise<SourceCoverageSnapshot>; readonly startedAt: number;
+    value?: SourceCoverageSnapshot };
+  let cached: Entry | null = null;
+  let refreshing = false;
+  const start = (request: Parameters<SourceCoverageReader>[0], now: number): Entry => {
+    const entry: Entry = { snapshot: read(request), startedAt: now };
+    entry.snapshot.then((value) => { entry.value = value; }, () => {});
+    return entry;
+  };
   return async (request, execution = {}) => {
     const now = clock().getTime();
-    if (cached === null || now - cached.startedAt >= options.ttlMs || now < cached.startedAt) {
-      const entry = { snapshot: read(request), startedAt: now };
+    const age = cached === null || now < cached.startedAt ? Number.POSITIVE_INFINITY : now - cached.startedAt;
+    if (cached !== null && age >= options.ttlMs && age < options.ttlMs + staleMs && cached.value !== undefined) {
+      const current = cached.value;
+      if (!refreshing) {
+        refreshing = true;
+        const entry = start(request, now);
+        entry.snapshot.then(() => { cached = entry; }, () => {}).finally(() => { refreshing = false; });
+      }
+      return current;
+    }
+    if (cached === null || age >= options.ttlMs) {
+      const entry = start(request, now);
       cached = entry;
       entry.snapshot.catch(() => { if (cached === entry) cached = null; });
     }

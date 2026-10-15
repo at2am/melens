@@ -258,6 +258,58 @@ CREATE TABLE IF NOT EXISTS `melens_ingest.parking_sensor_current` (
 )
 CLUSTER BY source_id, sensor_id;
 
+-- The current records of the sources the map's geo layers draw (src/core/geo-records-current.ts),
+-- with the columns of v_geo_records_current. That view rebuilds "current" from the whole
+-- append-only history on every read (about 500 MB, about 4 s on 2026-10-15). This copy is refreshed
+-- after each publication instead: snapshot sources rebuild their own rows from the view's SQL, and
+-- append sources (GDELT) apply only their newly published batches. The source-retention job
+-- rebuilds every source from the view's SQL, so any drift lasts at most one retention cycle.
+-- Readers use v_geo_records_current_served, which re-applies the time limits that depend on the
+-- read time. Never append to it from a connector.
+CREATE TABLE IF NOT EXISTS `melens_ingest.geo_records_current` (
+  geo_record_id STRING NOT NULL,
+  version_id STRING NOT NULL,
+  batch_id STRING NOT NULL,
+  source_id STRING NOT NULL,
+  schema_version INT64,
+  topic STRING,
+  assertion_kind STRING,
+  is_prediction BOOL,
+  title STRING,
+  summary STRING,
+  original_url STRING,
+  geometry_geojson STRING,
+  geometry GEOGRAPHY,
+  centroid_lat FLOAT64,
+  centroid_lon FLOAT64,
+  location_role STRING,
+  location_confidence STRING,
+  area_refs ARRAY<STRING>,
+  observed_at TIMESTAMP,
+  published_at TIMESTAMP,
+  valid_from TIMESTAMP,
+  valid_to TIMESTAMP,
+  fetched_at TIMESTAMP,
+  batch_published_at TIMESTAMP,
+  source_updated_at TIMESTAMP,
+  source_version_ordinal INT64,
+  freshness_state STRING,
+  record_status STRING,
+  rights_status STRING
+)
+CLUSTER BY topic, source_id;
+
+-- The newest published batch that geo_records_current reflects, per source. The map compares it
+-- with the source registry: a copy that lags a publication is never cached as current.
+CREATE TABLE IF NOT EXISTS `melens_ingest.geo_records_current_state` (
+  source_id STRING NOT NULL,
+  batch_id STRING,
+  published_at TIMESTAMP,
+  refreshed_at TIMESTAMP NOT NULL,
+  method STRING NOT NULL
+)
+CLUSTER BY source_id;
+
 CREATE TABLE IF NOT EXISTS `melens_ingest.parking_rules` (
   rule_id STRING NOT NULL,
   version_id STRING NOT NULL,

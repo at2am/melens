@@ -12,7 +12,8 @@ const baseRequest = {
   layers: ['planning'], mode: 'current',
   window: { from: '2026-10-01T00:00:00Z', to: '2026-10-01T01:00:00Z' },
 };
-const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' });
+// These tests describe the dry-run preflight; the default runs without it (see the last tests).
+const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_DRY_RUN_PREFLIGHT: 'true' });
 
 function records(...rows: readonly object[]) {
   return rows.map((row) => ({ record: JSON.stringify(row) }));
@@ -41,7 +42,7 @@ function isQueryError(code: MapQueryError['code']) {
 
 function smallDeadlineConfig(): MapConfig {
   return loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_QUERY_TIMEOUT_MS: '20',
-    MAP_DRY_RUN_TIMEOUT_MS: '10', MAP_CANCEL_TIMEOUT_MS: '5' });
+    MAP_DRY_RUN_TIMEOUT_MS: '10', MAP_CANCEL_TIMEOUT_MS: '5', MAP_DRY_RUN_PREFLIGHT: 'true' });
 }
 
 test('complete bounded queries preserve measured zero/null, exact totals and fixed parameterized SQL', async () => {
@@ -56,7 +57,7 @@ test('complete bounded queries preserve measured zero/null, exact totals and fix
   assert.equal(fake.queries.length, 2);
   const executed = fake.queries.at(1);
   assert.ok(executed !== undefined);
-  assert.match(executed.query, /`melens-testing\.melens_query\.v_geo_records_current`/);
+  assert.match(executed.query, /`melens-testing\.melens_query\.v_geo_records_current_served`/);
   assert.doesNotMatch(executed.query, /melens_ingest|staging|raw\./);
   assert.equal(executed.params.west, baseRequest.bbox[0]);
   assert.equal(executed.params.resultLimit, 1_001);
@@ -377,4 +378,35 @@ test('server maximumBytesBilled failures remain budget errors with sanitized met
       assert.ok(!JSON.stringify(error).includes('private'));
       return true;
     });
+});
+
+test('by default a query starts one job, whose own maximumBytesBilled bounds the scan', async () => {
+  const fake = fakeAdapter({ rows: records({ id: 'one' }), complete: true, hasMore: false });
+  fake.adapter.dryRun = async () => { throw new Error('The default runs no dry run'); };
+  const runner = createViewQueryRunner({ config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }), adapter: fake.adapter });
+  const result = await runner.run({ queryId: 'planning', request: baseRequest });
+  assert.equal(result.kind, 'complete');
+  assert.equal(fake.starts, 1);
+  assert.equal(fake.queries.length, 1);
+  assert.equal(fake.queries[0]!.maximumBytesBilled, '100000000');
+});
+
+test('the dry-run preflight setting accepts only true or false', () => {
+  assert.equal(loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }).dryRunPreflight, false);
+  assert.equal(loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_DRY_RUN_PREFLIGHT: 'true' }).dryRunPreflight, true);
+  assert.throws(() => loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_DRY_RUN_PREFLIGHT: 'yes' }),
+    (error: unknown) => error instanceof Error && error.message.includes('dryRunPreflight'));
+});
+
+test('a server-built query runs under the same bounds without request parsing', async () => {
+  const fake = fakeAdapter({ rows: records({ id: 'a' }, { id: 'b' }), complete: true, hasMore: false });
+  const runner = createViewQueryRunner({ config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }), adapter: fake.adapter });
+  const prepared = { query: 'SELECT 1', params: {}, types: {}, location: 'australia-southeast2',
+    maximumBytesBilled: '1000', jobTimeoutMs: 1_000 };
+  const partial = await runner.runPrepared(prepared, { pageSize: 1, byteBudget: 1_000 }, {});
+  assert.equal(partial.kind, 'partial');
+  assert.deepEqual(fake.reads.at(-1), { maxRows: 2, timeoutMs: 10_000 });
+  const complete = await runner.runPrepared(prepared, { pageSize: 5, byteBudget: 1_000 }, {});
+  assert.equal(complete.kind, 'complete');
+  assert.equal(complete.rows.length, 2);
 });

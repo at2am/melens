@@ -456,9 +456,10 @@ test('simultaneous same-source batches cannot cross the validation/publication b
   assert.equal(bigquery.visible('source_records').length, 1);
 });
 
-// parking_sensor_current is not a publisher fact table: the ingest job swaps it in a single
-// transaction after the batch is published (src/core/parking-sensor-current.ts, with its own tests).
-const NOT_PUBLISHER_FACT_TABLES = new Set(['sync_batches', 'data_sources', 'parking_sensor_current']);
+// The current copies are not publisher fact tables: the ingest job refreshes them after the batch is
+// published (src/core/parking-sensor-current.ts and geo-records-current.ts, with their own tests).
+const NOT_PUBLISHER_FACT_TABLES = new Set(['sync_batches', 'data_sources', 'parking_sensor_current',
+  'geo_records_current', 'geo_records_current_state']);
 for (const table of [...schemas.keys()].filter(name => !NOT_PUBLISHER_FACT_TABLES.has(name ?? ''))) {
   test(`quality failures in ${table} block publication even when the plan is empty`, async () => {
     const { publisher, bigquery, store } = setup();

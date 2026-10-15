@@ -44,7 +44,7 @@ function pedestrianRight(item: Extract<MapItem, { kind: 'pedestrian' }>): string
 
 /** A deterministic published-view adapter; these tests never access cloud records. */
 function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: boolean; partial?: boolean;
-  independentPedestrianRights?: boolean; productionAggregation?: boolean } = {}) {
+  independentPedestrianRights?: boolean; productionAggregation?: boolean; sqlRecheck?: boolean } = {}) {
   const sources = [metadata('acceptance.planning', 'planning'), metadata('acceptance.traffic', 'transport'),
     metadata('acceptance.pedestrian', 'pedestrian'), metadata('acceptance.boundary', 'boundary')];
   const rows = options.rows ?? [planning('acceptance:first'), planning('acceptance:second')];
@@ -100,6 +100,7 @@ function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: bool
     },
   };
   const service = createMapService({ adapter, config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }),
+    ...(options.sqlRecheck === true ? { currentLayerCache: false } : {}),
     // Flat-record acceptance deliberately separates paging/state semantics from T025 grouping.
     ...(options.productionAggregation === true ? {} : {
       aggregateLayer: (layer) => ({ items: layer.items, groups: new Map() }),
@@ -200,8 +201,10 @@ test('current and historical contexts retain eligible lifecycle and source-time 
   assert.ok(!historical.layers[0]!.items.some((item) => item.id === 'acceptance:withdrawn'));
 });
 
+// The SQL recheck sees a removal at once. The current-layer cache sees it at the next publication or when its
+// entry ages out (current-layer-cache.test.ts); the served copy itself changes only on refresh.
 test('record removal with unchanged public-source watermark invalidates both detail and continuation', async () => {
-  const f = publishedFixture();
+  const f = publishedFixture({ sqlRecheck: true });
   const first = await f.service.queryViewport({ ...request, pageSize: 1 });
   const item = first.layers[0]!.items[0]!;
   assert.ok(first.layers[0]!.nextCursor);

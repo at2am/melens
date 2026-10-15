@@ -181,7 +181,7 @@ test('coverage reader uses approved fixed view, current admission, 1000-source b
         async cancel() {} };
     },
   };
-  const runner = createViewQueryRunner({ config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }), adapter });
+  const runner = createViewQueryRunner({ config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_DRY_RUN_PREFLIGHT: 'true' }), adapter });
   const reader = createSourceCoverageReader({ runner });
   const snapshot = await reader.read({ ...request, pageSize: 1, cursor: 'opaque', snapshotId: 'old-snapshot' });
   assert.equal(snapshot.completeness, 'complete');
@@ -218,7 +218,7 @@ test('scan rejection and provider exceptions remain bounded safe query errors', 
     async startQuery() { starts += 1; throw new Error('private SDK project SQL'); },
   };
   const reader = createSourceCoverageReader({ runner: createViewQueryRunner({
-    config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }), adapter }) });
+    config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', MAP_DRY_RUN_PREFLIGHT: 'true' }), adapter }) });
   await assert.rejects(reader.read(request), (error: unknown) => error instanceof MapQueryError && error.code === 'budgetExceeded');
   assert.equal(starts, 0);
   const unsafe = createSourceCoverageReader({ runner: { async run() { throw new Error('private SDK project SQL'); } } });

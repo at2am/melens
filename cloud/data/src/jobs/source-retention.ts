@@ -10,6 +10,7 @@ import { loadConfig } from '../core/config.js';
 import { GcsStore } from '../core/gcs.js';
 import { BigQueryPublisher } from '../core/publisher.js';
 import { loadSourceRegistry } from '../core/registry.js';
+import { GEO_CURRENT_SOURCES, rebuildGeoRecordsCurrent } from '../core/geo-records-current.js';
 import { cleanupSourceContent, SOURCE_RETENTION } from '../core/source-retention.js';
 
 /** A rights request can immediately withdraw the whole Ticketmaster source. */
@@ -52,6 +53,23 @@ export async function sourceRetention(args: readonly string[], env = process.env
       const message = error instanceof Error ? error.message : 'retention failed';
       process.stderr.write(JSON.stringify({ action: 'retention_failed', source_id: source, message }) + '\n');
       failures.push(source);
+    }
+  }
+  // The map's current geo copy is refreshed per publication, incrementally for GDELT. Rebuilding
+  // every map source from the view's SQL here bounds any drift to one retention cycle, and drops
+  // rows this cleanup removed. A GDELT refresh committing at the same moment conflicts; retry.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rebuildGeoRecordsCurrent(config, bigquery, [...GEO_CURRENT_SOURCES]);
+      process.stdout.write(JSON.stringify({ action: 'geo_records_current_rebuilt',
+        sources: GEO_CURRENT_SOURCES.size }) + '\n');
+      break;
+    } catch (error) {
+      if (attempt < 2) { await setTimeout(30_000); continue; }
+      const message = error instanceof Error ? error.message : 'rebuild failed';
+      process.stderr.write(JSON.stringify({ action: 'retention_failed', source_id: 'geo_records_current', message }) + '\n');
+      failures.push('geo_records_current');
+      break;
     }
   }
   if (failures.length) throw new Error(`Retention failed for: ${failures.join(', ')}`);

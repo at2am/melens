@@ -14,6 +14,7 @@ import { withPublishedPedestrianLocationHistory } from '../core/pedestrian-locat
 import { withPublishedGtfsLocations } from '../core/gtfs-runtime.js';
 import { withPublishedNewsLocations } from '../normalization/news-runtime.js';
 import { pruneSupersededParkingMemberships, withPublishedParkingState } from '../normalization/parking-runtime.js';
+import { GEO_CURRENT_SOURCES, refreshGeoRecordsCurrent } from '../core/geo-records-current.js';
 import { buildParkingSensorCurrentRows, replaceParkingSensorCurrent, SENSOR_SOURCE_ID,
 } from '../core/parking-sensor-current.js';
 import { withVerifiedNewsPublicationEvidence } from '../normalization/news-publication-evidence.js';
@@ -152,10 +153,24 @@ export async function ingest(args: readonly string[],
         message: error instanceof Error ? error.message : 'Unknown prune failure' })}\n`);
     }
   }
+  // The map's geo layers read a refreshed current copy instead of rebuilding "current" from the
+  // whole history per request. A failed refresh leaves the previous rows, which the map treats as
+  // lagging this publication; the next publication or the retention rebuild brings it up to date.
+  let geoCurrent: string | null = null;
+  if (GEO_CURRENT_SOURCES.has(source.source_id) && batch.state === 'published') {
+    try {
+      geoCurrent = await refreshGeoRecordsCurrent(config, bigquery, source.source_id);
+    } catch (error) {
+      geoCurrent = 'failed';
+      process.stderr.write(`${JSON.stringify({ source_id: source.source_id, action: 'geo_current_refresh_failed',
+        message: error instanceof Error ? error.message : 'Unknown refresh failure' })}\n`);
+    }
+  }
   process.stdout.write(JSON.stringify({ source_id: source.source_id, batch_id: batch.batch_id,
     state: batch.state, input_count: batch.input_count, output_count: batch.output_count,
     rejected_count: batch.rejected_count, checkpoint_after: batch.checkpoint_after,
-    ...(currentSensors === null ? {} : { current_sensors: currentSensors }) }) + '\n');
+    ...(currentSensors === null ? {} : { current_sensors: currentSensors }),
+    ...(geoCurrent === null ? {} : { geo_current: geoCurrent }) }) + '\n');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

@@ -10,6 +10,12 @@ const configSchema = z.strictObject({
   historicalScanBytes: positiveInteger,
   queryTimeoutMs: positiveInteger.max(30_000),
   dryRunTimeoutMs: positiveInteger.max(30_000),
+  /**
+   * Estimate each query with a dry run before starting it. Off by default: every job already
+   * carries maximumBytesBilled, which BigQuery enforces before billing, and the dry run cost a
+   * second round trip per query (about 0.3-0.5 s) while overestimating views it cannot prune.
+   */
+  dryRunPreflight: z.boolean().default(false),
   cancelTimeoutMs: positiveInteger.max(5_000),
   maxPageItems: positiveInteger.max(1_000),
   maxResponseBytes: positiveInteger.max(2 * 1024 * 1024),
@@ -41,6 +47,12 @@ function integerSetting(value: string | undefined, fallback: number): number {
   return /^\d+$/.test(value) ? Number(value) : Number.NaN;
 }
 
+/** Anything but `true` or `false` stays a string, so validation names the setting. */
+function booleanSetting(value: string | undefined, fallback: boolean): boolean | string {
+  if (value === undefined) return fallback;
+  return value === 'true' ? true : value === 'false' ? false : value;
+}
+
 /** Credentials come from ADC; this configuration never accepts credential contents. */
 export function loadMapConfig(env: Readonly<Record<string, string | undefined>> = process.env): MapConfig {
   return validateMapConfig({
@@ -51,6 +63,7 @@ export function loadMapConfig(env: Readonly<Record<string, string | undefined>> 
     historicalScanBytes: integerSetting(env.MAP_HISTORICAL_SCAN_BYTES, 500_000_000),
     queryTimeoutMs: integerSetting(env.MAP_QUERY_TIMEOUT_MS, 10_000),
     dryRunTimeoutMs: integerSetting(env.MAP_DRY_RUN_TIMEOUT_MS, 5_000),
+    dryRunPreflight: booleanSetting(env.MAP_DRY_RUN_PREFLIGHT, false),
     cancelTimeoutMs: integerSetting(env.MAP_CANCEL_TIMEOUT_MS, 1_000),
     maxPageItems: integerSetting(env.MAP_MAX_PAGE_ITEMS, 1_000),
     maxResponseBytes: integerSetting(env.MAP_MAX_RESPONSE_BYTES, 2 * 1024 * 1024),

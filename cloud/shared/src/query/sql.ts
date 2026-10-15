@@ -10,8 +10,9 @@ import type { ViewQueryId } from './view-queries.js';
  * happens here once and reaches every family.
  */
 
-export type ViewName = 'v_geo_records_current' | 'v_geo_records_history' | 'v_pedestrian_observations'
-  | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage' | 'v_anomaly_current' | 'v_parking_sensor_current';
+export type ViewName = 'v_geo_records_current_served' | 'v_geo_records_current_state' | 'v_geo_records_history'
+  | 'v_pedestrian_observations' | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage' | 'v_anomaly_current'
+  | 'v_parking_sensor_current';
 export type QueryMode = 'current' | 'historical';
 
 export interface QueryBindings {
@@ -29,8 +30,13 @@ export function bind(...parts: readonly QueryBindings[]): QueryBindings {
 
 export const viewPath = (config: MapConfig, view: ViewName): string =>
   `\`${config.projectId}.melens_query.${view}\``;
+/**
+ * Current reads use the refreshed copy (cloud/data/sql/010_serving_views.sql): the same rows as
+ * v_geo_records_current at a few MB per read, where that view rebuilt "current" from the whole
+ * history on every request (about 500 MB and 4 s on 2026-10-15).
+ */
 export const geoView = (mode: QueryMode): ViewName =>
-  mode === 'current' ? 'v_geo_records_current' : 'v_geo_records_history';
+  mode === 'current' ? 'v_geo_records_current_served' : 'v_geo_records_history';
 
 export const GEO_COLUMNS = `g.geo_record_id, g.version_id, g.source_id, g.topic, g.assertion_kind,
   g.is_prediction, g.title, g.summary, g.original_url, g.geometry_geojson,

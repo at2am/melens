@@ -33,7 +33,8 @@ function row(id: string, located = true, topic = 'planning', idSource = sourceId
     valid_from: '2026-10-01T00:00:00Z', valid_to: null, fetched_at: time,
     freshness_state: 'current', record_status: 'planned' };
 }
-function fixture(options: { rows?: ReturnType<typeof row>[]; partial?: boolean; aggregate?: boolean; maxBytes?: number } = {}) {
+function fixture(options: { rows?: ReturnType<typeof row>[]; partial?: boolean; aggregate?: boolean; maxBytes?: number;
+  coverageStaleMs?: number } = {}) {
   let clockValue = Date.parse(time);
   const metadata = [registry()];
   const rows = options.rows ?? [row('planning:first/a'), row('planning:second'), row('planning:third')];
@@ -61,6 +62,7 @@ function fixture(options: { rows?: ReturnType<typeof row>[]; partial?: boolean; 
     MAP_MAX_RESPONSE_BYTES: String(options.maxBytes), MAP_RESPONSE_ENVELOPE_RESERVE_BYTES: '512' }) });
   const store = createSnapshotStore({ clock });
   const service = createMapService({ config, adapter, publicSources: [source], clock, snapshotStore: store,
+    ...(options.coverageStaleMs === undefined ? {} : { coverageStaleMs: options.coverageStaleMs }),
     aggregateLayer: options.aggregate === true ? aggregateLayer : (layer) => ({ items: layer.items, groups: new Map() }) });
   return { service, metadata, rows, unlocated, queries, store, withdrawnIds, advance(ms: number) { clockValue += ms; } };
 }
@@ -134,7 +136,8 @@ test('all context fields, layer and family bind cursor; unknown tokens differ fr
 });
 
 test('detail, continuation and member reads recheck current admission and publication watermark', async () => {
-  const f = fixture({ aggregate: true }); const first = await f.service.queryViewport({ ...base, zoom: 8 });
+  // Without the stale window a registry change applies as soon as the cache window has passed.
+  const f = fixture({ aggregate: true, coverageStaleMs: 0 }); const first = await f.service.queryViewport({ ...base, zoom: 8 });
   const aggregate = first.layers[0]!.items[0]!; assert.equal(aggregate.kind, 'aggregate');
   const context = { requestId: 'members', snapshotId: first.snapshotId, pageSize: 1 };
   const members = await f.service.getMembers(aggregate.id, context);
