@@ -107,6 +107,38 @@ export function createSourceCoverageReader(options: { readonly runner: CoverageQ
   };
 }
 
+/**
+ * The registry read is the same query for every request, so requests share one result for [ttlMs] and concurrent
+ * requests share one query. A failure is not kept. The shared query runs without any caller's signal, so one
+ * abandoned request cannot fail the others; each caller still stops waiting when its own signal aborts. Access
+ * changes in the registry reach the map within [ttlMs].
+ */
+export function cacheSourceCoverage(read: SourceCoverageReader, options: {
+  readonly ttlMs: number; readonly clock?: () => Date;
+}): SourceCoverageReader {
+  const clock = options.clock ?? (() => new Date());
+  let cached: { readonly snapshot: Promise<SourceCoverageSnapshot>; readonly startedAt: number } | null = null;
+  return async (request, execution = {}) => {
+    const now = clock().getTime();
+    if (cached === null || now - cached.startedAt >= options.ttlMs || now < cached.startedAt) {
+      const entry = { snapshot: read(request), startedAt: now };
+      cached = entry;
+      entry.snapshot.catch(() => { if (cached === entry) cached = null; });
+    }
+    return abortable(cached.snapshot, execution.signal);
+  };
+}
+
+function abortable<T>(value: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return value;
+  if (signal.aborted) return Promise.reject(new MapQueryError('queryTimeout'));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new MapQueryError('queryTimeout'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    value.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
 function published(source: PublicSourceCoverage): boolean {
   return source.publishedBatchId !== null && source.publishedAt !== null;
 }
