@@ -164,6 +164,7 @@ approved = {
     'v_pedestrian_observations', 'v_planning_changes_current', 'v_road_disruptions_current',
     'v_road_disruptions_history', 'v_source_abnormal_delay', 'v_source_coverage', 'v_source_health',
     'v_street_observations', 'v_transport_changes_current',
+    'v_anomaly_current',  # 009: anomaly results of published batches, the detector's or the labelled replay (UC-04)
 }
 views = read([bq, 'ls', '--max_results=1000', '--format=prettyjson', project + ':melens_query'])
 if any(table.get('type') != 'VIEW' or table['tableReference']['tableId'] not in approved for table in views):

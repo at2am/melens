@@ -141,7 +141,7 @@ The 2026-10-09 deployments moved the service to image digest
 `sha256:fd88fdb18b285b33312e258e7f6021d207ed02e6ddf14a475970c15cf73c017f` (the first
 `cloud/` workspace build carrying `@melens/shared`) with the same identity, runtime
 limits and `http://localhost:8000` origin. The audit's approved list grew to the 25 views
-`cloud/data/sql` publishes. Revision `melens-dev-map-00002-g2p` kept the 400,000,000-byte
+`cloud/data/sql` publishes (26 with `v_anomaly_current`, added 2026-10-15 for the UC-04 replay). Revision `melens-dev-map-00002-g2p` kept the 400,000,000-byte
 ceiling and denied current-mode planning, because that dry run had grown to 481,467,396
 bytes (383,847,461 on 2026-10-01; council engagement rows joined the geo view on
 2026-10-07). Revision `melens-dev-map-00003-nlr` raised the ceiling to 1,000,000,000
