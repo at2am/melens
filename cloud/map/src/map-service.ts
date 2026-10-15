@@ -6,7 +6,7 @@ import { createAnomalyLayerLoader, consumeVerifiedAnomalyBatch, failSoftAnomalyL
 import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createUnlocatedLayerLoader, createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
 import { createViewQueryRunner } from '@melens/shared/query/query-runner';
-import { createSourceCoverageReader, findPublicSource, type CoverageAreaResolver, type SourceCoverageSnapshot }
+import { cacheSourceCoverage, createSourceCoverageReader, findPublicSource, type CoverageAreaResolver, type SourceCoverageSnapshot }
   from '@melens/shared/query/source-coverage';
 import { aggregateLayer } from './services/aggregation.js';
 import { createDetailService } from './services/details.js';
@@ -16,6 +16,9 @@ import { coverageRequest } from './services/viewport.js';
 import { createSnapshotStore, type SnapshotStore } from './services/snapshot-store.js';
 import { createUnlocatedService } from './services/unlocated.js';
 import { createViewportService, type ViewportLayerAggregator, type ViewportLayerLoader } from './services/viewport.js';
+
+/** The source registry changes per ingest batch, minutes apart; one read serves the requests of this window. */
+export const COVERAGE_CACHE_TTL_MS = 30_000;
 
 /** Composition root: wires the query runner, layer loaders, rights checker and page services. */
 export function createMapService(options: {
@@ -28,6 +31,8 @@ export function createMapService(options: {
   readonly anomalyProducerConfigured?: boolean;
   readonly checkPublicRecords?: PublicRecordChecker;
   readonly aggregateLayer?: ViewportLayerAggregator;
+  /** How long requests share one source registry read; 0 reads it on every use. */
+  readonly coverageCacheTtlMs?: number;
 }) {
   const clock = options.clock ?? (() => new Date());
   const references = new Map((options.publicSources ?? []).map((source) => {
@@ -37,7 +42,8 @@ export function createMapService(options: {
   const runner = createViewQueryRunner({ config: options.config,
     adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
   const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) => runner.run(input, execution);
-  const readCoverage = createSourceCoverageReader({ runner }).read;
+  const readCoverage = cacheSourceCoverage(createSourceCoverageReader({ runner }).read, {
+    ttlMs: options.coverageCacheTtlMs ?? COVERAGE_CACHE_TTL_MS, clock });
   const store = options.snapshotStore ?? createSnapshotStore({ clock });
   // A source is public only while it is admitted and published and has a reviewed reference.
   const resolveSource = (coverage: SourceCoverageSnapshot): PublicSourceResolver => (id) =>

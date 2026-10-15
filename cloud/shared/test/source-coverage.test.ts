@@ -6,8 +6,9 @@ import { parseViewportQuery } from '../src/contracts/map-contract.js';
 import type { BigQueryViewAdapter, PreparedViewQuery } from '../src/query/bigquery-adapter.js';
 import { createViewQueryRunner, MapQueryError, type ViewQueryResult, type ViewRow } from '../src/query/query-runner.js';
 import {
-  assessLayerCoverage, compareSourceInstants, createSourceCoverageReader, finalizeLayerResult,
+  assessLayerCoverage, cacheSourceCoverage, compareSourceInstants, createSourceCoverageReader, finalizeLayerResult,
   findPublicSource, parseSourceCoverage, sourceBelongsToLayer, type LayerCoverageAssessment,
+  type SourceCoverageSnapshot,
 } from '../src/query/source-coverage.js';
 
 const request = parseViewportQuery({
@@ -227,4 +228,36 @@ test('scan rejection and provider exceptions remain bounded safe query errors', 
     assert.doesNotMatch(error.message, /private|SDK|SQL/);
     return true;
   });
+});
+
+test('the coverage cache shares one read per window and keeps no failure', async () => {
+  let now = 0; let reads = 0; let fail = false;
+  const snapshot: SourceCoverageSnapshot = { sources: [], completeness: 'complete' };
+  const read = cacheSourceCoverage(async () => {
+    reads += 1; await Promise.resolve();
+    if (fail) throw new MapQueryError('serviceUnavailable');
+    return snapshot;
+  }, { ttlMs: 1000, clock: () => new Date(now) });
+
+  assert.deepEqual(await Promise.all([read(request), read(request)]), [snapshot, snapshot]);
+  now = 999; await read(request);
+  assert.equal(reads, 1);
+
+  now = 1000; fail = true;
+  await assert.rejects(read(request), MapQueryError);
+  fail = false; assert.equal(await read(request), snapshot);
+  assert.equal(reads, 3);
+});
+
+test('a caller that gives up does not fail the shared coverage read', async () => {
+  let release!: () => void;
+  const snapshot: SourceCoverageSnapshot = { sources: [], completeness: 'complete' };
+  const read = cacheSourceCoverage(() => new Promise((resolve) => { release = () => resolve(snapshot); }), { ttlMs: 1000 });
+  const controller = new AbortController();
+  const abandoned = read(request, { signal: controller.signal });
+  const waiting = read(request);
+  controller.abort();
+  await assert.rejects(abandoned, (error: unknown) => error instanceof MapQueryError);
+  release();
+  assert.equal(await waiting, snapshot);
 });
