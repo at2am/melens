@@ -27,11 +27,13 @@ export async function sourceRetention(args: readonly string[], env = process.env
     return;
   }
   if (args.length) throw new Error('Expected no arguments or --withdraw-source ticketmaster.events');
-  const failed: string[] = [];
+  // One source failing must not stop the others from being cleaned, or a backlog in one
+  // source lets every later source grow. The job still exits non-zero at the end.
+  const failures: string[] = [];
   for (const source of Object.keys(SOURCE_RETENTION)) {
     const lease = `source_${createHash('sha256').update(source).digest('hex')}`;
-    let result;
     try {
+      let result;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           result = await gcs.withBatchLease(lease,
@@ -45,22 +47,19 @@ export async function sourceRetention(args: readonly string[], env = process.env
         }
       }
       if (!result) throw new Error('Retention lease could not be acquired');
+      process.stdout.write(JSON.stringify({ action: 'retention_checked', ...result }) + '\n');
     } catch (error) {
-      // Each source is cleaned independently; one failure must not leave the
-      // others to grow until the next schedule.
-      failed.push(source);
-      process.stderr.write(`${JSON.stringify({ action: 'retention_failed', sourceId: source,
-        message: error instanceof Error ? error.message : 'Unknown retention failure' })}\n`);
-      continue;
+      const message = error instanceof Error ? error.message : 'retention failed';
+      process.stderr.write(JSON.stringify({ action: 'retention_failed', source_id: source, message }) + '\n');
+      failures.push(source);
     }
-    process.stdout.write(JSON.stringify({ action: 'retention_checked', ...result }) + '\n');
   }
-  if (failed.length) throw new Error(`Source content retention failed: ${failed.join(', ')}`);
+  if (failures.length) throw new Error(`Retention failed for: ${failures.join(', ')}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   sourceRetention(process.argv.slice(2)).catch(() => {
-    process.stderr.write('Source content retention failed; inspect the job and query metadata\n');
+    process.stderr.write('Source content retention failed; the per-source retention_failed lines above name the tables\n');
     process.exitCode = 1;
   });
 }

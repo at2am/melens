@@ -67,3 +67,10 @@ test('rows of batches that never published are removed after two hours for every
   assert.match(membership, /t\.batch_id != @latestBatchId/);
   assert.match(membership, /@membershipCutoff/);
 });
+
+test('retention still requires a billed-byte ceiling and a known source', async () => {
+  const { bigquery } = fakeBigQuery([]);
+  await assert.rejects(cleanupSourceContent({ ...config, maxBytesBilled: null }, bigquery as never, gcs,
+    'melbourne.parking.sensors', now), /query ceiling/);
+  await assert.rejects(cleanupSourceContent(config, bigquery as never, gcs, 'unknown.source', now));
+});

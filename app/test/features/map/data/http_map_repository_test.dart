@@ -54,7 +54,11 @@ void main() {
 
     final catalog = await repository.getLayers();
     expect(catalog.dataMode, MapDataMode.sample);
-    expect(catalog.layers.length, 9);
+    expect(catalog.layers.length, MapLayerId.values.length);
+    expect(
+      catalog.layers.map((layer) => layer.id),
+      contains(MapLayerId.parking),
+    );
     final viewport = await repository.queryViewport(query);
     expect(viewport.dataMode, MapDataMode.sample);
     expect(viewport.mode, MapQueryMode.current);

@@ -15,9 +15,9 @@
 | Optional enhancement | US5 T040–T044 H3; US6 T045–T051 3D | G3 plus selected P1 accepted | H3 coverage/3D D01; anomaly ratio D04 |
 | Release checks | T052–T055 | Selected slice ready | Record accepted slice; never claim all features complete |
 
-Spec story labels P1/P2/P3 are relative ranking within this feature; they do not replace project P0/P1/P2. News and area comparison can run in parallel after G3. H3 and 3D are independent of one another. If either is deferred for feature freeze, core map delivery remains valid.
+Spec story labels P1/P2/P3 are relative ranking within this feature; they do not replace project P0/P1/P2. News and area comparison can run in parallel after G3. H3 and 3D are independent of one another. If either is deferred, core map delivery remains valid.
 
-Project dates: P0 target Oct12; P1 Oct13–15; freeze Oct15; submission target Oct17. These dates come from the existing use-case index/project rules; no unsupported duration estimate is added.
+Project dates: P0 target Oct12; P1 from Oct13; no feature freeze (cancelled 2026-10-15); submission target Oct17. These dates come from the existing use-case index/project rules; no unsupported duration estimate is added.
 
 ## External dependency register
 

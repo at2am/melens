@@ -7,6 +7,8 @@ import { GcsStore } from './gcs.js';
 export const SOURCE_RETENTION = {
   'ticketmaster.events': { seconds: 86_400, cleanupAgeSeconds: 64_800,
     tables: ['source_records', 'geo_records', 'geo_record_sources'] },
+  // Memberships come first: the other tables protect only what the latest membership still
+  // references, so shrinking it first keeps every later cleanup query small.
   'melbourne.parking.sensors': { seconds: 172_800, cleanupAgeSeconds: 172_800,
     tables: ['parking_sensor_memberships', 'source_records', 'geo_records', 'geo_record_sources',
       'parking_observations'] },
@@ -22,12 +24,12 @@ export const SOURCE_RETENTION = {
 export const UNPUBLISHED_BATCH_CLEANUP_SECONDS = 7_200;
 
 /**
- * Only the latest complete parking snapshot's membership is ever read (by the
- * views and by runtime recovery). A full membership row per sensor is written
- * every two minutes, so superseded snapshots are removed after an hour, once
- * the rows are well clear of the streaming write path.
+ * Every sensor snapshot writes one membership row per sensor (about 3.3 MB). Only the latest
+ * published snapshot is ever read (the current views and the ingest recovery), so older ones
+ * are audit noise that grows to gigabytes a day. Keep an hour for investigation, no more;
+ * that also keeps the deletes well clear of rows still on the streaming write path.
  */
-export const SUPERSEDED_PARKING_MEMBERSHIP_SECONDS = 3_600;
+export const PARKING_MEMBERSHIP_RETENTION_SECONDS = 3_600;
 
 export type RetainedSourceId = keyof typeof SOURCE_RETENTION;
 const retainedSourceId = z.enum(['ticketmaster.events', 'melbourne.parking.sensors', 'gdelt.news']);
@@ -42,7 +44,7 @@ export function sourceRetentionPlan(sourceId: string, now: Date) {
   return { sourceId: source, tables: policy.tables,
     cutoff: ago(policy.cleanupAgeSeconds),
     unpublishedCutoff: ago(UNPUBLISHED_BATCH_CLEANUP_SECONDS),
-    membershipCutoff: ago(SUPERSEDED_PARKING_MEMBERSHIP_SECONDS) };
+    membershipCutoff: ago(PARKING_MEMBERSHIP_RETENTION_SECONDS) };
 }
 
 type RetentionPlan = ReturnType<typeof sourceRetentionPlan>;

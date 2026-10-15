@@ -22,6 +22,9 @@ enum MapLayerId {
   news,
   rent,
   census,
+
+  /// Live on-street parking sensors (UC-15), a v1 layer since 2026-10-15.
+  parking,
 }
 
 enum MapLayerState { available, noMatching, notCovered, unavailable, unknown }
@@ -85,6 +88,19 @@ enum AnomalyEligibility { eligible, ineligible, unknown }
 
 enum AnomalyClassification { anomalous, notAnomalous, unclassified }
 
+/// What the map may draw for a parking sensor. `noData` whenever the reading is
+/// not current, never a guess.
+enum ParkingState { occupied, vacant, noData }
+
+enum ParkingNoDataReason {
+  notReporting,
+  publicHoliday,
+  holidayUnknown,
+  noStatus,
+}
+
+enum ParkingReading { current, late, stale, unknown }
+
 enum MapEventStatus { active, planned, cancelled, resolved, unknown }
 
 enum DisruptionExtentKind { roadSegment, route, stop, area, unknown }
@@ -105,6 +121,7 @@ enum MapItemKind {
   disruption,
   event,
   planning,
+  parking,
   boundary,
   news,
   areaIndicator,
@@ -775,6 +792,65 @@ final class PlanningDetails extends MapItemDetails {
   }
 
   Map<String, dynamic> toJson() => _$PlanningDetailsToJson(this);
+}
+
+/// A live on-street parking sensor (UC-15). The feed proves only whether a car
+/// is on the bay: it never proves that parking there is legal, so
+/// [legalParking] is always `unknown`, and construction can leave a blocked bay
+/// looking vacant ([mayBeObstructed]).
+@JsonSerializable(checked: true, explicitToJson: true)
+final class ParkingDetails extends MapItemDetails {
+  const ParkingDetails({
+    required this.sensorId,
+    required this.state,
+    required this.noDataReason,
+    required this.reading,
+    required this.lastReportedAt,
+    required this.statusChangedAt,
+    required this.zoneNumber,
+    required this.legalParking,
+    required this.mayBeObstructed,
+  });
+
+  @JsonKey(required: true)
+  final String sensorId;
+
+  @JsonKey(required: true)
+  final ParkingState state;
+
+  @JsonKey(required: true)
+  final ParkingNoDataReason? noDataReason;
+
+  @JsonKey(required: true)
+  final ParkingReading reading;
+
+  /// The sensor's own last report. A sensor that stopped reporting keeps an
+  /// old value here.
+  @JsonKey(required: true)
+  @UtcInstantConverter()
+  final DateTime? lastReportedAt;
+
+  @JsonKey(required: true)
+  @UtcInstantConverter()
+  final DateTime? statusChangedAt;
+
+  @JsonKey(required: true)
+  final int? zoneNumber;
+
+  @JsonKey(required: true)
+  final String legalParking;
+
+  @JsonKey(required: true)
+  final bool mayBeObstructed;
+
+  factory ParkingDetails.fromJson(Map<String, dynamic> json) {
+    _requireIntegers(json, ['zoneNumber']);
+    final value = _$ParkingDetailsFromJson(json);
+    _validateParking(value);
+    return value;
+  }
+
+  Map<String, dynamic> toJson() => _$ParkingDetailsToJson(this);
 }
 
 @JsonSerializable(checked: true, explicitToJson: true)
@@ -1715,6 +1791,23 @@ sealed class MapItem with _$MapItem {
     @JsonKey(includeIfNull: false) GeometryPresentation? geometryPresentation,
   }) = PlanningMapItem;
 
+  @FreezedUnionValue('parking')
+  @JsonSerializable(checked: true, explicitToJson: true)
+  const factory MapItem.parking({
+    @JsonKey(required: true) required String id,
+    @JsonKey(required: true) required String versionId,
+    @JsonKey(required: true) required MapLayerId layerId,
+    @JsonKey(required: true) required String title,
+    @JsonKey(required: true) required GeoJsonGeometry? geometry,
+    @JsonKey(required: true) required MapLocation location,
+    @JsonKey(required: true) required MapAssertionKind assertionKind,
+    @JsonKey(required: true) required MapLifecycle lifecycle,
+    @JsonKey(required: true) required MapItemTime time,
+    @JsonKey(required: true) required List<MapSource> sources,
+    @JsonKey(required: true) required ParkingDetails details,
+    @JsonKey(includeIfNull: false) GeometryPresentation? geometryPresentation,
+  }) = ParkingMapItem;
+
   @FreezedUnionValue('boundary')
   @JsonSerializable(checked: true, explicitToJson: true)
   const factory MapItem.boundary({
@@ -1795,6 +1888,7 @@ sealed class MapItem with _$MapItem {
     DisruptionMapItem() => MapItemKind.disruption,
     EventMapItem() => MapItemKind.event,
     PlanningMapItem() => MapItemKind.planning,
+    ParkingMapItem() => MapItemKind.parking,
     BoundaryMapItem() => MapItemKind.boundary,
     NewsMapItem() => MapItemKind.news,
     AreaIndicatorMapItem() => MapItemKind.areaIndicator,
@@ -1872,7 +1966,7 @@ void _validateQueryFields({
   _id(requestId, 'requestId');
   _require(
     layers.isNotEmpty &&
-        layers.length <= 9 &&
+        layers.length <= MapLayerId.values.length &&
         layers.toSet().length == layers.length,
     'Select distinct registered layers.',
   );
@@ -2018,6 +2112,25 @@ void _validatePedestrian(PedestrianDetails detail) {
       'Sensor location must be effective throughout the observation window.',
     );
   }
+}
+
+void _validateParking(ParkingDetails detail) {
+  _id(detail.sensorId, 'sensorId');
+  _nonnegative(detail.zoneNumber, 'zoneNumber');
+  _require(
+    detail.legalParking == 'unknown',
+    'A parking sensor never establishes legal parking.',
+  );
+  _require(
+    (detail.state == ParkingState.noData) == (detail.noDataReason != null),
+    'noData needs its reason, and only noData has one.',
+  );
+  _require(
+    detail.state == ParkingState.noData ||
+        detail.reading == ParkingReading.current ||
+        detail.reading == ParkingReading.late,
+    'Occupancy cannot be drawn from a stale or unknown reading.',
+  );
 }
 
 void _validateAnomaly(AnomalyDetails detail) {
@@ -2257,6 +2370,16 @@ void _validateItem(MapItem item) {
         item.layerId == MapLayerId.planning,
         'Planning kind must use planning layer.',
       );
+    case ParkingMapItem():
+      _require(
+        item.layerId == MapLayerId.parking,
+        'Parking kind must use parking layer.',
+      );
+      _require(
+        item.geometry is GeoJsonPoint &&
+            item.location.role == MapLocationRole.sensor,
+        'A parking sensor is drawn only at its own sensor point.',
+      );
     case BoundaryMapItem():
       _require(
         item.layerId == MapLayerId.boundary &&
@@ -2359,7 +2482,7 @@ void _validateViewportResponse(ViewportResponse response) {
   );
   _require(
     response.layers.isNotEmpty &&
-        response.layers.length <= 9 &&
+        response.layers.length <= MapLayerId.values.length &&
         response.layers.map((layer) => layer.layerId).toSet().length ==
             response.layers.length,
     'Viewport results need distinct registered layers.',

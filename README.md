@@ -34,7 +34,6 @@ The team plan (timeline, owners, task order) lives in the [team plan doc](https:
 | Judging | Technical merit & GenAI 40%, problem alignment & impact 25%, innovation & creativity 25%, UX & solution design 10% |
 | Deliverables | Live URL on Cloud Run or Firebase, demo video under 3 minutes, public GitHub repo, PDF deck |
 | Team registration closes | 2026-10-11 |
-| Feature freeze | 2026-10-15 |
 | Submission | Target 2026-10-17, deadline 2026-10-18 |
 | Finals | Demo Day in Singapore, 2026-12-04 |
 

@@ -97,12 +97,14 @@ export const geometrySchema = z.discriminatedUnion('type', [
 ]);
 export type MapGeometry = z.infer<typeof geometrySchema>;
 
+/** Ten registered layers. `parking` (UC-15) was added on 2026-10-15 and is a v1 layer; do not remove it. */
+export const REGISTERED_LAYER_COUNT = 10;
 export const layerIdSchema = z.enum([
-  'pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'boundary', 'news', 'rent', 'census',
+  'pedestrian', 'anomaly', 'disruption', 'event', 'planning', 'boundary', 'news', 'rent', 'census', 'parking',
 ]);
 export type LayerId = z.infer<typeof layerIdSchema>;
 export const modeSchema = z.enum(['current', 'historical']);
-const layerIds = z.array(layerIdSchema).min(1).max(9).refine(
+const layerIds = z.array(layerIdSchema).min(1).max(REGISTERED_LAYER_COUNT).refine(
   (layers) => new Set(layers).size === layers.length,
   'Layer ids must be distinct',
 );
@@ -320,6 +322,30 @@ const pedestrianDetailsSchema = z.object({
     context.addIssue({ code: 'custom', message: 'Location validity interval is reversed or empty' });
   }
 });
+/**
+ * A live on-street parking sensor (UC-15). `state` is all a map may draw: it is `occupied` or
+ * `vacant` only while the sensor's own last report is current or late, otherwise `noData` with the
+ * reason, never a guess. The feed proves a car is or is not on the bay; it never proves that
+ * parking there is legal (no sensor-to-restriction crosswalk is admitted), so `legalParking` is
+ * always `unknown`, and construction can leave a blocked bay looking vacant (`mayBeObstructed`).
+ */
+const parkingDetailsSchema = z.object({
+  sensorId: identifier,
+  state: z.enum(['occupied', 'vacant', 'noData']),
+  noDataReason: z.enum(['notReporting', 'publicHoliday', 'holidayUnknown', 'noStatus']).nullable(),
+  reading: z.enum(['current', 'late', 'stale', 'unknown']),
+  lastReportedAt: instant.nullable(), statusChangedAt: instant.nullable(),
+  zoneNumber: count.nullable(),
+  legalParking: z.literal('unknown'),
+  mayBeObstructed: z.boolean(),
+}).superRefine((details, context) => {
+  if ((details.state === 'noData') !== (details.noDataReason !== null)) {
+    context.addIssue({ code: 'custom', path: ['noDataReason'], message: 'noData needs its reason, and only noData has one' });
+  }
+  if (details.state !== 'noData' && details.reading !== 'current' && details.reading !== 'late') {
+    context.addIssue({ code: 'custom', path: ['state'], message: 'Occupancy cannot be drawn from a stale or unknown reading' });
+  }
+});
 const anomalyDetailsSchema = z.object({
   resultId: identifier, sensorId: identifier, observationId: identifier.nullable(), window: timeWindowSchema,
   baselineDefinitionId: identifier.nullable(), baselineValue: z.number().nullable(),
@@ -428,6 +454,7 @@ export const mapItemSchema = z.discriminatedUnion('kind', [
   z.object({ ...itemCommon, kind: z.literal('disruption'), details: disruptionDetailsSchema }),
   z.object({ ...itemCommon, kind: z.literal('event'), details: eventDetailsSchema }),
   z.object({ ...itemCommon, kind: z.literal('planning'), details: planningDetailsSchema }),
+  z.object({ ...itemCommon, kind: z.literal('parking'), details: parkingDetailsSchema }),
   z.object({ ...itemCommon, kind: z.literal('boundary'), details: boundaryDetailsSchema }),
   z.object({ ...itemCommon, kind: z.literal('news'), details: newsDetailsSchema }),
   z.object({ ...itemCommon, kind: z.literal('areaIndicator'), details: areaIndicatorDetailsSchema }),
@@ -462,6 +489,9 @@ export const mapItemSchema = z.discriminatedUnion('kind', [
   }
   if (item.kind === 'news' && item.location.role === 'mention' && item.geometry !== null) {
     context.addIssue({ code: 'custom', message: 'A news mention cannot become an event geometry' });
+  }
+  if (item.kind === 'parking' && (item.geometry === null || item.geometry.type !== 'Point' || item.location.role !== 'sensor')) {
+    context.addIssue({ code: 'custom', message: 'A parking sensor is drawn only at its own sensor point' });
   }
   if (item.kind === 'pedestrian') {
     if ((item.details.locationStatus === 'located') !== (item.geometry !== null)) {
@@ -542,7 +572,7 @@ const responseCommon = {
   generatedAt: instant, mode: modeSchema, dataMode: z.enum(['live', 'sample']),
 };
 export const viewportResponseSchema = z.object({
-  ...responseCommon, layers: z.array(layerResultSchema).min(1).max(9),
+  ...responseCommon, layers: z.array(layerResultSchema).min(1).max(REGISTERED_LAYER_COUNT),
 }).superRefine((response, context) => {
   if (new Set(response.layers.map((layer) => layer.layerId)).size !== response.layers.length) {
     context.addIssue({ code: 'custom', message: 'Layer results must be distinct' });
@@ -605,8 +635,9 @@ export const layerDescriptorSchema = z.object({
 });
 export const mapLayerCatalogSchema = z.object({
   schemaVersion: z.literal(MAP_SCHEMA_VERSION), generatedAt: instant, dataMode: z.enum(['live', 'sample']),
-  serviceBounds: bboxSchema, layers: z.array(layerDescriptorSchema).length(9),
-}).refine((catalog) => new Set(catalog.layers.map((layer) => layer.id)).size === 9, 'Catalog must contain each registered layer once');
+  serviceBounds: bboxSchema, layers: z.array(layerDescriptorSchema).length(REGISTERED_LAYER_COUNT),
+}).refine((catalog) => new Set(catalog.layers.map((layer) => layer.id)).size === REGISTERED_LAYER_COUNT,
+  'Catalog must contain each registered layer once');
 export type MapLayerCatalog = z.infer<typeof mapLayerCatalogSchema>;
 export const mapItemResponseSchema = z.object({ ...responseCommon, item: mapItemSchema });
 export type MapItemResponse = z.infer<typeof mapItemResponseSchema>;

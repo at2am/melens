@@ -148,6 +148,12 @@ abstract class AppLocalizations {
   /// **'Development projects'**
   String get mapLayerPlanning;
 
+  /// Layer title for live on-street parking bay sensors (UC-15).
+  ///
+  /// In en, this message translates to:
+  /// **'Parking sensors'**
+  String get mapLayerParking;
+
   /// Layer title for geographic context polygons.
   ///
   /// In en, this message translates to:
@@ -735,6 +741,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Plan'**
   String get mapDetailPlan;
+
+  /// A parking sensor whose own current reading detects no car.
+  ///
+  /// In en, this message translates to:
+  /// **'Vacant now (live sensor)'**
+  String get mapDetailParkingVacant;
+
+  /// A parking sensor whose own current reading detects a car.
+  ///
+  /// In en, this message translates to:
+  /// **'Occupied (live sensor)'**
+  String get mapDetailParkingOccupied;
+
+  /// A parking sensor whose reading cannot be shown; never presented as vacant.
+  ///
+  /// In en, this message translates to:
+  /// **'No current reading'**
+  String get mapDetailParkingNoData;
+
+  /// Why a parking sensor has no current reading: its own last report is too old.
+  ///
+  /// In en, this message translates to:
+  /// **'This sensor has stopped reporting, so its last status is not shown.'**
+  String get mapDetailParkingNotReporting;
+
+  /// Why parking sensors have no current reading on a public holiday.
+  ///
+  /// In en, this message translates to:
+  /// **'Bay sensors do not operate on public holidays.'**
+  String get mapDetailParkingPublicHoliday;
+
+  /// Why parking sensors have no current reading when the holiday calendar is not known.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s public holiday status is not known, so sensor readings are not shown.'**
+  String get mapDetailParkingHolidayUnknown;
+
+  /// Why a parking sensor has no current reading: the source gives no status.
+  ///
+  /// In en, this message translates to:
+  /// **'This sensor has no status.'**
+  String get mapDetailParkingNoStatus;
+
+  /// A parking reading that is late but still shown.
+  ///
+  /// In en, this message translates to:
+  /// **'This reading is a few minutes old.'**
+  String get mapDetailParkingLate;
+
+  /// Label for the sensor's own last report time.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor last reported'**
+  String get mapDetailParkingLastReported;
+
+  /// Label for when the sensor's occupied/vacant status last changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Status last changed'**
+  String get mapDetailParkingStatusChanged;
+
+  /// Label for the City of Melbourne parking zone number of a sensor.
+  ///
+  /// In en, this message translates to:
+  /// **'Parking zone'**
+  String get mapDetailParkingZone;
+
+  /// Always shown with a parking sensor: occupancy is never legal permission.
+  ///
+  /// In en, this message translates to:
+  /// **'A vacant sensor only means no car is detected. It does not mean you may park here now: check the signs for limits, permits and fees.'**
+  String get mapDetailParkingNotLegal;
+
+  /// Always shown with a parking sensor: a vacant reading can be a blocked bay.
+  ///
+  /// In en, this message translates to:
+  /// **'Works or construction can block a bay that still reads vacant.'**
+  String get mapDetailParkingObstruction;
 
   /// Direction counters do not imply geographic movement or headings.
   ///

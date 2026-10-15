@@ -1154,6 +1154,28 @@ const _sampleEnvelopes = <String, String>{
       },
       "timeSemantics": "statisticalPeriod",
       "updatedAt": null
+    },
+    {
+      "id": "parking",
+      "titleKey": "mapLayerParking",
+      "topic": "cityActivity",
+      "defaultEnabled": false,
+      "supportedModes": [
+        "current"
+      ],
+      "sourceIds": [
+        "sample.parking"
+      ],
+      "availability": "unknown",
+      "freshness": "unknown",
+      "coverage": {
+        "state": "unknown",
+        "areaRefs": [],
+        "window": null,
+        "evidenceSourceIds": []
+      },
+      "timeSemantics": "observationWindow",
+      "updatedAt": null
     }
   ]
 }

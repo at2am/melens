@@ -64,6 +64,8 @@ export function createViewportLayerLoader(deps: LayerLoaderDependencies): Viewpo
     }
     if (!ADAPTED_LAYERS.has(layerId)) return denied();
     if (EXTERNALLY_VERIFIED_LAYERS.has(layerId) && !deps.externalVerifier) return denied();
+    // Only the latest sensor snapshot is kept, so there is nothing to read in historical mode.
+    if (layerId === 'parking' && request.mode === 'historical') return denied();
     try {
       const result = await deps.runQuery({ queryId: layerId, request: { ...request, pageSize: execution.rowLimit },
         publicSourceIds: sourceIds, resultBudgetBytes: execution.resultBudgetBytes }, execution);

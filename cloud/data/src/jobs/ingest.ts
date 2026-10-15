@@ -14,6 +14,8 @@ import { withPublishedPedestrianLocationHistory } from '../core/pedestrian-locat
 import { withPublishedGtfsLocations } from '../core/gtfs-runtime.js';
 import { withPublishedNewsLocations } from '../normalization/news-runtime.js';
 import { pruneSupersededParkingMemberships, withPublishedParkingState } from '../normalization/parking-runtime.js';
+import { buildParkingSensorCurrentRows, replaceParkingSensorCurrent, SENSOR_SOURCE_ID,
+} from '../core/parking-sensor-current.js';
 import { withVerifiedNewsPublicationEvidence } from '../normalization/news-publication-evidence.js';
 import { enrichVerifiedCrimeNews } from '../normalization/crime-news-evidence.js';
 import { loadConnector, loadSourceRegistry } from '../core/registry.js';
@@ -135,7 +137,13 @@ export async function ingest(args: readonly string[],
     windowFrom: window.kind === 'time' ? window.from : null,
     windowTo: window.kind === 'time' ? window.to : null,
     initialCheckpoint: window.kind === 'time' ? initialCheckpoint ?? window.from : null });
-  if (source.source_id === 'melbourne.parking.sensors' && batch.state === 'published') {
+  // The map reads a small table holding only the latest sensor snapshot, rebuilt from this
+  // fetch alone. It is swapped in after publication, so a failure here leaves the previous
+  // snapshot in place (it reads as stale) and the job fails visibly for the next cycle to retry.
+  let currentSensors: number | null = null;
+  if (source.source_id === SENSOR_SOURCE_ID && batch.state === 'published') {
+    currentSensors = (await replaceParkingSensorCurrent(config, bigquery,
+      buildParkingSensorCurrentRows(normalizedResult, batch.batch_id))).rows;
     try {
       await pruneSupersededParkingMemberships(config, bigquery, batch.batch_id);
     } catch (error) {
@@ -146,7 +154,8 @@ export async function ingest(args: readonly string[],
   }
   process.stdout.write(JSON.stringify({ source_id: source.source_id, batch_id: batch.batch_id,
     state: batch.state, input_count: batch.input_count, output_count: batch.output_count,
-    rejected_count: batch.rejected_count, checkpoint_after: batch.checkpoint_after }) + '\n');
+    rejected_count: batch.rejected_count, checkpoint_after: batch.checkpoint_after,
+    ...(currentSensors === null ? {} : { current_sensors: currentSensors }) }) + '\n');
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

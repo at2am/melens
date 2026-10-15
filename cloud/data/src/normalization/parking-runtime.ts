@@ -5,7 +5,7 @@ import type { DataConfig } from '../core/config.js';
 import type { ConnectorSuccess } from '../core/connector.js';
 import type { LicenseStatus, ParkingSensorMembership, SourceRecord } from '../core/types.js';
 import { parseSourceManifest } from '../core/registry.js';
-import { SUPERSEDED_PARKING_MEMBERSHIP_SECONDS } from '../core/source-retention.js';
+import { PARKING_MEMBERSHIP_RETENTION_SECONDS } from '../core/source-retention.js';
 import { sourceVersionId } from '../validation/record.js';
 
 const sourceId = 'melbourne.parking.sensors';
@@ -231,7 +231,7 @@ export async function pruneSupersededParkingMemberships(config: DataConfig,
   bigquery: ParkingHistoryReader, publishedBatchId: string, now = new Date()): Promise<void> {
   if (!config.maxBytesBilled) throw new Error('Parking membership pruning requires a billed-byte ceiling');
   nonEmpty.parse(publishedBatchId);
-  const cutoff = new Date(now.getTime() - SUPERSEDED_PARKING_MEMBERSHIP_SECONDS * 1000).toISOString();
+  const cutoff = new Date(now.getTime() - PARKING_MEMBERSHIP_RETENTION_SECONDS * 1000).toISOString();
   const floor = new Date(now.getTime() - 2 * 86_400_000).toISOString();
   await bigquery.query({ query: `/* prune-superseded-parking-memberships */
     DELETE FROM \`${config.projectId}.${config.ingestDataset}.parking_sensor_memberships\`

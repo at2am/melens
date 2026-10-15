@@ -1,4 +1,4 @@
-import { MAX_PAGE_ITEMS } from '@melens/shared/contracts/map-contract';
+import { MAX_PAGE_ITEMS, type MapItem } from '@melens/shared/contracts/map-contract';
 import type { PublicSourceResolver } from '@melens/shared/query/adapter-common';
 import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, adaptContext, adaptLayerRows } from '@melens/shared/query/layer-adapters';
 import type { ViewQueryResult } from '@melens/shared/query/query-runner';
@@ -30,12 +30,18 @@ export function createPublicRecordChecker(options: {
         const result = await options.runQuery({ family: 'publicRecords', queryId: layerId,
           request: { ...context, pageSize: MAX_PAGE_ITEMS },
           recordKeys: expected.map((item) => ({ id: item.id, versionId: item.versionId, sourceId: item.sources[0]!.sourceId,
-            ...(item.kind === 'pedestrian' ? { sensorId: item.details.sensorId, observedAt: item.time.observedAt } : {}) })),
+            ...(item.kind === 'pedestrian' ? { sensorId: item.details.sensorId, observedAt: item.time.observedAt } : {}),
+            ...(item.kind === 'parking' ? { sensorId: item.details.sensorId } : {}) })),
         }, execution);
         const actual = adaptLayerRows(layerId, result.rows, adaptContext(snapshot.request, options.resolveSource(coverage), asOf));
         // The stored item must come back byte for byte; a changed version is a withdrawn right.
-        const published = new Set([...actual.items, ...actual.unlocatedItems].map((item) => JSON.stringify(item)));
-        if (!expected.every((item) => published.has(JSON.stringify(item)))) return false;
+        // Parking is the exception. Its snapshot is replaced every 2 minutes, so a new batch can land between the
+        // first read and this recheck, and its reading is derived from the read time. A newer publication is not a
+        // withdrawn right; a withdrawal (source not public, record inactive, rights changed) removes the row from
+        // the view. So a parking sensor passes while the public view still returns it.
+        const key = (item: MapItem) => layerId === 'parking' ? item.id : JSON.stringify(item);
+        const published = new Set([...actual.items, ...actual.unlocatedItems].map(key));
+        if (!expected.every((item) => published.has(key(item)))) return false;
       }
       return true;
     } catch { return false; }

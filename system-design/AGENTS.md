@@ -48,7 +48,7 @@ Breaking one of these can disqualify the entry.
 
 - Build P0 use cases first. Start P1 only when P0 works end to end. Start P2 only after P1.
 - Do not build use cases marked `out-of-scope`.
-- Feature freeze is 2026-10-15. After that: bug fixes, UI polish and demo data only.
+- There is no feature freeze. The 2026-10-15 freeze was cancelled on 2026-10-15 by the project owner, so features can still be built and changed until submission. Do not reintroduce a freeze, or reject or defer work because of one.
 - Submission target is 2026-10-17; the deadline is 2026-10-18.
 
 ## Flutter app
@@ -81,6 +81,7 @@ Breaking one of these can disqualify the entry.
 - HTTP servers use `node:http` directly, as `cloud/map` does; no web framework.
 - Firestore is written only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid; user events (UC-09) in `userEvents`. The only other reader is the `user_events` connector in `cloud/data`, which exports user events to BigQuery read-only; no other service reaches Firestore.
 - Deployment scripts plan by default, take an immutable image digest and audit the runtime identity, following `cloud/map/infra/deploy.sh`.
+- Live parking (UC-15) is a v1 layer. The sensor job collects the whole city; readers use only `v_parking_sensor_current`, which reads only the latest-snapshot table `parking_sensor_current`, never the append-only parking history. Retention runs one query per table. Read the Notes in `use-cases/uc-15-live-parking.md` before changing the parking pipeline, view, retention or layer.
 
 ## Documentation conventions
 

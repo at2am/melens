@@ -34,7 +34,7 @@ const BAND_ZOOM: Record<ZoomBand, number> = {
 };
 const CELL_PIXELS = 64;
 type PointItem = MapItem & { geometry: Extract<NonNullable<MapItem['geometry']>, { type: 'Point' }> };
-type GroupableItem = Extract<MapItem, { kind: 'pedestrian' | 'anomaly' | 'disruption' | 'event' | 'planning' }>;
+type GroupableItem = Extract<MapItem, { kind: 'pedestrian' | 'anomaly' | 'disruption' | 'event' | 'planning' | 'parking' }>;
 
 /** Nominal first-load bands. Stateful boundary hysteresis belongs to the client zoom policy. */
 export function nominalZoomBand(zoom: number): ZoomBand {
@@ -68,7 +68,8 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
       continue;
     }
     const item = deepFreeze(mapItemSchema.parse(candidate));
-    if (item.geometry?.type !== 'Point' || !isGroupable(item)) {
+    // Bays sit a few metres apart, so a close-up view shows each sensor rather than a cluster.
+    if (item.geometry?.type !== 'Point' || !isGroupable(item) || (item.kind === 'parking' && band === 'closeUp')) {
       passthrough.push(item);
       continue;
     }
@@ -114,7 +115,7 @@ function isDrawable(item: MapItem, bounds: Bbox): boolean {
 
 function isGroupable(item: MapItem): item is GroupableItem {
   return item.kind === 'pedestrian' || item.kind === 'anomaly' || item.kind === 'disruption'
-    || item.kind === 'event' || item.kind === 'planning';
+    || item.kind === 'event' || item.kind === 'planning' || item.kind === 'parking';
 }
 
 function normalizedInstant(value: string | null): string | null {
@@ -141,6 +142,9 @@ function semanticKey(item: GroupableItem): string {
         normalizedInstant(item.details.startAt), normalizedInstant(item.details.endAt), effectiveTime(item)]);
     case 'planning':
       return JSON.stringify([...common, item.details.projectStatus, effectiveTime(item)]);
+    case 'parking':
+      // Every sensor in a cell shares one cluster whatever its state; the metric counts the vacant ones.
+      return JSON.stringify(common);
   }
 }
 
@@ -185,6 +189,11 @@ function groupMetric(members: readonly MapItem[]): AggregateItem['details']['met
       ? [JSON.stringify([sourceIds(item), item.details.resultId])] : []));
     return { id: 'anomalyCount', label: 'Verified anomaly results', unit: 'anomaly results', value: results.size,
       definition: 'Distinct eligible producer-classified anomaly results in this loaded group, with the same observation window, baseline definition and anomaly direction.' };
+  }
+  if (first.kind === 'parking') {
+    const vacant = members.filter((item) => item.kind === 'parking' && item.details.state === 'vacant').length;
+    return { id: 'vacantSensorCount', label: 'Vacant sensors', unit: 'sensors', value: vacant,
+      definition: `Sensors in this loaded group whose own current reading is vacant, out of ${members.length} sensors. Sensors that are not reporting or have no status are not counted as vacant. A vacant sensor does not mean parking there is legal or that the bay is not blocked.` };
   }
   const unit = first.kind === 'event' ? 'event records' : first.kind === 'disruption' ? 'disruption records' : 'planning records';
   return { id: `${first.kind}Count`, label: `Loaded ${unit}`, unit, value: members.length,

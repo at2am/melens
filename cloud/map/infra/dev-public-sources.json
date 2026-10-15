@@ -40,5 +40,11 @@
     "url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/",
     "attribution": "Melens replay of City of Melbourne pedestrian counts (CC BY 4.0)",
     "versionRef": null
+  },
+  {
+    "sourceId": "melbourne.parking.sensors",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/on-street-parking-bay-sensors/",
+    "attribution": "City of Melbourne — On-street parking bay sensors (CC BY 4.0)",
+    "versionRef": null
   }
 ]

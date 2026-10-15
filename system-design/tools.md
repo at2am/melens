@@ -8,7 +8,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 
 | Tool | Group | Owner | Used by |
 | --- | --- | --- | --- |
-| [`search_features`](#search_features) | Data | Haoyuan | UC-02, UC-03, UC-13 |
+| [`search_features`](#search_features) | Data | Haoyuan | UC-02, UC-03, UC-13, UC-15 |
 | [`get_feature`](#get_feature) | Data | Haoyuan | UC-13 |
 | [`heritage_lookup`](#heritage_lookup) | Data | Wasabii | UC-02, UC-08, UC-13 |
 | [`get_anomaly`](#get_anomaly) | Data | Alex | UC-04, UC-13 |
@@ -43,7 +43,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | `LatLng` | `{ "lat": number, "lng": number }` | WGS84 |
 | `Area` | `{ "center": LatLng, "radius_m": integer }` or `{ "bbox": { "north", "south", "east", "west" } }` | `radius_m` 50–5000; a bbox at most 10 km per side |
 | `TimeWindow` | `{ "from": time, "to": time }` | Either end may be omitted |
-| `LayerId` | `"pedestrian"`, `"anomaly"`, `"disruption"`, `"event"`, `"news"`, `"planning"`, `"parking"`, or `"user:<source_id>"` | The point-feature layers of map contract v1; `parking` is P2; `user:` layers come from UC-07. The code enum currently stops at `planning` |
+| `LayerId` | `"pedestrian"`, `"anomaly"`, `"disruption"`, `"event"`, `"news"`, `"planning"`, `"parking"`, or `"user:<source_id>"` | The point-feature layers of map contract v1. `parking` is the live bay sensor layer of UC-15, a v1 layer since 2026-10-15; it is in the code enum but not in the default search layers, so the model asks for it by name. `user:` layers come from UC-07 and are not in the code enum yet |
 | `FeatureId` | string | A [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem `id`; the server resolves the current `versionId`. The example ids in this file are illustrative until F3 confirms them against the published views |
 | `CompactFeature` | See below | What list results contain |
 | `Source` | `{ "feature_id": FeatureId }` or `{ "url": string, "title"?: string }` | What a card item cites |
@@ -64,7 +64,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 }
 ```
 
-A `CompactFeature` shortens `summary` to 160 characters and uses the centroid for lines and polygons. `get_feature` returns the full record.
+A `CompactFeature` shortens `summary` to 160 characters and uses the centroid for lines and polygons. `get_feature` returns the full record. A parking sensor's `summary` is its reading, for example "Vacant (live sensor, sensor reported 18:38); legal parking and time limits are not known" or "No data: the sensor is not reporting".
 
 ## Errors
 
@@ -89,12 +89,12 @@ A failed call returns an error object to the model instead of raising, so the mo
 
 Status line: "Searching the map". Cost: one BigQuery query per selected layer family.
 
-**Description for the model:** Find map features (events, transport disruptions, news, pedestrian sensors, anomalies, user layers) in an area, optionally filtered by layer, time window and keywords. Use it before recommending or describing anything on the map, and cite the ids it returns.
+**Description for the model:** Find map features (events, transport disruptions, news, planning applications, pedestrian sensors, anomalies, live parking bay sensors) in an area, optionally filtered by layer, time window and keywords. Use it before recommending or describing anything on the map, and cite the ids it returns. For parking, pass layers ["parking"] with a small radius (about 300 m): each result is one on-street bay sensor that reads Vacant, Occupied or No data. A vacant reading does not mean parking there is legal or allowed now; say so, and do not state rules, limits or prices from it.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `area` | `Area` | Yes | |
-| `layers` | `LayerId[]` | No | Defaults to the layers enabled in the request context |
+| `layers` | `LayerId[]` | No | Defaults to the layers enabled in the request context, without `parking`; with nothing enabled, every layer except `parking`. A few hundred sensors sit near any central point and would crowd out every other result, so parking is searched only by name or when it is the only visible layer |
 | `time` | `TimeWindow` | No | Keeps features valid at some point in the window |
 | `query` | string | No | Keyword match on title and summary; at most 100 characters |
 | `sort` | `"distance"` or `"time"` | No | Default `"distance"` from the area centre |
