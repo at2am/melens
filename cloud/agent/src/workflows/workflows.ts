@@ -1,12 +1,15 @@
 import type { MapItem } from '@melens/shared/contracts/map-contract';
 import { z } from 'zod';
 
-import { toMelbourneIso, melbourneDate } from '../agent/time.js';
+import { melbourneDate, melbourneHourLabel, toMelbourneIso } from '../agent/time.js';
 import { cached } from '../cache.js';
 import { centroid, compactFeature, type CompactFeature } from '../features/compact.js';
 import { latLngSchema, type Card, type CardItem, type LatLng } from '../protocol/schemas.js';
 import { grounded, searchArea, resolveFeature, distanceLabel, windowOf, HOUR, type Area, type ToolDependencies } from '../tools/catalog.js';
 import { defineTool, isToolError, toolError, type ToolSpec, type TurnRegistry } from '../tools/define.js';
+
+/** Workflow grounding may take longer than a chat tool call: nobody waits on it step by step, and the card is cached for everyone. */
+const WORKFLOW_GROUNDING_TIMEOUT_MS = 75_000;
 
 const SYSTEM = 'You write short, factual map cards for Melbourne, Australia, in English. Use only the numbered sources you are given: '
   + 'cite one source reference per item exactly as written, never invent places, times or references, and never state a cause as fact.';
@@ -106,7 +109,7 @@ export const areaBriefTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> => 
       const [found, grounding] = await Promise.all([
         searchArea(deps, turn, area, ['event', 'disruption', 'news', 'planning'], window),
         grounded(deps, turn, 'search', `What is the character of the Melbourne area around latitude ${args.point.lat.toFixed(4)}, longitude ${args.point.lng.toFixed(4)}, `
-          + 'and which notable places, cafés, galleries or landmarks are within a short walk?', null).catch(() => null),
+          + 'and which notable places, cafés, galleries or landmarks are within a short walk?', null, { timeoutMs: WORKFLOW_GROUNDING_TIMEOUT_MS }).catch(() => null),
       ]);
       const book = new SourceBook();
       const lines: string[] = [];
@@ -166,7 +169,7 @@ function describeAnomaly(item: Extract<MapItem, { kind: 'anomaly' }>): string {
   const change = d.observedValue !== null && d.baselineValue !== null && d.baselineValue !== 0
     ? `${Math.round(Math.abs(d.observedValue - d.baselineValue) / d.baselineValue * 100)}% ${d.direction}` : d.direction;
   return `${item.title}: ${d.observedValue ?? '?'} people counted against a usual ${d.baselineValue ?? '?'} (${change}), `
-    + `window ${d.window.from} to ${d.window.to}`;
+    + `${melbourneHourLabel(new Date(d.window.from), new Date(d.window.to))}`;
 }
 
 export const analyseAnomalyTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> => defineTool({
@@ -196,7 +199,7 @@ export const analyseAnomalyTool = (deps: ToolDependencies): ToolSpec<z.ZodObject
       const [found, grounding] = await Promise.all([
         searchArea(deps, turn, area, ['news', 'event', 'disruption'], window),
         grounded(deps, turn, 'search', `What events, road or tram disruptions, closures or news around ${place}, Melbourne on `
-          + `${melbourneDate(new Date(from))} could explain ${anomaly.details.direction === 'lower' ? 'unusually low' : 'unusually high'} foot traffic?`, null).catch(() => null),
+          + `${melbourneDate(new Date(from))} could explain ${anomaly.details.direction === 'lower' ? 'unusually low' : 'unusually high'} foot traffic?`, null, { timeoutMs: WORKFLOW_GROUNDING_TIMEOUT_MS }).catch(() => null),
       ]);
       const book = new SourceBook();
       const lines: string[] = [];
@@ -224,8 +227,11 @@ export const analyseAnomalyTool = (deps: ToolDependencies): ToolSpec<z.ZodObject
           ...(entry.feature === null ? {} : { location: { lat: entry.feature.lat, lng: entry.feature.lng } }) });
       }
       if (items.length === 0) {
-        items.push({ title: 'No clear cause found', summary: 'Confidence low. No nearby news, events or disruptions in the data explain this change.',
-          source: { feature_id: anomaly.id }, location: here });
+        items.push(complete
+          ? { title: 'No clear cause found', summary: 'Confidence low. No nearby news, events or disruptions in the data explain this change.',
+            source: { feature_id: anomaly.id }, location: here }
+          : { title: 'Analysis incomplete', summary: 'Confidence low. The web search for nearby events did not answer in time, so no cause was checked. Try again.',
+            source: { feature_id: anomaly.id }, location: here });
       }
       const card: Omit<Card, 'id'> = { type: 'anomaly_analysis', title: 'Why is it unusual here?', intro: clip(output.headline, 300), items };
       const { ids, urls } = sourceIds(items);

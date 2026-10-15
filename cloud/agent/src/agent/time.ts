@@ -36,3 +36,10 @@ export function melbourneDayOfWeek(date: Date): 'mon' | 'tue' | 'wed' | 'thu' | 
 export function melbourneDate(date: Date): string {
   return localParts(date).text.slice(0, 10);
 }
+
+/** A Melbourne hour for people: `Sat 27 Sep 2025, 12:00 pm to 1:00 pm`. */
+export function melbourneHourLabel(from: Date, to: Date): string {
+  const day = new Intl.DateTimeFormat('en-AU', { timeZone: MELBOURNE, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(from);
+  const clock = new Intl.DateTimeFormat('en-AU', { timeZone: MELBOURNE, hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${day}, ${clock.format(from)} to ${clock.format(to)}`;
+}

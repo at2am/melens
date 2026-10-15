@@ -37,7 +37,7 @@ const context = (layers: string[] = ['event', 'disruption', 'news']) => ({ viewp
 interface Case {
   readonly id: number;
   readonly use: string;
-  readonly input: { kind: 'text'; text: string } | { kind: 'area'; lat: number; lng: number };
+  readonly input: { kind: 'text'; text: string } | { kind: 'area'; lat: number; lng: number } | { kind: 'analyse'; featureId: string };
   /** Tools the trace must contain. */
   readonly expect: readonly string[];
   /** Tools the trace must not contain. */
@@ -59,6 +59,7 @@ const CASES: readonly Case[] = [
   { id: 9, use: 'UC-13', input: { kind: 'text', text: 'Is the State Library worth visiting?' }, expect: [] },
   { id: 10, use: 'UC-13', input: { kind: 'text', text: 'What time does the free tram zone end?' }, expect: ['search_grounding'] },
   { id: 11, use: 'UC-08', input: { kind: 'text', text: "What's the history of Flinders Street Station?" }, expect: ['search_grounding'], expectCard: true },
+  { id: 13, use: 'UC-04', input: { kind: 'analyse', featureId: 'anomaly:replay-161-2025092702' }, expect: ['analyse_anomaly'], expectCard: true },
   { id: 12, use: 'UC-04', input: { kind: 'text', text: 'Why is it so busy here right now?' }, expect: ['nearby_context'], layers: ['event', 'disruption', 'news', 'pedestrian', 'anomaly'] },
 ];
 
@@ -104,6 +105,7 @@ for (const testCase of CASES) {
     calls = stored.usage.calls;
     cards = stored.cards.length;
     text = stored.text;
+    if (args.includes('--show')) for (const card of stored.cards) console.log(JSON.stringify(card, null, 1));
     for (const tool of testCase.expect) if (!tools.includes(tool)) verdict.push(`missing ${tool}`);
     for (const tool of testCase.forbid ?? []) if (tools.includes(tool)) verdict.push(`unexpected ${tool}`);
     if (testCase.expectCard === true && cards === 0) verdict.push('no card');
@@ -116,7 +118,7 @@ for (const testCase of CASES) {
     verdict = [`error ${error instanceof Error ? error.message.slice(0, 80) : 'unknown'}`];
   }
   if (verdict.length > 0) failures += 1;
-  const input = testCase.input.kind === 'text' ? testCase.input.text : `map tap at ${testCase.input.lat}, ${testCase.input.lng}`;
+  const input = testCase.input.kind === 'text' ? testCase.input.text : testCase.input.kind === 'analyse' ? `Analyse ${testCase.input.featureId}` : `map tap at ${testCase.input.lat}, ${testCase.input.lng}`;
   rows.push(`| ${testCase.id} | ${testCase.use} | ${input.replace(/\|/g, '/')} | ${tools.join(' → ') || 'none'} | ${cards} | ${calls} / ${usageTotal} | ${Math.round((Date.now() - startedAt) / 1000)} s | ${verdict.length === 0 ? 'pass' : `**FAIL** ${verdict.join('; ')}`} |`);
   console.log(`#${testCase.id} ${verdict.length === 0 ? 'pass' : `FAIL ${verdict.join('; ')}`} | ${tools.join(' → ')} | cards ${cards} | ${text.slice(0, 100).replace(/\n/g, ' ')}`);
 }

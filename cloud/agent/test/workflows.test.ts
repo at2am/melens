@@ -147,12 +147,21 @@ test('analyse_anomaly writes possible causes with confidence and sources, and an
   assert.match(result.summary, /Possible causes/);
   assert.match(structured.prompts[0] ?? '', /4210 people counted against a usual 1830/);
 
-  const quiet: ToolDependencies = { features: fakeReader([anomaly]), grounding: null, structured: structuredModel([]), cache: createMemoryCache(clock) };
+  const quiet: ToolDependencies = { features: fakeReader([anomaly]), grounding: grounding([]), structured: structuredModel([]), cache: createMemoryCache(clock) };
   const none = registry(quiet);
   await runTool(none.spec('analyse_anomaly'), none.turn, { feature_id: 'anomaly:41-h18' });
   assert.equal(none.turn.cards[0]?.items[0]?.title, 'No clear cause found');
   assert.deepEqual(none.turn.cards[0]?.items[0]?.source, { feature_id: 'anomaly:41-h18' });
-  assert.equal(none.turn.usage.calls, 0, 'no model call when there is nothing to explain it with');
+  assert.equal(none.turn.usage.calls, 1, 'only the grounded search ran: nothing to explain it with, so no generation');
+
+  // When the web search could not answer, the card says the analysis is incomplete and is not shared through the cache.
+  const blind: ToolDependencies = { features: fakeReader([anomaly]), grounding: null, structured: structuredModel([]), cache: createMemoryCache(clock) };
+  const incomplete = registry(blind);
+  await runTool(incomplete.spec('analyse_anomaly'), incomplete.turn, { feature_id: 'anomaly:41-h18' });
+  assert.equal(incomplete.turn.cards[0]?.items[0]?.title, 'Analysis incomplete');
+  const again = registry(blind);
+  await runTool(again.spec('analyse_anomaly'), again.turn, { feature_id: 'anomaly:41-h18' });
+  assert.equal(again.turn.cards.length, 1, 'recomputed, not served from the cache');
 
   const notAnomaly = registry({ features: fakeReader(EVENTS), grounding: null, structured: structuredModel([]) });
   const wrong = await runTool(notAnomaly.spec('analyse_anomaly'), notAnomaly.turn, { feature_id: 'event:1' }) as { error: { code: string } };

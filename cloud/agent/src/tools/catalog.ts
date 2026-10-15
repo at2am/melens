@@ -452,10 +452,10 @@ function groundingKey(kind: 'maps' | 'search', question: string, location: LatLn
  * grounding timeout returns `upstream_unavailable`. Whatever the answer cites is registered as a source for this turn.
  */
 export async function grounded(deps: ToolDependencies, turn: TurnRegistry, kind: 'maps' | 'search', question: string,
-  location: LatLng | null): Promise<GroundedAnswer | ToolError> {
+  location: LatLng | null, options: { readonly timeoutMs?: number } = {}): Promise<GroundedAnswer | ToolError> {
   if (deps.grounding === null) return toolError('upstream_unavailable', 'Grounding is not configured in this environment.');
   const maps = kind === 'maps';
-  const timeoutMs = deps.groundingTimeoutMs ?? DEFAULT_GROUNDING_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? deps.groundingTimeoutMs ?? DEFAULT_GROUNDING_TIMEOUT_MS;
   const outcome = await cached<GroundedAnswer | ToolError>(deps.cache, groundingKey(kind, question, maps ? location : null, turn.now()), GROUNDING_TTL_MS[kind], async () => {
     const startedAt = turn.now().getTime();
     // The call gives up after the configured time, so a slow grounding service costs the turn one tool error, not minutes.
