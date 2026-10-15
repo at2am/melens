@@ -90,6 +90,9 @@ Future<void> pumpApp(
   WidgetTester tester,
   ProviderContainer container, {
   Size size = const Size(390, 844),
+
+  /// False while a request is held open: a progress indicator never settles.
+  bool settle = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -98,5 +101,11 @@ Future<void> pumpApp(
   await tester.pumpWidget(
     UncontrolledProviderScope(container: container, child: const MelensApp()),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
 }

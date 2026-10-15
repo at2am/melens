@@ -79,12 +79,21 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, String layerKey) async {
 
 /// The feed: the community events and what is on now in each subscribed map
 /// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed.
+/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
+/// slower than the events, so the feed does not wait for them: it lists them
+/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
 @Riverpod(retry: _manualRetry)
 Future<FeedResult> feed(Ref ref) async {
   final topics = ref.watch(feedSubscriptionsProvider);
   final items = <FeedItem>[];
   final failed = <FeedTopic>{};
+  final loading = <FeedTopic>{};
+
+  // Watched before the events are awaited, so both requests start together.
+  final layerNames = ref.watch(subscribedLayerKeyProvider);
+  final mapItems = layerNames.isEmpty
+      ? null
+      : ref.watch(mapFeedItemsProvider(layerNames));
 
   if (topics.contains(FeedTopic.community)) {
     try {
@@ -107,13 +116,15 @@ Future<FeedResult> feed(Ref ref) async {
     }
   }
 
-  final layerNames = ref.watch(subscribedLayerKeyProvider);
-  if (layerNames.isNotEmpty) {
-    try {
-      items.addAll(await ref.watch(mapFeedItemsProvider(layerNames).future));
-    } on Object catch (error, stack) {
-      _log.warning('Map feed failed', error, stack);
-      failed.addAll(topics.where((topic) => topic.layer != null));
+  if (mapItems != null) {
+    final layerTopics = topics.where((topic) => topic.layer != null);
+    if (mapItems.hasError && !mapItems.isLoading) {
+      _log.warning('Map feed failed', mapItems.error, mapItems.stackTrace);
+      failed.addAll(layerTopics);
+    } else if (mapItems.hasValue) {
+      items.addAll(mapItems.requireValue);
+    } else {
+      loading.addAll(layerTopics);
     }
   }
 
@@ -134,7 +145,7 @@ Future<FeedResult> feed(Ref ref) async {
     if (left == null || right == null) return 0;
     return rank(a) == 0 ? left.compareTo(right) : right.compareTo(left);
   });
-  return FeedResult(items: items, failedTopics: failed);
+  return FeedResult(items: items, failedTopics: failed, loadingTopics: loading);
 }
 
 FeedItem _fromMapItem(MapItem item, FeedTopic topic, bool sample) {
