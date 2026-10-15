@@ -13,7 +13,7 @@ String _topicTitle(AppLocalizations strings, MapTopic topic) => switch (topic) {
   MapTopic.context => throw ArgumentError.value(topic, 'topic'),
 };
 
-String _layerTitle(AppLocalizations strings, MapLayerId layer) =>
+String layerTitle(AppLocalizations strings, MapLayerId layer) =>
     switch (layer) {
       MapLayerId.pedestrian => strings.mapLayerPedestrian,
       MapLayerId.anomaly => strings.mapLayerAnomaly,
@@ -100,7 +100,7 @@ class LayerPanel extends ConsumerWidget {
           SwitchListTile.adaptive(
             key: ValueKey('layer-${layer.name}'),
             contentPadding: EdgeInsets.zero,
-            title: Text(_layerTitle(strings, layer)),
+            title: Text(layerTitle(strings, layer)),
             subtitle: Text(
               _availabilityText(
                 strings,

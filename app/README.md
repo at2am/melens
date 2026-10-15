@@ -45,6 +45,16 @@ Without [fvm](https://fvm.app), install Flutter 3.47.5 stable and drop the `fvm`
 | Logging | `logging` | Official, with named loggers | `logger`, `talker` |
 | Lints | `flutter_lints`, strict analyzer modes, `riverpod_lint` | | `very_good_analysis` (too strict for a three-week build) |
 
+## Navigation and design
+
+Three bottom tabs, one `StatefulShellRoute` in `lib/app/router.dart`: **Feed** (`/`), **Discover** (`/discover`, the map) and **Settings** (`/settings`). Event pages (`/events/new`, `/events/:id`) sit under the feed branch, inside the shell. Each tab keeps its state while the user is elsewhere, so the map keeps its camera.
+
+The agent chat belongs to the shell (`features/shell/ui/app_shell.dart`), not to a tab: its floating button is on every tab and the conversation survives tab changes. A card item tapped in the chat, and an agent `focus_map` or `highlight_features`, bring the Discover tab forward (`cardItemRequestsProvider`, `mapActionsControllerProvider`).
+
+Discover is a full-bleed map. Layers are chips along the top: ticked and filled when on, outlined when off. The app's own "Community events" layer (UC-09) sits beside the contract layers because the map contract has no layer for it. The layers button opens the full panel: topics, availability, the time window, statuses, the legend and the text list of results; from 1050 px wide the panel docks on the left.
+
+The look is minimal: white (or near-black) surfaces, one teal accent, flat tonal cards, 20 px radii, no shadows except the floating button. It is all in `lib/app/theme.dart`.
+
 ## Layout
 
 ```
@@ -60,10 +70,14 @@ lib/
     data/               clients, repositories, freezed models
     state/              providers and notifiers
     ui/                 screens and widgets
+  features/shell/       the frame: bottom tabs and the global chat button
+  features/feed/        the Feed tab: topic subscriptions and the feed (UC-14)
+  features/map/         the Discover tab: the map screen, its state and MapActions
+  features/settings/    the Settings tab: profile, topics, theme
+  features/events/      user events: model, in-memory repository, editor, event page, invites (UC-09)
   features/agent/       the agent protocol: models and the SSE client
   features/chat/        the chat panel: controller, session list, turn views
   features/cards/       the card registry, one widget per card type
-  features/map/         the map screen, its state and MapActions
   l10n/                 app_en.arb and the generated AppLocalizations
 test/                   mirrors lib/
 config/                 build config; only example.json is committed
@@ -114,7 +128,7 @@ On the Android emulator, the host machine is `10.0.2.2`, not `localhost`. Cloud 
 
 ## Testing the agent locally
 
-The chat panel (toolbar speech-bubble button on the map screen) talks to the agent service through the [agent protocol](../system-design/agent-protocol.md). To test the agent from the app against a service running on your machine:
+The chat panel (the floating button on every tab; a sheet on phones, docked beside the page from 1050 px wide) talks to the agent service through the [agent protocol](../system-design/agent-protocol.md). To test the agent from the app against a service running on your machine:
 
 1. Start the map and agent services with `npm run dev` in `cloud/` ([agent README](../cloud/agent/README.md#local-commands)): it builds both and runs the map service on 8081 and the agent service in development mode on 8080 with `AGENT_ALLOWED_ORIGINS=http://localhost:8000` and `AGENT_DEVELOPMENT_TOKEN=dev`. Development mode keeps sessions in memory and accepts that fixed token for the uid `dev-user`. The service still needs a real Google Cloud project id (lowercase, for example `melens-510012`) and Application Default Credentials (`gcloud auth application-default login`) to reach Gemini; without credentials every turn fails with a retryable error, and the service log line `modelLoopFailed` carries the reason.
 2. In `config/dev.json` set `AGENT_BASE_URL` to `http://localhost:8080` and `AGENT_DEV_TOKEN` to `dev`.
@@ -123,6 +137,27 @@ The chat panel (toolbar speech-bubble button on the map screen) talks to the age
 What the panel shows, so the agent's behaviour can be judged turn by turn: every tool call as a step, live while it runs (a spinner, then its row count and duration, or its error), with the arguments it was called with and, for a UI action, whether the map applied it (`show_layers` toggles layers of the current topic, `focus_map` moves the camera, `highlight_features` lists chips above the map, `draw_route` is not drawn yet); a Thinking or Writing indicator between steps, so the user always sees that the turn is moving; the streamed answer in the order it arrived around the steps; every card with its sources and Google Maps attribution; the agent's question with its options; and the turn's token usage from Gemini's own counts (↑ input, ↓ output). Each card item is a tile of its own. A message sent while a turn runs interrupts it: the panel stops the turn, the server stores what it had, and the agent answers the new message with the stopped turn in its history; the stop button stops a turn without a new message. The photo button attaches up to four photos (gallery, or camera on phones) to a message, with or without text; photos larger than 1 MB after the picker's resizing, or of a type the service does not take, are re-encoded as a smaller PNG. Tapping a card item opens its details beside the map: a map record is selected (fetched by id when the map has not loaded it), and a Google Maps or web item shows what the card knows about it with its source link. The session list (history button) switches, creates and deletes conversations; the newest one is reopened when the panel first opens. Selecting a map record offers "Brief this area" (`area` input) and, for an anomaly, "Analyse this anomaly" (`analyse` input).
 
 Against the deployed service, set `AGENT_BASE_URL` to its Cloud Run URL (`https://melens-dev-agent-saepk4k6hq-km.a.run.app` in development), leave `AGENT_DEV_TOKEN` empty and add the Firebase keys with `cloud/agent/infra/firebase.sh --project melens-510012 --verify --app-config app/config/dev.json` (from the repository root). Opening the chat signs in anonymously; the browser keeps the user in IndexedDB, so a reload restores the same sessions. The agent service allows only `http://localhost:8000` for CORS, so run the app with `--web-port 8000`. Clearing site data or switching browsers or devices starts a new anonymous user without the old sessions.
+
+## Deploying the Web app
+
+The Web build is served by Firebase Hosting at `https://melens-510012.web.app` (`firebase.json` rewrites every path to `index.html`, so deep links such as `/discover` work). Build against the deployed services and release:
+
+```sh
+fvm flutter build web --release --no-web-resources-cdn --dart-define-from-file=config/dev.json   # AGENT_BASE_URL = the Cloud Run URL, AGENT_DEV_TOKEN empty
+firebase deploy --only hosting --project melens-510012
+```
+
+Startup speed: the first load downloads the engine (CanvasKit, about 1.5 MB brotli) and `main.dart.js` (about 1 MB brotli). `--no-web-resources-cdn` serves CanvasKit from our own Hosting site instead of `gstatic.com`, and Roboto is bundled (`assets/fonts`, `pubspec.yaml`) instead of downloaded from `fonts.gstatic.com`; both hosts are slow or blocked on some networks and each blocked the first frame. `web/index.html` shows a splash until the `flutter-first-frame` event. `firebase.json` caches `/canvaskit` and `/assets` for a day; `main.dart.js` is not content-hashed, so it keeps the one-hour default. Not done: `--wasm` (smaller and faster, but needs cross-origin isolation headers that break the Maps script) and deferred loading of the chat.
+
+The Firebase CLI account must have access to `melens-510012`. The first release (2026-10-15) was made through the Hosting REST API with the project owner's gcloud token, because the CLI was logged in to another account.
+
+A new origin needs three things before the app works there, none of them done by the release itself:
+
+1. The agent service allows it: `AGENT_ALLOWED_ORIGINS` on `melens-dev-agent`.
+2. The map service allows it: `MAP_ALLOWED_ORIGINS` on `melens-dev-map`. Both were set to `http://localhost:8000,https://melens-510012.web.app` on 2026-10-15 with `gcloud run services update --update-env-vars`, which keeps the image and every other setting; the services' `deploy.sh` would also reset those.
+3. The Maps JavaScript API key lists the origin among its allowed referrers (Google Cloud console, Credentials). This is not done by a script.
+
+The site is public and so is the agent behind it: anyone with the link can start anonymous sessions, and only the per-uid rate limit applies.
 
 ## Web
 
@@ -155,4 +190,6 @@ Sources: [Maps Flutter plugin](https://pub.dev/packages/google_maps_flutter), [e
 
 | Item | Why it waits | Already decided |
 | --- | --- | --- |
+| Shared user events and subscriptions | The agent service has no publish, join or subscription endpoint, and the app never reaches Firestore itself. Events and subscriptions live in memory for the app run behind `UserEventRepository` and `FeedSubscriptions` | The seam is the repository interface; the identity becomes the Firebase uid |
+| Map picker for event places | The editor offers Melbourne landmarks | Coordinates are WGS84 on `EventPlace` |
 | Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Dependency and Web loader are prepared; 2D surface integration is T015, native setup is separate |

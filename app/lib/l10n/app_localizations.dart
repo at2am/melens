@@ -1954,6 +1954,612 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear highlights'**
   String get mapAgentHighlightsClear;
+
+  /// Label of the bottom tab that opens the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Feed'**
+  String get tabFeed;
+
+  /// Label of the bottom tab that opens the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover'**
+  String get tabDiscover;
+
+  /// Label of the bottom tab that opens settings, and the settings title.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get tabSettings;
+
+  /// Button on the not-found screen that opens the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the feed'**
+  String get notFoundBackToFeed;
+
+  /// Small label on demo content that is not real.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample'**
+  String get sampleBadge;
+
+  /// Large title of the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Melbourne'**
+  String get feedTitle;
+
+  /// Tooltip of the feed button that opens the event editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Host an event'**
+  String get feedHostEvent;
+
+  /// Feed topic: events people publish in the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Community events'**
+  String get feedTopicCommunity;
+
+  /// Feed topic: official events from the events layer.
+  ///
+  /// In en, this message translates to:
+  /// **'Events'**
+  String get feedTopicEvents;
+
+  /// Feed topic: road and tram disruptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Disruptions'**
+  String get feedTopicDisruptions;
+
+  /// Feed topic: news by area.
+  ///
+  /// In en, this message translates to:
+  /// **'Local news'**
+  String get feedTopicNews;
+
+  /// Feed topic: unusual pedestrian counts.
+  ///
+  /// In en, this message translates to:
+  /// **'Crowd anomalies'**
+  String get feedTopicAnomalies;
+
+  /// Feed topic: planning permits and projects.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning'**
+  String get feedTopicPlanning;
+
+  /// Subtitle of the community events topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Events people host around Melbourne'**
+  String get feedTopicCommunityHint;
+
+  /// Subtitle of the events topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Concerts, festivals and shows'**
+  String get feedTopicEventsHint;
+
+  /// Subtitle of the disruptions topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Road and tram disruptions right now'**
+  String get feedTopicDisruptionsHint;
+
+  /// Subtitle of the news topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Local news, placed on the map'**
+  String get feedTopicNewsHint;
+
+  /// Subtitle of the anomalies topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Unusual foot traffic in the city'**
+  String get feedTopicAnomaliesHint;
+
+  /// Subtitle of the planning topic switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning permits and projects'**
+  String get feedTopicPlanningHint;
+
+  /// Feed message when no topic is subscribed.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not following anything'**
+  String get feedEmptyNoTopics;
+
+  /// Feed message body when no topic is subscribed.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose topics and they show up here.'**
+  String get feedEmptyNoTopicsBody;
+
+  /// Button that opens the topic chooser.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose topics'**
+  String get feedChooseTopics;
+
+  /// Feed message when subscribed topics have no items.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing right now'**
+  String get feedEmpty;
+
+  /// Feed message body when subscribed topics have no items.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is happening in the topics you follow. Try following more, or host something yourself.'**
+  String get feedEmptyBody;
+
+  /// Feed message when loading failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The feed could not load'**
+  String get feedError;
+
+  /// Button that reloads the feed.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get feedRetry;
+
+  /// Title of the topic chooser sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'What do you follow?'**
+  String get feedTopicsSheetTitle;
+
+  /// Body of the topic chooser sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Followed topics appear in your feed.'**
+  String get feedTopicsSheetBody;
+
+  /// Title of the event editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Host an event'**
+  String get eventNewTitle;
+
+  /// Button that publishes the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get eventPublish;
+
+  /// Event title field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get eventFieldTitle;
+
+  /// Event description field label.
+  ///
+  /// In en, this message translates to:
+  /// **'What is the plan?'**
+  String get eventFieldDescription;
+
+  /// Event category label.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get eventFieldCategory;
+
+  /// Event time label.
+  ///
+  /// In en, this message translates to:
+  /// **'When'**
+  String get eventFieldWhen;
+
+  /// Prefix of the event end time chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends'**
+  String get eventFieldEnds;
+
+  /// Event place label.
+  ///
+  /// In en, this message translates to:
+  /// **'Where'**
+  String get eventFieldPlace;
+
+  /// Event capacity field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest limit (optional)'**
+  String get eventFieldCapacity;
+
+  /// Event visibility label.
+  ///
+  /// In en, this message translates to:
+  /// **'Who can find it'**
+  String get eventFieldVisibility;
+
+  /// Visibility option: everyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Public'**
+  String get eventVisibilityPublic;
+
+  /// Visibility option: only people with the link.
+  ///
+  /// In en, this message translates to:
+  /// **'Link only'**
+  String get eventVisibilityLinkOnly;
+
+  /// Explains the public visibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown on the map and in the feed of people who follow community events.'**
+  String get eventVisibilityPublicHint;
+
+  /// Explains the link-only visibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden from the map and feed. Only people you send the link to can open it.'**
+  String get eventVisibilityLinkOnlyHint;
+
+  /// Validation message for an empty title.
+  ///
+  /// In en, this message translates to:
+  /// **'Give your event a title'**
+  String get eventTitleRequired;
+
+  /// Validation message for a start in the past.
+  ///
+  /// In en, this message translates to:
+  /// **'The event must start in the future'**
+  String get eventStartPast;
+
+  /// Validation message for an end before the start.
+  ///
+  /// In en, this message translates to:
+  /// **'The event must end after it starts'**
+  String get eventEndBeforeStart;
+
+  /// Validation message for the guest limit.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number from 2 to 500, or leave it empty'**
+  String get eventCapacityInvalid;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Music'**
+  String get eventCategoryMusic;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Arts'**
+  String get eventCategoryArts;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Food and drink'**
+  String get eventCategoryFood;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Sport'**
+  String get eventCategorySport;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdoors'**
+  String get eventCategoryOutdoors;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get eventCategoryCommunity;
+
+  /// Event category.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get eventCategoryOther;
+
+  /// Message on the event page for an unknown event.
+  ///
+  /// In en, this message translates to:
+  /// **'This event is not available'**
+  String get eventNotFound;
+
+  /// Who hosts the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Hosted by {name}'**
+  String eventHostedBy(String name);
+
+  /// Shown to the host of the event.
+  ///
+  /// In en, this message translates to:
+  /// **'You are hosting'**
+  String get eventYouHost;
+
+  /// Number of guests.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No one is going yet} =1{1 person going} other{{count} people going}}'**
+  String eventGoing(int count);
+
+  /// Guests against the limit.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {capacity} going'**
+  String eventGoingOf(int count, int capacity);
+
+  /// Note on a link-only event.
+  ///
+  /// In en, this message translates to:
+  /// **'Link only: not on the map or in the feed'**
+  String get eventLinkOnlyNote;
+
+  /// Button that joins the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get eventJoin;
+
+  /// Button that leaves the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get eventLeave;
+
+  /// Disabled join button of a full event.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get eventFull;
+
+  /// State of a cancelled event.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get eventCancelled;
+
+  /// State of a finished event.
+  ///
+  /// In en, this message translates to:
+  /// **'This event has ended'**
+  String get eventEnded;
+
+  /// Button that opens the invite sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite people'**
+  String get eventInvite;
+
+  /// Invite sheet body.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this to the people you want to bring. The link opens the event so they can join.'**
+  String get eventInviteHint;
+
+  /// Invite sheet body without a link.
+  ///
+  /// In en, this message translates to:
+  /// **'This build has no public link yet. Send this message; people can find the event under Community events.'**
+  String get eventInviteNoLink;
+
+  /// Button that copies the invite message.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy message'**
+  String get eventInviteCopyMessage;
+
+  /// Button that copies the invite link.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get eventInviteCopyLink;
+
+  /// Snackbar after copying.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get eventInviteCopied;
+
+  /// Button that shows the event on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on map'**
+  String get eventShowOnMap;
+
+  /// Button that cancels the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel event'**
+  String get eventCancelAction;
+
+  /// Title of the cancel confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this event?'**
+  String get eventCancelConfirmTitle;
+
+  /// Body of the cancel confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Guests will see it as cancelled.'**
+  String get eventCancelConfirmBody;
+
+  /// Dialog button that keeps the event.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it'**
+  String get eventKeep;
+
+  /// Snackbar when joining a full event.
+  ///
+  /// In en, this message translates to:
+  /// **'This event is full'**
+  String get eventFullNotice;
+
+  /// Snackbar when joining a closed event.
+  ///
+  /// In en, this message translates to:
+  /// **'This event is no longer open'**
+  String get eventUnavailableNotice;
+
+  /// Snackbar when an event action failed.
+  ///
+  /// In en, this message translates to:
+  /// **'That did not work. Try again.'**
+  String get eventActionFailed;
+
+  /// Note on a sample event.
+  ///
+  /// In en, this message translates to:
+  /// **'A sample event for development. It is not real.'**
+  String get eventSampleNote;
+
+  /// Map layer chip for user events.
+  ///
+  /// In en, this message translates to:
+  /// **'Community events'**
+  String get mapCommunityLayer;
+
+  /// Button that opens the layers sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get mapLayersButton;
+
+  /// Button that opens the list of map results.
+  ///
+  /// In en, this message translates to:
+  /// **'Results'**
+  String get mapResultsButton;
+
+  /// Settings section and dialog title for the profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get settingsProfile;
+
+  /// Subtitle under the profile name.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown to guests of events you host'**
+  String get settingsProfileHint;
+
+  /// Name field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get settingsNameLabel;
+
+  /// Dialog cancel button.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get settingsCancel;
+
+  /// Dialog save button.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get settingsSave;
+
+  /// Settings section for feed topics.
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get settingsFollowing;
+
+  /// Settings section for the theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// Theme option: follow the device.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsThemeSystem;
+
+  /// Theme option.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// Theme option.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
+  /// Settings section.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// Settings row title.
+  ///
+  /// In en, this message translates to:
+  /// **'Map data'**
+  String get settingsData;
+
+  /// Settings row when sample data is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample data for development'**
+  String get settingsDataSample;
+
+  /// Settings row when live data is on.
+  ///
+  /// In en, this message translates to:
+  /// **'Live City of Melbourne data'**
+  String get settingsDataLive;
+
+  /// About text.
+  ///
+  /// In en, this message translates to:
+  /// **'Melens shows City of Melbourne open data as map layers. Answers come from Gemini agents on Google Cloud.'**
+  String get settingsAboutBody;
+
+  /// Notice that some feed sources failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load: {topics}. Pull down to try again.'**
+  String feedSourceFailed(String topics);
+
+  /// Button in the map preview that opens the event page.
+  ///
+  /// In en, this message translates to:
+  /// **'Open event'**
+  String get eventOpen;
+
+  /// Row in the layers sheet that lists map items that have no place on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Items without a location'**
+  String get mapUnlocatedAction;
+
+  /// Title of the sheet that holds the map's layers, time window and results.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers and time'**
+  String get mapLayersSheetTitle;
 }
 
 class _AppLocalizationsDelegate

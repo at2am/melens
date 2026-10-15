@@ -1107,4 +1107,330 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapAgentHighlightsClear => 'Clear highlights';
+
+  @override
+  String get tabFeed => 'Feed';
+
+  @override
+  String get tabDiscover => 'Discover';
+
+  @override
+  String get tabSettings => 'Settings';
+
+  @override
+  String get notFoundBackToFeed => 'Back to the feed';
+
+  @override
+  String get sampleBadge => 'Sample';
+
+  @override
+  String get feedTitle => 'Melbourne';
+
+  @override
+  String get feedHostEvent => 'Host an event';
+
+  @override
+  String get feedTopicCommunity => 'Community events';
+
+  @override
+  String get feedTopicEvents => 'Events';
+
+  @override
+  String get feedTopicDisruptions => 'Disruptions';
+
+  @override
+  String get feedTopicNews => 'Local news';
+
+  @override
+  String get feedTopicAnomalies => 'Crowd anomalies';
+
+  @override
+  String get feedTopicPlanning => 'Planning';
+
+  @override
+  String get feedTopicCommunityHint => 'Events people host around Melbourne';
+
+  @override
+  String get feedTopicEventsHint => 'Concerts, festivals and shows';
+
+  @override
+  String get feedTopicDisruptionsHint => 'Road and tram disruptions right now';
+
+  @override
+  String get feedTopicNewsHint => 'Local news, placed on the map';
+
+  @override
+  String get feedTopicAnomaliesHint => 'Unusual foot traffic in the city';
+
+  @override
+  String get feedTopicPlanningHint => 'Planning permits and projects';
+
+  @override
+  String get feedEmptyNoTopics => 'You are not following anything';
+
+  @override
+  String get feedEmptyNoTopicsBody => 'Choose topics and they show up here.';
+
+  @override
+  String get feedChooseTopics => 'Choose topics';
+
+  @override
+  String get feedEmpty => 'Nothing right now';
+
+  @override
+  String get feedEmptyBody =>
+      'Nothing is happening in the topics you follow. Try following more, or host something yourself.';
+
+  @override
+  String get feedError => 'The feed could not load';
+
+  @override
+  String get feedRetry => 'Try again';
+
+  @override
+  String get feedTopicsSheetTitle => 'What do you follow?';
+
+  @override
+  String get feedTopicsSheetBody => 'Followed topics appear in your feed.';
+
+  @override
+  String get eventNewTitle => 'Host an event';
+
+  @override
+  String get eventPublish => 'Publish';
+
+  @override
+  String get eventFieldTitle => 'Title';
+
+  @override
+  String get eventFieldDescription => 'What is the plan?';
+
+  @override
+  String get eventFieldCategory => 'Category';
+
+  @override
+  String get eventFieldWhen => 'When';
+
+  @override
+  String get eventFieldEnds => 'Ends';
+
+  @override
+  String get eventFieldPlace => 'Where';
+
+  @override
+  String get eventFieldCapacity => 'Guest limit (optional)';
+
+  @override
+  String get eventFieldVisibility => 'Who can find it';
+
+  @override
+  String get eventVisibilityPublic => 'Public';
+
+  @override
+  String get eventVisibilityLinkOnly => 'Link only';
+
+  @override
+  String get eventVisibilityPublicHint =>
+      'Shown on the map and in the feed of people who follow community events.';
+
+  @override
+  String get eventVisibilityLinkOnlyHint =>
+      'Hidden from the map and feed. Only people you send the link to can open it.';
+
+  @override
+  String get eventTitleRequired => 'Give your event a title';
+
+  @override
+  String get eventStartPast => 'The event must start in the future';
+
+  @override
+  String get eventEndBeforeStart => 'The event must end after it starts';
+
+  @override
+  String get eventCapacityInvalid =>
+      'Enter a number from 2 to 500, or leave it empty';
+
+  @override
+  String get eventCategoryMusic => 'Music';
+
+  @override
+  String get eventCategoryArts => 'Arts';
+
+  @override
+  String get eventCategoryFood => 'Food and drink';
+
+  @override
+  String get eventCategorySport => 'Sport';
+
+  @override
+  String get eventCategoryOutdoors => 'Outdoors';
+
+  @override
+  String get eventCategoryCommunity => 'Community';
+
+  @override
+  String get eventCategoryOther => 'Other';
+
+  @override
+  String get eventNotFound => 'This event is not available';
+
+  @override
+  String eventHostedBy(String name) {
+    return 'Hosted by $name';
+  }
+
+  @override
+  String get eventYouHost => 'You are hosting';
+
+  @override
+  String eventGoing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count people going',
+      one: '1 person going',
+      zero: 'No one is going yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String eventGoingOf(int count, int capacity) {
+    return '$count of $capacity going';
+  }
+
+  @override
+  String get eventLinkOnlyNote => 'Link only: not on the map or in the feed';
+
+  @override
+  String get eventJoin => 'Join';
+
+  @override
+  String get eventLeave => 'Leave';
+
+  @override
+  String get eventFull => 'Full';
+
+  @override
+  String get eventCancelled => 'Cancelled';
+
+  @override
+  String get eventEnded => 'This event has ended';
+
+  @override
+  String get eventInvite => 'Invite people';
+
+  @override
+  String get eventInviteHint =>
+      'Send this to the people you want to bring. The link opens the event so they can join.';
+
+  @override
+  String get eventInviteNoLink =>
+      'This build has no public link yet. Send this message; people can find the event under Community events.';
+
+  @override
+  String get eventInviteCopyMessage => 'Copy message';
+
+  @override
+  String get eventInviteCopyLink => 'Copy link';
+
+  @override
+  String get eventInviteCopied => 'Copied';
+
+  @override
+  String get eventShowOnMap => 'Show on map';
+
+  @override
+  String get eventCancelAction => 'Cancel event';
+
+  @override
+  String get eventCancelConfirmTitle => 'Cancel this event?';
+
+  @override
+  String get eventCancelConfirmBody => 'Guests will see it as cancelled.';
+
+  @override
+  String get eventKeep => 'Keep it';
+
+  @override
+  String get eventFullNotice => 'This event is full';
+
+  @override
+  String get eventUnavailableNotice => 'This event is no longer open';
+
+  @override
+  String get eventActionFailed => 'That did not work. Try again.';
+
+  @override
+  String get eventSampleNote =>
+      'A sample event for development. It is not real.';
+
+  @override
+  String get mapCommunityLayer => 'Community events';
+
+  @override
+  String get mapLayersButton => 'Layers';
+
+  @override
+  String get mapResultsButton => 'Results';
+
+  @override
+  String get settingsProfile => 'Your name';
+
+  @override
+  String get settingsProfileHint => 'Shown to guests of events you host';
+
+  @override
+  String get settingsNameLabel => 'Name';
+
+  @override
+  String get settingsCancel => 'Cancel';
+
+  @override
+  String get settingsSave => 'Save';
+
+  @override
+  String get settingsFollowing => 'Following';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsThemeSystem => 'System';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsData => 'Map data';
+
+  @override
+  String get settingsDataSample => 'Sample data for development';
+
+  @override
+  String get settingsDataLive => 'Live City of Melbourne data';
+
+  @override
+  String get settingsAboutBody =>
+      'Melens shows City of Melbourne open data as map layers. Answers come from Gemini agents on Google Cloud.';
+
+  @override
+  String feedSourceFailed(String topics) {
+    return 'Could not load: $topics. Pull down to try again.';
+  }
+
+  @override
+  String get eventOpen => 'Open event';
+
+  @override
+  String get mapUnlocatedAction => 'Items without a location';
+
+  @override
+  String get mapLayersSheetTitle => 'Layers and time';
 }
