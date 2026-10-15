@@ -1719,6 +1719,10 @@
   "@mapCommunityLayer": {
     "description": "Map layer chip for user events."
   },
+  "mapSearchThisArea": "Search this area",
+  "@mapSearchThisArea": {
+    "description": "Button shown after the user moves the map while auto-search is off; searches the area now in view."
+  },
   "mapTimeNow": "Now",
   "@mapTimeNow": {
     "description": "The time pill on the map while it shows current data."
@@ -1778,6 +1782,22 @@
   "settingsFollowing": "Following",
   "@settingsFollowing": {
     "description": "Settings section for feed topics."
+  },
+  "settingsMap": "Map",
+  "@settingsMap": {
+    "description": "Settings section for map behaviour."
+  },
+  "settingsMapAutoSearch": "Search as the map moves",
+  "@settingsMapAutoSearch": {
+    "description": "Settings switch that makes the map search again after every pan or zoom."
+  },
+  "settingsMapAutoSearchOn": "On. The map searches again after every pan or zoom.",
+  "@settingsMapAutoSearchOn": {
+    "description": "Subtitle of the map auto-search switch while on."
+  },
+  "settingsMapAutoSearchOff": "Off. After moving the map, tap Search this area.",
+  "@settingsMapAutoSearchOff": {
+    "description": "Subtitle of the map auto-search switch while off."
   },
   "settingsAppearance": "Appearance",
   "@settingsAppearance": {

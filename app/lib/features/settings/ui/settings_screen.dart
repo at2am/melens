@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../events/state/user_events_providers.dart';
 import '../../location/data/device_location.dart';
 import '../../location/state/user_location.dart';
+import '../../map/state/viewport_controller.dart';
 import '../../shell/state/shell_providers.dart';
 
 /// The third tab: who you are, what you follow, how the app looks and what
@@ -21,6 +22,7 @@ class SettingsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final name = ref.watch(userEventDisplayNameProvider);
     final choice = ref.watch(appThemeSettingProvider);
+    final autoSearch = ref.watch(mapAutoSearchProvider);
     final env = ref.watch(envProvider);
 
     return SafeArea(
@@ -53,6 +55,21 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _Section(strings.settingsLocation),
           _LocationSwitch(),
+          const SizedBox(height: 16),
+          _Section(strings.settingsMap),
+          SwitchListTile(
+            key: const ValueKey('settings-map-auto-search'),
+            secondary: const Icon(Icons.travel_explore),
+            title: Text(strings.settingsMapAutoSearch),
+            subtitle: Text(
+              autoSearch
+                  ? strings.settingsMapAutoSearchOn
+                  : strings.settingsMapAutoSearchOff,
+            ),
+            value: autoSearch,
+            onChanged: (value) =>
+                ref.read(mapAutoSearchProvider.notifier).set(enabled: value),
+          ),
           const SizedBox(height: 16),
           _Section(strings.settingsAppearance),
           SegmentedButton<AppThemeChoice>(
