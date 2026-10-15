@@ -67,8 +67,16 @@ final class FeedItem {
 /// The feed's items, with the topics whose source failed, so one failing
 /// source never hides the others.
 final class FeedResult {
-  const FeedResult({required this.items, this.failedTopics = const {}});
+  const FeedResult({
+    required this.items,
+    this.failedTopics = const {},
+    this.loadingTopics = const {},
+  });
 
   final List<FeedItem> items;
   final Set<FeedTopic> failedTopics;
+
+  /// Topics whose source has not answered yet; the feed shows the others
+  /// meanwhile and fills these in when they arrive.
+  final Set<FeedTopic> loadingTopics;
 }

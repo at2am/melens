@@ -21,6 +21,15 @@ import 'feed_topic_list.dart';
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
+  /// The feed and the sources it reads: they do not retry on their own, so
+  /// a source that failed once keeps its error until it is invalidated too.
+  static void _refresh(WidgetRef ref) {
+    ref
+      ..invalidate(communityEventsProvider)
+      ..invalidate(mapFeedItemsProvider)
+      ..invalidate(feedProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = AppLocalizations.of(context);
@@ -34,7 +43,7 @@ class FeedScreen extends ConsumerWidget {
       bottom: false,
       child: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(feedProvider);
+          _refresh(ref);
           await ref.read(feedProvider.future).catchError((Object _) {
             return const FeedResult(items: []);
           });
@@ -141,7 +150,9 @@ class FeedScreen extends ConsumerWidget {
         ),
       ];
     }
+    // A source arriving rebuilds the feed; it keeps showing what it has.
     return feed.when(
+      skipLoadingOnReload: true,
       loading: () => [
         const SliverFillRemaining(
           hasScrollBody: false,
@@ -155,13 +166,23 @@ class FeedScreen extends ConsumerWidget {
             icon: Icons.cloud_off,
             title: strings.feedError,
             actionLabel: strings.feedRetry,
-            onAction: () => ref.invalidate(feedProvider),
+            onAction: () => _refresh(ref),
           ),
         ),
       ],
       data: (result) {
         final failed = result.failedTopics;
+        final loading = result.loadingTopics.isNotEmpty;
         return [
+          if (loading && result.items.isNotEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: LinearProgressIndicator(
+                  key: ValueKey('feed-source-loading'),
+                ),
+              ),
+            ),
           if (failed.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
@@ -176,7 +197,12 @@ class FeedScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          if (result.items.isEmpty)
+          if (result.items.isEmpty && loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (result.items.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: _Message(
