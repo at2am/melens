@@ -8,23 +8,81 @@ part of 'feed_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The topics the user follows. Kept for the app run; persisting them needs
-/// the account work in UC-09.
+/// Tests override this with a scripted [FeedsClient].
 
-@ProviderFor(FeedSubscriptions)
-final feedSubscriptionsProvider = FeedSubscriptionsProvider._();
+@ProviderFor(feedsClient)
+final feedsClientProvider = FeedsClientProvider._();
 
-/// The topics the user follows. Kept for the app run; persisting them needs
-/// the account work in UC-09.
-final class FeedSubscriptionsProvider
-    extends $NotifierProvider<FeedSubscriptions, Set<FeedTopic>> {
-  /// The topics the user follows. Kept for the app run; persisting them needs
-  /// the account work in UC-09.
-  FeedSubscriptionsProvider._()
+/// Tests override this with a scripted [FeedsClient].
+
+final class FeedsClientProvider
+    extends $FunctionalProvider<FeedsClient, FeedsClient, FeedsClient>
+    with $Provider<FeedsClient> {
+  /// Tests override this with a scripted [FeedsClient].
+  FeedsClientProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
+        name: r'feedsClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$feedsClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<FeedsClient> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  FeedsClient create(Ref ref) {
+    return feedsClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(FeedsClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<FeedsClient>(value),
+    );
+  }
+}
+
+String _$feedsClientHash() => r'0b5c7f9c69502eefe8dd73324bdc5bd6217bacd1';
+
+/// The user's feeds, in their order, as the agent service stores them. A
+/// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// A change shows at once and then saves the whole list. Saves run one after
+/// another, so an older list never lands after a newer one; a failed save
+/// puts the list back and rethrows for the caller to report.
+
+@ProviderFor(FeedSubscriptions)
+final feedSubscriptionsProvider = FeedSubscriptionsProvider._();
+
+/// The user's feeds, in their order, as the agent service stores them. A
+/// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// A change shows at once and then saves the whole list. Saves run one after
+/// another, so an older list never lands after a newer one; a failed save
+/// puts the list back and rethrows for the caller to report.
+final class FeedSubscriptionsProvider
+    extends $AsyncNotifierProvider<FeedSubscriptions, List<FeedSubscription>> {
+  /// The user's feeds, in their order, as the agent service stores them. A
+  /// user who never saved one sees [defaultFeedSubscriptions].
+  ///
+  /// A change shows at once and then saves the whole list. Saves run one after
+  /// another, so an older list never lands after a newer one; a failed save
+  /// puts the list back and rethrows for the caller to report.
+  FeedSubscriptionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: _manualRetry,
         name: r'feedSubscriptionsProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -37,32 +95,34 @@ final class FeedSubscriptionsProvider
   @$internal
   @override
   FeedSubscriptions create() => FeedSubscriptions();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<FeedTopic> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<FeedTopic>>(value),
-    );
-  }
 }
 
-String _$feedSubscriptionsHash() => r'3e31db6704a736450687c1a149366fe8f6d1a217';
+String _$feedSubscriptionsHash() => r'03f0f972857590babd6f4811c0cad03227468aec';
 
-/// The topics the user follows. Kept for the app run; persisting them needs
-/// the account work in UC-09.
+/// The user's feeds, in their order, as the agent service stores them. A
+/// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// A change shows at once and then saves the whole list. Saves run one after
+/// another, so an older list never lands after a newer one; a failed save
+/// puts the list back and rethrows for the caller to report.
 
-abstract class _$FeedSubscriptions extends $Notifier<Set<FeedTopic>> {
-  Set<FeedTopic> build();
+abstract class _$FeedSubscriptions
+    extends $AsyncNotifier<List<FeedSubscription>> {
+  FutureOr<List<FeedSubscription>> build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<Set<FeedTopic>, Set<FeedTopic>>;
+    final ref =
+        this.ref
+            as $Ref<AsyncValue<List<FeedSubscription>>, List<FeedSubscription>>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<Set<FeedTopic>, Set<FeedTopic>>,
-              Set<FeedTopic>,
+              AnyNotifier<
+                AsyncValue<List<FeedSubscription>>,
+                List<FeedSubscription>
+              >,
+              AsyncValue<List<FeedSubscription>>,
               Object?,
               Object?
             >;
@@ -70,71 +130,130 @@ abstract class _$FeedSubscriptions extends $Notifier<Set<FeedTopic>> {
   }
 }
 
-/// The subscribed map layers as one sorted, comma-separated key. A string
-/// compares by value, so the feed's map request is not repeated when the
-/// subscriptions change in a way that leaves the layers alone.
+/// Null in the app, which asks the platform map; tests, which have none,
+/// override it.
 
-@ProviderFor(subscribedLayerKey)
-final subscribedLayerKeyProvider = SubscribedLayerKeyProvider._();
+@ProviderFor(areaPickerRegionReader)
+final areaPickerRegionReaderProvider = AreaPickerRegionReaderProvider._();
 
-/// The subscribed map layers as one sorted, comma-separated key. A string
-/// compares by value, so the feed's map request is not repeated when the
-/// subscriptions change in a way that leaves the layers alone.
+/// Null in the app, which asks the platform map; tests, which have none,
+/// override it.
 
-final class SubscribedLayerKeyProvider
-    extends $FunctionalProvider<String, String, String>
-    with $Provider<String> {
-  /// The subscribed map layers as one sorted, comma-separated key. A string
-  /// compares by value, so the feed's map request is not repeated when the
-  /// subscriptions change in a way that leaves the layers alone.
-  SubscribedLayerKeyProvider._()
+final class AreaPickerRegionReaderProvider
+    extends
+        $FunctionalProvider<
+          VisibleRegionReader?,
+          VisibleRegionReader?,
+          VisibleRegionReader?
+        >
+    with $Provider<VisibleRegionReader?> {
+  /// Null in the app, which asks the platform map; tests, which have none,
+  /// override it.
+  AreaPickerRegionReaderProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'subscribedLayerKeyProvider',
-        isAutoDispose: true,
+        name: r'areaPickerRegionReaderProvider',
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$subscribedLayerKeyHash();
+  String debugGetCreateSourceHash() => _$areaPickerRegionReaderHash();
 
   @$internal
   @override
-  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<VisibleRegionReader?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
 
   @override
-  String create(Ref ref) {
-    return subscribedLayerKey(ref);
+  VisibleRegionReader? create(Ref ref) {
+    return areaPickerRegionReader(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(String value) {
+  Override overrideWithValue(VisibleRegionReader? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<String>(value),
+      providerOverride: $SyncValueProvider<VisibleRegionReader?>(value),
     );
   }
 }
 
-String _$subscribedLayerKeyHash() =>
-    r'53578834edf07840a5abad59bbbab5611f07f6d9';
+String _$areaPickerRegionReaderHash() =>
+    r'e5fbf11b8c50b50dba961be14ea13b10783a2c27';
 
-/// What is on now in the given map layers, as one comma-separated key of
-/// layer names so that the request is made once per set of layers and not
-/// again when community events change. Failures surface as the exception, for
-/// [feed] to report per topic.
+/// The feed chip the user picked: one feed's id, or null for all of them.
+
+@ProviderFor(SelectedFeed)
+final selectedFeedProvider = SelectedFeedProvider._();
+
+/// The feed chip the user picked: one feed's id, or null for all of them.
+final class SelectedFeedProvider
+    extends $NotifierProvider<SelectedFeed, String?> {
+  /// The feed chip the user picked: one feed's id, or null for all of them.
+  SelectedFeedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'selectedFeedProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$selectedFeedHash();
+
+  @$internal
+  @override
+  SelectedFeed create() => SelectedFeed();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$selectedFeedHash() => r'e395543657c61cdd1de9979ccccfee11e7b0b0bc';
+
+/// The feed chip the user picked: one feed's id, or null for all of them.
+
+abstract class _$SelectedFeed extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// What one layer holds now inside one scope. Each layer is its own request,
+/// so the layers load in parallel and a slow one delays only its own items.
+/// Failures surface as the exception, for [feed] to report per source.
 
 @ProviderFor(mapFeedItems)
 final mapFeedItemsProvider = MapFeedItemsFamily._();
 
-/// What is on now in the given map layers, as one comma-separated key of
-/// layer names so that the request is made once per set of layers and not
-/// again when community events change. Failures surface as the exception, for
-/// [feed] to report per topic.
+/// What one layer holds now inside one scope. Each layer is its own request,
+/// so the layers load in parallel and a slow one delays only its own items.
+/// Failures surface as the exception, for [feed] to report per source.
 
 final class MapFeedItemsProvider
     extends
@@ -144,13 +263,12 @@ final class MapFeedItemsProvider
           FutureOr<List<FeedItem>>
         >
     with $FutureModifier<List<FeedItem>>, $FutureProvider<List<FeedItem>> {
-  /// What is on now in the given map layers, as one comma-separated key of
-  /// layer names so that the request is made once per set of layers and not
-  /// again when community events change. Failures surface as the exception, for
-  /// [feed] to report per topic.
+  /// What one layer holds now inside one scope. Each layer is its own request,
+  /// so the layers load in parallel and a slow one delays only its own items.
+  /// Failures surface as the exception, for [feed] to report per source.
   MapFeedItemsProvider._({
     required MapFeedItemsFamily super.from,
-    required String super.argument,
+    required FeedLayerQuery super.argument,
   }) : super(
          retry: _manualRetry,
          name: r'mapFeedItemsProvider',
@@ -177,7 +295,7 @@ final class MapFeedItemsProvider
 
   @override
   FutureOr<List<FeedItem>> create(Ref ref) {
-    final argument = this.argument as String;
+    final argument = this.argument as FeedLayerQuery;
     return mapFeedItems(ref, argument);
   }
 
@@ -192,15 +310,14 @@ final class MapFeedItemsProvider
   }
 }
 
-String _$mapFeedItemsHash() => r'f3019c434ca6a03fcf1103143648190d8c320f9a';
+String _$mapFeedItemsHash() => r'4b3a6a18b34e6111ee8cf678924348b78e2a8c4e';
 
-/// What is on now in the given map layers, as one comma-separated key of
-/// layer names so that the request is made once per set of layers and not
-/// again when community events change. Failures surface as the exception, for
-/// [feed] to report per topic.
+/// What one layer holds now inside one scope. Each layer is its own request,
+/// so the layers load in parallel and a slow one delays only its own items.
+/// Failures surface as the exception, for [feed] to report per source.
 
 final class MapFeedItemsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<FeedItem>>, String> {
+    with $FunctionalFamilyOverride<FutureOr<List<FeedItem>>, FeedLayerQuery> {
   MapFeedItemsFamily._()
     : super(
         retry: _manualRetry,
@@ -210,32 +327,130 @@ final class MapFeedItemsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// What is on now in the given map layers, as one comma-separated key of
-  /// layer names so that the request is made once per set of layers and not
-  /// again when community events change. Failures surface as the exception, for
-  /// [feed] to report per topic.
+  /// What one layer holds now inside one scope. Each layer is its own request,
+  /// so the layers load in parallel and a slow one delays only its own items.
+  /// Failures surface as the exception, for [feed] to report per source.
 
-  MapFeedItemsProvider call(String layerKey) =>
-      MapFeedItemsProvider._(argument: layerKey, from: this);
+  MapFeedItemsProvider call(FeedLayerQuery query) =>
+      MapFeedItemsProvider._(argument: query, from: this);
 
   @override
   String toString() => r'mapFeedItemsProvider';
 }
 
-/// The feed: the community events and what is on now in each subscribed map
-/// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
-/// slower than the events, so the feed does not wait for them: it lists them
-/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
+/// The published, upcoming community events of one scope. The discover
+/// route takes boxes up to 10 km a side, so a wider scope is cut down around
+/// its centre; the whole city reads central Melbourne.
+
+@ProviderFor(feedCommunityEvents)
+final feedCommunityEventsProvider = FeedCommunityEventsFamily._();
+
+/// The published, upcoming community events of one scope. The discover
+/// route takes boxes up to 10 km a side, so a wider scope is cut down around
+/// its centre; the whole city reads central Melbourne.
+
+final class FeedCommunityEventsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<FeedItem>>,
+          List<FeedItem>,
+          FutureOr<List<FeedItem>>
+        >
+    with $FutureModifier<List<FeedItem>>, $FutureProvider<List<FeedItem>> {
+  /// The published, upcoming community events of one scope. The discover
+  /// route takes boxes up to 10 km a side, so a wider scope is cut down around
+  /// its centre; the whole city reads central Melbourne.
+  FeedCommunityEventsProvider._({
+    required FeedCommunityEventsFamily super.from,
+    required FeedCommunityQuery super.argument,
+  }) : super(
+         retry: _manualRetry,
+         name: r'feedCommunityEventsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$feedCommunityEventsHash();
+
+  @override
+  String toString() {
+    return r'feedCommunityEventsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<FeedItem>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<FeedItem>> create(Ref ref) {
+    final argument = this.argument as FeedCommunityQuery;
+    return feedCommunityEvents(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FeedCommunityEventsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$feedCommunityEventsHash() =>
+    r'aa439661dbaceeda377dc5f319c032d13bd7d2a0';
+
+/// The published, upcoming community events of one scope. The discover
+/// route takes boxes up to 10 km a side, so a wider scope is cut down around
+/// its centre; the whole city reads central Melbourne.
+
+final class FeedCommunityEventsFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<FeedItem>>,
+          FeedCommunityQuery
+        > {
+  FeedCommunityEventsFamily._()
+    : super(
+        retry: _manualRetry,
+        name: r'feedCommunityEventsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The published, upcoming community events of one scope. The discover
+  /// route takes boxes up to 10 km a side, so a wider scope is cut down around
+  /// its centre; the whole city reads central Melbourne.
+
+  FeedCommunityEventsProvider call(FeedCommunityQuery query) =>
+      FeedCommunityEventsProvider._(argument: query, from: this);
+
+  @override
+  String toString() => r'feedCommunityEventsProvider';
+}
+
+/// The feed: the items of every enabled feed, an item two feeds share shown
+/// once, upcoming first. Each source (one topic of one feed) loads on its
+/// own: one that fails is reported in [FeedResult.failedSources], one that
+/// has not answered yet in [FeedResult.loadingSources], and neither holds up
+/// the others.
 
 @ProviderFor(feed)
 final feedProvider = FeedProvider._();
 
-/// The feed: the community events and what is on now in each subscribed map
-/// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
-/// slower than the events, so the feed does not wait for them: it lists them
-/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
+/// The feed: the items of every enabled feed, an item two feeds share shown
+/// once, upcoming first. Each source (one topic of one feed) loads on its
+/// own: one that fails is reported in [FeedResult.failedSources], one that
+/// has not answered yet in [FeedResult.loadingSources], and neither holds up
+/// the others.
 
 final class FeedProvider
     extends
@@ -245,11 +460,11 @@ final class FeedProvider
           FutureOr<FeedResult>
         >
     with $FutureModifier<FeedResult>, $FutureProvider<FeedResult> {
-  /// The feed: the community events and what is on now in each subscribed map
-  /// layer, upcoming first. A source that fails is reported in
-  /// [FeedResult.failedTopics] instead of failing the feed. The map layers are
-  /// slower than the events, so the feed does not wait for them: it lists them
-  /// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
+  /// The feed: the items of every enabled feed, an item two feeds share shown
+  /// once, upcoming first. Each source (one topic of one feed) loads on its
+  /// own: one that fails is reported in [FeedResult.failedSources], one that
+  /// has not answered yet in [FeedResult.loadingSources], and neither holds up
+  /// the others.
   FeedProvider._()
     : super(
         from: null,
@@ -275,4 +490,4 @@ final class FeedProvider
   }
 }
 
-String _$feedHash() => r'ed130ab8fa189f9b7f5d36033ec1eaf07bff6e88';
+String _$feedHash() => r'94213ed1c4b4f53e288fb8f67d60f59f488a07af';

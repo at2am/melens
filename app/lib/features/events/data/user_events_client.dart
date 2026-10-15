@@ -1,11 +1,8 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
 import '../../agent/data/agent_client.dart';
+import '../../agent/data/agent_rest_transport.dart';
 import '../../map/data/map_models.dart';
 import 'user_event_models.dart';
 
@@ -54,30 +51,29 @@ abstract interface class UserEventsClient {
 
 final class HttpUserEventsClient implements UserEventsClient {
   HttpUserEventsClient({
-    required this.client,
+    required http.Client client,
     required Uri baseUrl,
-    required this.tokenSource,
-    this.requestTimeout = const Duration(seconds: 30),
-  }) : _baseUrl = baseUrl {
-    if (!{'http', 'https'}.contains(baseUrl.scheme) ||
-        baseUrl.host.isEmpty ||
-        baseUrl.userInfo.isNotEmpty ||
-        baseUrl.hasQuery ||
-        baseUrl.hasFragment ||
-        requestTimeout <= Duration.zero) {
-      throw ArgumentError.value(baseUrl, 'baseUrl');
-    }
-  }
+    required AgentTokenSource tokenSource,
+    Duration requestTimeout = const Duration(seconds: 30),
+  }) : _transport = AgentRestTransport(
+         client: client,
+         baseUrl: baseUrl,
+         tokenSource: tokenSource,
+         // The default 2 MiB response limit: 200 events of 2000-character
+         // descriptions stay well below it.
+         requestTimeout: requestTimeout,
+       );
 
   static final _log = Logger('UserEventsClient');
 
-  /// 200 events of 2000-character descriptions stay well below this.
-  static const int _maxResponseBytes = 2 * 1024 * 1024;
+  final AgentRestTransport _transport;
 
-  final http.Client client;
-  final Uri _baseUrl;
-  final AgentTokenSource tokenSource;
-  final Duration requestTimeout;
+  Future<Map<String, dynamic>?> _json(
+    String method,
+    List<String> segments, {
+    Map<String, String>? query,
+    Map<String, dynamic>? body,
+  }) => _transport.json(method, segments, query: query, body: body);
 
   @override
   Future<UserEvent> publish(UserEventDraft draft) async {
@@ -190,96 +186,6 @@ final class HttpUserEventsClient implements UserEventsClient {
   /// Six decimals: about 10 cm, what the map's own bounds carry.
   static String _coordinate(double value) => value.toStringAsFixed(6);
 
-  Future<Map<String, String>> _headers() async {
-    final token = await tokenSource();
-    if (token == null || token.isEmpty) throw const AgentSignInException();
-    return {'authorization': 'Bearer $token', 'accept': 'application/json'};
-  }
-
-  /// A route: bounded, timed out and decoded; null for `204`.
-  Future<Map<String, dynamic>?> _json(
-    String method,
-    List<String> segments, {
-    Map<String, String>? query,
-    Map<String, dynamic>? body,
-  }) async {
-    final bytes = await _send(method, segments, query: query, body: body);
-    if (bytes.isEmpty) return null;
-    final Object? json;
-    try {
-      json = jsonDecode(utf8.decode(bytes));
-    } on FormatException {
-      throw const AgentProtocolException('The response was not JSON');
-    }
-    if (json is! Map<String, dynamic>) {
-      throw const AgentProtocolException('The response was not an object');
-    }
-    return json;
-  }
-
-  Future<Uint8List> _send(
-    String method,
-    List<String> segments, {
-    Map<String, String>? query,
-    Map<String, dynamic>? body,
-  }) async {
-    final headers = await _headers();
-    final timeout = Completer<void>();
-    final timer = Timer(requestTimeout, timeout.complete);
-    final request =
-        http.AbortableRequest(
-            method,
-            _endpoint(segments, query),
-            abortTrigger: timeout.future,
-          )
-          ..followRedirects = false
-          ..headers.addAll(headers);
-    if (body != null) {
-      request
-        ..headers['content-type'] = 'application/json'
-        ..bodyBytes = utf8.encode(_encode(body));
-    }
-    try {
-      final response = await client.send(request);
-      final bytes = await _collect(response.stream, limit: _maxResponseBytes);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw parseAgentHttpFailure(response.statusCode, bytes);
-      }
-      return bytes;
-    } on http.RequestAbortedException {
-      throw const AgentTimeoutException();
-    } on http.ClientException {
-      throw const AgentNetworkException();
-    } finally {
-      timer.cancel();
-    }
-  }
-
-  Future<Uint8List> _collect(
-    http.ByteStream stream, {
-    required int limit,
-  }) async {
-    final bytes = BytesBuilder(copy: false);
-    await for (final chunk in stream) {
-      if (bytes.length + chunk.length > limit) {
-        throw const AgentProtocolException('The response was too large');
-      }
-      bytes.add(chunk);
-    }
-    return bytes.takeBytes();
-  }
-
-  Uri _endpoint(List<String> segments, Map<String, String>? query) => Uri(
-    scheme: _baseUrl.scheme,
-    host: _baseUrl.host,
-    port: _baseUrl.hasPort ? _baseUrl.port : null,
-    pathSegments: [
-      ..._baseUrl.pathSegments.where((segment) => segment.isNotEmpty),
-      ...segments,
-    ],
-    queryParameters: query,
-  );
-
   static Map<String, dynamic> _object(Map<String, dynamic>? json, String key) {
     final Object? value = json?[key];
     if (value is! Map<String, dynamic>) {
@@ -294,14 +200,6 @@ final class HttpUserEventsClient implements UserEventsClient {
     } on Object catch (error) {
       _log.fine('Protocol decode failed', error);
       throw const AgentProtocolException('The response did not match');
-    }
-  }
-
-  static String _encode(Map<String, dynamic> json) {
-    try {
-      return jsonEncode(json);
-    } on Object {
-      throw const AgentProtocolException('The request could not be encoded');
     }
   }
 

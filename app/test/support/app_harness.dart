@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:melens/app/app.dart';
 import 'package:melens/core/config/env.dart';
@@ -7,6 +8,7 @@ import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/agent/state/agent_providers.dart';
 import 'package:melens/features/events/data/user_event_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
+import 'package:melens/features/feed/state/feed_providers.dart';
 import 'package:melens/features/location/data/device_location.dart';
 import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/map/data/map_repository.dart';
@@ -16,6 +18,7 @@ import 'package:melens/features/map/ui/map_surface.dart';
 
 import '../features/agent/fake_agent_client.dart';
 import '../features/events/fake_user_events_client.dart';
+import '../features/feed/fake_feeds_client.dart';
 
 /// 18 Oct 2026, 11:00 Melbourne time, a Sunday.
 final harnessNow = DateTime.utc(2026, 10, 18);
@@ -51,17 +54,20 @@ List<UserEvent> harnessEvents() => [
   ),
 ];
 
-/// The whole app on sample data, a fake agent, a fake events service and a
-/// fixed clock.
+/// The whole app on sample data, a fake agent, fake events and feeds
+/// services and a fixed clock.
 ProviderContainer appContainer({
   FakeAgentClient? agent,
   FakeUserEventsClient? events,
+  FakeFeedsClient? feeds,
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
   MapRepository? mapRepository,
   DeviceLocationReader? deviceLocation,
+  List<Override> overrides = const [],
 }) => ProviderContainer.test(
   overrides: [
+    ...overrides,
     if (deviceLocation != null)
       deviceLocationReaderProvider.overrideWithValue(deviceLocation),
     mapRepositoryProvider.overrideWithValue(
@@ -72,6 +78,7 @@ ProviderContainer appContainer({
     userEventsClientProvider.overrideWithValue(
       events ?? FakeUserEventsClient(harnessEvents()),
     ),
+    feedsClientProvider.overrideWithValue(feeds ?? FakeFeedsClient()),
     melbourneClockProvider.overrideWithValue(
       MelbourneClock(now: () => harnessNow),
     ),

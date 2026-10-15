@@ -204,6 +204,40 @@ Rules:
 | `userEvents/{eventId}` | The event fields above plus `ownerUid`, `visibility` (`visible`, or `hidden` for moderation), `attendeeUids` (who joined, in join order: the count, the viewer's `joined` flag and `GET /v1/events/mine` read it), `activeUntil` (`endAt`, or `startAt` plus 3 hours) and `expiresAtTs` (90 days after `activeUntil`, the TTL policy). `status` is `published`, `cancelled` or `removed`; a removed event stays until the TTL so the export can withdraw it. `version` increments on every change, joins included |
 | `userEvents/{eventId}/attendees/{uid}` | `uid`, `memberId`, `displayName` or null, `joinedAt`; written and deleted with the membership |
 
+## Feed subscriptions
+
+The feeds a user built on the Feed tab (UC-14) are stored per uid by the same service on `/v1/feeds`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; no other service and no client reads them ([uc-14](use-cases/uc-14-personal-feed.md)).
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /v1/feeds` | The caller's feeds, in the user's order: `{ "feeds": […] }`. `feeds` is null when this uid never saved, and the app then applies its default feeds; an empty list is a saved choice |
+| `PUT /v1/feeds` | Replace the whole list with the body `{ "feeds": […] }`, order kept; `200` with the stored list, names trimmed |
+
+A feed subscription:
+
+```json
+{
+  "id": "f_k3Qm",
+  "name": "Near the office",
+  "topics": ["events", "disruptions"],
+  "scope": { "kind": "bbox", "bbox": [144.955, -37.822, 144.972, -37.809] },
+  "includeUnlocated": false,
+  "communityHorizonDays": 7,
+  "enabled": true
+}
+```
+
+Rules:
+
+1. **Shape.** Every field is required and unknown fields are refused (`400 invalidRequest`). `id` matches `^[A-Za-z0-9_-]{1,64}$` and is distinct within the list. `name` is 1 to 60 characters after trimming. `topics` is a nonempty list of distinct values from `community`, `events`, `disruptions`, `news`, `anomalies` and `planning`. `communityHorizonDays` is 1, 7 or 14. `enabled` false keeps a paused feed saved without loading it.
+2. **Scope.** `{ "kind": "city" }` is the whole service area; `{ "kind": "area", "areaId": … }` names a City of Melbourne small area, whose list and boxes the app owns (the service checks only the id pattern); `{ "kind": "bbox", "bbox": [west, south, east, north] }` is a box the user framed on the map, finite, ordered and inside the map contract's `SERVICE_BBOX`. `includeUnlocated` also reads the source jurisdiction's records that have no location.
+3. **Limits.** At most 20 feeds per uid. Saves count against a per-uid limit of 120 per hour (`429 rateLimited`); a refused body does not count, and reads are not limited.
+4. **Whole-list writes.** A save replaces the stored list, last write wins; there is no per-feed route or version check.
+
+| Document | Fields |
+| --- | --- |
+| `userFeeds/{uid}` | `feeds` (the list above, in order) and `updatedAt` (UTC instant of the last save). A stored list that no longer parses reads as null, as if never saved |
+
 ## Authentication
 
 Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header. The Cloud Run service allows unauthenticated invocation at the platform level, because a browser cannot obtain an IAM token; the service itself verifies the Firebase ID token on every request and rejects a missing or invalid token before any model or tool call. This ties sessions to users and allows per-uid rate limiting, with counters in Firestore, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.

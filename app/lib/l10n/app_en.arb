@@ -1655,23 +1655,11 @@
   "@feedTopicPlanningHint": {
     "description": "Subtitle of the planning topic switch."
   },
-  "feedEmptyNoTopics": "You are not following anything",
-  "@feedEmptyNoTopics": {
-    "description": "Feed message when no topic is subscribed."
-  },
-  "feedEmptyNoTopicsBody": "Choose topics and they show up here.",
-  "@feedEmptyNoTopicsBody": {
-    "description": "Feed message body when no topic is subscribed."
-  },
-  "feedChooseTopics": "Choose topics",
-  "@feedChooseTopics": {
-    "description": "Button that opens the topic chooser."
-  },
   "feedEmpty": "Nothing right now",
   "@feedEmpty": {
     "description": "Feed message when subscribed topics have no items."
   },
-  "feedEmptyBody": "Nothing is happening in the topics you follow. Try following more, or host something yourself.",
+  "feedEmptyBody": "Nothing is happening in your feeds right now. Try a wider area or more topics, or host something yourself.",
   "@feedEmptyBody": {
     "description": "Feed message body when subscribed topics have no items."
   },
@@ -1682,14 +1670,6 @@
   "feedRetry": "Try again",
   "@feedRetry": {
     "description": "Button that reloads the feed."
-  },
-  "feedTopicsSheetTitle": "What do you follow?",
-  "@feedTopicsSheetTitle": {
-    "description": "Title of the topic chooser sheet."
-  },
-  "feedTopicsSheetBody": "Followed topics appear in your feed.",
-  "@feedTopicsSheetBody": {
-    "description": "Body of the topic chooser sheet."
   },
   "eventInvite": "Invite people",
   "@eventInvite": {
@@ -1743,9 +1723,9 @@
   "@mapTimePastMonth": {
     "description": "Time pill menu entry."
   },
-  "mapResultsButton": "Results and legend",
+  "mapResultsButton": "Results",
   "@mapResultsButton": {
-    "description": "Tooltip of the map button that lists what the map shows."
+    "description": "Button that opens the list of map results."
   },
   "mapDataStatus": "Data status",
   "@mapDataStatus": {
@@ -1754,10 +1734,6 @@
   "mapLayersButton": "Layers",
   "@mapLayersButton": {
     "description": "Button that opens the layers sheet."
-  },
-  "mapResultsButton": "Results",
-  "@mapResultsButton": {
-    "description": "Button that opens the list of map results."
   },
   "settingsProfile": "Your name",
   "@settingsProfile": {
@@ -1778,10 +1754,6 @@
   "settingsSave": "Save",
   "@settingsSave": {
     "description": "Dialog save button."
-  },
-  "settingsFollowing": "Following",
-  "@settingsFollowing": {
-    "description": "Settings section for feed topics."
   },
   "settingsMap": "Map",
   "@settingsMap": {
@@ -2385,5 +2357,216 @@
   "settingsLocationOn": "On. Your position is sent with your questions while this is on, and never stored.",
   "@settingsLocationOn": {
     "description": "Subtitle of the location switch while on."
+  },
+  "feedNew": "New feed",
+  "@feedNew": {
+    "description": "Tooltip of the feed button that creates a feed, and title of the feed editor for a new feed."
+  },
+  "feedEdit": "Edit feed",
+  "@feedEdit": {
+    "description": "Title of the feed editor for an existing feed."
+  },
+  "feedChipAll": "All feeds",
+  "@feedChipAll": {
+    "description": "Feed chip that shows the items of every feed."
+  },
+  "feedManage": "Manage feeds",
+  "@feedManage": {
+    "description": "Feed chip and button that open the feeds section in Settings."
+  },
+  "feedEmptyNoFeeds": "You have no feeds yet",
+  "@feedEmptyNoFeeds": {
+    "description": "Title of the feed when the user has no feeds."
+  },
+  "feedEmptyNoFeedsBody": "A feed follows a few topics in one part of Melbourne. Create one and what happens there shows up here.",
+  "@feedEmptyNoFeedsBody": {
+    "description": "Body of the feed when the user has no feeds."
+  },
+  "feedCreate": "Create a feed",
+  "@feedCreate": {
+    "description": "Button that opens the feed editor from an empty feed."
+  },
+  "feedAllPaused": "All your feeds are paused",
+  "@feedAllPaused": {
+    "description": "Title of the feed when every feed is paused."
+  },
+  "feedAllPausedBody": "Turn a feed back on in Settings.",
+  "@feedAllPausedBody": {
+    "description": "Body of the feed when every feed is paused."
+  },
+  "feedSourceName": "{feed}: {topic}",
+  "@feedSourceName": {
+    "description": "One failed feed source in the failure notice.",
+    "placeholders": {
+      "feed": {
+        "type": "String"
+      },
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "feedEditorName": "Name",
+  "@feedEditorName": {
+    "description": "Label of the feed name field."
+  },
+  "feedEditorNameHint": "For example: Near the office",
+  "@feedEditorNameHint": {
+    "description": "Hint of the feed name field; an empty name takes the area name."
+  },
+  "feedEditorTopics": "What to follow",
+  "@feedEditorTopics": {
+    "description": "Heading of the topic chips in the feed editor."
+  },
+  "feedEditorTopicsNone": "Choose at least one topic.",
+  "@feedEditorTopicsNone": {
+    "description": "Shown when no topic is chosen in the feed editor."
+  },
+  "feedEditorWhere": "Where",
+  "@feedEditorWhere": {
+    "description": "Heading of the scope choice in the feed editor."
+  },
+  "feedScopeMap": "Map area",
+  "@feedScopeMap": {
+    "description": "Scope option: a box the user frames on the map."
+  },
+  "feedScopeArea": "Named area",
+  "@feedScopeArea": {
+    "description": "Scope option: one named City of Melbourne area."
+  },
+  "feedScopeCity": "All of Melbourne",
+  "@feedScopeCity": {
+    "description": "Scope option and summary: the whole service area."
+  },
+  "feedScopeCityHint": "Everything the map holds. The slowest to load. Community events stay within central Melbourne.",
+  "@feedScopeCityHint": {
+    "description": "Hint under the whole-city scope."
+  },
+  "feedScopeAreaUnknown": "Unknown area",
+  "@feedScopeAreaUnknown": {
+    "description": "Summary of a named area this app version no longer knows."
+  },
+  "feedScopeMapSummary": "Map area, {size}",
+  "@feedScopeMapSummary": {
+    "description": "Summary of a framed map area.",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "feedScopeMapNone": "No area framed yet",
+  "@feedScopeMapNone": {
+    "description": "Shown before the user frames a map area."
+  },
+  "feedScopeMapPick": "Frame on the map",
+  "@feedScopeMapPick": {
+    "description": "Button that opens the area picker."
+  },
+  "feedScopeMapChange": "Change area",
+  "@feedScopeMapChange": {
+    "description": "Button that reopens the area picker."
+  },
+  "feedScopeMapHint": "Smaller areas load faster.",
+  "@feedScopeMapHint": {
+    "description": "Hint under the map-area scope."
+  },
+  "feedEditorUnlocated": "Include reports without a place",
+  "@feedEditorUnlocated": {
+    "description": "Switch that adds records with no location to the feed."
+  },
+  "feedEditorUnlocatedHint": "Adds reports that cover the whole city, such as a disruption to a whole tram line. These are not limited to the area.",
+  "@feedEditorUnlocatedHint": {
+    "description": "Subtitle of the unlocated switch."
+  },
+  "feedEditorHorizon": "Community events ahead",
+  "@feedEditorHorizon": {
+    "description": "Heading of the community events time range."
+  },
+  "feedHorizonToday": "24 hours",
+  "@feedHorizonToday": {
+    "description": "Community events range option."
+  },
+  "feedHorizonWeek": "7 days",
+  "@feedHorizonWeek": {
+    "description": "Community events range option."
+  },
+  "feedHorizonFortnight": "14 days",
+  "@feedHorizonFortnight": {
+    "description": "Community events range option."
+  },
+  "feedEditorSave": "Save",
+  "@feedEditorSave": {
+    "description": "Button that saves the feed."
+  },
+  "feedEditorDelete": "Delete feed",
+  "@feedEditorDelete": {
+    "description": "Button that deletes the feed being edited."
+  },
+  "feedEditorDeleteTitle": "Delete {name}?",
+  "@feedEditorDeleteTitle": {
+    "description": "Title of the dialog that confirms deleting a feed.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "feedEditorDeleteBody": "Its items leave your feed.",
+  "@feedEditorDeleteBody": {
+    "description": "Body of the dialog that confirms deleting a feed."
+  },
+  "feedEditorDeleteConfirm": "Delete",
+  "@feedEditorDeleteConfirm": {
+    "description": "Confirm button of the delete-feed dialog."
+  },
+  "feedEditorCancel": "Cancel",
+  "@feedEditorCancel": {
+    "description": "Cancel button of the delete-feed dialog."
+  },
+  "feedSaveFailed": "Your feeds could not be saved. Try again.",
+  "@feedSaveFailed": {
+    "description": "Notice that saving the feeds failed."
+  },
+  "feedLimitReached": "You can keep up to {count} feeds.",
+  "@feedLimitReached": {
+    "description": "Notice that the feed limit is reached.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "feedNotFound": "This feed no longer exists.",
+  "@feedNotFound": {
+    "description": "Shown when the feed editor opens a feed that was deleted."
+  },
+  "feedAreaPickerTitle": "Frame the area",
+  "@feedAreaPickerTitle": {
+    "description": "Title of the area picker."
+  },
+  "feedAreaPickerHint": "Move and zoom the map until the frame covers the area to follow.",
+  "@feedAreaPickerHint": {
+    "description": "Hint of the area picker."
+  },
+  "feedAreaPickerUse": "Use this area",
+  "@feedAreaPickerUse": {
+    "description": "Button that confirms the framed area."
+  },
+  "feedAreaPickerOutside": "That area is outside Melbourne. Move the map back.",
+  "@feedAreaPickerOutside": {
+    "description": "Notice that the framed area is outside the service area."
+  },
+  "settingsFeeds": "Feeds",
+  "@settingsFeeds": {
+    "description": "Settings section listing the user's feeds."
+  },
+  "settingsFeedsError": "Your feeds could not load.",
+  "@settingsFeedsError": {
+    "description": "Settings row when the feeds failed to load."
+  },
+  "settingsFeedPaused": "Paused",
+  "@settingsFeedPaused": {
+    "description": "Prefix of a paused feed's subtitle in Settings."
   }
 }

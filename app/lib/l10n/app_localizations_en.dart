@@ -1210,32 +1210,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedTopicPlanningHint => 'Planning permits and projects';
 
   @override
-  String get feedEmptyNoTopics => 'You are not following anything';
-
-  @override
-  String get feedEmptyNoTopicsBody => 'Choose topics and they show up here.';
-
-  @override
-  String get feedChooseTopics => 'Choose topics';
-
-  @override
   String get feedEmpty => 'Nothing right now';
 
   @override
   String get feedEmptyBody =>
-      'Nothing is happening in the topics you follow. Try following more, or host something yourself.';
+      'Nothing is happening in your feeds right now. Try a wider area or more topics, or host something yourself.';
 
   @override
   String get feedError => 'The feed could not load';
 
   @override
   String get feedRetry => 'Try again';
-
-  @override
-  String get feedTopicsSheetTitle => 'What do you follow?';
-
-  @override
-  String get feedTopicsSheetBody => 'Followed topics appear in your feed.';
 
   @override
   String get eventInvite => 'Invite people';
@@ -1302,9 +1287,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSave => 'Save';
-
-  @override
-  String get settingsFollowing => 'Following';
 
   @override
   String get settingsMap => 'Map';
@@ -1763,4 +1745,158 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsLocationOn =>
       'On. Your position is sent with your questions while this is on, and never stored.';
+
+  @override
+  String get feedNew => 'New feed';
+
+  @override
+  String get feedEdit => 'Edit feed';
+
+  @override
+  String get feedChipAll => 'All feeds';
+
+  @override
+  String get feedManage => 'Manage feeds';
+
+  @override
+  String get feedEmptyNoFeeds => 'You have no feeds yet';
+
+  @override
+  String get feedEmptyNoFeedsBody =>
+      'A feed follows a few topics in one part of Melbourne. Create one and what happens there shows up here.';
+
+  @override
+  String get feedCreate => 'Create a feed';
+
+  @override
+  String get feedAllPaused => 'All your feeds are paused';
+
+  @override
+  String get feedAllPausedBody => 'Turn a feed back on in Settings.';
+
+  @override
+  String feedSourceName(String feed, String topic) {
+    return '$feed: $topic';
+  }
+
+  @override
+  String get feedEditorName => 'Name';
+
+  @override
+  String get feedEditorNameHint => 'For example: Near the office';
+
+  @override
+  String get feedEditorTopics => 'What to follow';
+
+  @override
+  String get feedEditorTopicsNone => 'Choose at least one topic.';
+
+  @override
+  String get feedEditorWhere => 'Where';
+
+  @override
+  String get feedScopeMap => 'Map area';
+
+  @override
+  String get feedScopeArea => 'Named area';
+
+  @override
+  String get feedScopeCity => 'All of Melbourne';
+
+  @override
+  String get feedScopeCityHint =>
+      'Everything the map holds. The slowest to load. Community events stay within central Melbourne.';
+
+  @override
+  String get feedScopeAreaUnknown => 'Unknown area';
+
+  @override
+  String feedScopeMapSummary(String size) {
+    return 'Map area, $size';
+  }
+
+  @override
+  String get feedScopeMapNone => 'No area framed yet';
+
+  @override
+  String get feedScopeMapPick => 'Frame on the map';
+
+  @override
+  String get feedScopeMapChange => 'Change area';
+
+  @override
+  String get feedScopeMapHint => 'Smaller areas load faster.';
+
+  @override
+  String get feedEditorUnlocated => 'Include reports without a place';
+
+  @override
+  String get feedEditorUnlocatedHint =>
+      'Adds reports that cover the whole city, such as a disruption to a whole tram line. These are not limited to the area.';
+
+  @override
+  String get feedEditorHorizon => 'Community events ahead';
+
+  @override
+  String get feedHorizonToday => '24 hours';
+
+  @override
+  String get feedHorizonWeek => '7 days';
+
+  @override
+  String get feedHorizonFortnight => '14 days';
+
+  @override
+  String get feedEditorSave => 'Save';
+
+  @override
+  String get feedEditorDelete => 'Delete feed';
+
+  @override
+  String feedEditorDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String get feedEditorDeleteBody => 'Its items leave your feed.';
+
+  @override
+  String get feedEditorDeleteConfirm => 'Delete';
+
+  @override
+  String get feedEditorCancel => 'Cancel';
+
+  @override
+  String get feedSaveFailed => 'Your feeds could not be saved. Try again.';
+
+  @override
+  String feedLimitReached(int count) {
+    return 'You can keep up to $count feeds.';
+  }
+
+  @override
+  String get feedNotFound => 'This feed no longer exists.';
+
+  @override
+  String get feedAreaPickerTitle => 'Frame the area';
+
+  @override
+  String get feedAreaPickerHint =>
+      'Move and zoom the map until the frame covers the area to follow.';
+
+  @override
+  String get feedAreaPickerUse => 'Use this area';
+
+  @override
+  String get feedAreaPickerOutside =>
+      'That area is outside Melbourne. Move the map back.';
+
+  @override
+  String get settingsFeeds => 'Feeds';
+
+  @override
+  String get settingsFeedsError => 'Your feeds could not load.';
+
+  @override
+  String get settingsFeedPaused => 'Paused';
 }
