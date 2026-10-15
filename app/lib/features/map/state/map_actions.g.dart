@@ -51,7 +51,7 @@ final class MapActionsControllerProvider
 }
 
 String _$mapActionsControllerHash() =>
-    r'845ee0f803b38a9b9a56cd37170fb74bfdcd07ae';
+    r'f0d7b0e7bcc4a3ed711f03b1858be0bd14e4cea9';
 
 /// Applies the agent's one-way UI actions to the map (agent-protocol.md,
 /// Rules). The server never waits for a result; the next request context

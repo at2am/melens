@@ -1526,5 +1526,432 @@
   "mapAgentHighlightsClear": "Clear highlights",
   "@mapAgentHighlightsClear": {
     "description": "Button that clears the agent's highlights."
+  },
+  "tabFeed": "Feed",
+  "@tabFeed": {
+    "description": "Label of the bottom tab that opens the feed."
+  },
+  "tabDiscover": "Discover",
+  "@tabDiscover": {
+    "description": "Label of the bottom tab that opens the map."
+  },
+  "tabSettings": "Settings",
+  "@tabSettings": {
+    "description": "Label of the bottom tab that opens settings, and the settings title."
+  },
+  "notFoundBackToFeed": "Back to the feed",
+  "@notFoundBackToFeed": {
+    "description": "Button on the not-found screen that opens the feed."
+  },
+  "sampleBadge": "Sample",
+  "@sampleBadge": {
+    "description": "Small label on demo content that is not real."
+  },
+  "feedTitle": "Melbourne",
+  "@feedTitle": {
+    "description": "Large title of the feed."
+  },
+  "feedHostEvent": "Host an event",
+  "@feedHostEvent": {
+    "description": "Tooltip of the feed button that opens the event editor."
+  },
+  "feedTopicCommunity": "Community events",
+  "@feedTopicCommunity": {
+    "description": "Feed topic: events people publish in the app."
+  },
+  "feedTopicEvents": "Events",
+  "@feedTopicEvents": {
+    "description": "Feed topic: official events from the events layer."
+  },
+  "feedTopicDisruptions": "Disruptions",
+  "@feedTopicDisruptions": {
+    "description": "Feed topic: road and tram disruptions."
+  },
+  "feedTopicNews": "Local news",
+  "@feedTopicNews": {
+    "description": "Feed topic: news by area."
+  },
+  "feedTopicAnomalies": "Crowd anomalies",
+  "@feedTopicAnomalies": {
+    "description": "Feed topic: unusual pedestrian counts."
+  },
+  "feedTopicPlanning": "Planning",
+  "@feedTopicPlanning": {
+    "description": "Feed topic: planning permits and projects."
+  },
+  "feedTopicCommunityHint": "Events people host around Melbourne",
+  "@feedTopicCommunityHint": {
+    "description": "Subtitle of the community events topic switch."
+  },
+  "feedTopicEventsHint": "Concerts, festivals and shows",
+  "@feedTopicEventsHint": {
+    "description": "Subtitle of the events topic switch."
+  },
+  "feedTopicDisruptionsHint": "Road and tram disruptions right now",
+  "@feedTopicDisruptionsHint": {
+    "description": "Subtitle of the disruptions topic switch."
+  },
+  "feedTopicNewsHint": "Local news, placed on the map",
+  "@feedTopicNewsHint": {
+    "description": "Subtitle of the news topic switch."
+  },
+  "feedTopicAnomaliesHint": "Unusual foot traffic in the city",
+  "@feedTopicAnomaliesHint": {
+    "description": "Subtitle of the anomalies topic switch."
+  },
+  "feedTopicPlanningHint": "Planning permits and projects",
+  "@feedTopicPlanningHint": {
+    "description": "Subtitle of the planning topic switch."
+  },
+  "feedEmptyNoTopics": "You are not following anything",
+  "@feedEmptyNoTopics": {
+    "description": "Feed message when no topic is subscribed."
+  },
+  "feedEmptyNoTopicsBody": "Choose topics and they show up here.",
+  "@feedEmptyNoTopicsBody": {
+    "description": "Feed message body when no topic is subscribed."
+  },
+  "feedChooseTopics": "Choose topics",
+  "@feedChooseTopics": {
+    "description": "Button that opens the topic chooser."
+  },
+  "feedEmpty": "Nothing right now",
+  "@feedEmpty": {
+    "description": "Feed message when subscribed topics have no items."
+  },
+  "feedEmptyBody": "Nothing is happening in the topics you follow. Try following more, or host something yourself.",
+  "@feedEmptyBody": {
+    "description": "Feed message body when subscribed topics have no items."
+  },
+  "feedError": "The feed could not load",
+  "@feedError": {
+    "description": "Feed message when loading failed."
+  },
+  "feedRetry": "Try again",
+  "@feedRetry": {
+    "description": "Button that reloads the feed."
+  },
+  "feedTopicsSheetTitle": "What do you follow?",
+  "@feedTopicsSheetTitle": {
+    "description": "Title of the topic chooser sheet."
+  },
+  "feedTopicsSheetBody": "Followed topics appear in your feed.",
+  "@feedTopicsSheetBody": {
+    "description": "Body of the topic chooser sheet."
+  },
+  "eventNewTitle": "Host an event",
+  "@eventNewTitle": {
+    "description": "Title of the event editor."
+  },
+  "eventPublish": "Publish",
+  "@eventPublish": {
+    "description": "Button that publishes the event."
+  },
+  "eventFieldTitle": "Title",
+  "@eventFieldTitle": {
+    "description": "Event title field label."
+  },
+  "eventFieldDescription": "What is the plan?",
+  "@eventFieldDescription": {
+    "description": "Event description field label."
+  },
+  "eventFieldCategory": "Category",
+  "@eventFieldCategory": {
+    "description": "Event category label."
+  },
+  "eventFieldWhen": "When",
+  "@eventFieldWhen": {
+    "description": "Event time label."
+  },
+  "eventFieldEnds": "Ends",
+  "@eventFieldEnds": {
+    "description": "Prefix of the event end time chip."
+  },
+  "eventFieldPlace": "Where",
+  "@eventFieldPlace": {
+    "description": "Event place label."
+  },
+  "eventFieldCapacity": "Guest limit (optional)",
+  "@eventFieldCapacity": {
+    "description": "Event capacity field label."
+  },
+  "eventFieldVisibility": "Who can find it",
+  "@eventFieldVisibility": {
+    "description": "Event visibility label."
+  },
+  "eventVisibilityPublic": "Public",
+  "@eventVisibilityPublic": {
+    "description": "Visibility option: everyone."
+  },
+  "eventVisibilityLinkOnly": "Link only",
+  "@eventVisibilityLinkOnly": {
+    "description": "Visibility option: only people with the link."
+  },
+  "eventVisibilityPublicHint": "Shown on the map and in the feed of people who follow community events.",
+  "@eventVisibilityPublicHint": {
+    "description": "Explains the public visibility."
+  },
+  "eventVisibilityLinkOnlyHint": "Hidden from the map and feed. Only people you send the link to can open it.",
+  "@eventVisibilityLinkOnlyHint": {
+    "description": "Explains the link-only visibility."
+  },
+  "eventTitleRequired": "Give your event a title",
+  "@eventTitleRequired": {
+    "description": "Validation message for an empty title."
+  },
+  "eventStartPast": "The event must start in the future",
+  "@eventStartPast": {
+    "description": "Validation message for a start in the past."
+  },
+  "eventEndBeforeStart": "The event must end after it starts",
+  "@eventEndBeforeStart": {
+    "description": "Validation message for an end before the start."
+  },
+  "eventCapacityInvalid": "Enter a number from 2 to 500, or leave it empty",
+  "@eventCapacityInvalid": {
+    "description": "Validation message for the guest limit."
+  },
+  "eventCategoryMusic": "Music",
+  "@eventCategoryMusic": {
+    "description": "Event category."
+  },
+  "eventCategoryArts": "Arts",
+  "@eventCategoryArts": {
+    "description": "Event category."
+  },
+  "eventCategoryFood": "Food and drink",
+  "@eventCategoryFood": {
+    "description": "Event category."
+  },
+  "eventCategorySport": "Sport",
+  "@eventCategorySport": {
+    "description": "Event category."
+  },
+  "eventCategoryOutdoors": "Outdoors",
+  "@eventCategoryOutdoors": {
+    "description": "Event category."
+  },
+  "eventCategoryCommunity": "Community",
+  "@eventCategoryCommunity": {
+    "description": "Event category."
+  },
+  "eventCategoryOther": "Other",
+  "@eventCategoryOther": {
+    "description": "Event category."
+  },
+  "eventNotFound": "This event is not available",
+  "@eventNotFound": {
+    "description": "Message on the event page for an unknown event."
+  },
+  "eventHostedBy": "Hosted by {name}",
+  "@eventHostedBy": {
+    "description": "Who hosts the event.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eventYouHost": "You are hosting",
+  "@eventYouHost": {
+    "description": "Shown to the host of the event."
+  },
+  "eventGoing": "{count, plural, =0{No one is going yet} =1{1 person going} other{{count} people going}}",
+  "@eventGoing": {
+    "description": "Number of guests.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eventGoingOf": "{count} of {capacity} going",
+  "@eventGoingOf": {
+    "description": "Guests against the limit.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "capacity": {
+        "type": "int"
+      }
+    }
+  },
+  "eventLinkOnlyNote": "Link only: not on the map or in the feed",
+  "@eventLinkOnlyNote": {
+    "description": "Note on a link-only event."
+  },
+  "eventJoin": "Join",
+  "@eventJoin": {
+    "description": "Button that joins the event."
+  },
+  "eventLeave": "Leave",
+  "@eventLeave": {
+    "description": "Button that leaves the event."
+  },
+  "eventFull": "Full",
+  "@eventFull": {
+    "description": "Disabled join button of a full event."
+  },
+  "eventCancelled": "Cancelled",
+  "@eventCancelled": {
+    "description": "State of a cancelled event."
+  },
+  "eventEnded": "This event has ended",
+  "@eventEnded": {
+    "description": "State of a finished event."
+  },
+  "eventInvite": "Invite people",
+  "@eventInvite": {
+    "description": "Button that opens the invite sheet."
+  },
+  "eventInviteHint": "Send this to the people you want to bring. The link opens the event so they can join.",
+  "@eventInviteHint": {
+    "description": "Invite sheet body."
+  },
+  "eventInviteNoLink": "This build has no public link yet. Send this message; people can find the event under Community events.",
+  "@eventInviteNoLink": {
+    "description": "Invite sheet body without a link."
+  },
+  "eventInviteCopyMessage": "Copy message",
+  "@eventInviteCopyMessage": {
+    "description": "Button that copies the invite message."
+  },
+  "eventInviteCopyLink": "Copy link",
+  "@eventInviteCopyLink": {
+    "description": "Button that copies the invite link."
+  },
+  "eventInviteCopied": "Copied",
+  "@eventInviteCopied": {
+    "description": "Snackbar after copying."
+  },
+  "eventShowOnMap": "Show on map",
+  "@eventShowOnMap": {
+    "description": "Button that shows the event on the map."
+  },
+  "eventCancelAction": "Cancel event",
+  "@eventCancelAction": {
+    "description": "Button that cancels the event."
+  },
+  "eventCancelConfirmTitle": "Cancel this event?",
+  "@eventCancelConfirmTitle": {
+    "description": "Title of the cancel confirmation."
+  },
+  "eventCancelConfirmBody": "Guests will see it as cancelled.",
+  "@eventCancelConfirmBody": {
+    "description": "Body of the cancel confirmation."
+  },
+  "eventKeep": "Keep it",
+  "@eventKeep": {
+    "description": "Dialog button that keeps the event."
+  },
+  "eventFullNotice": "This event is full",
+  "@eventFullNotice": {
+    "description": "Snackbar when joining a full event."
+  },
+  "eventUnavailableNotice": "This event is no longer open",
+  "@eventUnavailableNotice": {
+    "description": "Snackbar when joining a closed event."
+  },
+  "eventActionFailed": "That did not work. Try again.",
+  "@eventActionFailed": {
+    "description": "Snackbar when an event action failed."
+  },
+  "eventSampleNote": "A sample event for development. It is not real.",
+  "@eventSampleNote": {
+    "description": "Note on a sample event."
+  },
+  "mapCommunityLayer": "Community events",
+  "@mapCommunityLayer": {
+    "description": "Map layer chip for user events."
+  },
+  "mapLayersButton": "Layers",
+  "@mapLayersButton": {
+    "description": "Button that opens the layers sheet."
+  },
+  "mapResultsButton": "Results",
+  "@mapResultsButton": {
+    "description": "Button that opens the list of map results."
+  },
+  "settingsProfile": "Your name",
+  "@settingsProfile": {
+    "description": "Settings section and dialog title for the profile."
+  },
+  "settingsProfileHint": "Shown to guests of events you host",
+  "@settingsProfileHint": {
+    "description": "Subtitle under the profile name."
+  },
+  "settingsNameLabel": "Name",
+  "@settingsNameLabel": {
+    "description": "Name field label."
+  },
+  "settingsCancel": "Cancel",
+  "@settingsCancel": {
+    "description": "Dialog cancel button."
+  },
+  "settingsSave": "Save",
+  "@settingsSave": {
+    "description": "Dialog save button."
+  },
+  "settingsFollowing": "Following",
+  "@settingsFollowing": {
+    "description": "Settings section for feed topics."
+  },
+  "settingsAppearance": "Appearance",
+  "@settingsAppearance": {
+    "description": "Settings section for the theme."
+  },
+  "settingsThemeSystem": "System",
+  "@settingsThemeSystem": {
+    "description": "Theme option: follow the device."
+  },
+  "settingsThemeLight": "Light",
+  "@settingsThemeLight": {
+    "description": "Theme option."
+  },
+  "settingsThemeDark": "Dark",
+  "@settingsThemeDark": {
+    "description": "Theme option."
+  },
+  "settingsAbout": "About",
+  "@settingsAbout": {
+    "description": "Settings section."
+  },
+  "settingsData": "Map data",
+  "@settingsData": {
+    "description": "Settings row title."
+  },
+  "settingsDataSample": "Sample data for development",
+  "@settingsDataSample": {
+    "description": "Settings row when sample data is on."
+  },
+  "settingsDataLive": "Live City of Melbourne data",
+  "@settingsDataLive": {
+    "description": "Settings row when live data is on."
+  },
+  "settingsAboutBody": "Melens shows City of Melbourne open data as map layers. Answers come from Gemini agents on Google Cloud.",
+  "@settingsAboutBody": {
+    "description": "About text."
+  },
+  "feedSourceFailed": "Could not load: {topics}. Pull down to try again.",
+  "@feedSourceFailed": {
+    "description": "Notice that some feed sources failed.",
+    "placeholders": {
+      "topics": {
+        "type": "String"
+      }
+    }
+  },
+  "eventOpen": "Open event",
+  "@eventOpen": {
+    "description": "Button in the map preview that opens the event page."
+  },
+  "mapUnlocatedAction": "Items without a location",
+  "@mapUnlocatedAction": {
+    "description": "Row in the layers sheet that lists map items that have no place on the map."
+  },
+  "mapLayersSheetTitle": "Layers and time",
+  "@mapLayersSheetTitle": {
+    "description": "Title of the sheet that holds the map's layers, time window and results."
   }
 }

@@ -3,18 +3,22 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
+import '../../../app/router.dart';
 import '../../../core/network/public_source_opener.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_item_details.dart';
-import '../../cards/ui/card_registry.dart';
-import '../../chat/ui/chat_panel.dart';
+import '../../events/data/user_event.dart';
+import '../../events/state/event_providers.dart';
+import '../../events/ui/event_preview_card.dart';
+import '../../shell/state/shell_providers.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
 import '../state/map_actions.dart';
@@ -63,7 +67,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _usesVisibleRegion = false;
   bool _regionReadFailed = false;
   bool _showUnlocated = false;
-  bool _showChat = false;
+  String? _communityEventId;
+  MapFocusRequest? _pendingFocus;
+  CardItem? _awaitingItem;
 
   /// A tapped card item with no map record, shown in the details pane.
   CardItem? _cardItem;
@@ -93,6 +99,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     });
     ref.listenManual(viewportControllerProvider, (previous, next) {
       _reconcileSelection();
+      // A card item asked for before the first results arrived.
+      final waiting = _awaitingItem;
+      if (waiting != null && next.response != null) {
+        _awaitingItem = null;
+        _onCardItemTap(waiting);
+      }
     });
     ref.listenManual(
       mapActionsControllerProvider.select((state) => state.focus),
@@ -102,8 +114,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         }
       },
     );
+    ref.listenManual(cardItemRequestsProvider, (previous, next) {
+      if (next != null) _takeCardItemRequest(next);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // The agent or an event page may have asked for the map before it was
+      // built: take what is waiting.
+      final waiting = ref.read(cardItemRequestsProvider);
+      if (waiting != null) _takeCardItemRequest(waiting);
+      _pendingFocus = ref.read(mapActionsControllerProvider).focus;
       final viewport = ref.read(viewportControllerProvider.notifier);
       viewport.setLayers(ref.read(layerControllerProvider).enabledLayerIds);
       final catalog = ref.read(mapLayerCatalogProvider).value;
@@ -323,6 +343,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Applies a `focus_map` action from the agent (agent-protocol.md,
   /// Rules): a bounds target fits the box, a point target centres on it.
   void _applyFocus(MapFocusRequest request) {
+    if (_map == null && widget.onFocusRequest == null) {
+      _pendingFocus = request;
+      return;
+    }
     if (widget.onFocusRequest != null) {
       widget.onFocusRequest!(request);
       return;
@@ -401,40 +425,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return null;
   }
 
-  Widget _chatPanel({VoidCallback? onClose, CardItemCallback? onCardItemTap}) =>
-      ChatPanel(
-        key: const ValueKey('map-chat-panel'),
-        onClose: onClose,
-        onCardItemTap: onCardItemTap ?? _onCardItemTap,
-        onOpenSource: _sourceOpener,
-      );
-
-  void _showChatSheet(BuildContext context) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (sheetContext) => PointerInterceptor(
-          child: SafeArea(
-            child: SizedBox(
-              height: math.min(
-                760,
-                MediaQuery.sizeOf(sheetContext).height * 0.9,
-              ),
-              child: _chatPanel(
-                onClose: () => Navigator.of(sheetContext).pop(),
-                // The sheet covers the map, so a tapped item closes it to
-                // show the details it opened.
-                onCardItemTap: (item) {
-                  Navigator.of(sheetContext).pop();
-                  _onCardItemTap(item);
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  void _takeCardItemRequest(CardItemRequest request) {
+    ref.read(cardItemRequestsProvider.notifier).consume(request.sequence);
+    final item = request.item;
+    final loaded = ref.read(viewportControllerProvider).response != null;
+    if (item.source is FeatureCardSource && !loaded) {
+      // Selecting a record needs the snapshot the map shows; wait for it.
+      _awaitingItem = item;
+      return;
+    }
+    _onCardItemTap(item);
   }
 
   /// The features the agent highlighted, as chips above the map. The surface
@@ -527,12 +527,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context);
     final viewport = ref.watch(viewportControllerProvider);
     final layers = ref.watch(layerControllerProvider);
     final selection = ref.watch(selectionControllerProvider);
     final catalog = ref.watch(mapLayerCatalogProvider);
     final actions = ref.watch(mapActionsControllerProvider);
+    final communityOn = ref.watch(communityLayerEnabledProvider);
+    final List<UserEvent> communityEvents = communityOn
+        ? ref.watch(publicUpcomingEventsProvider)
+        : const <UserEvent>[];
+    final communityEvent = _communityEventId == null
+        ? null
+        : ref.watch(userEventByIdProvider(_communityEventId!));
     final unlocated = _unlocatedQuery(catalog.value, viewport);
     final response = viewport.response;
     final items =
@@ -550,12 +556,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       onZoomToBounds: _zoomToBounds,
       builder: (context, renderer) => MapSurface(
         key: const ValueKey('map-screen-surface'),
+        compact: true,
         layers: response?.layers ?? const [],
         enabledLayers: layers.enabledLayers,
         dataMode: response?.dataMode ?? viewport.dataMode,
         selectedItemId: selection.highlightedItemId,
         onItemSelected: _selectItem,
         onAggregateSelected: _selectItem,
+        extraMarkers: {
+          for (final event in communityEvents)
+            Marker(
+              markerId: MarkerId('user-event:${event.id}'),
+              position: LatLng(event.place.latitude, event.place.longitude),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueViolet,
+              ),
+              infoWindow: InfoWindow(
+                title: event.title,
+                snippet: event.place.name,
+              ),
+              zIndexInt: 3,
+              onTap: () => _selectCommunityEvent(event.id),
+            ),
+        },
         onCameraChanged: (camera) {
           _zoom = camera.zoom;
           _regionGeneration++;
@@ -565,6 +588,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         onMapCreated: (controller) {
           _map = controller;
           unawaited(_readVisibleRegion());
+          if (_pendingFocus case final pending?) {
+            _pendingFocus = null;
+            _applyFocus(pending);
+          }
         },
         mapBuilder: widget.mapBuilder,
         aggregateRenderer: renderer,
@@ -606,6 +633,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 onRefreshSnapshot: () => unawaited(_refreshAggregateSnapshot()),
               ),
       );
+    } else if (communityEvent != null) {
+      details = EventPreviewCard(
+        event: communityEvent,
+        onClose: () => setState(() => _communityEventId = null),
+        onOpen: () => context.go(AppRoutes.event(communityEvent.id)),
+      );
     } else if (_cardItem case final cardItem?) {
       details = CardItemDetails(
         item: cardItem,
@@ -615,97 +648,281 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } else {
       details = null;
     }
+    final highlights = _highlightBar(items, actions);
+    final status = _queryStatus(catalog, viewport);
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 1050;
-        final panel = _controls(catalog, viewport);
-        final highlights = _highlightBar(items, actions);
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(strings.mapScreenTitle),
-            actions: [
-              IconButton(
-                key: const ValueKey('map-chat-toggle'),
-                tooltip: wide && _showChat
-                    ? strings.chatClose
-                    : strings.chatOpen,
-                isSelected: wide && _showChat,
-                onPressed: () {
-                  if (wide) {
-                    setState(() => _showChat = !_showChat);
-                  } else {
-                    _showChatSheet(context);
-                  }
-                },
-                icon: const Icon(Icons.chat_bubble_outline),
-                selectedIcon: const Icon(Icons.chat_bubble),
-              ),
-              IconButton(
-                key: const ValueKey('map-layer-statuses'),
-                tooltip: strings.mapScreenStatuses,
-                onPressed: () => _showStatuses(context),
-                icon: const Icon(Icons.info_outline),
-              ),
-              IconButton(
-                key: const ValueKey('map-show-unlocated'),
-                tooltip: strings.mapScreenUnlocated,
-                onPressed: unlocated == null
-                    ? null
-                    : () => setState(() => _showUnlocated = !_showUnlocated),
-                icon: const Icon(Icons.list_alt),
-              ),
-            ],
-          ),
-          drawer: wide
-              ? null
-              : Drawer(
-                  child: PointerInterceptor(child: SafeArea(child: panel)),
-                ),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _timeControls(viewport),
-              SizedBox(
-                height: 72,
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
+        final theme = Theme.of(context);
+        final overlay = PointerInterceptor(
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _layerChips(layers, communityOn, wide: wide),
+                if (viewport.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
-                    child: _queryStatus(catalog, viewport),
                   ),
-                ),
-              ),
-              SizedBox(
-                height: 4,
-                child: viewport.isLoading
-                    ? const LinearProgressIndicator()
-                    : null,
-              ),
-              ?highlights,
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (wide) SizedBox(width: 290, child: panel),
-                    Expanded(
-                      child: MapDetailsLayout(map: map, details: details),
-                    ),
-                    if (wide && _showChat)
-                      SizedBox(
-                        width: 380,
-                        child: _chatPanel(
-                          onClose: () => setState(() => _showChat = false),
+                if (status.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface.withValues(
+                            alpha: 0.94,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Semantics(
+                            liveRegion: true,
+                            child: Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: status,
+                            ),
+                          ),
                         ),
                       ),
-                  ],
+                    ),
+                  ),
+                ?highlights,
+              ],
+            ),
+          ),
+        );
+        final stage = Stack(
+          children: [
+            Positioned.fill(child: map),
+            Positioned(left: 0, right: 0, top: 0, child: overlay),
+          ],
+        );
+        return Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wide)
+                SizedBox(
+                  width: 320,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: theme.colorScheme.outlineVariant),
+                      ),
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: SingleChildScrollView(
+                        child: _sheetContent(
+                          catalog,
+                          viewport,
+                          enabledLayers: layers.enabledLayers,
+                          items: items,
+                          selectedItemId: selection.highlightedItemId,
+                          hasUnlocated: unlocated != null,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              Expanded(child: MapDetailsLayout(map: stage, details: details)),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _selectCommunityEvent(String id) {
+    ref.read(selectionControllerProvider.notifier).clear();
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = null;
+      _communityEventId = id;
+    });
+  }
+
+  /// The layers as chips: filled and ticked when on, outlined when off, so
+  /// what the map shows is readable at a glance. The community layer sits
+  /// beside the contract layers; the tune button opens the full panel.
+  Widget _layerChips(
+    LayerSelectionState layers,
+    bool communityOn, {
+    required bool wide,
+  }) {
+    final strings = AppLocalizations.of(context);
+    final controller = ref.read(layerControllerProvider.notifier);
+    final scheme = Theme.of(context).colorScheme;
+    Widget chip({
+      required Key key,
+      required String label,
+      required bool on,
+      required ValueChanged<bool> onChanged,
+    }) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        key: key,
+        avatar: Icon(
+          on ? Icons.check_circle : Icons.circle_outlined,
+          size: 18,
+          color: on ? scheme.primary : scheme.outline,
+        ),
+        label: Text(label),
+        selected: on,
+        backgroundColor: scheme.surface,
+        onSelected: onChanged,
+      ),
+    );
+    return SizedBox(
+      height: 56,
+      child: Row(
+        children: [
+          Expanded(
+            child: ListView(
+              key: const ValueKey('map-layer-chips'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              children: [
+                for (final layer in layers.availableLayers)
+                  chip(
+                    key: ValueKey('map-chip-${layer.name}'),
+                    label: layerTitle(strings, layer),
+                    on: layers.isLayerEnabled(layer),
+                    onChanged: (on) => controller.setLayerEnabled(layer, on),
+                  ),
+                chip(
+                  key: const ValueKey('map-chip-community'),
+                  label: strings.mapCommunityLayer,
+                  on: communityOn,
+                  onChanged: (on) => ref
+                      .read(communityLayerEnabledProvider.notifier)
+                      .set(enabled: on),
+                ),
+              ],
+            ),
+          ),
+          if (!wide)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: IconButton.filled(
+                key: const ValueKey('map-layers-button'),
+                tooltip: strings.mapLayersButton,
+                onPressed: _showLayersSheet,
+                icon: const Icon(Icons.layers_outlined),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The full panel: topics, every layer with its availability, the time
+  /// window, layer statuses, the legend and the text list of results.
+  Widget _sheetContent(
+    AsyncValue<MapLayerCatalog> catalog,
+    ViewportState viewport, {
+    required Set<MapLayerId> enabledLayers,
+    required List<MapItem> items,
+    required String? selectedItemId,
+    required bool hasUnlocated,
+    VoidCallback? afterAction,
+  }) {
+    final strings = AppLocalizations.of(context);
+    void select(MapItem item) {
+      afterAction?.call();
+      _selectItem(item);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _timeControls(viewport),
+        _controls(catalog, viewport),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: MapLegend(enabledLayers: enabledLayers),
+        ),
+        ListTile(
+          key: const ValueKey('map-show-unlocated'),
+          enabled: hasUnlocated,
+          leading: const Icon(Icons.list_alt),
+          title: Text(strings.mapUnlocatedAction),
+          onTap: hasUnlocated
+              ? () {
+                  afterAction?.call();
+                  setState(() {
+                    _communityEventId = null;
+                    _showUnlocated = true;
+                  });
+                }
+              : null,
+        ),
+        SizedBox(
+          height: 240,
+          child: MapObjectList(
+            items: items,
+            selectedItemId: selectedItemId,
+            onSelected: select,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showLayersSheet() {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => PointerInterceptor(
+          child: SizedBox(
+            height: math.min(720, MediaQuery.sizeOf(sheetContext).height * 0.88),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final viewport = ref.watch(viewportControllerProvider);
+                final layers = ref.watch(layerControllerProvider);
+                final catalog = ref.watch(mapLayerCatalogProvider);
+                final selection = ref.watch(selectionControllerProvider);
+                final items =
+                    viewport.response?.layers
+                        .expand((layer) => layer.items)
+                        .where(
+                          (item) => layers.enabledLayers.contains(item.layerId),
+                        )
+                        .toList() ??
+                    const <MapItem>[];
+                return SingleChildScrollView(
+                  child: _sheetContent(
+                    catalog,
+                    viewport,
+                    enabledLayers: layers.enabledLayers,
+                    items: items,
+                    selectedItemId: selection.highlightedItemId,
+                    hasUnlocated:
+                        _unlocatedQuery(catalog.value, viewport) != null,
+                    afterAction: () => Navigator.of(sheetContext).pop(),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -797,18 +1014,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return const AsyncLoading<LayerResult>();
   }
 
-  Widget _queryStatus(
+  /// What the map is doing or lacking, as short lines; empty when all is well.
+  List<Widget> _queryStatus(
     AsyncValue<MapLayerCatalog> catalog,
     ViewportState state,
   ) {
     final strings = AppLocalizations.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
+    return [
           if (state.layers.isEmpty)
             Text(strings.mapNoLayersSelected)
           else if (state.isOutsideService)
@@ -854,9 +1066,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onPressed: () => ref.invalidate(mapLayerCatalogProvider),
               child: Text(strings.mapScreenRetryCatalog),
             ),
-        ],
-      ),
-    );
+    ];
   }
 
   Widget _timeControls(ViewportState state) {
@@ -989,38 +1199,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showStatuses(BuildContext context) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) => PointerInterceptor(
-          child: SafeArea(
-            child: SizedBox(
-              height: math.min(640, MediaQuery.sizeOf(context).height * 0.85),
-              child: Consumer(
-                builder: (context, ref, child) => SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).mapScreenStatuses,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 12),
-                      ..._layerStatuses(ref.watch(viewportControllerProvider)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -3,27 +3,83 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../features/events/ui/event_detail_screen.dart';
+import '../features/events/ui/event_editor_screen.dart';
+import '../features/feed/ui/feed_screen.dart';
 import '../features/map/ui/map_screen.dart';
+import '../features/settings/ui/settings_screen.dart';
+import '../features/shell/ui/app_shell.dart';
 import '../l10n/app_localizations.dart';
 
 part 'router.g.dart';
 
+/// The bottom tabs, in the order of the navigation bar.
+enum AppBranch { feed, discover, settings }
+
 /// Every route path in the app. Navigate with these, never with string
-/// literals: `context.go(AppRoutes.map)`.
+/// literals: `context.go(AppRoutes.discover)`.
 abstract final class AppRoutes {
-  static const map = '/';
+  static const feed = '/';
+  static const discover = '/discover';
+  static const settings = '/settings';
+  static const newEvent = '/events/new';
+  static const eventPattern = '/events/:id';
+
+  static String event(String id) => '/events/${Uri.encodeComponent(id)}';
 }
 
 /// The app's router. It is a provider so that redirects can later watch app
 /// state, for example the auth state for UC-07 and UC-09.
+///
+/// The three tabs are branches of one stateful shell, so each keeps its scroll
+/// position and the map keeps its camera while the user is elsewhere. Event
+/// pages sit under the feed branch, inside the shell, so the chat button stays
+/// reachable on them.
 @Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
   final router = GoRouter(
     debugLogDiagnostics: kDebugMode,
     routes: [
-      GoRoute(
-        path: AppRoutes.map,
-        builder: (context, state) => const MapScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) => AppShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.feed,
+                builder: (context, state) => const FeedScreen(),
+                routes: [
+                  // `new` precedes `:id` so it is not read as an event id.
+                  GoRoute(
+                    path: 'events/new',
+                    builder: (context, state) => const EventEditorScreen(),
+                  ),
+                  GoRoute(
+                    path: 'events/:id',
+                    builder: (context, state) =>
+                        EventDetailScreen(eventId: state.pathParameters['id']!),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.discover,
+                builder: (context, state) => const MapScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.settings,
+                builder: (context, state) => const SettingsScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
     errorBuilder: (context, state) => const _NotFoundScreen(),
@@ -42,8 +98,8 @@ class _NotFoundScreen extends StatelessWidget {
       appBar: AppBar(title: Text(l10n.notFoundTitle)),
       body: Center(
         child: FilledButton(
-          onPressed: () => context.go(AppRoutes.map),
-          child: Text(l10n.notFoundBackToMap),
+          onPressed: () => context.go(AppRoutes.feed),
+          child: Text(l10n.notFoundBackToFeed),
         ),
       ),
     );

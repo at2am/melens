@@ -48,3 +48,15 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+  # Roboto ships with the app instead of downloading from fonts.gstatic.com
+  # at startup: that request blocks the first frame, and the host is slow or
+  # unreachable on some networks. The files are the Flutter SDK's own copies
+  # (Apache 2.0, assets/fonts/Roboto_LICENSE.txt).
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

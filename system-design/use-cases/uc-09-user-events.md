@@ -2,7 +2,7 @@
 id: UC-09
 title: Publish and join user events
 priority: P2
-status: planned
+status: in-progress
 proposed_by: Haoyuan Tang
 trigger: browse
 agents: []
@@ -28,9 +28,21 @@ Local events that cannot be found anywhere in Google Maps. P2 because it needs a
 2. The event is stored in Firestore as a MapFeature in a user-events layer.
 3. Everyone sees it on the map.
 
+## Behaviour in the app today (2026-10-15)
+
+The app side is built behind a repository seam; the shared store is not.
+
+1. **Define.** An event has a title, description, category, start and end (Melbourne time), a place, a visibility (public, or link only), an optional guest limit, a host and the guests who joined. The host is the first guest.
+2. **Publish.** The Feed tab's add button opens the editor. Places are picked from a list of Melbourne landmarks until a map picker exists. A public event appears on the Discover tab (a "Community events" chip beside the layers, violet markers) and in the feed of people who follow community events. A link-only event appears in neither.
+3. **Join.** A guest joins or leaves on the event page, up to the guest limit. The host cancels instead of leaving; a cancelled or finished event is closed.
+4. **Bring people.** The host's Invite sheet gives a message to paste into any chat, with a link that opens the event page where the app has a public origin (the Web build). The app sends nothing itself. Sharing through the system share sheet and push notifications are not built.
+5. **Store.** Events live in memory for the app run (`InMemoryUserEventRepository`), and development builds seed three labelled sample events. The shared store is Firestore behind the agent service, which needs a publish and join endpoint that does not exist yet; the app never reaches Firestore itself (AGENTS.md).
+6. **Identity.** Until accounts exist, the person is a local profile whose name is edited in Settings.
+
 ## Acceptance criteria (Draft)
 
 - [ ] A signed-in user can publish an event, and it appears on the map for other users.
+- [x] In the app, a published public event appears on the map and in the feed of the same device, and a guest can join it (in-memory store).
 
 ## Notes
 
@@ -39,3 +51,5 @@ Local events that cannot be found anywhere in Google Maps. P2 because it needs a
 ## Open questions
 
 - Can anonymous users publish, or does publishing need a full account?
+- Moderation: who removes an abusive public event, and how is it reported?
+- The map contract registers nine layers; a shared user-events layer needs a tenth, or events stay a client-side overlay.

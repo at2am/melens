@@ -76,6 +76,21 @@ Future<ProviderContainer> showScreen(
   return container;
 }
 
+/// Opens the layers sheet, which holds the time window, the layer statuses and
+/// the text list of results on a narrow screen.
+Future<void> openLayers(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('map-layers-button')));
+  await tester.pumpAndSettle();
+}
+
+/// Picks a result from the text list in the layers sheet; the sheet closes.
+Future<void> pickFromList(WidgetTester tester, String title) async {
+  await openLayers(tester);
+  await tester.ensureVisible(find.text(title));
+  await tester.tap(find.text(title));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('loading and failure keep the actual map rectangle stable', (
     tester,
@@ -146,7 +161,7 @@ void main() {
       repository,
       reader: () async => t017Region,
     );
-    expect(find.text('Melens map'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-layer-chips')), findsOneWidget);
     expect(find.text('The map goes here (UC-01).'), findsNothing);
     expect(find.text('Sample sensor A'), findsOneWidget);
     expect(find.text('Sample data — illustrative only'), findsWidgets);
@@ -184,10 +199,11 @@ void main() {
       find.textContaining('Results use the query service area'),
       findsOneWidget,
     );
+    await openLayers(tester);
     expect(find.text('Sample sensor A'), findsOneWidget);
+    await tester.ensureVisible(find.text('Sample sensor A'));
     await tester.tap(find.text('Sample sensor A'));
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(
       container.read(selectionControllerProvider).selectedItemId,
       'sample.sensor.A',
@@ -209,9 +225,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final repository = T017Repository(autoComplete: true);
     final container = await showScreen(tester, repository);
-    await tester.tap(find.text('Sample sensor A'));
-    await tester.pump();
-    await tester.pump();
+    await pickFromList(tester, 'Sample sensor A');
     expect(
       find.byKey(const ValueKey('map-details-bottom-layout')),
       findsOneWidget,
@@ -241,9 +255,7 @@ void main() {
         return const SizedBox();
       },
     );
-    await tester.tap(find.text('Sample sensor A'));
-    await tester.pump();
-    await tester.pump();
+    await pickFromList(tester, 'Sample sensor A');
     map!.onCameraChanged!(
       const CameraPosition(target: LatLng(-37.82, 144.97), zoom: 16),
     );
@@ -260,7 +272,13 @@ void main() {
       container.read(selectionControllerProvider).disposition,
       MapSelectionDisposition.filterExcluded,
     );
-    expect(map!.renderPlan.markers, isEmpty);
+    // Community events are the app's own layer, with their own switch.
+    expect(
+      map!.renderPlan.markers.where(
+        (marker) => !marker.markerId.value.startsWith('user-event:'),
+      ),
+      isEmpty,
+    );
     expect(find.textContaining('No layers selected'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -304,13 +322,15 @@ void main() {
     (tester) async {
       final repository = T017Repository(autoComplete: true);
       final container = await showScreen(tester, repository);
-      await tester.tap(find.text('Sample sensor A'));
-      await tester.pump();
-      await tester.pump();
+      await pickFromList(tester, 'Sample sensor A');
+      await openLayers(tester);
       repository.nextViewportError = const MapNetworkException();
       await tester.tap(find.byKey(const ValueKey('map-time-historical')));
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
+      // Back to the map: the failure notice and its retry live there.
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
       expect(
         container.read(viewportControllerProvider).response!.mode,
         MapQueryMode.current,
@@ -352,9 +372,10 @@ void main() {
         'Sample Melbourne source jurisdiction',
       ),
     );
+    await openLayers(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('map-show-unlocated')));
     await tester.tap(find.byKey(const ValueKey('map-show-unlocated')));
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(repository.unlocatedQueries, hasLength(1));
     expect(repository.unlocatedQueries.single.snapshotId, isNull);
     await tester.tap(
@@ -428,14 +449,12 @@ void main() {
       repository.nextViewportError = const MapNetworkException();
       await container.read(viewportControllerProvider.notifier).refresh();
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('map-layer-statuses')));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump();
+      await openLayers(tester);
       expect(
         container.read(viewportControllerProvider).response,
         same(original),
       );
-      expect(find.text('Data available'), findsOneWidget);
+      expect(find.text('Data available'), findsWidgets);
       expect(find.text('Partial result — more data may exist'), findsWidgets);
       expect(find.text('Full matching total unknown'), findsWidgets);
       expect(

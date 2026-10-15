@@ -10,6 +10,7 @@ import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/state/selection_controller.dart';
 import 'package:melens/features/map/ui/map_screen.dart';
 import 'package:melens/features/map/ui/map_surface.dart';
+import 'package:melens/features/shell/state/shell_providers.dart';
 import 'package:melens/l10n/app_localizations.dart';
 
 import '../../agent/fake_agent_client.dart';
@@ -69,24 +70,19 @@ Future<ProviderContainer> showScreen(
 }
 
 void main() {
-  testWidgets('the toolbar opens the chat beside the map on wide screens', (
+  testWidgets('the agent moves the camera and highlights features', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final client = FakeAgentClient();
     final focused = <MapFocusRequest>[];
-    final container = await showScreen(tester, client, focused: focused);
-    expect(find.byKey(const ValueKey('map-chat-panel')), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('map-chat-toggle')));
-    await tester.pump();
-    await tester.pump();
-    expect(find.byKey(const ValueKey('map-chat-panel')), findsOneWidget);
-    expect(find.byKey(const ValueKey('fake-map')), findsOneWidget);
-    expect(client.calls, ['list']);
+    final container = await showScreen(
+      tester,
+      FakeAgentClient(),
+      focused: focused,
+    );
 
     // A focus_map action reaches the screen's camera hook once per request.
     final actions = container.read(mapActionsControllerProvider.notifier);
@@ -104,6 +100,11 @@ void main() {
     await tester.pump();
     expect(focused.single.point?.lng, 144.96);
     expect(focused.single.zoom, 16);
+
+    // An app-side focus, such as "Show on map" on an event, takes the same path.
+    actions.focusPoint(-37.8179, 144.9691);
+    await tester.pump();
+    expect(focused.last.point?.lat, -37.8179);
 
     // Highlights appear as chips above the map and can be cleared.
     actions.apply(
@@ -129,78 +130,34 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('map-highlights-clear')));
     await tester.pump();
     expect(find.text('Highlighted by the agent'), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('chat-close')));
-    await tester.pump();
-    expect(find.byKey(const ValueKey('map-chat-panel')), findsNothing);
   });
 
-  testWidgets('tapping a card item opens its details beside the map', (
+  testWidgets('a requested card item opens its details beside the map', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final client = FakeAgentClient();
-    final focused = <MapFocusRequest>[];
-    final container = await showScreen(tester, client, focused: focused);
-    await tester.tap(find.byKey(const ValueKey('map-chat-toggle')));
-    await tester.pump();
-    await tester.pump();
-    await tester.enterText(
-      find.byKey(const ValueKey('chat-input')),
-      'What is here?',
+    final container = await showScreen(
+      tester,
+      FakeAgentClient(),
+      focused: <MapFocusRequest>[],
     );
-    await tester.tap(find.byKey(const ValueKey('chat-send')));
-    await tester.pump();
-    await tester.pump();
-    final turn = client.lastTurn;
-    // One item is a record the map has not loaded (it is unlocated), the
-    // other a Google Maps place with no map record at all.
-    const card = AgentCard(
-      id: 'c_1',
-      type: CardType.list,
-      title: 'Around here',
-      items: [
-        CardItem(
-          title: 'Unlocated sensor',
-          source: FeatureCardSource(featureId: 'sample.sensor.C'),
-        ),
-        CardItem(
-          title: 'State Library',
-          summary: 'Open until 6 pm.',
-          source: LinkCardSource(
-            url: 'https://maps.google.com/?cid=1',
-            title: 'Google Maps',
-          ),
-          placeId: 'place-1',
-          location: AgentLatLng(lat: -37.8098, lng: 144.9652),
-        ),
-      ],
-    );
-    turn.emit(
-      const AgentEvent.card(turnId: 't_1', seq: 0, stepId: 's_1', card: card),
-    );
-    turn.emit(
-      const AgentEvent.done(
-        turnId: 't_1',
-        seq: 1,
-        stop: StopReason.end,
-        usage: fakeFinalUsage,
+    final requests = container.read(cardItemRequestsProvider.notifier);
+
+    // The unloaded record is fetched by id against the shown snapshot and its
+    // details open in the side pane.
+    requests.request(
+      const CardItem(
+        title: 'Unlocated sensor',
+        source: FeatureCardSource(featureId: 'sample.sensor.C'),
       ),
     );
-    await turn.close();
-    await tester.pump();
-    await tester.pump();
-    expect(find.byKey(const ValueKey('map-details-close')), findsNothing);
-
-    // The unloaded record is fetched by id against the shown snapshot and
-    // its details open in the side pane.
-    await tester.tap(find.text('Unlocated sensor'));
     await tester.pump();
     await tester.pump();
     await tester.pump();
+    expect(container.read(cardItemRequestsProvider), isNull);
     expect(find.byKey(const ValueKey('map-details-close')), findsOneWidget);
     expect(find.text('Sample unlocated sensor'), findsOneWidget);
     final selection = container.read(selectionControllerProvider);
@@ -209,7 +166,18 @@ void main() {
     expect(selection.isLoading, isFalse);
 
     // A place with no map record shows what the card knows about it.
-    await tester.tap(find.text('State Library'));
+    requests.request(
+      const CardItem(
+        title: 'State Library',
+        summary: 'Open until 6 pm.',
+        source: LinkCardSource(
+          url: 'https://maps.google.com/?cid=1',
+          title: 'Google Maps',
+        ),
+        placeId: 'place-1',
+        location: AgentLatLng(lat: -37.8098, lng: 144.9652),
+      ),
+    );
     await tester.pump();
     await tester.pump();
     expect(find.byKey(const ValueKey('map-details-close')), findsNothing);
@@ -219,35 +187,10 @@ void main() {
       find.descendant(of: pane, matching: find.text('Open until 6 pm.')),
       findsOneWidget,
     );
-    expect(
-      find.descendant(
-        of: pane,
-        matching: find.text('Place details from Google Maps'),
-      ),
-      findsOneWidget,
-    );
     expect(container.read(selectionControllerProvider).hasSelection, isFalse);
 
     await tester.tap(find.byKey(const ValueKey('card-item-details-close')));
     await tester.pump();
     expect(find.byKey(const ValueKey('card-item-details')), findsNothing);
-  });
-
-  testWidgets('the toolbar opens the chat as a sheet on narrow screens', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await showScreen(tester, FakeAgentClient(), focused: []);
-
-    await tester.tap(find.byKey(const ValueKey('map-chat-toggle')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('map-chat-panel')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('chat-close')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('map-chat-panel')), findsNothing);
   });
 }
