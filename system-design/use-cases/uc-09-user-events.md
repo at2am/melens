@@ -26,15 +26,19 @@ Local events that cannot be found anywhere in Google Maps. P2 because it needs a
 
 1. A signed-in user publishes an event: title, description, a pin (the map centre or a tapped point), start and optional end time, an optional place name and capacity, and whether attendance is anonymous.
 2. The event is stored in Firestore by the agent service (`/v1/events`, [agent-protocol.md](../agent-protocol.md#user-events)) and exported to BigQuery as `event` versions of source `user.events`, so it reads like any other event on the map and in the agent's tools.
-3. Everyone discovers published events near the map's viewport in the Events panel, and on the map once the export has run.
+3. Everyone discovers published events near the map's viewport in the Events panel on the Discover tab, as violet pins on the map (the "Community events" chip switches them), and in the feed of people who follow community events (UC-14); the map's event layer shows them once the export has run.
 4. A user joins or leaves an event, optionally with a display name. An anonymous event shows only how many are going; otherwise the owner sees the members.
 5. The owner edits, cancels or removes the event and removes members. A cancelled event stays visible as cancelled; a removed one disappears and is withdrawn from BigQuery.
+6. **Bring people.** An open event's page has an Invite action: a message to paste into any chat, with a link where the app has a public origin (the Web build). The link, `/events/{eventId}`, opens the app on the Discover tab with that event's details. The app sends nothing itself; sharing through the system share sheet and push notifications are not built.
+7. **Where it lives in the app.** The Events panel belongs to the Discover tab (a sheet on phones, docked from 1050 px wide). The feed's add button and a tapped community event in the feed switch to Discover and open the panel on the new-event form or on that event. Joining uses the name set in Settings, if any.
 
 ## Acceptance criteria (Draft)
 
-- [x] A signed-in user can publish an event, and it appears in the Events panel for other users (implemented 2026-10-10, pending the review of the panel).
+- [x] A signed-in user can publish an event, and it appears in the Events panel for other users (implemented 2026-10-10; panel moved into the app shell 2026-10-15).
 - [ ] The published event appears on the map's event layer for other users once the `user.events` export is scheduled.
 - [x] A user can join and leave an event; an anonymous event shows only the count.
+- [x] A host can invite people with a pasteable message and an event link; the link opens the event.
+- [x] Followers of community events see them in the feed (UC-14).
 - [x] The owner can edit, cancel and remove the event and remove a member.
 
 ## Design (Draft, 2026-10-09; implemented 2026-10-10, see the protocol's User events section for the routes)
@@ -92,7 +96,8 @@ One row per document version, written the way the Ticketmaster connector writes 
 
 ## Notes
 
-- Build only after P1 is done, and only the "publish + show on the map" minimum. Joining, moderation and seeding content are later.
+- Joining, editing and the member list are built (2026-10-10). Moderation and seeding content are later.
+- The service routes need the updated `melens-dev-agent` image and the `userEvents` TTL policy; the `user.events` export needs its Cloud Scheduler job. Until they are deployed, the app's events calls fail and the feed names community events as failed to load.
 
 ## Open questions
 

@@ -25,6 +25,7 @@ class UserEventsPanel extends ConsumerStatefulWidget {
     this.onClose,
     this.onPickOnMap,
     this.initialEventId,
+    this.startWithForm = false,
     super.key,
   });
 
@@ -40,6 +41,9 @@ class UserEventsPanel extends ConsumerStatefulWidget {
   /// An event to open at once, from a tapped marker.
   final String? initialEventId;
 
+  /// Open on the form for a new event, from the feed's add button.
+  final bool startWithForm;
+
   @override
   ConsumerState<UserEventsPanel> createState() => _UserEventsPanelState();
 }
@@ -50,9 +54,13 @@ class _UserEventsPanelState extends ConsumerState<UserEventsPanel> {
   String? _eventId;
   UserEvent? _editing;
 
+  /// Kept for [dispose], where `ref` is no longer safe to use.
+  late final NearbyUserEventsController _nearby;
+
   @override
   void initState() {
     super.initState();
+    _nearby = ref.read(nearbyUserEventsControllerProvider.notifier);
     final initial = widget.initialEventId ?? ref.read(openUserEventProvider);
     // A form that closed to pick a pin on the map comes back first.
     final draft = ref.read(userEventFormDraftProvider);
@@ -63,6 +71,8 @@ class _UserEventsPanelState extends ConsumerState<UserEventsPanel> {
     } else if (initial != null) {
       _view = _View.details;
       _eventId = initial;
+    } else if (widget.startWithForm) {
+      _view = _View.form;
     }
     ref.listenManual(openUserEventProvider, (previous, next) {
       if (next == null) return;
@@ -76,13 +86,13 @@ class _UserEventsPanelState extends ConsumerState<UserEventsPanel> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(openUserEventProvider.notifier).clear();
-      ref.read(nearbyUserEventsControllerProvider.notifier).setActive(true);
+      _nearby.setActive(true);
     });
   }
 
   @override
   void dispose() {
-    ref.read(nearbyUserEventsControllerProvider.notifier).setActive(false);
+    _nearby.setActive(false);
     super.dispose();
   }
 

@@ -88,12 +88,9 @@ class MapSurface extends ConsumerWidget {
     this.mapBuilder,
     this.aggregateRenderer,
     this.overlay,
+    this.compact = false,
     super.key,
   });
-
-  /// Objects drawn over the layers, such as the user events near the
-  /// viewport (UC-09); they are not map records and are never selected.
-  final CoreRenderPlan? overlay;
 
   final List<LayerResult> layers;
   final Set<MapLayerId> enabledLayers;
@@ -108,6 +105,15 @@ class MapSurface extends ConsumerWidget {
   final ValueChanged<LatLng>? onMapTap;
   final MapSurfaceBuilder? mapBuilder;
   final MapAggregateRenderer? aggregateRenderer;
+
+  /// Objects drawn over the layers, such as the user events near the
+  /// viewport (UC-09); they are not map records and are never selected.
+  final CoreRenderPlan? overlay;
+
+  /// Draws only the map and a data-mode label. The caller supplies the legend
+  /// ([MapLegend]) and the object list ([MapObjectList]) elsewhere, so the map
+  /// can fill its page.
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -154,6 +160,40 @@ class MapSurface extends ConsumerWidget {
       onCameraIdle: onCameraIdle,
       onMapTap: onMapTap,
     );
+    final mapBody = readiness.when(
+      data: (state) => switch (state) {
+        MapSurfaceReadiness.ready =>
+          mapBuilder?.call(context, configuration) ??
+              _GoogleMapSurface(configuration: configuration),
+        MapSurfaceReadiness.missingKey => _MapReadinessMessage(
+          message: strings.mapSurfaceMissingKey,
+        ),
+        MapSurfaceReadiness.unsupportedPlatform => _MapReadinessMessage(
+          message: strings.mapSurfaceNativeUnavailable,
+        ),
+      },
+      loading: () => _MapReadinessMessage(
+        message: strings.mapSurfaceLoading,
+        loading: true,
+      ),
+      error: (error, stack) => _MapReadinessMessage(
+        message: strings.mapSurfaceLoadError,
+        onRetry: () => ref.invalidate(mapSurfaceReadinessProvider),
+      ),
+    );
+    if (compact) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          mapBody,
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: IgnorePointer(child: MapDataModeLabel(dataMode: dataMode)),
+          ),
+        ],
+      );
+    }
     return LayoutBuilder(
       builder: (context, constraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -172,51 +212,17 @@ class MapSurface extends ConsumerWidget {
                     key: const ValueKey('map-surface-legend'),
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(strings.mapSurfaceGeometryLegend),
-                          if (enabledLayers.contains(MapLayerId.pedestrian))
-                            Text(
-                              strings.mapSurfaceCountLegend(
-                                NumberFormat.decimalPattern('en_AU')
-                                    .format(passageCircleAreaSquareMeters),
-                              ),
-                            ),
-                        ],
-                      ),
+                      child: MapLegend(enabledLayers: enabledLayers),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: readiness.when(
-              data: (state) => switch (state) {
-                MapSurfaceReadiness.ready =>
-                  mapBuilder?.call(context, configuration) ??
-                      _GoogleMapSurface(configuration: configuration),
-                MapSurfaceReadiness.missingKey => _MapReadinessMessage(
-                  message: strings.mapSurfaceMissingKey,
-                ),
-                MapSurfaceReadiness.unsupportedPlatform => _MapReadinessMessage(
-                  message: strings.mapSurfaceNativeUnavailable,
-                ),
-              },
-              loading: () => _MapReadinessMessage(
-                message: strings.mapSurfaceLoading,
-                loading: true,
-              ),
-              error: (error, stack) => _MapReadinessMessage(
-                message: strings.mapSurfaceLoadError,
-                onRetry: () => ref.invalidate(mapSurfaceReadinessProvider),
-              ),
-            ),
-          ),
+          Expanded(child: mapBody),
           SizedBox(
             height: math.min(164, constraints.maxHeight * 0.3),
-            child: _MapObjectList(
+            child: MapObjectList(
               items: items,
               selectedItemId: selectedItemId,
               onSelected: onItemSelected == null && onAggregateSelected == null
@@ -226,6 +232,32 @@ class MapSurface extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// What the map's shapes mean, and the scale of the pedestrian circles.
+class MapLegend extends StatelessWidget {
+  const MapLegend({required this.enabledLayers, super.key});
+
+  final Set<MapLayerId> enabledLayers;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(strings.mapSurfaceGeometryLegend),
+        if (enabledLayers.contains(MapLayerId.pedestrian))
+          Text(
+            strings.mapSurfaceCountLegend(
+              NumberFormat.decimalPattern(
+                'en_AU',
+              ).format(passageCircleAreaSquareMeters),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -336,11 +368,13 @@ String _describeItem(AppLocalizations strings, MapItem item) {
   return description.join(' · ');
 }
 
-class _MapObjectList extends StatelessWidget {
-  const _MapObjectList({
+/// The map's results as a list: the text alternative to the drawn shapes.
+class MapObjectList extends StatelessWidget {
+  const MapObjectList({
     required this.items,
     required this.selectedItemId,
     required this.onSelected,
+    super.key,
   });
 
   final List<MapItem> items;

@@ -30,6 +30,25 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Melens</title>
+  <!-- Shown at once while the engine and the app download; removed on the
+       first Flutter frame. -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #fff; }
+    @media (prefers-color-scheme: dark) { html, body { background: #0e1111; } }
+    #splash {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+      font: 700 28px/1 Roboto, system-ui, sans-serif; letter-spacing: -0.5px;
+      color: #00696b; transition: opacity .25s ease-out;
+    }
+    #splash.done { opacity: 0; pointer-events: none; }
+    #splash i {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid rgba(0, 105, 107, .2); border-top-color: #00696b;
+      animation: melens-spin .8s linear infinite;
+    }
+    @keyframes melens-spin { to { transform: rotate(360deg); } }
+  </style>
   <link rel="manifest" href="manifest.json">
   <script>
     (() => {
@@ -150,6 +169,15 @@
   </script>
 </head>
 <body>
+  <div id="splash" aria-label="Loading Melens" role="status">Melens<i></i></div>
+  <script>
+    window.addEventListener('flutter-first-frame', () => {
+      const splash = document.getElementById('splash');
+      if (!splash) return;
+      splash.classList.add('done');
+      setTimeout(() => splash.remove(), 300);
+    });
+  </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

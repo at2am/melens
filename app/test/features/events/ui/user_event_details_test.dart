@@ -18,6 +18,11 @@ Future<ProviderContainer> showDetails(
   List<UserEvent>? edited,
   VoidCallback? onBack,
 }) async {
+  // Tall enough for the organiser's actions and the members list.
+  tester.view.physicalSize = const Size(800, 1100);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   final container = ProviderContainer(
     // No automatic retry: a failed load stays failed, with no pending timer.
     retry: (retryCount, error) => null,

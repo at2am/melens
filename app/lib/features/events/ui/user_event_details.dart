@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../data/user_event_models.dart';
 import '../state/user_events_providers.dart';
+import 'event_invite_sheet.dart';
 import 'user_event_text.dart';
 
 /// One event: what it is, when and where, who is going, and the actions the
@@ -241,14 +242,28 @@ class _UserEventDetailsState extends ConsumerState<UserEventDetails> {
           formatEventPin(strings, event.point),
           style: theme.textTheme.bodySmall,
         ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const ValueKey('event-details-show-on-map'),
-            onPressed: () => widget.onShowOnMap(event.point),
-            icon: const Icon(Icons.place_outlined),
-            label: Text(strings.eventsShowOnMap),
-          ),
+        Wrap(
+          children: [
+            TextButton.icon(
+              key: const ValueKey('event-details-show-on-map'),
+              onPressed: () => widget.onShowOnMap(event.point),
+              icon: const Icon(Icons.place_outlined),
+              label: Text(strings.eventsShowOnMap),
+            ),
+            if (!event.isCancelled && !ended)
+              TextButton.icon(
+                key: const ValueKey('event-details-invite'),
+                onPressed: () => unawaited(
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => EventInviteSheet(event: event),
+                  ),
+                ),
+                icon: const Icon(Icons.person_add_alt),
+                label: Text(strings.eventInvite),
+              ),
+          ],
         ),
         if (event.description.isNotEmpty) ...[
           const SizedBox(height: 8),

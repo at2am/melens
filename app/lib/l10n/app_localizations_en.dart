@@ -1109,6 +1109,178 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapAgentHighlightsClear => 'Clear highlights';
 
   @override
+  String get tabFeed => 'Feed';
+
+  @override
+  String get tabDiscover => 'Discover';
+
+  @override
+  String get tabSettings => 'Settings';
+
+  @override
+  String get notFoundBackToFeed => 'Back to the feed';
+
+  @override
+  String get sampleBadge => 'Sample';
+
+  @override
+  String get feedTitle => 'Melbourne';
+
+  @override
+  String get feedHostEvent => 'Host an event';
+
+  @override
+  String get feedTopicCommunity => 'Community events';
+
+  @override
+  String get feedTopicEvents => 'Events';
+
+  @override
+  String get feedTopicDisruptions => 'Disruptions';
+
+  @override
+  String get feedTopicNews => 'Local news';
+
+  @override
+  String get feedTopicAnomalies => 'Crowd anomalies';
+
+  @override
+  String get feedTopicPlanning => 'Planning';
+
+  @override
+  String get feedTopicCommunityHint => 'Events people host around Melbourne';
+
+  @override
+  String get feedTopicEventsHint => 'Concerts, festivals and shows';
+
+  @override
+  String get feedTopicDisruptionsHint => 'Road and tram disruptions right now';
+
+  @override
+  String get feedTopicNewsHint => 'Local news, placed on the map';
+
+  @override
+  String get feedTopicAnomaliesHint => 'Unusual foot traffic in the city';
+
+  @override
+  String get feedTopicPlanningHint => 'Planning permits and projects';
+
+  @override
+  String get feedEmptyNoTopics => 'You are not following anything';
+
+  @override
+  String get feedEmptyNoTopicsBody => 'Choose topics and they show up here.';
+
+  @override
+  String get feedChooseTopics => 'Choose topics';
+
+  @override
+  String get feedEmpty => 'Nothing right now';
+
+  @override
+  String get feedEmptyBody =>
+      'Nothing is happening in the topics you follow. Try following more, or host something yourself.';
+
+  @override
+  String get feedError => 'The feed could not load';
+
+  @override
+  String get feedRetry => 'Try again';
+
+  @override
+  String get feedTopicsSheetTitle => 'What do you follow?';
+
+  @override
+  String get feedTopicsSheetBody => 'Followed topics appear in your feed.';
+
+  @override
+  String get eventInvite => 'Invite people';
+
+  @override
+  String get eventInviteHint =>
+      'Send this to the people you want to bring. The link opens the event so they can join.';
+
+  @override
+  String get eventInviteNoLink =>
+      'This build has no public link yet. Send this message; people can find the event on the Discover tab under Events.';
+
+  @override
+  String get eventInviteCopyMessage => 'Copy message';
+
+  @override
+  String get eventInviteCopyLink => 'Copy link';
+
+  @override
+  String get eventInviteCopied => 'Copied';
+
+  @override
+  String get mapCommunityLayer => 'Community events';
+
+  @override
+  String get mapLayersButton => 'Layers';
+
+  @override
+  String get mapResultsButton => 'Results';
+
+  @override
+  String get settingsProfile => 'Your name';
+
+  @override
+  String get settingsProfileHint =>
+      'Shown to the organiser when you join an event';
+
+  @override
+  String get settingsNameLabel => 'Name';
+
+  @override
+  String get settingsCancel => 'Cancel';
+
+  @override
+  String get settingsSave => 'Save';
+
+  @override
+  String get settingsFollowing => 'Following';
+
+  @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsThemeSystem => 'System';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsData => 'Map data';
+
+  @override
+  String get settingsDataSample => 'Sample data for development';
+
+  @override
+  String get settingsDataLive => 'Live City of Melbourne data';
+
+  @override
+  String get settingsAboutBody =>
+      'Melens shows City of Melbourne open data as map layers. Answers come from Gemini agents on Google Cloud.';
+
+  @override
+  String feedSourceFailed(String topics) {
+    return 'Could not load: $topics. Pull down to try again.';
+  }
+
+  @override
+  String get mapUnlocatedAction => 'Items without a location';
+
+  @override
+  String get mapLayersSheetTitle => 'Layers and time';
+
+  @override
   String get eventsOpen => 'Open user events';
 
   @override
@@ -1444,4 +1616,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get eventsErrorNotJoined => 'You had not joined this event.';
+
+  @override
+  String get settingsNameUnset => 'Add your name';
 }

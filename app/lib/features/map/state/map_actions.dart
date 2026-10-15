@@ -102,6 +102,18 @@ class MapActionsController extends _$MapActionsController {
     return report;
   }
 
+  /// Moves the camera to a point for the app itself, for example from an
+  /// event page. The agent's `focus_map` takes the same path.
+  void focusPoint(double lat, double lng, {int zoom = 16}) {
+    state = state._with(
+      focus: MapFocusRequest(
+        sequence: ++_focusSequence,
+        point: AgentLatLng(lat: lat, lng: lng),
+        zoom: zoom,
+      ),
+    );
+  }
+
   void clearHighlights() {
     state = state._with(highlightedIds: const [], missingIds: const []);
   }

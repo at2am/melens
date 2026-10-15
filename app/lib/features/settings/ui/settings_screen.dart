@@ -1,0 +1,174 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../../../core/config/env.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../events/state/user_events_providers.dart';
+import '../../feed/ui/feed_topic_list.dart';
+import '../../shell/state/shell_providers.dart';
+
+/// The third tab: who you are, what you follow, how the app looks and what
+/// data it is showing.
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final name = ref.watch(userEventDisplayNameProvider);
+    final choice = ref.watch(appThemeSettingProvider);
+    final env = ref.watch(envProvider);
+
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        key: const ValueKey('settings-list'),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 112),
+        children: [
+          Text(
+            strings.tabSettings,
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _Section(strings.settingsProfile),
+          ListTile(
+            key: const ValueKey('settings-profile'),
+            leading: CircleAvatar(
+              child: name == null
+                  ? const Icon(Icons.person_outline)
+                  : Text(name.characters.first.toUpperCase()),
+            ),
+            title: Text(name ?? strings.settingsNameUnset),
+            subtitle: Text(strings.settingsProfileHint),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _rename(context, ref, name ?? ''),
+          ),
+          const SizedBox(height: 16),
+          _Section(strings.settingsFollowing),
+          const FeedTopicList(),
+          const SizedBox(height: 16),
+          _Section(strings.settingsAppearance),
+          SegmentedButton<AppThemeChoice>(
+            key: const ValueKey('settings-theme'),
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: AppThemeChoice.system,
+                label: Text(strings.settingsThemeSystem),
+              ),
+              ButtonSegment(
+                value: AppThemeChoice.light,
+                label: Text(strings.settingsThemeLight),
+              ),
+              ButtonSegment(
+                value: AppThemeChoice.dark,
+                label: Text(strings.settingsThemeDark),
+              ),
+            ],
+            selected: {choice},
+            onSelectionChanged: (value) =>
+                ref.read(appThemeSettingProvider.notifier).choose(value.first),
+          ),
+          const SizedBox(height: 24),
+          _Section(strings.settingsAbout),
+          ListTile(
+            leading: const Icon(Icons.dataset_outlined),
+            title: Text(strings.settingsData),
+            subtitle: Text(
+              env.usesSampleMapData
+                  ? strings.settingsDataSample
+                  : strings.settingsDataLive,
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: Text(strings.settingsAboutBody),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _rename(
+    BuildContext context,
+    WidgetRef ref,
+    String current,
+  ) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => _RenameDialog(initial: current),
+    );
+    if (name != null) {
+      ref.read(userEventDisplayNameProvider.notifier).remember(name.trim());
+    }
+  }
+}
+
+/// Owns its text controller, so the controller outlives the dialog's exit
+/// animation instead of being disposed under it.
+class _RenameDialog extends StatefulWidget {
+  const _RenameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends State<_RenameDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(strings.settingsProfile),
+      content: TextField(
+        key: const ValueKey('settings-name-field'),
+        controller: _controller,
+        autofocus: true,
+        maxLength: 40,
+        decoration: InputDecoration(labelText: strings.settingsNameLabel),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.settingsCancel),
+        ),
+        FilledButton(
+          key: const ValueKey('settings-name-save'),
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: Text(strings.settingsSave),
+        ),
+      ],
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}

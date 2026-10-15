@@ -45,6 +45,16 @@ Without [fvm](https://fvm.app), install Flutter 3.47.5 stable and drop the `fvm`
 | Logging | `logging` | Official, with named loggers | `logger`, `talker` |
 | Lints | `flutter_lints`, strict analyzer modes, `riverpod_lint` | | `very_good_analysis` (too strict for a three-week build) |
 
+## Navigation and design
+
+Three bottom tabs, one `StatefulShellRoute` in `lib/app/router.dart`: **Feed** (`/`), **Discover** (`/discover`, the map) and **Settings** (`/settings`). Event pages (`/events/new`, `/events/:id`) sit under the feed branch, inside the shell. Each tab keeps its state while the user is elsewhere, so the map keeps its camera.
+
+The agent chat belongs to the shell (`features/shell/ui/app_shell.dart`), not to a tab: its floating button is on every tab and the conversation survives tab changes. A card item tapped in the chat, and an agent `focus_map` or `highlight_features`, bring the Discover tab forward (`cardItemRequestsProvider`, `mapActionsControllerProvider`).
+
+Discover is a full-bleed map. Layers are chips along the top: ticked and filled when on, outlined when off. The app's own "Community events" layer (UC-09) sits beside the contract layers because the map contract has no layer for it; its switch also keeps the nearby user events loaded so their pins stay on the map. The events button opens the Events panel (a sheet on phones, docked from 1050 px); the feed's add button and a tapped community event open it from the Feed tab (`eventsPanelRequestsProvider`), and an invite link `/events/:id` opens it on one event. The layers button opens the full panel: topics, availability, the time window, statuses, the legend and the text list of results; from 1050 px wide the panel docks on the left.
+
+The look is minimal: white (or near-black) surfaces, one teal accent, flat tonal cards, 20 px radii, no shadows except the floating button. It is all in `lib/app/theme.dart`.
+
 ## Layout
 
 ```
@@ -60,11 +70,14 @@ lib/
     data/               clients, repositories, freezed models
     state/              providers and notifiers
     ui/                 screens and widgets
+  features/shell/       the frame: bottom tabs and the global chat button
+  features/feed/        the Feed tab: topic subscriptions and the feed (UC-14)
+  features/map/         the Discover tab: the map screen, its state and MapActions
+  features/settings/    the Settings tab: profile, topics, theme
+  features/events/      user events (UC-09): the service client, the panel with its form, details and pin picker, invites
   features/agent/       the agent protocol: models and the SSE client
   features/chat/        the chat panel: controller, session list, turn views
   features/cards/       the card registry, one widget per card type
-  features/map/         the map screen, its state and MapActions
-  features/events/      user events (UC-09): the client, state, panel, form and details
   l10n/                 app_en.arb and the generated AppLocalizations
 test/                   mirrors lib/
 config/                 build config; only example.json is committed
@@ -106,7 +119,7 @@ Build-time values come from `--dart-define-from-file=config/<env>.json`. The fil
 | `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, and the `ANDROID` and `IOS` pairs | Each platform's Firebase client configuration. `cloud/agent/infra/firebase.sh --app-config config/dev.json` writes all eight keys without printing them. A platform without its pair, and a build with neither these nor `AGENT_DEV_TOKEN`, reports in the chat panel that sign-in is not configured | Empty |
 | `MAP_BASE_URL` | The separate read-only map query service, serving bounded v1 JSON/GeoJSON | `http://localhost:8081` |
 | `MAP_DATA_MODE` | `live` or explicit development-only `sample`; live failures retain their error/coverage state | `live` |
-| `GOOGLE_MAPS_WEB_API_KEY` | Browser-restricted key for the Maps JavaScript API, and for Places API (New) if the event form's address search should work; read by the Web loader | Empty, map setup unavailable |
+| `GOOGLE_MAPS_WEB_API_KEY` | Browser-restricted key for the Maps JavaScript API; read by the Web loader | Empty, map setup unavailable |
 | `GOOGLE_MAPS_MAP_ID` | Optional 2D map ID passed to `GoogleMap(mapId: ...)`; advanced markers and the later vector 3D pilot require an appropriate ID | Empty |
 
 `config/example.json` explicitly selects `sample` for development. Samples must carry the persistent Sample data label. Production uses `MELENS_ENV=prod` and `MAP_DATA_MODE=live`; the app rejects production sample mode at startup. The service URL must be HTTP(S), without credentials, query or fragment. The map repository never changes data mode after a failed live request.
@@ -115,7 +128,7 @@ On the Android emulator, the host machine is `10.0.2.2`, not `localhost`. Cloud 
 
 ## Testing the agent locally
 
-The chat panel (toolbar speech-bubble button on the map screen) talks to the agent service through the [agent protocol](../system-design/agent-protocol.md). To test the agent from the app against a service running on your machine:
+The chat panel (the floating button on every tab; a sheet on phones, docked beside the page from 1050 px wide) talks to the agent service through the [agent protocol](../system-design/agent-protocol.md). To test the agent from the app against a service running on your machine:
 
 1. Start the map and agent services with `npm run dev` in `cloud/` ([agent README](../cloud/agent/README.md#local-commands)): it builds both and runs the map service on 8081 and the agent service in development mode on 8080 with `AGENT_ALLOWED_ORIGINS=http://localhost:8000` and `AGENT_DEVELOPMENT_TOKEN=dev`. Development mode keeps sessions in memory and accepts that fixed token for the uid `dev-user`. The service still needs a real Google Cloud project id (lowercase, for example `melens-510012`) and Application Default Credentials (`gcloud auth application-default login`) to reach Gemini; without credentials every turn fails with a retryable error, and the service log line `modelLoopFailed` carries the reason.
 2. In `config/dev.json` set `AGENT_BASE_URL` to `http://localhost:8080` and `AGENT_DEV_TOKEN` to `dev`.
@@ -125,9 +138,26 @@ What the panel shows, so the agent's behaviour can be judged turn by turn: every
 
 Against the deployed service, set `AGENT_BASE_URL` to its Cloud Run URL (`https://melens-dev-agent-saepk4k6hq-km.a.run.app` in development), leave `AGENT_DEV_TOKEN` empty and add the Firebase keys with `cloud/agent/infra/firebase.sh --project melens-510012 --verify --app-config app/config/dev.json` (from the repository root). Opening the chat signs in anonymously; the browser keeps the user in IndexedDB, so a reload restores the same sessions. The agent service allows only `http://localhost:8000` for CORS, so run the app with `--web-port 8000`. Clearing site data or switching browsers or devices starts a new anonymous user without the old sessions.
 
-## User events
+## Deploying the Web app
 
-The events panel (toolbar calendar button on the map screen; a side panel when the window is at least 1050 px wide, a sheet otherwise) is UC-09: it talks to the agent service's `/v1/events` routes ([agent-protocol.md](../system-design/agent-protocol.md#user-events)) with the same bearer token as the chat. "Nearby" lists the published and cancelled events inside the map's viewport (cut down to the route's 10 km limit around its centre) for the next two weeks, reloading with a short debounce while the panel is open and the map moves, and the same events are drawn as violet pins on the map; "Mine" lists the events the user published and joined. An event opens to its details: anyone can show it on the map, join (optionally with a name shown to the organiser only, remembered for the session) or leave; the organiser can edit, cancel, remove and see the members, with a remove action per member, unless the event has anonymous attendance, in which case everyone, the organiser included, sees only how many are going. "Publish event" opens the form: title, description, place name, Melbourne start and optional end, the anonymous switch, an optional capacity, and the location: the map's centre when the form opens, and from there "Pick on the map" (the panel or sheet gets out of the way, a banner asks for one tap on the map, and the tap becomes the pin), "Use map centre", "Use <record>" when a map record with a point is selected (its title fills the place name), or an address search over Google Places (Web only, restricted to greater Melbourne, suggestions after three characters; the chosen place sets the pin, the place name and shows its address). The search needs Places API (New) enabled on the project and allowed on the browser key; otherwise the field reports why it is unavailable and the other ways remain. The form checks the protocol's limits before sending and shows the service's refusal (full, cancelled, ended, rate limited) under the action. Times are shown in Melbourne time through `melbourneClockProvider`.
+The Web build is served by Firebase Hosting at `https://melens-510012.web.app` (`firebase.json` rewrites every path to `index.html`, so deep links such as `/discover` work). Build against the deployed services and release:
+
+```sh
+fvm flutter build web --release --no-web-resources-cdn --dart-define-from-file=config/dev.json   # AGENT_BASE_URL = the Cloud Run URL, AGENT_DEV_TOKEN empty
+firebase deploy --only hosting --project melens-510012
+```
+
+Startup speed: the first load downloads the engine (CanvasKit, about 1.5 MB brotli) and `main.dart.js` (about 1 MB brotli). `--no-web-resources-cdn` serves CanvasKit from our own Hosting site instead of `gstatic.com`, and Roboto is bundled (`assets/fonts`, `pubspec.yaml`) instead of downloaded from `fonts.gstatic.com`; both hosts are slow or blocked on some networks and each blocked the first frame. `web/index.html` shows a splash until the `flutter-first-frame` event. `firebase.json` caches `/canvaskit` and `/assets` for a day; `main.dart.js` is not content-hashed, so it keeps the one-hour default. Not done: `--wasm` (smaller and faster, but needs cross-origin isolation headers that break the Maps script) and deferred loading of the chat.
+
+The Firebase CLI account must have access to `melens-510012`. The first release (2026-10-15) was made through the Hosting REST API with the project owner's gcloud token, because the CLI was logged in to another account.
+
+A new origin needs three things before the app works there, none of them done by the release itself:
+
+1. The agent service allows it: `AGENT_ALLOWED_ORIGINS` on `melens-dev-agent`.
+2. The map service allows it: `MAP_ALLOWED_ORIGINS` on `melens-dev-map`. Both were set to `http://localhost:8000,https://melens-510012.web.app` on 2026-10-15 with `gcloud run services update --update-env-vars`, which keeps the image and every other setting; the services' `deploy.sh` would also reset those.
+3. The Maps JavaScript API key lists the origin among its allowed referrers (Google Cloud console, Credentials). This is not done by a script.
+
+The site is public and so is the agent behind it: anyone with the link can start anonymous sessions, and only the per-uid rate limit applies.
 
 ## Web
 
@@ -138,7 +168,7 @@ The events panel (toolbar calendar button on the map screen; a side panel when t
 
 The dependency and loader are configured; the current map screen is still a placeholder. A real browser-restricted key has not been supplied or validated by this setup. Both live and sample overlays need a configured base map key.
 
-1. Enable Maps JavaScript API in the Google Cloud project and configure its billing and Web-origin restrictions. Put the key in ignored `config/dev.json` under `GOOGLE_MAPS_WEB_API_KEY`. For the event form's address search (UC-09), also enable Places API (New) and allow it on the same key; `web/index.html` loads the Places library on demand through `google.maps.importLibrary`.
+1. Enable Maps JavaScript API in the Google Cloud project and configure its billing and Web-origin restrictions. Put the key in ignored `config/dev.json` under `GOOGLE_MAPS_WEB_API_KEY`.
 2. Create a `GoogleMapsWebApiLoader` in a provider and await `load(env)` before constructing the Web `GoogleMap`. The helper calls the loader in `web/index.html` through supported Dart JS interop. It uses the compile-time key from `Env`, so no key substitution or second Maps script is needed in HTML.
 3. Pass a nonempty `env.googleMapsMapId` to `GoogleMap(mapId: ...)` when configured; use `null` for the basic 2D map without an ID. The loader requests the `marker` library. Base circles, polylines and polygons use Maps core APIs. Deprecated drawing and visualization libraries are not requested.
 4. Use a bounded map widget and `PointerInterceptor` around Flutter controls placed above its Web platform view. Keep app imports on `material_ui`. The locked Maps plugin and Web implementation still import legacy `flutter/material.dart`; wrap the `GoogleMap` subtree in `MaterialUiCompatibilityBridge` when integrating T015.
@@ -160,4 +190,5 @@ Sources: [Maps Flutter plugin](https://pub.dev/packages/google_maps_flutter), [e
 
 | Item | Why it waits | Already decided |
 | --- | --- | --- |
+| Subscriptions that survive a restart | The agent service has no subscription endpoint and the app never reaches Firestore itself, so `FeedSubscriptions` lives in memory for the app run | The seam is the provider; the identity is the Firebase uid |
 | Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Dependency and Web loader are prepared; 2D surface integration is T015, native setup is separate |

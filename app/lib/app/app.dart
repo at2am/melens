@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../features/shell/state/shell_providers.dart';
 import '../l10n/app_localizations.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -19,6 +20,11 @@ class MelensApp extends ConsumerWidget {
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      themeMode: switch (ref.watch(appThemeSettingProvider)) {
+        AppThemeChoice.system => ThemeMode.system,
+        AppThemeChoice.light => ThemeMode.light,
+        AppThemeChoice.dark => ThemeMode.dark,
+      },
       locale: appLocale,
       supportedLocales: const [appLocale],
       localizationsDelegates: const [

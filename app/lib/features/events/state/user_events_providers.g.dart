@@ -157,7 +157,7 @@ final class NearbyUserEventsControllerProvider
 }
 
 String _$nearbyUserEventsControllerHash() =>
-    r'7bf61188ba27d04b693f69909000ac55ba38594f';
+    r'dff7fd2c4609d3170881d34b9b8eeb7b42341a81';
 
 /// The user events near the map's viewport. It loads while the events panel
 /// is open, following the viewport with a debounce, and keeps the last list

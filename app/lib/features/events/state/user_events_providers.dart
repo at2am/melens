@@ -110,7 +110,10 @@ class NearbyUserEventsController extends _$NearbyUserEventsController {
 
   Timer? _pending;
   int _generation = 0;
-  bool _active = false;
+  // Each holder (the events panel, the map's community layer) keeps the list
+  // loading and following the viewport until it lets go.
+  int _holders = 0;
+  bool get _active => _holders > 0;
 
   @override
   NearbyUserEventsState build() {
@@ -126,10 +129,10 @@ class NearbyUserEventsController extends _$NearbyUserEventsController {
   /// The panel is open: load now and follow the viewport until [setActive]
   /// is called with false.
   void setActive(bool active) {
-    _active = active;
+    _holders = math.max(0, _holders + (active ? 1 : -1));
     if (active) {
       unawaited(refresh());
-    } else {
+    } else if (!_active) {
       _pending?.cancel();
     }
   }
