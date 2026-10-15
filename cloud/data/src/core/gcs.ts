@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { Storage } from '@google-cloud/storage';
+import { Storage, type Bucket } from '@google-cloud/storage';
 import { z } from 'zod';
 
 const utc = z.iso.datetime({ offset: false });
@@ -28,6 +28,58 @@ function httpCode(error: unknown): number | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null;
   const code = error.code;
   return typeof code === 'number' ? code : typeof code === 'string' ? Number(code) : null;
+}
+
+const leaseRecord = z.object({
+  startedAt: z.iso.datetime({ offset: true }).optional(),
+  leaseUntil: z.iso.datetime({ offset: true }).optional(),
+}).passthrough();
+
+/**
+ * Create a lock object, or take over one whose holder's lease has run out.
+ * Cloud Run stops a task at its timeout without running `finally` blocks, so a
+ * lock without an expiry would block every later run of the source for good.
+ * Returns the generation of the lock this caller now owns.
+ */
+export async function acquireExpiringLease(bucket: Pick<Bucket, 'file'>, name: string,
+  leaseMs: number, busy: () => Error, clock: () => number = Date.now): Promise<string> {
+  if (!Number.isFinite(leaseMs) || leaseMs <= 0) throw new Error('Invalid lease duration');
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const now = clock();
+    try {
+      await bucket.file(name).save(JSON.stringify({ startedAt: new Date(now).toISOString(),
+        leaseUntil: new Date(now + leaseMs).toISOString() }), {
+        resumable: false, contentType: 'application/json',
+        preconditionOpts: { ifGenerationMatch: 0 },
+      });
+      const [metadata] = await bucket.file(name).getMetadata();
+      if (!metadata.generation) throw new Error('Missing lease generation');
+      return String(metadata.generation);
+    } catch (error) {
+      if (httpCode(error) !== 412) throw error;
+    }
+    let generation: string;
+    let expiresAt = Number.NaN;
+    try {
+      const [metadata] = await bucket.file(name).getMetadata();
+      if (!metadata.generation) throw new Error('Missing lease generation');
+      generation = String(metadata.generation);
+      const [bytes] = await bucket.file(name, { generation }).download();
+      let lock: z.infer<typeof leaseRecord> = {};
+      try { lock = leaseRecord.parse(JSON.parse(bytes.toString('utf8'))); } catch { /* use object age */ }
+      const created = Date.parse(String(metadata.timeCreated ?? ''));
+      expiresAt = lock.leaseUntil !== undefined ? Date.parse(lock.leaseUntil)
+        : lock.startedAt !== undefined ? Date.parse(lock.startedAt) + leaseMs
+          : Number.isFinite(created) ? created + leaseMs : Number.NaN;
+    } catch (error) {
+      if (httpCode(error) === 404) continue;
+      throw error;
+    }
+    if (!Number.isFinite(expiresAt) || expiresAt > now) throw busy();
+    // Only the exact expired generation is removed; a competing takeover wins the next create.
+    await bucket.file(name, { generation }).delete({ ignoreNotFound: true });
+  }
+  throw busy();
 }
 
 export function addCompletedWindow(manifest: CheckpointManifest, window: CompletedWindow): CheckpointManifest {
@@ -63,7 +115,9 @@ export interface StoredObject {
 
 /** GCS objects use generation preconditions; a retry may only reuse identical bytes. */
 export class GcsStore {
-  constructor(private readonly storage: Storage, private readonly bucketName: string) {}
+  /** `leaseMs` must exceed the caller's Cloud Run task timeout. */
+  constructor(private readonly storage: Storage, private readonly bucketName: string,
+    private readonly leaseMs = 30 * 60_000) {}
 
   private get bucket() {
     return this.storage.bucket(this.bucketName);
@@ -268,24 +322,13 @@ export class GcsStore {
   /** A generation-bound lease serializes publication of the same batch. */
   async withBatchLease<T>(batchId: string, work: () => Promise<T>): Promise<T> {
     const id = safeId.parse(batchId);
-    const file = this.bucket.file(`locks/${id}.json`);
-    const leaseUntil = new Date(Date.now() + 30 * 60_000).toISOString();
-    try {
-      await file.save(JSON.stringify({ leaseUntil }), {
-        resumable: false, contentType: 'application/json',
-        preconditionOpts: { ifGenerationMatch: 0 },
-      });
-    } catch (error) {
-      if (httpCode(error) !== 412) throw error;
-      throw new Error('Batch publication is already in progress; inspect the job before clearing a stale lease');
-    }
-    const [metadata] = await file.getMetadata();
-    if (!metadata.generation) throw new Error('Missing batch lease generation');
+    const name = `locks/${id}.json`;
+    const generation = await acquireExpiringLease(this.bucket, name, this.leaseMs, () =>
+      new Error('Batch publication is already in progress; inspect the job before clearing a stale lease'));
     try {
       return await work();
     } finally {
-      await this.bucket.file(file.name, { generation: String(metadata.generation) })
-        .delete({ ignoreNotFound: true });
+      await this.bucket.file(name, { generation }).delete({ ignoreNotFound: true });
     }
   }
 }

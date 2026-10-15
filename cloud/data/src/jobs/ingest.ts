@@ -13,7 +13,7 @@ import { withPublishedPedestrianHistory } from '../core/pedestrian-history.js';
 import { withPublishedPedestrianLocationHistory } from '../core/pedestrian-location-history.js';
 import { withPublishedGtfsLocations } from '../core/gtfs-runtime.js';
 import { withPublishedNewsLocations } from '../normalization/news-runtime.js';
-import { withPublishedParkingState } from '../normalization/parking-runtime.js';
+import { pruneSupersededParkingMemberships, withPublishedParkingState } from '../normalization/parking-runtime.js';
 import { buildParkingSensorCurrentRows, replaceParkingSensorCurrent, SENSOR_SOURCE_ID,
 } from '../core/parking-sensor-current.js';
 import { withVerifiedNewsPublicationEvidence } from '../normalization/news-publication-evidence.js';
@@ -79,7 +79,11 @@ export async function ingest(args: readonly string[],
     ? { kind: 'time', from, to }
     : { kind: 'snapshot', revision: required(flags, '--revision') };
   const storage = new Storage({ projectId: config.projectId });
-  const gcs = new GcsStore(storage, config.bucketName);
+  // A publication stopped at the task timeout leaves its source lease; expire
+  // it a minute after that timeout so the next scheduled run can recover.
+  const taskTimeout = Number(env.MELENS_TASK_TIMEOUT_SECONDS);
+  const gcs = new GcsStore(storage, config.bucketName, Number.isInteger(taskTimeout) && taskTimeout > 0
+    && taskTimeout <= 3_600 ? (taskTimeout + 60) * 1000 : undefined);
   const explicitCursor = flags.get('--initial-cursor');
   const initialCheckpoint = window.kind === 'time'
     ? (typeof explicitCursor === 'string' ? explicitCursor : source.coverage_from) : null;
@@ -140,6 +144,13 @@ export async function ingest(args: readonly string[],
   if (source.source_id === SENSOR_SOURCE_ID && batch.state === 'published') {
     currentSensors = (await replaceParkingSensorCurrent(config, bigquery,
       buildParkingSensorCurrentRows(normalizedResult, batch.batch_id))).rows;
+    try {
+      await pruneSupersededParkingMemberships(config, bigquery, batch.batch_id);
+    } catch (error) {
+      // The snapshot is already published; the retention job removes what is left.
+      process.stderr.write(`${JSON.stringify({ source_id: source.source_id, action: 'membership_prune_failed',
+        message: error instanceof Error ? error.message : 'Unknown prune failure' })}\n`);
+    }
   }
   process.stdout.write(JSON.stringify({ source_id: source.source_id, batch_id: batch.batch_id,
     state: batch.state, input_count: batch.input_count, output_count: batch.output_count,
