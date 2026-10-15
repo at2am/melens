@@ -6,8 +6,9 @@ import '../data/feed_models.dart';
 import '../state/feed_providers.dart';
 import 'feed_labels.dart';
 
-/// One switch per topic: on means the topic's items appear in the feed.
-/// Shared by the feed's topic sheet and Settings.
+/// One chip per topic: filled means the topic's items appear in the feed.
+/// The same chips sit under the feed's title; this list is for the empty
+/// feed's topic sheet.
 class FeedTopicList extends ConsumerWidget {
   const FeedTopicList({super.key});
 
@@ -16,17 +17,17 @@ class FeedTopicList extends ConsumerWidget {
     final strings = AppLocalizations.of(context);
     final subscribed = ref.watch(feedSubscriptionsProvider);
     final controller = ref.read(feedSubscriptionsProvider.notifier);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final topic in FeedTopic.values)
-          SwitchListTile(
+          FilterChip(
             key: ValueKey('feed-topic-${topic.name}'),
-            secondary: Icon(feedTopicIcon(topic)),
-            title: Text(feedTopicTitle(strings, topic)),
-            subtitle: Text(feedTopicDescription(strings, topic)),
-            value: subscribed.contains(topic),
-            onChanged: (on) => controller.setSubscribed(topic, on),
+            avatar: Icon(feedTopicIcon(topic), size: 18),
+            label: Text(feedTopicTitle(strings, topic)),
+            selected: subscribed.contains(topic),
+            onSelected: (on) => controller.setSubscribed(topic, on),
           ),
       ],
     );
