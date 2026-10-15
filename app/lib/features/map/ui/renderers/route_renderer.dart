@@ -7,6 +7,16 @@ import 'core_renderers.dart';
 const routePolylineId = 'agent-route';
 const routeMarkerPrefix = 'agent-route-stop:';
 
+// Shared icons: the Maps plugin compares icons by identity, so a new one per
+// build re-applies every stop marker on each rebuild.
+final _startIcon = BitmapDescriptor.defaultMarkerWithHue(
+  BitmapDescriptor.hueGreen,
+);
+final _endIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+final _stopIcon = BitmapDescriptor.defaultMarkerWithHue(
+  BitmapDescriptor.hueAzure,
+);
+
 /// The route the agent drew: the path in the accent colour and one marker
 /// per stop. The first stop is green, the last red and the ones between blue;
 /// each marker's info window names the stop, or numbers it.
@@ -38,13 +48,11 @@ CoreRenderPlan routeRenderPlan(
         Marker(
           markerId: MarkerId('$routeMarkerPrefix$index'),
           position: LatLng(stop.point.lat, stop.point.lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            index == 0
-                ? BitmapDescriptor.hueGreen
-                : index == stops.length - 1
-                ? BitmapDescriptor.hueRed
-                : BitmapDescriptor.hueAzure,
-          ),
+          icon: index == 0
+              ? _startIcon
+              : index == stops.length - 1
+              ? _endIcon
+              : _stopIcon,
           infoWindow: InfoWindow(
             title: stop.label ?? stopLabel(index + 1),
             snippet: stop.label == null ? null : stopLabel(index + 1),

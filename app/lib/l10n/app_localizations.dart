@@ -2159,6 +2159,12 @@ abstract class AppLocalizations {
   /// **'Community events'**
   String get mapCommunityLayer;
 
+  /// Button shown after the user moves the map while auto-search is off; searches the area now in view.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this area'**
+  String get mapSearchThisArea;
+
   /// The time pill on the map while it shows current data.
   ///
   /// In en, this message translates to:
@@ -2242,6 +2248,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Following'**
   String get settingsFollowing;
+
+  /// Settings section for map behaviour.
+  ///
+  /// In en, this message translates to:
+  /// **'Map'**
+  String get settingsMap;
+
+  /// Settings switch that makes the map search again after every pan or zoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Search as the map moves'**
+  String get settingsMapAutoSearch;
+
+  /// Subtitle of the map auto-search switch while on.
+  ///
+  /// In en, this message translates to:
+  /// **'On. The map searches again after every pan or zoom.'**
+  String get settingsMapAutoSearchOn;
+
+  /// Subtitle of the map auto-search switch while off.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. After moving the map, tap Search this area.'**
+  String get settingsMapAutoSearchOff;
 
   /// Settings section for the theme.
   ///

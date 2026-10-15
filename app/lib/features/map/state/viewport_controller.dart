@@ -42,6 +42,20 @@ TimeWindow currentViewportWindow(MelbourneClock clock) {
   return TimeWindow(from: end.subtract(const Duration(minutes: 15)), to: end);
 }
 
+/// Whether the map searches again by itself after the user pans or zooms.
+/// Off by default: a moved map offers "Search this area" instead. Kept for
+/// the application session, like the theme choice.
+@Riverpod(keepAlive: true)
+class MapAutoSearch extends _$MapAutoSearch {
+  @override
+  bool build() => false;
+
+  void set({required bool enabled}) => state = enabled;
+}
+
+/// A camera region the user moved to and has not searched yet.
+typedef PendingMapRegion = ({MapBounds visible, double zoom});
+
 /// Desired controls and the last successful response deliberately stay separate.
 final class ViewportState {
   const ViewportState({
@@ -60,6 +74,7 @@ final class ViewportState {
     this.isLoading = false,
     this.isOutsideService = false,
     this.isCameraMoving = false,
+    this.pendingRegion,
     this.error,
   });
 
@@ -80,7 +95,12 @@ final class ViewportState {
   final bool isLoading;
   final bool isOutsideService;
   final bool isCameraMoving;
+
+  /// Set while auto-search is off and the camera has left the searched area.
+  final PendingMapRegion? pendingRegion;
   final MapRepositoryException? error;
+
+  bool get hasPendingRegion => pendingRegion != null;
 
   List<MapLayerId> get queryableLayers => List.unmodifiable(
     layers.where((layer) => !blockedLayers.contains(layer)),
@@ -130,6 +150,8 @@ final class ViewportState {
     bool? isLoading,
     bool? isOutsideService,
     bool? isCameraMoving,
+    PendingMapRegion? pendingRegion,
+    bool clearPendingRegion = false,
     MapRepositoryException? error,
     bool clearError = false,
   }) => ViewportState(
@@ -152,6 +174,9 @@ final class ViewportState {
     isLoading: isLoading ?? this.isLoading,
     isOutsideService: isOutsideService ?? this.isOutsideService,
     isCameraMoving: isCameraMoving ?? this.isCameraMoving,
+    pendingRegion: clearPendingRegion
+        ? null
+        : pendingRegion ?? this.pendingRegion,
     error: clearError ? null : error ?? this.error,
   );
 }
@@ -169,6 +194,10 @@ class ViewportController extends _$ViewportController {
   @override
   ViewportState build() {
     ref.onDispose(_cancelPending);
+    // Turning auto-search on searches the area the user has moved to.
+    ref.listen(mapAutoSearchProvider, (previous, next) {
+      if (next) searchPendingRegion();
+    });
     return ViewportState(
       window: currentViewportWindow(ref.watch(melbourneClockProvider)),
       dataMode: ref.watch(envProvider).mapDataMode,
@@ -182,15 +211,44 @@ class ViewportController extends _$ViewportController {
     _schedule(debounce: debounce);
   }
 
-  void setRegion(MapBounds visible, double zoom, {bool debounce = true}) {
+  /// The camera's visible region. The first real region is always searched;
+  /// after that a user's move is only searched when auto-search is on, or
+  /// [search] says the move was asked for (a focus request, a zoom to an
+  /// aggregate). Otherwise it waits as [ViewportState.pendingRegion].
+  void setRegion(
+    MapBounds visible,
+    double zoom, {
+    bool debounce = true,
+    bool search = false,
+  }) {
     if (!zoom.isFinite || zoom < 0 || zoom > 22) {
       throw ArgumentError.value(zoom, 'zoom');
     }
     final bounded = boundedViewportRegion(visible);
+    if (!search &&
+        !ref.read(mapAutoSearchProvider) &&
+        state.zoomPresentation != null) {
+      _awaitingRegion = false;
+      final searched =
+          state.isOutsideService == (bounded == null) &&
+          _sameBounds(state.bbox, bounded) &&
+          state.zoom == zoom;
+      if (searched) {
+        if (state.hasPendingRegion) {
+          state = state._with(clearPendingRegion: true);
+        }
+      } else {
+        state = state._with(pendingRegion: (visible: visible, zoom: zoom));
+      }
+      return;
+    }
     if (!_awaitingRegion &&
         state.zoomPresentation != null &&
         _sameBounds(state.bbox, bounded) &&
         state.zoom == zoom) {
+      if (state.hasPendingRegion) {
+        state = state._with(clearPendingRegion: true);
+      }
       return;
     }
     _awaitingRegion = false;
@@ -202,14 +260,25 @@ class ViewportController extends _$ViewportController {
           state.zoomPresentation?.at(zoom) ?? ZoomPresentation.initial(zoom),
       isOutsideService: bounded == null,
       isCameraMoving: false,
+      clearPendingRegion: true,
     );
     _schedule(debounce: debounce);
   }
 
-  /// An in-flight response cannot become current after camera motion starts.
-  /// The idle callback supplies a new public visible region before requesting.
+  /// "Search this area": searches the region the camera moved to.
+  void searchPendingRegion() {
+    final pending = state.pendingRegion;
+    if (pending == null) return;
+    setRegion(pending.visible, pending.zoom, debounce: false, search: true);
+  }
+
+  /// With auto-search on, an in-flight response cannot become current after
+  /// camera motion starts; the idle callback supplies a new public visible
+  /// region before requesting. With it off, the shown results stay and keep
+  /// loading until the user searches the new area.
   void cameraMoving() {
     _awaitingRegion = true;
+    if (!ref.read(mapAutoSearchProvider)) return;
     _cancelPending();
     if (!state.isCameraMoving || state.isLoading) {
       state = state._with(isLoading: false, isCameraMoving: true);

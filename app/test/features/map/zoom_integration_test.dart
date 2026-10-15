@@ -175,6 +175,7 @@ final class _ZoomRepository implements MapRepository {
 ProviderContainer _container(_ZoomRepository repository) =>
     ProviderContainer.test(
       overrides: [
+        mapAutoSearchProvider.overrideWithValue(true),
         mapRepositoryProvider.overrideWithValue(repository),
         melbourneClockProvider.overrideWithValue(
           MelbourneClock(now: () => t017Instant),

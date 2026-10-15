@@ -1214,6 +1214,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapCommunityLayer => 'Community events';
 
   @override
+  String get mapSearchThisArea => 'Search this area';
+
+  @override
   String get mapTimeNow => 'Now';
 
   @override
@@ -1255,6 +1258,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFollowing => 'Following';
+
+  @override
+  String get settingsMap => 'Map';
+
+  @override
+  String get settingsMapAutoSearch => 'Search as the map moves';
+
+  @override
+  String get settingsMapAutoSearchOn =>
+      'On. The map searches again after every pan or zoom.';
+
+  @override
+  String get settingsMapAutoSearchOff =>
+      'Off. After moving the map, tap Search this area.';
 
   @override
   String get settingsAppearance => 'Appearance';
