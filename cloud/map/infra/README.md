@@ -101,6 +101,7 @@ connectors' `source.json` manifests and source-policy records:
 | `gdelt.news` (news) | `verified_open` with attribution to The GDELT Project | gdeltproject.org | News metadata from The GDELT Project |
 | `victoria.council.engagement_news` (news) | `restricted`, facts and links only | none; every record carries its council news link | Greater Melbourne councils — community engagement news |
 | `user.events` (event) | `restricted`: content users publish in the app under its terms ([policy](../../data/docs/source-policies/user-events.md)), added 2026-10-10 for UC-09 | none; the records are published in Melens itself | Published by a Melens user |
+| `melens.anomaly.replay` (anomaly) | `verified_open`: a derived replay of City of Melbourne pedestrian counts (CC BY 4.0), added 2026-10-15 for UC-04 and registered by `cloud/data/scripts/anomaly_replay.py` without the live-source admission gates, **awaiting team review** | the City of Melbourne counts dataset page | Melens replay of City of Melbourne pedestrian counts (CC BY 4.0), then the replayed day |
 
 `deploy.sh` checks the registry against this reviewed table (source set, licence
 status reported by `v_source_coverage`, reference host) before any plan or apply.

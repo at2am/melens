@@ -94,6 +94,9 @@ reviewed = {
     'gdelt.news': ('verified_open', 'www.gdeltproject.org'),
     'victoria.council.engagement_news': ('restricted', None),
     'user.events': ('restricted', None),
+    # The labelled replay of a historical day (UC-04): derived from City of Melbourne CC BY counts, registered
+    # 2026-10-15 without the live-source admission gates; the team has yet to review it.
+    'melens.anomaly.replay': ('verified_open', 'data.melbourne.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:
