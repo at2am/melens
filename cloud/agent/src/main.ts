@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 import { createMapAgentRunner } from './agent/map-agent.js';
 import { createVertexGrounding } from './agent/grounding.js';
+import { createVertexStructuredModel } from './agent/structured.js';
+import { createFirestoreCache, createMemoryCache } from './cache.js';
 import { createFirebaseVerifier, staticVerifier } from './auth/verifier.js';
 import { loadAgentConfig } from './config.js';
 import { createFirestoreUserEventStore } from './events/firestore-store.js';
@@ -15,6 +17,7 @@ import { UserEventService } from './events/service.js';
 import { InMemoryUserEventStore } from './events/store.js';
 import { createSharedFeatureReader } from './features/reader.js';
 import { createRateLimiter } from './rate-limit.js';
+import { createRoutesClient } from './routes/routes-client.js';
 import { createAgentHttpServer } from './server.js';
 import { createFirestoreSessionStore } from './sessions/firestore-store.js';
 import { InMemorySessionStore } from './sessions/store.js';
@@ -27,14 +30,17 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
   const port = z.coerce.number().int().min(0).max(65_535).parse(env.PORT ?? '8080');
   const publicSources = config.publicSourcesFile === null ? []
     : z.array(sourceReferenceSchema).parse(JSON.parse(await readFile(config.publicSourcesFile, 'utf8')));
+  // Local development may keep sessions in memory and trust a fixed token; Cloud Run never does.
+  const development = env.AGENT_DEVELOPMENT_MODE === 'true';
   const model = new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation });
   const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools: {
     features: createSharedFeatureReader({ config: config.query, publicSources }),
     grounding: createVertexGrounding({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
     groundingTimeoutMs: config.groundingTimeoutMs,
+    structured: createVertexStructuredModel({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
+    routes: createRoutesClient(env.AGENT_ROUTES_QUOTA_PROJECT === undefined ? {} : { quotaProject: env.AGENT_ROUTES_QUOTA_PROJECT }),
+    cache: development ? createMemoryCache() : createFirestoreCache({ projectId: config.projectId, databaseId: config.firestoreDatabase }),
   } });
-  // Local development may keep sessions in memory and trust a fixed token; Cloud Run never does.
-  const development = env.AGENT_DEVELOPMENT_MODE === 'true';
   const store = development ? new InMemorySessionStore()
     : createFirestoreSessionStore({ projectId: config.projectId, databaseId: config.firestoreDatabase });
   const verifier = development && env.AGENT_DEVELOPMENT_TOKEN !== undefined

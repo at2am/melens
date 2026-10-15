@@ -12,6 +12,9 @@ import {
   type CoverageAreaResolver, type LayerCoverageAssessment, type SourceCoverageSnapshot,
 } from './source-coverage.js';
 
+/** A replay title always says so; the consumer refuses a replay result without it. */
+export const REPLAY_TITLE_PREFIX = 'Replay · ';
+
 export type AnomalyItem = Extract<MapItem, { kind: 'anomaly' }>;
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const distinctIds = z.array(identifier).min(1).max(MAX_PAGE_ITEMS)
@@ -27,6 +30,11 @@ const anomalyItemSchema = mapItemSchema.transform((item, context) => {
 const producerBatchSchema = z.strictObject({
   verification: z.literal('verifiedPublic'),
   dataMode: z.literal('live'),
+  /**
+   * A replay of a historical day: every result says so in its title, and its window is the historical hour, not a window
+   * inside the request. Every other check (publication, linkage, exact windows, sensor location) still applies.
+   */
+  replay: z.boolean().optional(),
   queryIdentity: z.string().regex(/^[a-f0-9]{64}$/),
   publicationProofs: z.array(z.strictObject({
     sourceId: identifier, publishedBatchId: identifier, publishedAt: timeWindowSchema.shape.from,
@@ -108,7 +116,8 @@ export function consumeVerifiedAnomalyBatch(value: unknown, options: {
       if (item.kind !== 'anomaly') throw new MapQueryError('serviceUnavailable');
       const details = item.details;
       if (item.lifecycle === 'withdrawn') throw new MapQueryError('notAvailable');
-      if (item.assertionKind !== 'observation' || !containedWindow(details.window, options.request.window)
+      if (batch.replay === true && !item.title.startsWith(REPLAY_TITLE_PREFIX)) throw new MapQueryError('serviceUnavailable');
+      if (item.assertionKind !== 'observation' || !(batch.replay === true || containedWindow(details.window, options.request.window))
         || resultIds.has(details.resultId) || details.resultId !== evidence.resultId
         || details.observationId !== evidence.observationId
         || details.baselineDefinitionId !== evidence.baselineDefinitionId) throw new MapQueryError('serviceUnavailable');
@@ -195,6 +204,22 @@ export function createAnomalyLayerLoader(options: {
     } catch (error) {
       if (error instanceof MapQueryError) throw error;
       throw new MapQueryError('serviceUnavailable');
+    }
+  };
+}
+
+/**
+ * A failing anomaly read (the view is not applied yet, a publication does not match) makes the anomaly layer unavailable;
+ * it never fails the whole viewport request that also carries the other layers. A cancelled read still cancels the request.
+ */
+export function failSoftAnomalyLayerLoader(loader: ViewportLayerLoader): ViewportLayerLoader {
+  return async (request, layerId, coverage, execution) => {
+    try {
+      return await loader(request, layerId, coverage, execution);
+    } catch (error) {
+      if (execution.signal?.aborted) throw error;
+      return { result: finalizeLayerResult({ layerId, assessment: unavailableAssessment(), items: [], completeness: 'partial',
+        unresolvedCount: null, totalMatching: null, querySucceeded: false }) };
     }
   };
 }

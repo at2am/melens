@@ -122,6 +122,24 @@
     // cross to Dart as JSON strings. The project needs Places API (New)
     // enabled and allowed on the browser key; otherwise the promise rejects
     // and the form says search is unavailable.
+    // The user's position, asked once and only when they switch on "My
+    // location". Resolves to a JSON string; rejects with 'denied',
+    // 'unavailable', 'timeout' or 'unsupported'. Nothing is stored.
+    window.melensGetPosition = () => new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('unsupported'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => resolve(JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracyM: position.coords.accuracy,
+        })),
+        (error) => reject(new Error(error.code === 1 ? 'denied' : error.code === 3 ? 'timeout' : 'unavailable')),
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 },
+      );
+    });
     (() => {
       // A session ties the suggestions and the chosen place into one billing unit.
       let session;

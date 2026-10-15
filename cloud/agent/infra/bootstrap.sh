@@ -11,7 +11,7 @@ readonly FIRESTORE_DATABASE="(default)"
 readonly QUERY_DATASET="melens_query"
 readonly INGEST_DATASET="melens_ingest"
 readonly TTL_FIELD="expiresAtTs"
-readonly TTL_COLLECTION_GROUPS=(sessions turns attachments userEvents)
+readonly TTL_COLLECTION_GROUPS=(sessions turns attachments userEvents agentCache)
 # The reviewed project roles of the agent identity; any other project role fails the audit.
 readonly PROJECT_ROLES=(roles/aiplatform.user roles/bigquery.jobUser roles/datastore.user)
 readonly APIS=(

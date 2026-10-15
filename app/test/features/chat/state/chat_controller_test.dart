@@ -677,4 +677,27 @@ void main() {
       expect(stateOf(container).error, isNull);
     },
   );
+
+  test(
+    'a new session takes the previous conversation\'s route off the map',
+    () async {
+      final container = makeContainer(FakeAgentClient());
+      container.listen(mapActionsControllerProvider, (_, _) {});
+      container
+          .read(mapActionsControllerProvider.notifier)
+          .apply(
+            const UiAction(
+              action: UiActionName.drawRoute,
+              args: <String, dynamic>{
+                'polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+              },
+            ),
+          );
+      expect(container.read(mapActionsControllerProvider).route, isNotNull);
+
+      await container.read(chatControllerProvider.notifier).newSession();
+
+      expect(container.read(mapActionsControllerProvider).route, isNull);
+    },
+  );
 }

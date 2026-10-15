@@ -121,64 +121,72 @@ function clipDetail(detail: string | undefined): string | undefined {
 }
 
 /**
- * The ADK tool for one spec. Gemini sees the schema as a declaration; the server validates the
- * arguments itself so an invalid call returns the error object (and counts) instead of throwing.
+ * One tool call as a step of the turn: validation, memo, `status` events, the run and the trace entry. The ADK tool
+ * and the workflow entry points (a map tap or Analyse, which skip the model loop) both go through here.
  *
  * Every call is one step of the turn's trace: a `status` event with state `running` when it starts
  * and one with `done` or `failed` when it ends, carrying the row count, the error code and the
- * duration. A memoised or invalid call is instant and sends only the final event.
+ * duration. A memoised or invalid call is instant and sends only the final event. The server
+ * validates the arguments itself so an invalid call returns the error object (and counts) instead of throwing.
+ */
+export async function runTool<S extends z.ZodObject>(spec: ToolSpec<S>, turn: TurnRegistry, rawArgs: unknown): Promise<unknown> {
+  const startedAt = turn.now().getTime();
+  const stepId = turn.nextStepId();
+  const finish = (fields: { state: Exclude<StepState, 'running'>; detail?: string | undefined; rows: number | null; error: string | null; durationMs: number; memo?: boolean }): void => {
+    turn.sink.emit({ event: 'status', stepId, state: fields.state, tool: spec.name, text: spec.status,
+      ...(fields.detail === undefined ? {} : { detail: fields.detail }), ...(fields.rows === null ? {} : { rows: fields.rows }),
+      ...(fields.error === null ? {} : { error: fields.error }), durationMs: fields.durationMs, ...(fields.memo === true ? { memo: true } : {}) });
+  };
+  const parsed = spec.schema.safeParse(rawArgs ?? {});
+  const argsForTrace = typeof rawArgs === 'object' && rawArgs !== null ? rawArgs as Record<string, unknown> : {};
+  if (!parsed.success) {
+    turn.invalidCalls += 1;
+    if (turn.invalidCalls >= MAX_INVALID_CALLS) turn.toolsDisabled = true;
+    const message = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; ');
+    turn.trace.push({ tool: spec.name, args: argsForTrace, status: spec.status, detail: null, rows: null, error: 'invalid_arguments', durationMs: 0, memo: false });
+    finish({ state: 'failed', rows: null, error: 'invalid_arguments', durationMs: 0 });
+    return toolError('invalid_arguments', message, { issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) });
+  }
+  turn.invalidCalls = 0;
+  const args = parsed.data;
+  const detail = clipDetail(spec.detail?.(args, turn));
+  const key = `${spec.name}:${stableJson(args)}`;
+  if (spec.readOnly) {
+    const memo = turn.memoGet(key);
+    if (memo !== undefined) {
+      const rows = rowsOf(memo);
+      turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error: null, durationMs: 0, memo: true });
+      finish({ state: 'done', detail, rows, error: null, durationMs: 0, memo: true });
+      return memo;
+    }
+  }
+  turn.sink.emit({ event: 'status', stepId, state: 'running', tool: spec.name, text: spec.status, ...(detail === undefined ? {} : { detail }) });
+  let result: unknown;
+  try {
+    result = await spec.run(args, turn, { id: stepId });
+  } catch (error) {
+    turn.turn.log?.({ severity: 'WARNING', event: 'toolFailed', turnId: turn.turn.turnId, tool: spec.name, reason: error instanceof Error ? error.name : 'unknown',
+      ...(typeof (error as { code?: unknown } | null)?.code === 'string' ? { code: (error as { code: string }).code } : {}) });
+    result = toolError('upstream_unavailable', 'The data source or Google API did not answer; answer with what you have and say what is missing.');
+  }
+  const durationMs = Math.max(0, turn.now().getTime() - startedAt);
+  const rows = rowsOf(result);
+  const error = isToolError(result) ? result.error.code : null;
+  turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error, durationMs, memo: false });
+  finish({ state: error === null ? 'done' : 'failed', detail, rows, error, durationMs });
+  if (spec.readOnly && error === null) turn.memoSet(key, result);
+  return result;
+}
+
+/**
+ * The ADK tool for one spec. Gemini sees the schema as a declaration; the server validates the
+ * arguments itself so an invalid call returns the error object (and counts) instead of throwing.
  */
 export function buildTool<S extends z.ZodObject>(spec: ToolSpec<S>, turn: TurnRegistry): FunctionTool<import('@google/genai').Schema> {
   return new FunctionTool({
     name: spec.name,
     description: spec.description,
     parameters: toGenaiSchema(spec.schema),
-    async execute(rawArgs: unknown) {
-      const startedAt = turn.now().getTime();
-      const stepId = turn.nextStepId();
-      const finish = (fields: { state: Exclude<StepState, 'running'>; detail?: string | undefined; rows: number | null; error: string | null; durationMs: number; memo?: boolean }): void => {
-        turn.sink.emit({ event: 'status', stepId, state: fields.state, tool: spec.name, text: spec.status,
-          ...(fields.detail === undefined ? {} : { detail: fields.detail }), ...(fields.rows === null ? {} : { rows: fields.rows }),
-          ...(fields.error === null ? {} : { error: fields.error }), durationMs: fields.durationMs, ...(fields.memo === true ? { memo: true } : {}) });
-      };
-      const parsed = spec.schema.safeParse(rawArgs ?? {});
-      const argsForTrace = typeof rawArgs === 'object' && rawArgs !== null ? rawArgs as Record<string, unknown> : {};
-      if (!parsed.success) {
-        turn.invalidCalls += 1;
-        if (turn.invalidCalls >= MAX_INVALID_CALLS) turn.toolsDisabled = true;
-        const message = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; ');
-        turn.trace.push({ tool: spec.name, args: argsForTrace, status: spec.status, detail: null, rows: null, error: 'invalid_arguments', durationMs: 0, memo: false });
-        finish({ state: 'failed', rows: null, error: 'invalid_arguments', durationMs: 0 });
-        return toolError('invalid_arguments', message, { issues: parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })) });
-      }
-      turn.invalidCalls = 0;
-      const args = parsed.data;
-      const detail = clipDetail(spec.detail?.(args, turn));
-      const key = `${spec.name}:${stableJson(args)}`;
-      if (spec.readOnly) {
-        const memo = turn.memoGet(key);
-        if (memo !== undefined) {
-          const rows = rowsOf(memo);
-          turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error: null, durationMs: 0, memo: true });
-          finish({ state: 'done', detail, rows, error: null, durationMs: 0, memo: true });
-          return memo;
-        }
-      }
-      turn.sink.emit({ event: 'status', stepId, state: 'running', tool: spec.name, text: spec.status, ...(detail === undefined ? {} : { detail }) });
-      let result: unknown;
-      try {
-        result = await spec.run(args, turn, { id: stepId });
-      } catch (error) {
-        turn.turn.log?.({ severity: 'WARNING', event: 'toolFailed', turnId: turn.turn.turnId, tool: spec.name, reason: error instanceof Error ? error.name : 'unknown' });
-        result = toolError('upstream_unavailable', 'The data source or Google API did not answer; answer with what you have and say what is missing.');
-      }
-      const durationMs = Math.max(0, turn.now().getTime() - startedAt);
-      const rows = rowsOf(result);
-      const error = isToolError(result) ? result.error.code : null;
-      turn.trace.push({ tool: spec.name, args: args as Record<string, unknown>, status: spec.status, detail: detail ?? null, rows, error, durationMs, memo: false });
-      finish({ state: error === null ? 'done' : 'failed', detail, rows, error, durationMs });
-      if (spec.readOnly && error === null) turn.memoSet(key, result);
-      return result;
-    },
+    async execute(rawArgs: unknown) { return runTool(spec, turn, rawArgs); },
   });
 }

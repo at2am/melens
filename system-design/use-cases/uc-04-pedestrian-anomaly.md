@@ -2,11 +2,11 @@
 id: UC-04
 title: Pedestrian anomaly detection and analysis
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Alex Gao
 trigger: proactive
 agents: [analyse_anomaly, map_agent]
-tools: [get_anomaly, nearby_context, search_grounding]
+tools: [get_anomaly, analyse_anomaly, nearby_context, search_grounding]
 data_sources: [pedestrian-live, pedestrian-history, news-rss, events-ticketmaster, ptv-gtfs-realtime, road-disruptions, search-grounding]
 source_rows: [Abnormal detection & analysis]
 ---
@@ -40,13 +40,18 @@ Translated from the original Chinese in the Notion table:
 - [ ] Sensors beyond the threshold appear as "?" markers without an app reload.
 - [ ] The pop-up shows the direction (higher or lower) and the size of the difference against the baseline.
 - [ ] The analysis lists possible causes, each with a confidence level and at least one source link.
-- [ ] Replay mode: a chosen historical day can run through the same pipeline, so the demo works even with no live anomaly.
+- [x] Replay mode: a chosen historical day can run through the same pipeline, so the demo works even with no live anomaly (once `apply-sql.py` has applied 009 and the replay script has published a batch).
 
 ## Notes
 
 - Live counts carry no coordinates; join them with the sensor locations table (134 sensors). Live data lags by about 15–30 minutes.
 - News arrives without coordinates; it is placed by the UC-06 extraction pipeline, which this use case shares.
 - The biggest demo risk is having no real anomaly on the day, so replay mode is part of P0.
+
+## Status
+
+- 2026-10-15: the `analyse_anomaly` workflow, `get_anomaly` and the Analyse button are built. The hourly pedestrian ingestion and the live detector do not exist yet (the pedestrian and road-disruption jobs are `enabled: false` in `cloud/data/infra/schedules.json` and their admission gates are open), so there is no live marker.
+- **Replay mode** (this day): `cloud/data/scripts/anomaly_replay.py` compares real City of Melbourne hourly counts of a historical day (default 2025-09-27, AFL Grand Final day) with the mean of the same hour on the previous 7 days (`same-hour-prev-7d-mean-v1`; anomalous at 50% and 300 people or more, at most 3 hours per sensor) and publishes the result as the source `melens.anomaly.replay` into `melens_ingest.anomaly_results`. `melens_query.v_anomaly_current` serves it; the map service and the agent read it through the same anomaly layer loader a live detector would use (`@melens/shared/query/anomaly-producer`). A replay result keeps its historical window, its title starts with "Replay · ", its attribution names the replayed day, and the consumer refuses a replay result without that title. The source was registered by the replay script without the live-source admission gates and awaits team review (see its `admission_evidence`). A failing anomaly read makes only the anomaly layer unavailable.
 
 ## Open questions
 

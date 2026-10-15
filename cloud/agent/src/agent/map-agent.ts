@@ -4,7 +4,8 @@ import type { Part } from '@google/genai';
 import { attachmentRefOf } from '../protocol/attachments.js';
 import type { StopReason, StoredTurn } from '../protocol/schemas.js';
 import type { TurnContext, TurnRunner } from '../server.js';
-import { TurnRegistry, buildTool } from '../tools/define.js';
+import { TurnRegistry, buildTool, isToolError, runTool } from '../tools/define.js';
+import { analyseAnomalyTool, areaBriefTool } from '../workflows/workflows.js';
 import { toolSpecs, type ToolDependencies } from '../tools/catalog.js';
 import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, turnMessage } from './prompts.js';
 import { hasUsage } from './usage.js';
@@ -66,75 +67,93 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         turn.sink.emit({ event: 'usage', call: usage, turn: registry.usage.turn });
       };
 
-      const agent = new LlmAgent({
-        name: AGENT_NAME,
-        model: options.model,
-        instruction: instructionFor(turn.session.pendingQuestion),
-        tools,
-        beforeModelCallback: ({ request }): LlmResponse | undefined => {
-          closeCall();
-          streamedText = false;
-          // ask_user ends the turn: the step after its answer gets an empty final response instead of a model call.
-          if (registry.asked !== null) return { content: { role: 'model', parts: [{ text: '' }] }, partial: false };
-          openCall = { startedAt: clock().getTime(), finishedAt: null };
-          const index = registry.usage.calls + 1;
-          if (registry.toolsDisabled || index >= options.maxModelCalls) {
-            stripTools(request);
-            if (index >= options.maxModelCalls) registry.budgetForced = true;
-            request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.noTools }] });
-          } else if (index === options.maxModelCalls - 1) {
-            request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.wrapUp }] });
-          }
-          return undefined;
-        },
-        afterModelCallback: ({ response }): LlmResponse | undefined => {
-          if (response.partial === true || openCall === null) return undefined;
-          // The first complete response ends the model's work; tools run before the trailing usage arrives.
-          openCall.finishedAt ??= clock().getTime();
-          if (hasUsage(response.usageMetadata)) closeCall(response.usageMetadata);
-          return undefined;
-        },
-      });
-
-      const sessionService = new InMemorySessionService();
-      const session = await sessionService.createSession({ appName: APP_NAME, userId: turn.uid, sessionId: turn.session.id });
-      for (const content of historyContents(turn.history, turn.historyImages)) {
-        await sessionService.appendEvent({ session, event: createEvent({ invocationId: 'history',
-          author: content.role === 'user' ? 'user' : AGENT_NAME, content }) });
-      }
-      const runner = new Runner({ appName: APP_NAME, agent, sessionService });
-      const runConfig: RunConfig = { streamingMode: StreamingMode.SSE, maxLlmCalls: options.maxModelCalls };
-
       let failed = false;
-      try {
-        const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
-          newMessage: turnMessage(turn.request.input, turn.request.context, turn.images), runConfig, abortSignal: turn.signal });
-        for await (const event of events) {
-          if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
-          if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
-          const parts = event.content.parts;
-          if (parts.some((part) => part.functionResponse !== undefined)) continue;
-          const text = textOf(parts);
-          if (event.partial === true) {
-            if (text !== '') { streamedText = true; answer += text; turn.sink.emit({ event: 'text', delta: text }); }
-          } else if (!streamedText && text.trim() !== '') {
-            answer += text;
-            turn.sink.emit({ event: 'text', delta: text });
+      // The map's own entry points already say what to do, so code, not the model, picks the workflow (agent-design.md, Entry routing).
+      // A workflow that produces no card (nothing found, a model or data failure) falls through to the loop with the explicit prompt.
+      let handledByWorkflow = false;
+      const input = turn.request.input;
+      if (input.kind === 'area' || input.kind === 'analyse') {
+        try {
+          const outcome = input.kind === 'area'
+            ? await runTool(areaBriefTool(options.tools), registry, { point: { lat: input.lat, lng: input.lng } })
+            : await runTool(analyseAnomalyTool(options.tools), registry, { feature_id: input.featureId });
+          handledByWorkflow = !isToolError(outcome) && registry.cards.length > 0;
+        } catch (error) {
+          if (!turn.signal.aborted) options.log?.({ severity: 'WARNING', event: 'workflowFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown' });
+        }
+      }
+
+      if (!handledByWorkflow && !turn.signal.aborted) {
+        const agent = new LlmAgent({
+          name: AGENT_NAME,
+          model: options.model,
+          instruction: instructionFor(turn.session.pendingQuestion),
+          tools,
+          beforeModelCallback: ({ request }): LlmResponse | undefined => {
+            closeCall();
+            streamedText = false;
+            // ask_user ends the turn: the step after its answer gets an empty final response instead of a model call.
+            if (registry.asked !== null) return { content: { role: 'model', parts: [{ text: '' }] }, partial: false };
+            openCall = { startedAt: clock().getTime(), finishedAt: null };
+            const index = registry.usage.calls + 1;
+            if (registry.toolsDisabled || index >= options.maxModelCalls) {
+              stripTools(request);
+              if (index >= options.maxModelCalls) registry.budgetForced = true;
+              request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.noTools }] });
+            } else if (index === options.maxModelCalls - 1) {
+              request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.wrapUp }] });
+            }
+            return undefined;
+          },
+          afterModelCallback: ({ response }): LlmResponse | undefined => {
+            if (response.partial === true || openCall === null) return undefined;
+            // The first complete response ends the model's work; tools run before the trailing usage arrives.
+            openCall.finishedAt ??= clock().getTime();
+            if (hasUsage(response.usageMetadata)) closeCall(response.usageMetadata);
+            return undefined;
+          },
+        });
+
+        const sessionService = new InMemorySessionService();
+        const session = await sessionService.createSession({ appName: APP_NAME, userId: turn.uid, sessionId: turn.session.id });
+        for (const content of historyContents(turn.history, turn.historyImages)) {
+          await sessionService.appendEvent({ session, event: createEvent({ invocationId: 'history',
+            author: content.role === 'user' ? 'user' : AGENT_NAME, content }) });
+        }
+        const runner = new Runner({ appName: APP_NAME, agent, sessionService });
+        const runConfig: RunConfig = { streamingMode: StreamingMode.SSE, maxLlmCalls: options.maxModelCalls };
+
+        try {
+          const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
+            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images), runConfig, abortSignal: turn.signal });
+          for await (const event of events) {
+            if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
+            if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
+            const parts = event.content.parts;
+            if (parts.some((part) => part.functionResponse !== undefined)) continue;
+            const text = textOf(parts);
+            if (event.partial === true) {
+              if (text !== '') { streamedText = true; answer += text; turn.sink.emit({ event: 'text', delta: text }); }
+            } else if (!streamedText && text.trim() !== '') {
+              answer += text;
+              turn.sink.emit({ event: 'text', delta: text });
+            }
+          }
+          closeCall();
+        } catch (error) {
+          openCall = null; // a failed call reports no usage of its own; the error event carries the totals
+          if (!turn.signal.aborted) {
+            failed = true;
+            options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown',
+              detail: error instanceof Error ? error.message.slice(0, 300) : undefined });
+            // Gemini refuses a photo it cannot decode; sending the same turn again cannot help.
+            const unreadablePhoto = error instanceof ModelCallError && turn.images.length > 0 && UNREADABLE_FILE.test(error.message);
+            turn.sink.emit({ event: 'error', message: unreadablePhoto ? 'A photo could not be read. Send a different one.' : 'The agent could not finish this turn',
+              retryable: !unreadablePhoto, usage: registry.usage.final(false) });
+            throw error;
           }
         }
-        closeCall();
-      } catch (error) {
-        openCall = null; // a failed call reports no usage of its own; the error event carries the totals
-        if (!turn.signal.aborted) {
-          failed = true;
-          options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown',
-            detail: error instanceof Error ? error.message.slice(0, 300) : undefined });
-          // Gemini refuses a photo it cannot decode; sending the same turn again cannot help.
-          const unreadablePhoto = error instanceof ModelCallError && turn.images.length > 0 && UNREADABLE_FILE.test(error.message);
-          turn.sink.emit({ event: 'error', message: unreadablePhoto ? 'A photo could not be read. Send a different one.' : 'The agent could not finish this turn',
-            retryable: !unreadablePhoto, usage: registry.usage.final(false) });
-          throw error;
-        }
+
       }
 
       const stop: StopReason = registry.asked !== null ? 'asked' : turn.signal.aborted ? 'cancelled' : registry.budgetForced ? 'budget' : 'end';

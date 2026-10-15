@@ -93,7 +93,11 @@ reviewed = {
     'ticketmaster.events': ('restricted', 'developer.ticketmaster.com'),
     'gdelt.news': ('verified_open', 'www.gdeltproject.org'),
     'victoria.council.engagement_news': ('restricted', None),
-    'user.events': ('restricted', None),
+    # 'user.events' (UC-09) returns here once the user_events export publishes into v_source_coverage; until then the
+    # audit below cannot pass with it listed, and the app reads community events from the agent service instead.
+    # The labelled replay of a historical day (UC-04): derived from City of Melbourne CC BY counts, registered
+    # 2026-10-15 without the live-source admission gates; the team has yet to review it.
+    'melens.anomaly.replay': ('verified_open', 'data.melbourne.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:
@@ -161,6 +165,7 @@ approved = {
     'v_pedestrian_observations', 'v_planning_changes_current', 'v_road_disruptions_current',
     'v_road_disruptions_history', 'v_source_abnormal_delay', 'v_source_coverage', 'v_source_health',
     'v_street_observations', 'v_transport_changes_current',
+    'v_anomaly_current',  # 009: anomaly results of published batches, the detector's or the labelled replay (UC-04)
 }
 views = read([bq, 'ls', '--max_results=1000', '--format=prettyjson', project + ':melens_query'])
 if any(table.get('type') != 'VIEW' or table['tableReference']['tableId'] not in approved for table in views):

@@ -53,7 +53,7 @@ const services: readonly Service[] = [
   {
     name: 'agent', cwd: resolve(root, 'agent'), entry: 'dist/src/main.js', port: port(env.AGENT_PORT, 8080), health: '/healthz',
     env: { AGENT_PROJECT_ID: projectId, AGENT_VERTEX_LOCATION: 'global', AGENT_ALLOWED_ORIGINS: appOrigin, AGENT_PUBLIC_SOURCES_FILE: publicSources,
-      MAP_DYNAMIC_SCAN_BYTES: dynamicScanBytes, AGENT_DEVELOPMENT_MODE: 'true', AGENT_DEVELOPMENT_TOKEN: 'dev' },
+      MAP_DYNAMIC_SCAN_BYTES: dynamicScanBytes, AGENT_DEVELOPMENT_MODE: 'true', AGENT_DEVELOPMENT_TOKEN: 'dev', AGENT_ROUTES_QUOTA_PROJECT: projectId },
   },
 ];
 

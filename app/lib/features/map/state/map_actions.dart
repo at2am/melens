@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/geo/polyline.dart';
 import '../../agent/data/agent_models.dart';
 import '../data/map_models.dart';
 import 'layer_controller.dart';
@@ -17,9 +20,6 @@ enum MapActionOutcome {
 
   /// Nothing in the arguments could be applied.
   ignored,
-
-  /// The app does not implement this action yet.
-  unsupported,
 
   /// Read back from a stored turn; never re-applied.
   restored,
@@ -52,11 +52,44 @@ final class MapFocusRequest {
   final int? zoom;
 }
 
+/// A route the agent drew with `draw_route`, decoded and ready to render.
+final class AgentRoute {
+  const AgentRoute({
+    required this.sequence,
+    required this.points,
+    required this.waypoints,
+    required this.mode,
+    this.distanceMetres,
+    this.durationMinutes,
+  });
+
+  final int sequence;
+
+  /// The decoded path, at least two points.
+  final List<AgentLatLng> points;
+
+  /// The stops the route passes through, first to last; may be empty.
+  final List<RouteWaypoint> waypoints;
+
+  /// `walk` or `transit`.
+  final String mode;
+  final int? distanceMetres;
+  final int? durationMinutes;
+}
+
+final class RouteWaypoint {
+  const RouteWaypoint({required this.point, this.label});
+
+  final AgentLatLng point;
+  final String? label;
+}
+
 final class MapActionsState {
   const MapActionsState({
     this.highlightedIds = const [],
     this.missingIds = const [],
     this.focus,
+    this.route,
   });
 
   /// Feature ids the agent asked to highlight, in request order.
@@ -67,14 +100,20 @@ final class MapActionsState {
 
   final MapFocusRequest? focus;
 
+  /// The route on the map, or null.
+  final AgentRoute? route;
+
   MapActionsState _with({
     List<String>? highlightedIds,
     List<String>? missingIds,
     MapFocusRequest? focus,
+    AgentRoute? route,
+    bool clearRoute = false,
   }) => MapActionsState(
     highlightedIds: highlightedIds ?? this.highlightedIds,
     missingIds: missingIds ?? this.missingIds,
     focus: focus ?? this.focus,
+    route: clearRoute ? null : route ?? this.route,
   );
 }
 
@@ -85,6 +124,7 @@ final class MapActionsState {
 class MapActionsController extends _$MapActionsController {
   static final _log = Logger('MapActions');
   int _focusSequence = 0;
+  int _routeSequence = 0;
 
   @override
   MapActionsState build() => const MapActionsState();
@@ -94,9 +134,7 @@ class MapActionsController extends _$MapActionsController {
       UiActionName.showLayers => _showLayers(action.args),
       UiActionName.focusMap => _focusMap(action.args),
       UiActionName.highlightFeatures => _highlight(action.args),
-      UiActionName.drawRoute => const MapActionReport(
-        MapActionOutcome.unsupported,
-      ),
+      UiActionName.drawRoute => _drawRoute(action.args),
     };
     _log.fine('${action.action.name}: ${report.outcome.name}');
     return report;
@@ -112,6 +150,11 @@ class MapActionsController extends _$MapActionsController {
         zoom: zoom,
       ),
     );
+  }
+
+  /// Removes the drawn route, for the dismiss chip and a new conversation.
+  void clearRoute() {
+    if (state.route != null) state = state._with(clearRoute: true);
   }
 
   void clearHighlights() {
@@ -182,6 +225,82 @@ class MapActionsController extends _$MapActionsController {
       ),
     );
     return const MapActionReport(MapActionOutcome.applied);
+  }
+
+  /// A route the agent computed with `draw: false` carries no polyline and is
+  /// not drawn. A polyline that does not decode is ignored, never half drawn.
+  MapActionReport _drawRoute(Map<String, dynamic> args) {
+    final Object? encoded = args['polyline'];
+    if (encoded is! String || encoded.isEmpty) {
+      return const MapActionReport(MapActionOutcome.ignored);
+    }
+    final List<({double lat, double lng})> decoded;
+    try {
+      decoded = decodePolyline(encoded);
+    } on FormatException {
+      return const MapActionReport(MapActionOutcome.ignored);
+    }
+    if (decoded.length < 2) {
+      return const MapActionReport(MapActionOutcome.ignored);
+    }
+    final points = [
+      for (final p in decoded) AgentLatLng(lat: p.lat, lng: p.lng),
+    ];
+    final waypoints = <RouteWaypoint>[];
+    final Object? rawWaypoints = args['waypoints'];
+    if (rawWaypoints is List<dynamic>) {
+      for (final raw in rawWaypoints) {
+        final point = _latLng(raw);
+        if (point == null) continue;
+        final Object? label = (raw as Map<String, dynamic>)['label'];
+        waypoints.add(
+          RouteWaypoint(point: point, label: label is String ? label : null),
+        );
+      }
+    }
+    final Object? distance = args['distance_m'];
+    final Object? duration = args['duration_min'];
+    state = state._with(
+      route: AgentRoute(
+        sequence: ++_routeSequence,
+        points: List.unmodifiable(points),
+        waypoints: List.unmodifiable(waypoints),
+        mode: args['mode'] == 'transit' ? 'transit' : 'walk',
+        distanceMetres: distance is num && distance.isFinite
+            ? distance.round()
+            : null,
+        durationMinutes: duration is num && duration.isFinite
+            ? duration.round()
+            : null,
+      ),
+      focus: MapFocusRequest(
+        sequence: ++_focusSequence,
+        bounds: _boundsOf(points),
+      ),
+    );
+    return const MapActionReport(MapActionOutcome.applied);
+  }
+
+  /// A box around the points, padded so a straight north-south or east-west
+  /// route still has area.
+  static AgentViewport _boundsOf(List<AgentLatLng> points) {
+    var north = points.first.lat;
+    var south = north;
+    var east = points.first.lng;
+    var west = east;
+    for (final p in points) {
+      north = math.max(north, p.lat);
+      south = math.min(south, p.lat);
+      east = math.max(east, p.lng);
+      west = math.min(west, p.lng);
+    }
+    const pad = 0.0005;
+    return AgentViewport(
+      north: north + pad,
+      south: south - pad,
+      east: east + pad,
+      west: west - pad,
+    );
   }
 
   MapActionReport _highlight(Map<String, dynamic> args) {

@@ -2,7 +2,7 @@
 id: UC-03
 title: Personalized discovery and planning
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Wasabii
 trigger: query
 agents: [map_agent]

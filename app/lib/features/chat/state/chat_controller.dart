@@ -252,6 +252,8 @@ class ChatController extends _$ChatController {
     try {
       final session = await _client.createSession();
       if (!ref.mounted || generation != _generation) return;
+      // The old conversation's route is not part of the new one.
+      ref.read(mapActionsControllerProvider.notifier).clearRoute();
       state = state.copyWith(
         sessionId: session.id,
         sessionTitle: session.title,
@@ -281,6 +283,9 @@ class ChatController extends _$ChatController {
       return;
     }
     if (!ref.mounted) return;
+    if (sessionId == state.sessionId) {
+      ref.read(mapActionsControllerProvider.notifier).clearRoute();
+    }
     state = state.copyWith(
       clearSession: sessionId == state.sessionId,
       turns: sessionId == state.sessionId ? const [] : null,

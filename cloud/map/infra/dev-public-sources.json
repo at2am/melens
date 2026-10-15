@@ -36,9 +36,9 @@
     "versionRef": null
   },
   {
-    "sourceId": "user.events",
-    "url": null,
-    "attribution": "Published by a Melens user",
+    "sourceId": "melens.anomaly.replay",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-monthly-counts-per-hour/",
+    "attribution": "Melens replay of City of Melbourne pedestrian counts (CC BY 4.0)",
     "versionRef": null
   }
 ]

@@ -4,14 +4,14 @@ import type { MapConfig } from '../config.js';
 import type { ViewportQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
-  BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, GEO_ORDER, NO_BINDINGS,
+  ANOMALY_COLUMNS, BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, GEO_ORDER, NO_BINDINGS,
   PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoTimeFilter,
   geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection, recordStatusFilter,
   resultLimit, spatialFilter, timeWindow, topicFilter, usesTimeWindow, viewPath, type ViewName,
 } from './sql.js';
 
 export const viewQueryIdSchema = z.enum([
-  'planning', 'disruption', 'event', 'news', 'pedestrian', 'boundary', 'rent', 'census', 'sourceCoverage',
+  'planning', 'disruption', 'event', 'news', 'pedestrian', 'anomaly', 'boundary', 'rent', 'census', 'sourceCoverage',
 ]);
 export type ViewQueryId = z.infer<typeof viewQueryIdSchema>;
 export type IndicatorFilter = NonNullable<ViewportQuery['areaFilter']>;
@@ -57,6 +57,15 @@ export function prepareViewQuery(options: {
             AND (p.location_valid_to IS NULL OR p.location_valid_to >= ${PEDESTRIAN_OBSERVATION_END})
           ${PEDESTRIAN_ORDER}`,
         ...bind(base, timeWindow(request.window)),
+      };
+    case 'anomaly':
+      // Results are the published detector or replay rows; the producer validates linkage and time.
+      return { ...defaults,
+        query: `${recordProjection(ANOMALY_COLUMNS)}
+          FROM ${path('v_anomaly_current')} a
+          WHERE a.lat BETWEEN @south AND @north AND a.lon BETWEEN @west AND @east ${admitted('a.source_id')}
+          ORDER BY a.window_to DESC, a.result_id LIMIT @resultLimit`,
+        ...bind(base),
       };
     case 'boundary': {
       const filter = request.boundaryFilter;

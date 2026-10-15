@@ -3,6 +3,8 @@ import { parseViewportQuery, sourceReferenceSchema } from '@melens/shared/contra
 import type { MapConfig } from '@melens/shared/config';
 import type { PublicSourceReference, PublicSourceResolver } from '@melens/shared/query/adapter-common';
 import { createBigQueryViewAdapter, type BigQueryViewAdapter } from '@melens/shared/query/bigquery-adapter';
+import { createAnomalyLayerLoader, failSoftAnomalyLayerLoader } from '@melens/shared/query/anomalies';
+import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
 import { createViewQueryRunner } from '@melens/shared/query/query-runner';
 import { createSourceCoverageReader, findPublicSource, type SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
@@ -46,8 +48,11 @@ export function createSharedFeatureReader(options: {
   const readCoverage = createSourceCoverageReader({ runner }).read;
   const resolveSource = (coverage: SourceCoverageSnapshot): PublicSourceResolver => (id) =>
     findPublicSource(coverage, id) === null ? null : references.get(id) ?? null;
-  const loadLayer = createViewportLayerLoader({ runQuery: (input, execution) => runner.run(input, execution), resolveSource, clock,
-    externalVerifier: false, resolveArea: undefined, loadAnomalyLayer: undefined });
+  const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) => runner.run(input, execution);
+  // The same published anomaly results as the map's anomaly layer: the detector's, or the labelled replay of a historical day.
+  const loadAnomalyLayer = failSoftAnomalyLayerLoader(createAnomalyLayerLoader({ producer: createViewAnomalyProducer({ runQuery, references }) }));
+  const loadLayer = createViewportLayerLoader({ runQuery, resolveSource, clock,
+    externalVerifier: false, resolveArea: undefined, loadAnomalyLayer });
   const rowLimit = options.config.maxPageItems;
   const resultBudgetBytes = options.config.maxResponseBytes - options.config.responseEnvelopeReserveBytes;
 

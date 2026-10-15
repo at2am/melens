@@ -100,7 +100,8 @@ connectors' `source.json` manifests and source-policy records:
 | `ticketmaster.events` (event) | `restricted` ([release record](../../data/docs/validation/events-release-2026-10-01.md)); 24-hour visibility, direct event link required | Discovery API page | Event information provided by Ticketmaster |
 | `gdelt.news` (news) | `verified_open` with attribution to The GDELT Project | gdeltproject.org | News metadata from The GDELT Project |
 | `victoria.council.engagement_news` (news) | `restricted`, facts and links only | none; every record carries its council news link | Greater Melbourne councils — community engagement news |
-| `user.events` (event) | `restricted`: content users publish in the app under its terms ([policy](../../data/docs/source-policies/user-events.md)), added 2026-10-10 for UC-09 | none; the records are published in Melens itself | Published by a Melens user |
+| `user.events` (event), **withdrawn from the registry 2026-10-15** | `restricted`: content users publish in the app under its terms ([policy](../../data/docs/source-policies/user-events.md)), added 2026-10-10 for UC-09. It was not published in `v_source_coverage`, which stopped the deployment audit; add it back to `dev-public-sources.json` and `deploy.sh` once the `user_events` export publishes | none; the records are published in Melens itself | Published by a Melens user |
+| `melens.anomaly.replay` (anomaly) | `verified_open`: a derived replay of City of Melbourne pedestrian counts (CC BY 4.0), added 2026-10-15 for UC-04 and registered by `cloud/data/scripts/anomaly_replay.py` without the live-source admission gates, **awaiting team review** | the City of Melbourne counts dataset page | Melens replay of City of Melbourne pedestrian counts (CC BY 4.0), then the replayed day |
 
 `deploy.sh` checks the registry against this reviewed table (source set, licence
 status reported by `v_source_coverage`, reference host) before any plan or apply.
@@ -140,7 +141,7 @@ The 2026-10-09 deployments moved the service to image digest
 `sha256:fd88fdb18b285b33312e258e7f6021d207ed02e6ddf14a475970c15cf73c017f` (the first
 `cloud/` workspace build carrying `@melens/shared`) with the same identity, runtime
 limits and `http://localhost:8000` origin. The audit's approved list grew to the 25 views
-`cloud/data/sql` publishes. Revision `melens-dev-map-00002-g2p` kept the 400,000,000-byte
+`cloud/data/sql` publishes (26 with `v_anomaly_current`, added 2026-10-15 for the UC-04 replay). Revision `melens-dev-map-00002-g2p` kept the 400,000,000-byte
 ceiling and denied current-mode planning, because that dry run had grown to 481,467,396
 bytes (383,847,461 on 2026-10-01; council engagement rows joined the geo view on
 2026-10-07). Revision `melens-dev-map-00003-nlr` raised the ceiling to 1,000,000,000

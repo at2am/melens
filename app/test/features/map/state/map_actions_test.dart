@@ -163,14 +163,76 @@ void main() {
     expect(state.missingIds, isEmpty);
   });
 
-  test('draw_route is recorded as unsupported', () {
-    final report = actions.apply(
-      const UiAction(
-        action: UiActionName.drawRoute,
-        args: <String, dynamic>{'polyline': 'abc'},
-      ),
-    );
+  // Google's documented example: three points of a path.
+  const encoded = '_p~iF~ps|U_ulLnnqC_mqNvxq`@';
 
-    expect(report.outcome, MapActionOutcome.unsupported);
+  test(
+    'draw_route decodes the polyline, keeps the stops and fits the camera',
+    () {
+      final report = actions.apply(
+        const UiAction(
+          action: UiActionName.drawRoute,
+          args: <String, dynamic>{
+            'polyline': encoded,
+            'mode': 'walk',
+            'distance_m': 3400,
+            'duration_min': 46,
+            'waypoints': [
+              {'lat': 38.5, 'lng': -120.2, 'label': 'Start'},
+              {'lat': 43.252, 'lng': -126.453},
+              {'lat': 'x', 'lng': 1},
+            ],
+          },
+        ),
+      );
+
+      expect(report.outcome, MapActionOutcome.applied);
+      final state = container.read(mapActionsControllerProvider);
+      final route = state.route!;
+      expect(route.points, hasLength(3));
+      expect(route.points.first.lat, closeTo(38.5, 1e-9));
+      expect(route.points.last.lng, closeTo(-126.453, 1e-9));
+      expect(route.waypoints, hasLength(2));
+      expect(route.waypoints.first.label, 'Start');
+      expect(route.mode, 'walk');
+      expect(route.distanceMetres, 3400);
+      expect(route.durationMinutes, 46);
+      final bounds = state.focus!.bounds!;
+      expect(bounds.north, greaterThan(43.252));
+      expect(bounds.south, lessThan(38.5));
+      expect(bounds.east, greaterThan(-120.2));
+      expect(bounds.west, lessThan(-126.453));
+    },
+  );
+
+  test('a new draw_route replaces the old one and clearRoute removes it', () {
+    const action = UiAction(
+      action: UiActionName.drawRoute,
+      args: <String, dynamic>{'polyline': encoded, 'mode': 'transit'},
+    );
+    actions.apply(action);
+    final first = container.read(mapActionsControllerProvider).route!;
+    actions.apply(action);
+    final second = container.read(mapActionsControllerProvider).route!;
+    expect(second.sequence, greaterThan(first.sequence));
+    expect(second.mode, 'transit');
+
+    actions.clearRoute();
+    expect(container.read(mapActionsControllerProvider).route, isNull);
+  });
+
+  test('draw_route without a usable polyline is ignored', () {
+    for (final args in <Map<String, dynamic>>[
+      {'distance_m': 100},
+      {'polyline': ''},
+      {'polyline': '!!!'},
+      {'polyline': '_p~iF'},
+    ]) {
+      final report = actions.apply(
+        UiAction(action: UiActionName.drawRoute, args: args),
+      );
+      expect(report.outcome, MapActionOutcome.ignored, reason: '$args');
+    }
+    expect(container.read(mapActionsControllerProvider).route, isNull);
   });
 }
