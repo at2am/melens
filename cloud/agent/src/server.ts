@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import type { IdTokenVerifier } from './auth/verifier.js';
 import type { UserEventService } from './events/service.js';
+import type { FeedService } from './feeds/service.js';
 import { decodeImages, type TurnImage } from './protocol/attachments.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
   type AgentErrorCode, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
@@ -50,7 +51,8 @@ type Route =
   | { readonly kind: 'eventCancel'; readonly eventId: string }
   | { readonly kind: 'eventJoin'; readonly method: 'POST' | 'DELETE'; readonly eventId: string }
   | { readonly kind: 'eventMembers'; readonly eventId: string }
-  | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string };
+  | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string }
+  | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -78,6 +80,7 @@ function matchEventRoute(method: string, pathname: string): Route | null {
 function matchRoute(method: string, pathname: string): Route | null {
   if (pathname === '/healthz' && method === 'GET') return { kind: 'health' };
   if (pathname.startsWith('/v1/events')) return matchEventRoute(method, pathname);
+  if (pathname === '/v1/feeds' && (method === 'GET' || method === 'PUT')) return { kind: 'feeds', method };
   if (pathname === '/v1/sessions' && (method === 'GET' || method === 'POST')) return { kind: 'sessions', method };
   const session = /^\/v1\/sessions\/([^/]+)$/.exec(pathname);
   if (session !== null && ID.test(session[1]!) && (method === 'GET' || method === 'DELETE')) {
@@ -152,6 +155,8 @@ export interface AgentServerOptions {
   readonly rateLimiter: RateLimiter;
   /** User events (UC-09), with their own write limit. */
   readonly events: UserEventService;
+  /** Feed subscriptions (UC-14), with their own write limit. */
+  readonly feeds: FeedService;
   /** Exact origins the Web app is served from; the agent additionally allows the Authorization header. */
   readonly allowedOrigins: readonly string[];
   readonly turnTimeoutMs: number;
@@ -299,7 +304,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     if (method === 'OPTIONS') {
       const requested = request.headers['access-control-request-method'];
       if (request.headers.origin === undefined || requested === undefined) { writeError(response, 'invalidRequest'); return; }
-      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '600' });
       response.end();
       return;
@@ -382,6 +387,11 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           await options.events.removeMember(uid, route.eventId, route.memberId);
           writeNoContent(response);
           return;
+        case 'feeds': {
+          if (route.method === 'PUT') writeJson(response, 200, { feeds: await options.feeds.replace(uid, await readJsonBody(request)) });
+          else writeJson(response, 200, { feeds: await options.feeds.list(uid) });
+          return;
+        }
       }
     } catch (error) {
       const { code, reason } = errorOf(error);

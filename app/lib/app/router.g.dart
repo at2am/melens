@@ -14,7 +14,8 @@ part of 'router.dart';
 /// The three tabs are branches of one stateful shell, so each keeps its scroll
 /// position and the map keeps its camera while the user is elsewhere. Event
 /// links (`/events/:id`, the address an invite carries) open that event in the
-/// events panel on the Discover tab.
+/// events panel on the Discover tab. The feed editor opens above the tabs,
+/// from the feed or from Settings, and returns to where it was opened.
 
 @ProviderFor(router)
 final routerProvider = RouterProvider._();
@@ -25,7 +26,8 @@ final routerProvider = RouterProvider._();
 /// The three tabs are branches of one stateful shell, so each keeps its scroll
 /// position and the map keeps its camera while the user is elsewhere. Event
 /// links (`/events/:id`, the address an invite carries) open that event in the
-/// events panel on the Discover tab.
+/// events panel on the Discover tab. The feed editor opens above the tabs,
+/// from the feed or from Settings, and returns to where it was opened.
 
 final class RouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
@@ -36,7 +38,8 @@ final class RouterProvider
   /// The three tabs are branches of one stateful shell, so each keeps its scroll
   /// position and the map keeps its camera while the user is elsewhere. Event
   /// links (`/events/:id`, the address an invite carries) open that event in the
-  /// events panel on the Discover tab.
+  /// events panel on the Discover tab. The feed editor opens above the tabs,
+  /// from the feed or from Settings, and returns to where it was opened.
   RouterProvider._()
     : super(
         from: null,
@@ -70,4 +73,4 @@ final class RouterProvider
   }
 }
 
-String _$routerHash() => r'e2c58d76ef1e870341feb683254e6c9b62600d33';
+String _$routerHash() => r'f3374b932ef12db5b0c660655bcaecabfe317b60';

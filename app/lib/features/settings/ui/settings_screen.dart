@@ -1,17 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../app/router.dart';
 import '../../../core/config/env.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../events/state/user_events_providers.dart';
+import '../../feed/data/feed_models.dart';
+import '../../feed/state/feed_providers.dart';
+import '../../feed/ui/feed_labels.dart';
 import '../../location/data/device_location.dart';
 import '../../location/state/user_location.dart';
 import '../../map/state/viewport_controller.dart';
 import '../../shell/state/shell_providers.dart';
 
-/// The third tab: who you are, what you follow, how the app looks and what
+/// The third tab: who you are, the feeds you follow, how the app looks and what
 /// data it is showing.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -52,6 +57,9 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.edit_outlined),
             onTap: () => _rename(context, ref, name ?? ''),
           ),
+          const SizedBox(height: 16),
+          _Section(strings.settingsFeeds),
+          const _FeedsSection(),
           const SizedBox(height: 16),
           _Section(strings.settingsLocation),
           _LocationSwitch(),
@@ -191,6 +199,81 @@ class _Section extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The user's feeds: a switch pauses one, a tap edits it. The same list
+/// the feed's chips show, so a change shows there at once.
+class _FeedsSection extends ConsumerWidget {
+  const _FeedsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = AppLocalizations.of(context);
+    final feeds = ref.watch(feedSubscriptionsProvider);
+    final list = feeds.value;
+    if (list == null) {
+      return feeds.hasError
+          ? ListTile(
+              key: const ValueKey('settings-feeds-error'),
+              leading: const Icon(Icons.cloud_off),
+              title: Text(strings.settingsFeedsError),
+              trailing: TextButton(
+                onPressed: () => ref.invalidate(feedSubscriptionsProvider),
+                child: Text(strings.feedRetry),
+              ),
+            )
+          : const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+    }
+
+    Future<void> setEnabled(FeedSubscription feed, bool enabled) async {
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await ref
+            .read(feedSubscriptionsProvider.notifier)
+            .setEnabled(feed.id, enabled: enabled);
+      } on Object {
+        messenger.showSnackBar(SnackBar(content: Text(strings.feedSaveFailed)));
+      }
+    }
+
+    return Column(
+      children: [
+        for (final feed in list)
+          ListTile(
+            key: ValueKey('settings-feed-${feed.id}'),
+            leading: Icon(feedScopeIcon(feed.scope)),
+            title: Text(feed.name),
+            subtitle: Text(
+              feed.enabled
+                  ? feedSubtitle(strings, feed)
+                  : '${strings.settingsFeedPaused} · '
+                        '${feedSubtitle(strings, feed)}',
+            ),
+            trailing: Switch(
+              key: ValueKey('settings-feed-switch-${feed.id}'),
+              value: feed.enabled,
+              onChanged: (value) => unawaited(setEnabled(feed, value)),
+            ),
+            onTap: () => context.push(AppRoutes.editFeed(feed.id)),
+          ),
+        if (list.length < maxFeedSubscriptions)
+          ListTile(
+            key: const ValueKey('settings-feed-new'),
+            leading: const Icon(Icons.add),
+            title: Text(strings.feedNew),
+            onTap: () => context.push(AppRoutes.newFeed),
+          )
+        else
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: Text(strings.feedLimitReached(maxFeedSubscriptions)),
+          ),
+      ],
+    );
+  }
 }
 
 /// The same switch as the map's My location chip: both drive

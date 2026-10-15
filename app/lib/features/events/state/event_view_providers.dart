@@ -1,8 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/time/melbourne_time.dart';
 import '../../map/data/map_models.dart';
-import '../data/user_event_models.dart';
 import 'user_events_providers.dart';
 
 part 'event_view_providers.g.dart';
@@ -67,10 +65,9 @@ Uri? inviteOrigin(Ref ref) {
       : null;
 }
 
-/// Where the feed looks for community events: a box around central
-/// Melbourne, cut to the discover route's size limit. The feed has no map
-/// viewport of its own.
-final _feedBounds = clampSearchBounds(
+/// Where a feed that follows the whole city looks for community events: a
+/// box around central Melbourne, cut to the discover route's size limit.
+final centralMelbourneEventBounds = clampSearchBounds(
   const MapBounds(
     west: 144.8631,
     south: -37.9136,
@@ -78,19 +75,3 @@ final _feedBounds = clampSearchBounds(
     north: -37.7136,
   ),
 );
-
-/// The published, upcoming community events near the city centre, for the
-/// feed. A failure is the feed's to report; it is not retried here.
-@Riverpod(retry: _manualRetry)
-Future<List<UserEvent>> communityEvents(Ref ref) async {
-  final now = ref.watch(melbourneClockProvider).now().toUtc();
-  final events = await ref
-      .watch(userEventsClientProvider)
-      .discover(_feedBounds, from: now, to: now.add(nearbyUserEventsHorizon));
-  return [
-    for (final event in events)
-      if (!event.isCancelled && !event.hasEndedAt(now)) event,
-  ];
-}
-
-Duration? _manualRetry(int retryCount, Object error) => null;

@@ -1,130 +1,332 @@
+import 'dart:async';
+
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/config/env.dart';
+import '../../../core/network/http_client.dart';
 import '../../../core/time/melbourne_time.dart';
+import '../../agent/state/agent_providers.dart';
+import '../../events/data/user_event_models.dart';
 import '../../events/state/event_view_providers.dart';
+import '../../events/state/user_events_providers.dart';
 import '../../map/data/map_models.dart';
 import '../../map/data/map_repository.dart';
 import '../../map/state/map_providers.dart';
 import '../../map/state/viewport_controller.dart';
 import '../data/feed_models.dart';
+import '../data/feeds_client.dart';
 
 part 'feed_providers.g.dart';
 
 final _log = Logger('feed');
 
-/// The topics the user follows. Kept for the app run; persisting them needs
-/// the account work in UC-09.
-@Riverpod(keepAlive: true)
-class FeedSubscriptions extends _$FeedSubscriptions {
-  @override
-  Set<FeedTopic> build() => defaultFeedTopics;
-
-  void setSubscribed(FeedTopic topic, bool subscribed) {
-    state = subscribed ? {...state, topic} : ({...state}..remove(topic));
-  }
-
-  void toggle(FeedTopic topic) => setSubscribed(topic, !state.contains(topic));
-}
-
 // A pull to refresh reissues the request; failures never loop.
 Duration? _manualRetry(int retryCount, Object error) => null;
 
-/// Zoom at which the service returns single items for a city-wide box.
-const _feedZoom = 12.0;
+/// Tests override this with a scripted [FeedsClient].
+@Riverpod(keepAlive: true)
+FeedsClient feedsClient(Ref ref) => HttpFeedsClient(
+  client: ref.watch(httpClientProvider),
+  baseUrl: ref.watch(envProvider).agentBaseUrl,
+  tokenSource: ref.watch(agentTokenSourceProvider),
+);
 
-/// The subscribed map layers as one sorted, comma-separated key. A string
-/// compares by value, so the feed's map request is not repeated when the
-/// subscriptions change in a way that leaves the layers alone.
-@riverpod
-String subscribedLayerKey(Ref ref) {
-  final topics = ref.watch(feedSubscriptionsProvider);
-  return ([for (final topic in topics) ?topic.layer?.name]..sort()).join(',');
+/// The user's feeds, in their order, as the agent service stores them. A
+/// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// A change shows at once and then saves the whole list. Saves run one after
+/// another, so an older list never lands after a newer one; a failed save
+/// puts the list back and rethrows for the caller to report.
+@Riverpod(keepAlive: true, retry: _manualRetry)
+class FeedSubscriptions extends _$FeedSubscriptions {
+  Future<void> _saving = Future.value();
+
+  @override
+  Future<List<FeedSubscription>> build() async =>
+      await ref.watch(feedsClientProvider).load() ?? defaultFeedSubscriptions;
+
+  Future<void> add(FeedSubscription feed) =>
+      _change((feeds) => [...feeds, feed]);
+
+  Future<void> replace(FeedSubscription feed) => _change(
+    (feeds) => [for (final old in feeds) old.id == feed.id ? feed : old],
+  );
+
+  Future<void> remove(String id) => _change(
+    (feeds) => [
+      for (final feed in feeds)
+        if (feed.id != id) feed,
+    ],
+  );
+
+  Future<void> setEnabled(String id, {required bool enabled}) => _change(
+    (feeds) => [
+      for (final feed in feeds)
+        feed.id == id ? feed.copyWith(enabled: enabled) : feed,
+    ],
+  );
+
+  Future<void> _change(
+    List<FeedSubscription> Function(List<FeedSubscription> feeds) edit,
+  ) async {
+    final previous = state.value;
+    if (previous == null) throw StateError('The feeds have not loaded');
+    final next = List<FeedSubscription>.unmodifiable(edit(previous));
+    state = AsyncData(next);
+    final client = ref.read(feedsClientProvider);
+    final save = _saving.then((_) => client.save(next));
+    _saving = save.then<void>((_) {}, onError: (Object _) {});
+    try {
+      final stored = await save;
+      if (identical(state.value, next)) state = AsyncData(stored);
+    } on Object catch (error, stack) {
+      _log.warning('Saving the feeds failed', error, stack);
+      if (identical(state.value, next)) state = AsyncData(previous);
+      rethrow;
+    }
+  }
 }
 
-/// What is on now in the given map layers, as one comma-separated key of
-/// layer names so that the request is made once per set of layers and not
-/// again when community events change. Failures surface as the exception, for
-/// [feed] to report per topic.
+/// Reads the area picker's visible map region.
+typedef VisibleRegionReader = Future<MapBounds> Function();
+
+/// Null in the app, which asks the platform map; tests, which have none,
+/// override it.
+@Riverpod(keepAlive: true)
+VisibleRegionReader? areaPickerRegionReader(Ref ref) => null;
+
+/// The feed chip the user picked: one feed's id, or null for all of them.
+@Riverpod(keepAlive: true)
+class SelectedFeed extends _$SelectedFeed {
+  @override
+  String? build() => null;
+
+  void select(String? feedId) => state = feedId;
+}
+
+/// Topics whose map layer has records without a location, which a feed can
+/// add with [FeedSubscription.includeUnlocated].
+const unlocatedFeedTopics = {
+  FeedTopic.events,
+  FeedTopic.disruptions,
+  FeedTopic.planning,
+};
+
+/// One map layer read inside one scope: the unit the feed requests. Feeds
+/// that ask the same share one request.
+final class FeedLayerQuery {
+  const FeedLayerQuery({
+    required this.layer,
+    required this.scope,
+    this.includeUnlocated = false,
+  });
+
+  final MapLayerId layer;
+  final FeedScope scope;
+  final bool includeUnlocated;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FeedLayerQuery &&
+      other.layer == layer &&
+      other.scope == scope &&
+      other.includeUnlocated == includeUnlocated;
+
+  @override
+  int get hashCode => Object.hash(layer, scope, includeUnlocated);
+}
+
+/// The community events of one scope and horizon.
+final class FeedCommunityQuery {
+  const FeedCommunityQuery({required this.scope, required this.horizon});
+
+  final FeedScope scope;
+  final CommunityHorizon horizon;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FeedCommunityQuery &&
+      other.scope == scope &&
+      other.horizon == horizon;
+
+  @override
+  int get hashCode => Object.hash(scope, horizon);
+}
+
+/// Close up, the service returns single items rather than groups, which a
+/// feed cannot list.
+const _feedZoom = 18.0;
+
+/// What one layer holds now inside one scope. Each layer is its own request,
+/// so the layers load in parallel and a slow one delays only its own items.
+/// Failures surface as the exception, for [feed] to report per source.
 @Riverpod(retry: _manualRetry)
-Future<List<FeedItem>> mapFeedItems(Ref ref, String layerKey) async {
-  final layers = [
-    for (final name in layerKey.split(','))
-      MapLayerId.values.firstWhere((layer) => layer.name == name),
-  ];
+Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
+  final topic = FeedTopic.forLayer(query.layer);
+  if (topic == null) return const [];
   final clock = ref.watch(melbourneClockProvider);
   final repository = ref.watch(mapRepositoryProvider);
-  final catalog = await ref.watch(mapLayerCatalogProvider.future);
-  final bbox = boundedViewportRegion(catalog.serviceBounds);
-  if (bbox == null) throw const MapRequestException();
+  final bbox = switch (query.scope) {
+    CityFeedScope() => boundedViewportRegion(
+      (await ref.watch(mapLayerCatalogProvider.future)).serviceBounds,
+    ),
+    AreaFeedScope(:final area) => area?.bounds,
+    BoxFeedScope(:final bounds) => boundedViewportRegion(bounds),
+  };
+  // A named area this build no longer knows reads nothing.
+  if (bbox == null) return const [];
+  final window = currentViewportWindow(clock);
+  final requestId =
+      'feed-${query.layer.name}-${clock.now().millisecondsSinceEpoch}';
+  final unlocated = query.includeUnlocated
+      ? _unlocatedItems(ref, repository, query.layer, window, requestId)
+      : null;
   final response = await repository.queryViewport(
     ViewportQuery(
-      requestId: 'feed-${clock.now().millisecondsSinceEpoch}',
+      requestId: requestId,
       bbox: bbox,
       zoom: _feedZoom,
-      layers: layers,
+      layers: [query.layer],
       mode: MapQueryMode.current,
-      window: currentViewportWindow(clock),
+      window: window,
       pageSize: 200,
     ),
   );
   final sample = response.dataMode == MapDataMode.sample;
   return [
     for (final layer in response.layers)
-      if (FeedTopic.forLayer(layer.layerId) case final topic?)
+      if (layer.layerId == query.layer)
         for (final item in layer.items)
           if (item is! AggregateMapItem) _fromMapItem(item, topic, sample),
+    if (unlocated != null)
+      for (final item in await unlocated) _fromMapItem(item, topic, sample),
   ];
 }
 
-/// The feed: the community events and what is on now in each subscribed map
-/// layer, upcoming first. A source that fails is reported in
-/// [FeedResult.failedTopics] instead of failing the feed. The map layers are
-/// slower than the events, so the feed does not wait for them: it lists them
-/// in [FeedResult.loadingTopics] and is rebuilt when they arrive.
+/// The layer's records with no location, read by the area its sources cover
+/// (the same evidence the map's unlocated list uses). A layer without that
+/// evidence has none to add.
+Future<List<MapItem>> _unlocatedItems(
+  Ref ref,
+  MapRepository repository,
+  MapLayerId layer,
+  TimeWindow window,
+  String requestId,
+) async {
+  final catalog = await ref.watch(mapLayerCatalogProvider.future);
+  final coverage = [
+    for (final descriptor in catalog.layers)
+      if (descriptor.id == layer) descriptor.coverage,
+  ].firstOrNull;
+  if (coverage == null ||
+      coverage.state != MapCoverageState.verified ||
+      coverage.evidenceSourceIds.isEmpty ||
+      coverage.areaRefs.isEmpty) {
+    return const [];
+  }
+  try {
+    final page = await repository.getUnlocated(
+      UnlocatedQuery(
+        requestId: '$requestId-unlocated',
+        layers: [layer],
+        mode: MapQueryMode.current,
+        window: window,
+        scope: UnlocatedScope.areaRefs([...coverage.areaRefs]..sort()),
+        pageSize: 100,
+      ),
+    );
+    return page.items;
+  } on MapHttpException catch (error) {
+    if (error.code == MapServiceErrorCode.notAvailable) return const [];
+    rethrow;
+  }
+}
+
+/// The published, upcoming community events of one scope. The discover
+/// route takes boxes up to 10 km a side, so a wider scope is cut down around
+/// its centre; the whole city reads central Melbourne.
+@Riverpod(retry: _manualRetry)
+Future<List<FeedItem>> feedCommunityEvents(
+  Ref ref,
+  FeedCommunityQuery query,
+) async {
+  final bounds = switch (query.scope) {
+    CityFeedScope() => centralMelbourneEventBounds,
+    AreaFeedScope(:final area) =>
+      area == null ? null : clampSearchBounds(area.bounds),
+    BoxFeedScope(:final bounds) => clampSearchBounds(bounds),
+  };
+  if (bounds == null) return const [];
+  final now = ref.watch(melbourneClockProvider).now().toUtc();
+  final events = await ref
+      .watch(userEventsClientProvider)
+      .discover(
+        bounds,
+        from: now,
+        to: now.add(Duration(days: query.horizon.days)),
+      );
+  return [
+    for (final event in events)
+      if (!event.isCancelled && !event.hasEndedAt(now)) _fromUserEvent(event),
+  ];
+}
+
+/// The feed: the items of every enabled feed, an item two feeds share shown
+/// once, upcoming first. Each source (one topic of one feed) loads on its
+/// own: one that fails is reported in [FeedResult.failedSources], one that
+/// has not answered yet in [FeedResult.loadingSources], and neither holds up
+/// the others.
 @Riverpod(retry: _manualRetry)
 Future<FeedResult> feed(Ref ref) async {
-  final topics = ref.watch(feedSubscriptionsProvider);
-  final items = <FeedItem>[];
-  final failed = <FeedTopic>{};
-  final loading = <FeedTopic>{};
+  final feeds = await ref.watch(feedSubscriptionsProvider.future);
+  final items = <String, FeedItem>{};
+  final itemFeeds = <String, Set<String>>{};
+  final failed = <FeedSource>{};
+  final loading = <FeedSource>{};
 
-  // Watched before the events are awaited, so both requests start together.
-  final layerNames = ref.watch(subscribedLayerKeyProvider);
-  final mapItems = layerNames.isEmpty
-      ? null
-      : ref.watch(mapFeedItemsProvider(layerNames));
-
-  if (topics.contains(FeedTopic.community)) {
-    try {
-      for (final event in await ref.watch(communityEventsProvider.future)) {
-        items.add(
-          FeedItem(
-            id: event.id,
-            topic: FeedTopic.community,
-            title: event.title,
-            summary: event.description.isEmpty ? null : event.description,
-            when: event.startAt,
-            place: event.placeName,
-            userEventId: event.id,
-          ),
+  for (final feed in feeds) {
+    if (!feed.enabled) continue;
+    for (final topic in FeedTopic.values) {
+      if (!feed.topics.contains(topic)) continue;
+      final layer = topic.layer;
+      final source = (feedId: feed.id, topic: topic);
+      final result = layer == null
+          ? ref.watch(
+              feedCommunityEventsProvider(
+                FeedCommunityQuery(
+                  scope: feed.scope,
+                  horizon: feed.communityHorizon,
+                ),
+              ),
+            )
+          : ref.watch(
+              mapFeedItemsProvider(
+                FeedLayerQuery(
+                  layer: layer,
+                  scope: feed.scope,
+                  includeUnlocated:
+                      feed.includeUnlocated &&
+                      unlocatedFeedTopics.contains(topic),
+                ),
+              ),
+            );
+      if (result.hasError && !result.isLoading) {
+        _log.warning(
+          'Feed source ${feed.id}/${topic.name} failed',
+          result.error,
+          result.stackTrace,
         );
+        failed.add(source);
+      } else if (result.hasValue) {
+        for (final item in result.requireValue) {
+          final key = '${item.topic.name}:${item.id}';
+          items.putIfAbsent(key, () => item);
+          (itemFeeds[key] ??= {}).add(feed.id);
+        }
+      } else {
+        loading.add(source);
       }
-    } on Object catch (error, stack) {
-      _log.warning('Community events failed', error, stack);
-      failed.add(FeedTopic.community);
-    }
-  }
-
-  if (mapItems != null) {
-    final layerTopics = topics.where((topic) => topic.layer != null);
-    if (mapItems.hasError && !mapItems.isLoading) {
-      _log.warning('Map feed failed', mapItems.error, mapItems.stackTrace);
-      failed.addAll(layerTopics);
-    } else if (mapItems.hasValue) {
-      items.addAll(mapItems.requireValue);
-    } else {
-      loading.addAll(layerTopics);
     }
   }
 
@@ -137,7 +339,11 @@ Future<FeedResult> feed(Ref ref) async {
     return when.isAfter(now) ? 0 : 1;
   }
 
-  items.sort((a, b) {
+  final sorted = [
+    for (final MapEntry(:key, :value) in items.entries)
+      value.inFeeds(itemFeeds[key]!),
+  ];
+  sorted.sort((a, b) {
     final byRank = rank(a).compareTo(rank(b));
     if (byRank != 0) return byRank;
     final left = a.when;
@@ -145,8 +351,22 @@ Future<FeedResult> feed(Ref ref) async {
     if (left == null || right == null) return 0;
     return rank(a) == 0 ? left.compareTo(right) : right.compareTo(left);
   });
-  return FeedResult(items: items, failedTopics: failed, loadingTopics: loading);
+  return FeedResult(
+    items: sorted,
+    failedSources: failed,
+    loadingSources: loading,
+  );
 }
+
+FeedItem _fromUserEvent(UserEvent event) => FeedItem(
+  id: event.id,
+  topic: FeedTopic.community,
+  title: event.title,
+  summary: event.description.isEmpty ? null : event.description,
+  when: event.startAt,
+  place: event.placeName,
+  userEventId: event.id,
+);
 
 FeedItem _fromMapItem(MapItem item, FeedTopic topic, bool sample) {
   final time = item.time;
