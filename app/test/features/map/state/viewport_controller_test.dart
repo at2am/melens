@@ -21,8 +21,10 @@ void main() {
 
   setUp(() {
     repository = T017Repository();
+    // These cases cover the search that follows every camera move.
     container = ProviderContainer(
       overrides: [
+        mapAutoSearchProvider.overrideWithValue(true),
         mapRepositoryProvider.overrideWithValue(repository),
         melbourneClockProvider.overrideWithValue(
           MelbourneClock(now: () => t017Instant),
@@ -305,4 +307,97 @@ void main() {
       await settle();
     },
   );
+
+  group('with auto-search off (the default)', () {
+    late ProviderContainer manual;
+    late ViewportController viewport;
+    const moved = MapBounds(
+      west: 144.96,
+      south: -37.82,
+      east: 144.99,
+      north: -37.8,
+    );
+
+    setUp(() {
+      manual = ProviderContainer(
+        overrides: [
+          mapRepositoryProvider.overrideWithValue(repository),
+          melbourneClockProvider.overrideWithValue(
+            MelbourneClock(now: () => t017Instant),
+          ),
+          envProvider.overrideWithValue(
+            Env(
+              environment: AppEnvironment.dev,
+              agentBaseUrl: Uri.parse('http://localhost:8080'),
+              mapBaseUrl: Uri.parse('http://localhost:8081'),
+              mapDataMode: MapDataMode.sample,
+            ),
+          ),
+        ],
+      );
+      addTearDown(manual.dispose);
+      viewport = manual.read(viewportControllerProvider.notifier)
+        ..setLayers([MapLayerId.pedestrian], debounce: false)
+        ..setRegion(t017Region, 14, debounce: false);
+    });
+
+    test('the first region searches; a later move waits', () async {
+      expect(manual.read(mapAutoSearchProvider), isFalse);
+      final first = repository.queries.single;
+      first.result.complete(t017Response(first.query));
+      await settle();
+
+      viewport
+        ..cameraMoving()
+        ..setRegion(moved, 15);
+      final state = manual.read(viewportControllerProvider);
+      expect(repository.queries, hasLength(1));
+      expect(state.isCameraMoving, isFalse);
+      expect(state.isLoading, isFalse);
+      expect(state.bbox!.toJson(), t017Region.toJson());
+      expect(state.response, isNotNull);
+      expect(state.pendingRegion, (visible: moved, zoom: 15.0));
+    });
+
+    test('moving keeps a running search for the shown area', () {
+      viewport
+        ..cameraMoving()
+        ..setRegion(moved, 15);
+      expect(repository.queries.single.cancellation!.isCancelled, isFalse);
+      expect(manual.read(viewportControllerProvider).isLoading, isTrue);
+    });
+
+    test('moving back to the searched area clears the waiting move', () {
+      viewport.setRegion(moved, 15);
+      expect(manual.read(viewportControllerProvider).hasPendingRegion, isTrue);
+      viewport.setRegion(t017Region, 14);
+      expect(manual.read(viewportControllerProvider).hasPendingRegion, isFalse);
+      expect(repository.queries, hasLength(1));
+    });
+
+    test('search this area queries the moved region at once', () {
+      viewport
+        ..setRegion(moved, 15)
+        ..searchPendingRegion();
+      final state = manual.read(viewportControllerProvider);
+      expect(state.hasPendingRegion, isFalse);
+      expect(state.zoom, 15);
+      expect(repository.queries, hasLength(2));
+      expect(repository.queries.last.query.bbox.toJson(), moved.toJson());
+    });
+
+    test('a move the app asked for searches without the button', () {
+      viewport.setRegion(moved, 15, debounce: false, search: true);
+      expect(manual.read(viewportControllerProvider).hasPendingRegion, isFalse);
+      expect(repository.queries.last.query.bbox.toJson(), moved.toJson());
+    });
+
+    test('turning auto-search on searches the waiting move', () async {
+      viewport.setRegion(moved, 15);
+      manual.read(mapAutoSearchProvider.notifier).set(enabled: true);
+      await settle();
+      expect(manual.read(viewportControllerProvider).hasPendingRegion, isFalse);
+      expect(repository.queries.last.query.bbox.toJson(), moved.toJson());
+    });
+  });
 }

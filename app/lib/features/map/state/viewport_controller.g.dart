@@ -8,6 +8,72 @@ part of 'viewport_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Whether the map searches again by itself after the user pans or zooms.
+/// Off by default: a moved map offers "Search this area" instead. Kept for
+/// the application session, like the theme choice.
+
+@ProviderFor(MapAutoSearch)
+final mapAutoSearchProvider = MapAutoSearchProvider._();
+
+/// Whether the map searches again by itself after the user pans or zooms.
+/// Off by default: a moved map offers "Search this area" instead. Kept for
+/// the application session, like the theme choice.
+final class MapAutoSearchProvider
+    extends $NotifierProvider<MapAutoSearch, bool> {
+  /// Whether the map searches again by itself after the user pans or zooms.
+  /// Off by default: a moved map offers "Search this area" instead. Kept for
+  /// the application session, like the theme choice.
+  MapAutoSearchProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mapAutoSearchProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mapAutoSearchHash();
+
+  @$internal
+  @override
+  MapAutoSearch create() => MapAutoSearch();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$mapAutoSearchHash() => r'7a37808140440966b6dbdbf3f1d5d7d30db0fe5d';
+
+/// Whether the map searches again by itself after the user pans or zooms.
+/// Off by default: a moved map offers "Search this area" instead. Kept for
+/// the application session, like the theme choice.
+
+abstract class _$MapAutoSearch extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// Cancels superseded operations before the debounce, and guards every result.
 
 @ProviderFor(ViewportController)
@@ -45,7 +111,7 @@ final class ViewportControllerProvider
 }
 
 String _$viewportControllerHash() =>
-    r'efd10adf4632f0bd96f821d1ff5de771f6b2526a';
+    r'2a058df17c94d10126eefb05c46f942a1802fb59';
 
 /// Cancels superseded operations before the debounce, and guards every result.
 

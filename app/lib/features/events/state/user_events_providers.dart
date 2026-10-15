@@ -120,6 +120,9 @@ class NearbyUserEventsController extends _$NearbyUserEventsController {
     ref.listen(userEventSearchBoundsProvider, (previous, next) {
       if (!_active || next == null || sameBounds(previous, next)) return;
       _pending?.cancel();
+      // Loading from now on, so the map keeps the shown pins and layers
+      // until this list has caught up with the new area too.
+      if (!state.isLoading) state = state._with(isLoading: true);
       _pending = Timer(_debounce, () => unawaited(refresh()));
     });
     ref.onDispose(() => _pending?.cancel());
@@ -133,7 +136,11 @@ class NearbyUserEventsController extends _$NearbyUserEventsController {
     if (active) {
       unawaited(refresh());
     } else if (!_active) {
-      _pending?.cancel();
+      // A load already running finishes; one still waiting is dropped.
+      if (_pending?.isActive ?? false) {
+        _pending!.cancel();
+        state = state._with(isLoading: false);
+      }
     }
   }
 

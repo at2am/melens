@@ -8,6 +8,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:melens/core/config/env.dart';
 import 'package:melens/core/network/public_source_opener.dart';
 import 'package:melens/core/time/melbourne_time.dart';
+import 'package:melens/features/agent/data/agent_models.dart';
+import 'package:melens/features/events/data/user_events_client.dart';
+import 'package:melens/features/events/state/user_events_providers.dart';
+import 'package:melens/features/events/ui/user_event_markers.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/state/layer_controller.dart';
@@ -18,6 +22,7 @@ import 'package:melens/features/map/ui/map_screen.dart';
 import 'package:melens/features/map/ui/map_surface.dart';
 import 'package:melens/l10n/app_localizations.dart';
 
+import '../../events/fake_user_events_client.dart';
 import '../t017_test_support.dart';
 
 Future<ProviderContainer> showScreen(
@@ -28,9 +33,13 @@ Future<ProviderContainer> showScreen(
   MapVisibleRegionReader? reader,
   UnlocatedScope? scope,
   Object? catalogError,
+  bool autoSearch = true,
+  UserEventsClient? events,
 }) async {
   final container = ProviderContainer(
     overrides: [
+      mapAutoSearchProvider.overrideWithValue(autoSearch),
+      if (events != null) userEventsClientProvider.overrideWithValue(events),
       mapRepositoryProvider.overrideWithValue(repository),
       if (catalogError != null)
         mapLayerCatalogProvider.overrideWith((ref) async => throw catalogError),
@@ -476,5 +485,134 @@ void main() {
       isFalse,
     );
     expect(supportsPublicSourceOpening, isFalse);
+  });
+
+  group('with auto-search off', () {
+    const moved = MapBounds(
+      west: 144.99,
+      south: -37.83,
+      east: 145.02,
+      north: -37.8,
+    );
+
+    Future<void> moveTo(
+      MapSurfaceConfiguration map,
+      WidgetTester tester,
+    ) async {
+      map.onCameraChanged!(
+        const CameraPosition(target: LatLng(-37.815, 145.005), zoom: 14),
+      );
+      map.onCameraIdle!();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    testWidgets('a moved map waits for Search this area', (tester) async {
+      final repository = T017Repository(autoComplete: true);
+      MapSurfaceConfiguration? map;
+      var region = t017Region;
+      await showScreen(
+        tester,
+        repository,
+        autoSearch: false,
+        reader: () async => region,
+        builder: (context, configuration) {
+          map = configuration;
+          return const SizedBox();
+        },
+      );
+      final before = repository.queries.length;
+      final button = find.byKey(const ValueKey('map-search-area'));
+      expect(button, findsNothing);
+
+      region = moved;
+      await moveTo(map!, tester);
+      expect(repository.queries, hasLength(before));
+      expect(button, findsOneWidget);
+
+      await tester.tap(button);
+      await tester.pump();
+      expect(repository.queries, hasLength(before + 1));
+      expect(repository.queries.last.query.bbox.toJson(), moved.toJson());
+      await tester.pump();
+      expect(button, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('pins and layers change together once every result is in', (
+      tester,
+    ) async {
+      final repository = T017Repository();
+      final events = FakeUserEventsClient([
+        fakeEvent(
+          'ue_here',
+          point: const AgentLatLng(lat: -37.815, lng: 144.965),
+        ),
+        fakeEvent(
+          'ue_there',
+          point: const AgentLatLng(lat: -37.815, lng: 145.005),
+        ),
+      ]);
+      MapSurfaceConfiguration? map;
+      var region = t017Region;
+      await showScreen(
+        tester,
+        repository,
+        autoSearch: false,
+        events: events,
+        reader: () async => region,
+        builder: (context, configuration) {
+          map = configuration;
+          return const SizedBox();
+        },
+      );
+      repository.queries.last.result.complete(
+        t017Response(repository.queries.last.query),
+      );
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump();
+      Set<String> pins() => {
+        for (final marker in map!.renderPlan.markers)
+          if (marker.markerId.value.startsWith(userEventMarkerPrefix))
+            marker.markerId.value.substring(userEventMarkerPrefix.length),
+      };
+      int layerMarkers() => map!.renderPlan.markers
+          .where((m) => !m.markerId.value.startsWith(userEventMarkerPrefix))
+          .length;
+      expect(pins(), {'ue_here'});
+      final shownLayers = layerMarkers();
+      expect(shownLayers, isPositive);
+      final pin = map!.renderPlan.markers.firstWhere(
+        (m) => m.markerId.value == '${userEventMarkerPrefix}ue_here',
+      );
+
+      region = moved;
+      await moveTo(map!, tester);
+      await tester.tap(find.byKey(const ValueKey('map-search-area')));
+      await tester.pump();
+      // Both searches running: the shown pins and layers stay, unchanged, so
+      // the map plugin has nothing to redraw.
+      expect(pins(), {'ue_here'});
+      expect(layerMarkers(), shownLayers);
+      expect(
+        map!.renderPlan.markers.firstWhere((m) => m.markerId == pin.markerId),
+        pin,
+      );
+
+      // The events arrive first; the map still waits for its layers.
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump();
+      expect(events.lastBounds!.contains(145.005, -37.815), isTrue);
+      expect(events.lastBounds!.contains(144.965, -37.815), isFalse);
+      expect(pins(), {'ue_here'});
+
+      repository.queries.last.result.complete(
+        t017Response(repository.queries.last.query),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(pins(), {'ue_there'});
+      expect(tester.takeException(), isNull);
+    });
   });
 }

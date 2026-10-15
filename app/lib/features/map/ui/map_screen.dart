@@ -42,6 +42,12 @@ import 'unlocated_list.dart';
 /// The marker id of the user's own position.
 const userLocationMarkerId = 'user-location';
 
+// Shared so the marker compares equal across builds (icons compare by
+// identity) and the Maps plugin leaves it alone.
+final _userLocationIcon = BitmapDescriptor.defaultMarkerWithHue(
+  BitmapDescriptor.hueAzure,
+);
+
 typedef MapVisibleRegionReader = Future<MapBounds> Function();
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -80,6 +86,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   String? _panelEventId;
   bool _panelNewEvent = false;
   bool _holdingNearby = false;
+
+  /// What the map draws: the last results that were all ready together.
+  ViewportResponse? _shownResponse;
+  List<UserEvent> _shownEvents = const [];
+
+  /// The next settled camera region came from a move the app asked for (a
+  /// focus request or a zoom to an aggregate), so it is searched even with
+  /// auto-search off.
+  bool _searchNextRegion = false;
 
   /// Kept for [dispose], where `ref` is no longer safe to use.
   late final NearbyUserEventsController _nearby;
@@ -212,9 +227,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _usesVisibleRegion = true;
         _regionReadFailed = false;
       });
+      final search = _searchNextRegion;
+      _searchNextRegion = false;
       ref
           .read(viewportControllerProvider.notifier)
-          .setRegion(bounds, _zoom.clamp(0, 22).toDouble());
+          .setRegion(bounds, _zoom.clamp(0, 22).toDouble(), search: search);
     } catch (_) {
       if (mounted && generation == _regionGeneration) {
         setState(() => _regionReadFailed = true);
@@ -356,6 +373,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (widget.onZoomToBounds != null) {
       widget.onZoomToBounds!(bounds);
     } else if (_map != null) {
+      _searchNextRegion = true;
       unawaited(
         _map!
             .animateCamera(
@@ -402,6 +420,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _focusPoint(AgentLatLng point, {int? zoom}) {
     final controller = _map;
     if (controller == null) return;
+    _searchNextRegion = true;
     unawaited(
       controller
           .animateCamera(
@@ -646,17 +665,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final catalog = ref.watch(mapLayerCatalogProvider);
     final actions = ref.watch(mapActionsControllerProvider);
     final communityOn = ref.watch(communityLayerEnabledProvider);
-    final userEvents = communityOn
-        ? ref.watch(
-            nearbyUserEventsControllerProvider.select((state) => state.events),
-          )
-        : const <UserEvent>[];
+    final nearbyEvents = ref.watch(
+      nearbyUserEventsControllerProvider.select((state) => state.events),
+    );
+    final nearbyLoading =
+        communityOn &&
+        ref.watch(
+          nearbyUserEventsControllerProvider.select((state) => state.isLoading),
+        );
+    // The map draws the previous results until every new one is in, so a
+    // search replaces layers and pins in one step instead of blanking them.
+    if (!viewport.isLoading && !nearbyLoading) {
+      _shownResponse = viewport.response;
+      _shownEvents = nearbyEvents;
+    }
+    final userEvents = communityOn ? _shownEvents : const <UserEvent>[];
     final pickingPin = ref.watch(
       userEventPinPickerProvider.select((state) => state.active),
     );
     final clock = ref.watch(melbourneClockProvider);
     final unlocated = _unlocatedQuery(catalog.value, viewport);
-    final response = viewport.response;
+    final response = _shownResponse;
     final items =
         response?.layers
             .expand((layer) => layer.items)
@@ -693,9 +722,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             Marker(
               markerId: const MarkerId(userLocationMarkerId),
               position: LatLng(userPoint.lat, userPoint.lng),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueAzure,
-              ),
+              icon: _userLocationIcon,
               infoWindow: InfoWindow(title: strings.mapMyLocationHere),
               zIndexInt: 5,
             ),
@@ -801,6 +828,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               children: [
                 _layerChips(layers, communityOn),
                 _timePill(viewport),
+                if (viewport.hasPendingRegion)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Center(
+                      child: FilledButton.tonalIcon(
+                        key: const ValueKey('map-search-area'),
+                        onPressed: () => ref
+                            .read(viewportControllerProvider.notifier)
+                            .searchPendingRegion(),
+                        icon: const Icon(Icons.search, size: 18),
+                        label: Text(strings.mapSearchThisArea),
+                      ),
+                    ),
+                  ),
                 if (viewport.isLoading)
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 8, 16, 0),

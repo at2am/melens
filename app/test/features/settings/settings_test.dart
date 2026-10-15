@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
 import 'package:melens/features/location/state/user_location.dart';
+import 'package:melens/features/map/state/viewport_controller.dart';
 import 'package:melens/features/shell/state/shell_providers.dart';
 
 import '../../support/app_harness.dart';
@@ -51,14 +52,38 @@ void main() {
     expect(container.read(userEventDisplayNameProvider), isNull);
   });
 
-  testWidgets('location sharing is the only switch', (tester) async {
+  testWidgets('location sharing and map search are the only switches', (
+    tester,
+  ) async {
     final container = appContainer();
     addTearDown(container.dispose);
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    expect(find.byType(Switch), findsOneWidget);
+    expect(find.byType(Switch), findsNWidgets(2));
     expect(key('feed-topic-news'), findsNothing);
+  });
+
+  testWidgets('the map waits for Search this area unless auto-search is on', (
+    tester,
+  ) async {
+    final container = appContainer();
+    addTearDown(container.dispose);
+    await pumpApp(tester, container, size: const Size(390, 1600));
+    await openSettings(tester);
+
+    expect(container.read(mapAutoSearchProvider), isFalse);
+    expect(
+      find.text('Off. After moving the map, tap Search this area.'),
+      findsOneWidget,
+    );
+    await tester.tap(key('settings-map-auto-search'));
+    await tester.pumpAndSettle();
+    expect(container.read(mapAutoSearchProvider), isTrue);
+    expect(
+      find.text('On. The map searches again after every pan or zoom.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the location switch shares the position only while on', (
