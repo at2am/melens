@@ -4,6 +4,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../data/map_models.dart';
+import '../map_layer_style.dart';
+import 'marker_icons.dart';
 
 /// Fixed ground area per sensor passage; never renormalized to the viewport.
 /// This is a display scale, not the sensor's catchment or a population density.
@@ -81,6 +83,7 @@ CoreRenderPlan buildGeometryRenderPlan({
   String? description,
   bool selected = false,
   VoidCallback? onTap,
+  BitmapDescriptor icon = BitmapDescriptor.defaultMarker,
 }) {
   if (!_validGeometry(geometry)) return const CoreRenderPlan.empty();
   final markers = <Marker>{};
@@ -95,6 +98,7 @@ CoreRenderPlan buildGeometryRenderPlan({
       Marker(
         markerId: MarkerId('$id:point:${pointIndex++}'),
         position: _position(point),
+        icon: icon,
         infoWindow: InfoWindow(title: title, snippet: description),
         onTap: onTap,
         zIndexInt: selected ? 2 : 1,
@@ -172,24 +176,22 @@ Color parkingStateColor(ParkingState state, ColorScheme colors) =>
 /// Point identities remain visible when a measured count is zero or unknown.
 /// Count circles contain no inferred readings; exact counts live in the list.
 /// Aggregate styling belongs to the separate aggregate renderer.
+/// Each layer draws in its own colour and its points carry its own pin
+/// ([layerStyle]); the selected object switches to the theme's accent.
 CoreRenderPlan buildCoreRenderPlan({
   required Iterable<MapItem> items,
   required ColorScheme colors,
   String? selectedItemId,
   ValueChanged<MapItem>? onSelected,
   String Function(MapItem)? describeItem,
+  MapMarkerIcons? icons,
 }) {
+  final pins = icons ?? MapMarkerIcons.fallback;
   var plan = const CoreRenderPlan.empty();
   for (final item in items) {
     if (item is AggregateMapItem || !isDrawableMapItem(item)) continue;
     final selected = item.id == selectedItemId;
-    final color = selected
-        ? colors.secondary
-        : switch (item.layerId) {
-            MapLayerId.anomaly || MapLayerId.disruption => colors.error,
-            MapLayerId.event || MapLayerId.planning => colors.tertiary,
-            _ => colors.primary,
-          };
+    final color = selected ? colors.secondary : layerStyle(item.layerId).color;
     final onTap = onSelected == null ? null : () => onSelected(item);
     // Hundreds of bays fit a street view, so each sensor is a small dot coloured
     // by its own reading rather than a pin.
@@ -228,6 +230,7 @@ CoreRenderPlan buildCoreRenderPlan({
         color: color,
         selected: selected,
         onTap: onTap,
+        icon: pins.layer(item.layerId, selected: selected),
       ),
     );
     if (item case PedestrianMapItem(

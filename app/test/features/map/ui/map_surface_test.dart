@@ -164,7 +164,14 @@ void main() {
           },
         ),
       );
-      expect(find.textContaining('Pedestrian anomalies'), findsOneWidget);
+      // The legend also names the layer; the label belongs to the object.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('map-surface-objects')),
+          matching: find.textContaining('Pedestrian anomalies'),
+        ),
+        findsOneWidget,
+      );
       expect(find.textContaining('Status: planned'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.textContaining('Status: active'),
