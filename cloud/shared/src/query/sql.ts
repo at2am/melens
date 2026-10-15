@@ -11,7 +11,7 @@ import type { ViewQueryId } from './view-queries.js';
  */
 
 export type ViewName = 'v_geo_records_current' | 'v_geo_records_history' | 'v_pedestrian_observations'
-  | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage';
+  | 'v_boundaries' | 'v_area_indicators' | 'v_source_coverage' | 'v_anomaly_current';
 export type QueryMode = 'current' | 'historical';
 
 export interface QueryBindings {
@@ -40,6 +40,9 @@ export const PEDESTRIAN_COLUMNS = `p.source_id, p.batch_id, p.sensor_id, p.obser
   p.direction_a_count, p.direction_b_count, p.total_count, p.record_granularity, p.fetched_at,
   p.source_last_success_at, p.location_source_id, p.location_valid_from, p.location_valid_to,
   p.geometry_geojson, p.location_status, p.source_freshness_state`;
+export const ANOMALY_COLUMNS = `a.result_id, a.source_id, a.batch_id, a.sensor_id, a.sensor_name, a.lat, a.lon,
+  a.window_from, a.window_to, a.observation_id, a.baseline_definition_id, a.baseline_value, a.observed_value,
+  a.delta, a.direction, a.classification, a.is_replay, a.replay_label, a.location_evidence, a.published_at`;
 export const BOUNDARY_COLUMNS = `b.boundary_id, b.version_id, b.scheme, b.code, b.name,
   b.vintage, b.geometry_geojson, b.valid_from, b.valid_to, b.source_record_id, b.source_id,
   b.batch_id, b.fetched_at`;

@@ -288,3 +288,31 @@ CREATE TABLE IF NOT EXISTS `melens_ingest.pedestrian_observations` (
 )
 PARTITION BY DATE(fetched_at)
 CLUSTER BY source_id, sensor_id, observed_at;
+
+-- Anomaly results of the hourly detector, and of the replay of a historical day
+-- (is_replay). One row is one sensor-hour judged against its baseline; a row is
+-- public only through melens_query.v_anomaly_current, once its batch is published.
+CREATE TABLE IF NOT EXISTS `melens_ingest.anomaly_results` (
+  result_id STRING NOT NULL,
+  source_id STRING NOT NULL,
+  batch_id STRING NOT NULL,
+  sensor_id STRING NOT NULL,
+  sensor_name STRING,
+  lat FLOAT64,
+  lon FLOAT64,
+  window_from TIMESTAMP NOT NULL,
+  window_to TIMESTAMP NOT NULL,
+  observation_id STRING,
+  baseline_definition_id STRING,
+  baseline_value FLOAT64,
+  observed_value FLOAT64,
+  delta FLOAT64,
+  direction STRING NOT NULL,
+  classification STRING NOT NULL,
+  is_replay BOOL NOT NULL,
+  replay_label STRING,
+  location_evidence STRING,
+  fetched_at TIMESTAMP NOT NULL
+)
+PARTITION BY DATE(fetched_at)
+CLUSTER BY source_id, result_id;
