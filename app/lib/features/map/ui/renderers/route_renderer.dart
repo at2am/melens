@@ -3,28 +3,22 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../state/map_actions.dart';
 import 'core_renderers.dart';
+import 'marker_icons.dart';
 
 const routePolylineId = 'agent-route';
 const routeMarkerPrefix = 'agent-route-stop:';
 
-// Shared icons: the Maps plugin compares icons by identity, so a new one per
-// build re-applies every stop marker on each rebuild.
-final _startIcon = BitmapDescriptor.defaultMarkerWithHue(
-  BitmapDescriptor.hueGreen,
-);
-final _endIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
-final _stopIcon = BitmapDescriptor.defaultMarkerWithHue(
-  BitmapDescriptor.hueAzure,
-);
-
 /// The route the agent drew: the path in the accent colour and one marker
-/// per stop. The first stop is green, the last red and the ones between blue;
-/// each marker's info window names the stop, or numbers it.
+/// per stop. The first stop is a green start pin, the last a red finish flag
+/// and the ones between blue; each marker's info window names the stop, or
+/// numbers it.
 CoreRenderPlan routeRenderPlan(
   AgentRoute route, {
   required Color color,
   required String Function(int number) stopLabel,
+  MapMarkerIcons? icons,
 }) {
+  final pins = icons ?? MapMarkerIcons.fallback;
   final stops = route.waypoints;
   return CoreRenderPlan(
     polylines: {
@@ -49,10 +43,10 @@ CoreRenderPlan routeRenderPlan(
           markerId: MarkerId('$routeMarkerPrefix$index'),
           position: LatLng(stop.point.lat, stop.point.lng),
           icon: index == 0
-              ? _startIcon
+              ? pins.routeStart
               : index == stops.length - 1
-              ? _endIcon
-              : _stopIcon,
+              ? pins.routeEnd
+              : pins.routeStop,
           infoWindow: InfoWindow(
             title: stop.label ?? stopLabel(index + 1),
             snippet: stop.label == null ? null : stopLabel(index + 1),

@@ -32,21 +32,17 @@ import 'aggregate_details.dart';
 import 'anomaly_details.dart';
 import 'layer_panel.dart';
 import 'map_details.dart';
+import 'map_layer_style.dart';
 import 'map_status.dart';
 import 'map_surface.dart';
 import 'renderers/aggregate_renderer.dart';
 import 'renderers/core_renderers.dart';
+import 'renderers/marker_icons.dart';
 import 'renderers/route_renderer.dart';
 import 'unlocated_list.dart';
 
 /// The marker id of the user's own position.
 const userLocationMarkerId = 'user-location';
-
-// Shared so the marker compares equal across builds (icons compare by
-// identity) and the Maps plugin leaves it alone.
-final _userLocationIcon = BitmapDescriptor.defaultMarkerWithHue(
-  BitmapDescriptor.hueAzure,
-);
 
 typedef MapVisibleRegionReader = Future<MapBounds> Function();
 
@@ -696,6 +692,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final userPoint = ref.watch(userLocationProvider.select((s) => s.point));
     final scheme = Theme.of(context).colorScheme;
     final strings = AppLocalizations.of(context);
+    final pins =
+        ref.watch(mapMarkerIconsProvider(markerPixelRatio(context))).value ??
+        MapMarkerIcons.fallback;
     var overlayPlan = const CoreRenderPlan.empty();
     if (userEvents.isNotEmpty) {
       overlayPlan = overlayPlan.merge(
@@ -703,6 +702,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           events: userEvents,
           snippetOf: (event) => formatEventTime(clock, event.startAt),
           onTap: _openUserEvent,
+          icons: pins,
         ),
       );
     }
@@ -712,6 +712,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           route,
           color: scheme.primary,
           stopLabel: (number) => strings.mapRouteStop(number.toString()),
+          icons: pins,
         ),
       );
     }
@@ -722,7 +723,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             Marker(
               markerId: const MarkerId(userLocationMarkerId),
               position: LatLng(userPoint.lat, userPoint.lng),
-              icon: _userLocationIcon,
+              icon: pins.userLocation,
+              anchor: pins.userLocationAnchor,
               infoWindow: InfoWindow(title: strings.mapMyLocationHere),
               zIndexInt: 5,
             ),
@@ -1075,7 +1077,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   /// One chip per layer, community events included: filled when on, plain
-  /// when off. Tapping a chip is the only way to turn a layer on or off.
+  /// when off, each led by the badge its pins carry on the map. Tapping a
+  /// chip is the only way to turn a layer on or off.
   Widget _layerChips(LayerSelectionState layers, bool communityOn) {
     final strings = AppLocalizations.of(context);
     final controller = ref.read(layerControllerProvider.notifier);
@@ -1083,12 +1086,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     Widget chip({
       required Key key,
       required String label,
+      required MapMarkerStyle style,
       required bool on,
       required ValueChanged<bool> onChanged,
     }) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         key: key,
+        avatar: MapLayerBadge(style: style),
         label: Text(label),
         selected: on,
         showCheckmark: false,
@@ -1115,12 +1120,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             chip(
               key: ValueKey('map-chip-${layer.name}'),
               label: layerTitle(strings, layer),
+              style: layerStyle(layer),
               on: layers.isLayerEnabled(layer),
               onChanged: (on) => controller.setLayerEnabled(layer, on),
             ),
           chip(
             key: const ValueKey('map-chip-community'),
             label: strings.mapCommunityLayer,
+            style: communityEventStyle,
             on: communityOn,
             onChanged: _setCommunity,
           ),

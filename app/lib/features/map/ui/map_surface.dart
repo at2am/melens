@@ -13,8 +13,11 @@ import '../../../core/config/maps_web_loader.dart';
 import '../../../core/config/native_maps_key.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/map_models.dart';
+import 'layer_panel.dart';
+import 'map_layer_style.dart';
 import 'map_status.dart';
 import 'renderers/core_renderers.dart';
+import 'renderers/marker_icons.dart';
 
 part 'map_surface.g.dart';
 
@@ -154,6 +157,7 @@ class MapSurface extends ConsumerWidget {
       selectedItemId: selectedItemId,
       onSelected: onItemSelected,
       describeItem: (item) => _describeItem(strings, item),
+      icons: ref.watch(mapMarkerIconsProvider(markerPixelRatio(context))).value,
     );
     final aggregates = items.whereType<AggregateMapItem>().toList(
       growable: false,
@@ -249,7 +253,8 @@ class MapSurface extends ConsumerWidget {
   }
 }
 
-/// What the map's shapes mean, and the scale of the pedestrian circles.
+/// What the map's shapes mean, each enabled layer's pin, and the scale of
+/// the pedestrian circles.
 class MapLegend extends StatelessWidget {
   const MapLegend({required this.enabledLayers, super.key});
 
@@ -262,6 +267,24 @@ class MapLegend extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(strings.mapSurfaceGeometryLegend),
+        Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            for (final layer in MapLayerId.values)
+              if (enabledLayers.contains(layer))
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ExcludeSemantics(
+                      child: MapLayerBadge(style: layerStyle(layer), size: 16),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(layerTitle(strings, layer)),
+                  ],
+                ),
+          ],
+        ),
         if (enabledLayers.contains(MapLayerId.pedestrian))
           Text(
             strings.mapSurfaceCountLegend(
@@ -300,6 +323,11 @@ class _GoogleMapSurface extends StatelessWidget {
         tiltGesturesEnabled: false,
         rotateGesturesEnabled: false,
         myLocationButtonEnabled: false,
+        // Google's zoom and camera controls sit in the bottom-right corner,
+        // under the app's own map buttons and chat button, and the overlap
+        // reads as a smear on the Web. Wheel, pinch and double-tap zoom.
+        zoomControlsEnabled: false,
+        webCameraControlEnabled: false,
       ),
     );
   }

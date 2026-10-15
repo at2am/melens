@@ -457,6 +457,7 @@ void main() {
       await container.read(viewportControllerProvider.notifier).refresh();
       await tester.pump();
       await openLayers(tester);
+      await tester.ensureVisible(find.byKey(const ValueKey('map-data-status')));
       await tester.tap(find.byKey(const ValueKey('map-data-status')));
       await tester.pumpAndSettle();
       expect(
