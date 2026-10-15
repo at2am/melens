@@ -1342,10 +1342,6 @@
   "@chatActionIgnored": {
     "description": "Outcome of a UI action the map could not apply."
   },
-  "chatActionUnsupported": "not supported yet",
-  "@chatActionUnsupported": {
-    "description": "Outcome of a UI action the app does not implement yet."
-  },
   "chatActionRestored": "from history",
   "@chatActionRestored": {
     "description": "Outcome of a UI action read back from a stored turn; it is not applied again."
@@ -2204,5 +2200,86 @@
   "settingsNameUnset": "Add your name",
   "@settingsNameUnset": {
     "description": "Settings row title when no display name is set."
+  },
+  "mapRouteSummary": "{minutes} min · {distance} km, {mode, select, transit{public transport} other{walk}}",
+  "@mapRouteSummary": {
+    "description": "Chip over the map describing the route the agent drew: duration, distance and how to travel.",
+    "placeholders": {
+      "minutes": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      },
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "mapRouteSummaryBare": "{mode, select, transit{Public transport route} other{Walking route}}",
+  "@mapRouteSummaryBare": {
+    "description": "Chip over the map for a route with no duration or distance.",
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "mapRouteRemove": "Remove route",
+  "@mapRouteRemove": {
+    "description": "Tooltip of the button that removes the agent's route from the map."
+  },
+  "mapRouteStop": "Stop {number}",
+  "@mapRouteStop": {
+    "description": "Info window title of an unnamed stop on the agent's route.",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "mapMyLocation": "My location",
+  "@mapMyLocation": {
+    "description": "Chip on the map that shares and shows the user's position."
+  },
+  "mapMyLocationLocating": "Finding you…",
+  "@mapMyLocationLocating": {
+    "description": "Chip label while the device position is being read."
+  },
+  "mapMyLocationHere": "You are here",
+  "@mapMyLocationHere": {
+    "description": "Info window title of the user's position marker."
+  },
+  "mapMyLocationDenied": "Location permission was refused. Allow it in your browser's site settings to use My location.",
+  "@mapMyLocationDenied": {
+    "description": "Shown when the user refused the location permission."
+  },
+  "mapMyLocationUnavailable": "Your position could not be found. Try again in a moment.",
+  "@mapMyLocationUnavailable": {
+    "description": "Shown when the device could not work out a position."
+  },
+  "mapMyLocationTimeout": "Finding your position took too long. Try again.",
+  "@mapMyLocationTimeout": {
+    "description": "Shown when the position request timed out."
+  },
+  "mapMyLocationUnsupported": "Location is not available on this device or in this build.",
+  "@mapMyLocationUnsupported": {
+    "description": "Shown on platforms with no location support."
+  },
+  "settingsLocation": "Location",
+  "@settingsLocation": {
+    "description": "Settings section title."
+  },
+  "settingsLocationShare": "Share my location with the assistant",
+  "@settingsLocationShare": {
+    "description": "Settings switch that turns on My location."
+  },
+  "settingsLocationOff": "Off. The assistant does not know where you are, so “near me” needs a map selection.",
+  "@settingsLocationOff": {
+    "description": "Subtitle of the location switch while off."
+  },
+  "settingsLocationOn": "On. Your position is sent with your questions while this is on, and never stored.",
+  "@settingsLocationOn": {
+    "description": "Subtitle of the location switch while on."
   }
 }

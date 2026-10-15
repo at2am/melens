@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -5,6 +7,8 @@ import '../../../core/config/env.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../events/state/user_events_providers.dart';
 import '../../feed/ui/feed_topic_list.dart';
+import '../../location/data/device_location.dart';
+import '../../location/state/user_location.dart';
 import '../../shell/state/shell_providers.dart';
 
 /// The third tab: who you are, what you follow, how the app looks and what
@@ -50,6 +54,9 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _Section(strings.settingsFollowing),
           const FeedTopicList(),
+          const SizedBox(height: 16),
+          _Section(strings.settingsLocation),
+          _LocationSwitch(),
           const SizedBox(height: 16),
           _Section(strings.settingsAppearance),
           SegmentedButton<AppThemeChoice>(
@@ -171,4 +178,47 @@ class _Section extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The same switch as the map's My location chip: both drive
+/// [userLocationProvider], so the position is shared with the assistant only
+/// while it is on.
+class _LocationSwitch extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = AppLocalizations.of(context);
+    final location = ref.watch(userLocationProvider);
+    final on = location.status == UserLocationStatus.on;
+    final locating = location.status == UserLocationStatus.locating;
+    final subtitle = switch (location.failure) {
+      _ when location.status != UserLocationStatus.failed =>
+        on ? strings.settingsLocationOn : strings.settingsLocationOff,
+      DeviceLocationFailure.denied => strings.mapMyLocationDenied,
+      DeviceLocationFailure.timeout => strings.mapMyLocationTimeout,
+      DeviceLocationFailure.unsupported => strings.mapMyLocationUnsupported,
+      _ => strings.mapMyLocationUnavailable,
+    };
+    return SwitchListTile(
+      key: const ValueKey('settings-location'),
+      secondary: locating
+          ? const SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(on ? Icons.my_location : Icons.location_searching),
+      title: Text(strings.settingsLocationShare),
+      subtitle: Text(subtitle),
+      value: on || locating,
+      onChanged: locating
+          ? null
+          : (value) {
+              final controller = ref.read(userLocationProvider.notifier);
+              if (value) {
+                unawaited(controller.enable());
+              } else {
+                controller.disable();
+              }
+            },
+    );
+  }
 }

@@ -63,6 +63,7 @@ lib/
   app/                  bootstrap, MaterialApp, router, theme
   core/                 cross-cutting code that knows no feature
     config/             Env, from --dart-define-from-file
+    geo/                the encoded polyline decoder
     logging/            console logging, provider failure logging
     network/            the HTTP client provider, SseDecoder
     time/               MelbourneClock, protocol time format
@@ -76,6 +77,7 @@ lib/
   features/settings/    the Settings tab: profile, topics, theme
   features/events/      user events (UC-09): the service client, the panel with its form, details and pin picker, invites
   features/agent/       the agent protocol: models and the SSE client
+  features/location/    the user's position, only on request (My location)
   features/chat/        the chat panel: controller, session list, turn views
   features/cards/       the card registry, one widget per card type
   l10n/                 app_en.arb and the generated AppLocalizations
@@ -90,8 +92,14 @@ Where the parts in [agent-protocol.md](../system-design/agent-protocol.md#flutte
 | `AgentClient` and the protocol models | `lib/features/agent/data/` (`HttpAgentClient`, `agent_models.dart`) |
 | `ChatController` | `lib/features/chat/state/chat_controller.dart`; the request context comes from `request_context.dart` |
 | `SessionList` | `lib/features/chat/ui/session_list.dart`, backed by the same controller |
-| `MapActions` | `lib/features/map/state/map_actions.dart` (`MapActionsController`); the map screen applies `focus_map` and shows highlights |
+| `MapActions` | `lib/features/map/state/map_actions.dart` (`MapActionsController`); the map screen applies `focus_map`, shows highlights and draws the route |
 | Card registry, one widget per card type | `lib/features/cards/ui/card_registry.dart` |
+
+## Route and location
+
+**Route.** `draw_route` arrives as a `ui_action` with `polyline` (Google encoded, precision 5), `mode` (`walk` or `transit`), `distance_m`, `duration_min` and `waypoints`. `MapActionsController` decodes it (`lib/core/geo/polyline.dart`), keeps it as `AgentRoute`, and asks the camera to fit it, which also brings the Discover tab forward. The map draws the path in the accent colour (dashed for transit) with a marker per stop (`renderers/route_renderer.dart`) and shows a chip, "46 min · 3.4 km, walk", whose close button removes the route. A new `draw_route` replaces the old route, and so does starting or deleting the conversation. An action without a polyline (the agent called the tool with `draw: false`) or with one that does not decode is reported as ignored and nothing is drawn.
+
+**My location.** The app never reads the position by itself. The "My location" chip on the Discover map and the switch in Settings both drive `userLocationProvider` (`features/location/`): switching on asks the browser once (`melensGetPosition` in `web/index.html`, behind the conditional import `device_location*.dart`), shows a marker, moves the camera there and from then on sends the point as `context.userLocation`; switching off drops it. The position is held in memory only. A refusal, timeout or missing support is shown on the map and in Settings. Android and iOS have no reader yet (the stub reports "unsupported"); native support needs a geolocation plugin.
 
 ## Conventions
 
@@ -134,7 +142,7 @@ The chat panel (the floating button on every tab; a sheet on phones, docked besi
 2. In `config/dev.json` set `AGENT_BASE_URL` to `http://localhost:8080` and `AGENT_DEV_TOKEN` to `dev`.
 3. Run the app with `--web-port 8000`, so the browser origin matches the allowed origin and the `Authorization` header passes the CORS preflight.
 
-What the panel shows, so the agent's behaviour can be judged turn by turn: every tool call as a step, live while it runs (a spinner, then its row count and duration, or its error), with the arguments it was called with and, for a UI action, whether the map applied it (`show_layers` toggles layers of the current topic, `focus_map` moves the camera, `highlight_features` lists chips above the map, `draw_route` is not drawn yet); a Thinking or Writing indicator between steps, so the user always sees that the turn is moving; the streamed answer in the order it arrived around the steps; every card with its sources and Google Maps attribution; the agent's question with its options; and the turn's token usage from Gemini's own counts (↑ input, ↓ output). Each card item is a tile of its own. A message sent while a turn runs interrupts it: the panel stops the turn, the server stores what it had, and the agent answers the new message with the stopped turn in its history; the stop button stops a turn without a new message. The photo button attaches up to four photos (gallery, or camera on phones) to a message, with or without text; photos larger than 1 MB after the picker's resizing, or of a type the service does not take, are re-encoded as a smaller PNG. Tapping a card item opens its details beside the map: a map record is selected (fetched by id when the map has not loaded it), and a Google Maps or web item shows what the card knows about it with its source link. The session list (history button) switches, creates and deletes conversations; the newest one is reopened when the panel first opens. Selecting a map record offers "Brief this area" (`area` input) and, for an anomaly, "Analyse this anomaly" (`analyse` input).
+What the panel shows, so the agent's behaviour can be judged turn by turn: every tool call as a step, live while it runs (a spinner, then its row count and duration, or its error), with the arguments it was called with and, for a UI action, whether the map applied it (`show_layers` toggles layers of the current topic, `focus_map` moves the camera, `highlight_features` lists chips above the map, `draw_route` draws the route on the map, see [Route and location](#route-and-location)); a Thinking or Writing indicator between steps, so the user always sees that the turn is moving; the streamed answer in the order it arrived around the steps; every card with its sources and Google Maps attribution; the agent's question with its options; and the turn's token usage from Gemini's own counts (↑ input, ↓ output). Each card item is a tile of its own. A message sent while a turn runs interrupts it: the panel stops the turn, the server stores what it had, and the agent answers the new message with the stopped turn in its history; the stop button stops a turn without a new message. The photo button attaches up to four photos (gallery, or camera on phones) to a message, with or without text; photos larger than 1 MB after the picker's resizing, or of a type the service does not take, are re-encoded as a smaller PNG. Tapping a card item opens its details beside the map: a map record is selected (fetched by id when the map has not loaded it), and a Google Maps or web item shows what the card knows about it with its source link. The session list (history button) switches, creates and deletes conversations; the newest one is reopened when the panel first opens. Selecting a map record offers "Brief this area" (`area` input) and, for an anomaly, "Analyse this anomaly" (`analyse` input).
 
 Against the deployed service, set `AGENT_BASE_URL` to its Cloud Run URL (`https://melens-dev-agent-saepk4k6hq-km.a.run.app` in development), leave `AGENT_DEV_TOKEN` empty and add the Firebase keys with `cloud/agent/infra/firebase.sh --project melens-510012 --verify --app-config app/config/dev.json` (from the repository root). Opening the chat signs in anonymously; the browser keeps the user in IndexedDB, so a reload restores the same sessions. The agent service allows only `http://localhost:8000` for CORS, so run the app with `--web-port 8000`. Clearing site data or switching browsers or devices starts a new anonymous user without the old sessions.
 

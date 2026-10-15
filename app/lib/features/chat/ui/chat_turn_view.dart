@@ -57,7 +57,6 @@ String _outcomeLabel(AppLocalizations strings, MapActionOutcome outcome) =>
       MapActionOutcome.applied => strings.chatActionApplied,
       MapActionOutcome.partial => strings.chatActionPartial,
       MapActionOutcome.ignored => strings.chatActionIgnored,
-      MapActionOutcome.unsupported => strings.chatActionUnsupported,
       MapActionOutcome.restored => strings.chatActionRestored,
     };
 
@@ -82,7 +81,6 @@ IconData _outcomeIcon(MapActionOutcome outcome) => switch (outcome) {
   MapActionOutcome.applied => Icons.check,
   MapActionOutcome.partial => Icons.rule,
   MapActionOutcome.ignored => Icons.block,
-  MapActionOutcome.unsupported => Icons.construction_outlined,
   MapActionOutcome.restored => Icons.history,
 };
 

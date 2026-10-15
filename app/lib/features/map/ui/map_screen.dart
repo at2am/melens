@@ -19,6 +19,8 @@ import '../../events/state/user_events_providers.dart';
 import '../../events/ui/user_event_markers.dart';
 import '../../events/ui/user_event_text.dart';
 import '../../events/ui/user_events_panel.dart';
+import '../../location/data/device_location.dart';
+import '../../location/state/user_location.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
@@ -33,7 +35,12 @@ import 'map_details.dart';
 import 'map_status.dart';
 import 'map_surface.dart';
 import 'renderers/aggregate_renderer.dart';
+import 'renderers/core_renderers.dart';
+import 'renderers/route_renderer.dart';
 import 'unlocated_list.dart';
+
+/// The marker id of the user's own position.
+const userLocationMarkerId = 'user-location';
 
 typedef MapVisibleRegionReader = Future<MapBounds> Function();
 
@@ -123,6 +130,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         }
       },
     );
+    ref.listenManual(userLocationProvider, (previous, next) {
+      // Each new fix moves the camera to the user once.
+      if (next.status == UserLocationStatus.on &&
+          next.sequence != previous?.sequence &&
+          next.point != null) {
+        ref
+            .read(mapActionsControllerProvider.notifier)
+            .focusPoint(next.point!.lat, next.point!.lng, zoom: 15);
+      }
+    });
     ref.listenManual(cardItemRequestsProvider, (previous, next) {
       if (next != null) _takeCardItemRequest(next);
     });
@@ -454,6 +471,127 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// The features the agent highlighted, as chips above the map. The surface
   /// highlights one selected item at a time, so a chip selects its feature.
+  Widget _locationChip() {
+    final strings = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final location = ref.watch(userLocationProvider);
+    final on = location.status == UserLocationStatus.on;
+    final locating = location.status == UserLocationStatus.locating;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        key: const ValueKey('map-chip-my-location'),
+        avatar: locating
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                on ? Icons.my_location : Icons.location_searching,
+                size: 18,
+                color: on ? scheme.primary : scheme.outline,
+              ),
+        label: Text(
+          locating ? strings.mapMyLocationLocating : strings.mapMyLocation,
+        ),
+        selected: on,
+        backgroundColor: scheme.surface,
+        onSelected: locating
+            ? null
+            : (value) {
+                final controller = ref.read(userLocationProvider.notifier);
+                if (value) {
+                  unawaited(controller.enable());
+                } else {
+                  controller.disable();
+                }
+              },
+      ),
+    );
+  }
+
+  /// Why My location did not work; nothing is shown otherwise.
+  Widget? _locationMessage() {
+    final failure = ref.watch(userLocationProvider.select((s) => s.failure));
+    final status = ref.watch(userLocationProvider.select((s) => s.status));
+    if (status != UserLocationStatus.failed || failure == null) return null;
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                key: const ValueKey('map-location-error'),
+                switch (failure) {
+                  DeviceLocationFailure.denied => strings.mapMyLocationDenied,
+                  DeviceLocationFailure.unavailable =>
+                    strings.mapMyLocationUnavailable,
+                  DeviceLocationFailure.timeout => strings.mapMyLocationTimeout,
+                  DeviceLocationFailure.unsupported =>
+                    strings.mapMyLocationUnsupported,
+                },
+                style: TextStyle(color: theme.colorScheme.onErrorContainer),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The route the agent drew, with a way to take it off the map.
+  Widget _routeChip(AgentRoute route) {
+    final strings = AppLocalizations.of(context);
+    final minutes = route.durationMinutes;
+    final metres = route.distanceMetres;
+    final label = minutes == null || metres == null
+        ? strings.mapRouteSummaryBare(route.mode)
+        : strings.mapRouteSummary(
+            NumberFormat.decimalPattern('en_AU').format(minutes),
+            NumberFormat('0.0', 'en_AU').format(metres / 1000),
+            route.mode,
+          );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: InputChip(
+          key: const ValueKey('map-route-chip'),
+          avatar: Icon(
+            route.mode == 'transit'
+                ? Icons.directions_transit_outlined
+                : Icons.directions_walk,
+            size: 18,
+          ),
+          label: Text(label),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          deleteIcon: const Icon(Icons.close, size: 18),
+          deleteButtonTooltipMessage: strings.mapRouteRemove,
+          onPressed: () => _zoomToBounds(
+            MapBounds(
+              west: route.points.map((p) => p.lng).reduce(math.min),
+              south: route.points.map((p) => p.lat).reduce(math.min),
+              east: route.points.map((p) => p.lng).reduce(math.max),
+              north: route.points.map((p) => p.lat).reduce(math.max),
+            ),
+          ),
+          onDeleted: () =>
+              ref.read(mapActionsControllerProvider.notifier).clearRoute(),
+        ),
+      ),
+    );
+  }
+
   Widget? _highlightBar(List<MapItem> items, MapActionsState actions) {
     if (actions.highlightedIds.isEmpty && actions.missingIds.isEmpty) {
       return null;
@@ -566,6 +704,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             .where((item) => layers.enabledLayers.contains(item.layerId))
             .toList() ??
         const <MapItem>[];
+    final route = actions.route;
+    final userPoint = ref.watch(userLocationProvider.select((s) => s.point));
+    final scheme = Theme.of(context).colorScheme;
+    final strings = AppLocalizations.of(context);
+    var overlayPlan = const CoreRenderPlan.empty();
+    if (userEvents.isNotEmpty) {
+      overlayPlan = overlayPlan.merge(
+        userEventMarkers(
+          events: userEvents,
+          snippetOf: (event) => formatEventTime(clock, event.startAt),
+          onTap: _openUserEvent,
+        ),
+      );
+    }
+    if (route != null) {
+      overlayPlan = overlayPlan.merge(
+        routeRenderPlan(
+          route,
+          color: scheme.primary,
+          stopLabel: (number) => strings.mapRouteStop(number.toString()),
+        ),
+      );
+    }
+    if (userPoint != null) {
+      overlayPlan = overlayPlan.merge(
+        CoreRenderPlan(
+          markers: {
+            Marker(
+              markerId: const MarkerId(userLocationMarkerId),
+              position: LatLng(userPoint.lat, userPoint.lng),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueAzure,
+              ),
+              infoWindow: InfoWindow(title: strings.mapMyLocationHere),
+              zIndexInt: 5,
+            ),
+          },
+        ),
+      );
+    }
     final aggregate = selection.item is AggregateMapItem
         ? selection.item! as AggregateMapItem
         : null;
@@ -585,13 +763,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         onMapTap: pickingPin
             ? (position) => _placeEventPin(context, position)
             : null,
-        overlay: userEvents.isEmpty
-            ? null
-            : userEventMarkers(
-                events: userEvents,
-                snippetOf: (event) => formatEventTime(clock, event.startAt),
-                onTap: _openUserEvent,
-              ),
+        overlay: overlayPlan,
         onCameraChanged: (camera) {
           _zoom = camera.zoom;
           _regionGeneration++;
@@ -708,6 +880,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ),
                 ?highlights,
+                if (route != null) _routeChip(route),
+                ?_locationMessage(),
                 if (pickingPin) _pinPickingBanner(),
               ],
             ),
@@ -729,7 +903,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       border: Border(
-                        right: BorderSide(color: theme.colorScheme.outlineVariant),
+                        right: BorderSide(
+                          color: theme.colorScheme.outlineVariant,
+                        ),
                       ),
                     ),
                     child: SafeArea(
@@ -747,7 +923,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     ),
                   ),
                 ),
-              Expanded(child: MapDetailsLayout(map: stage, details: details)),
+              Expanded(
+                child: MapDetailsLayout(map: stage, details: details),
+              ),
               if (wide && _showEvents)
                 SizedBox(
                   width: 380,
@@ -779,11 +957,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// Moves the camera to a user event's pin, through the same focus request
   /// the agent's `focus_map` uses.
-  void _showEventOnMap(AgentLatLng point) =>
-      ref.read(mapActionsControllerProvider.notifier).focusPoint(
-        point.lat,
-        point.lng,
-      );
+  void _showEventOnMap(AgentLatLng point) => ref
+      .read(mapActionsControllerProvider.notifier)
+      .focusPoint(point.lat, point.lng);
 
   Widget _eventsPanel({
     VoidCallback? onClose,
@@ -947,6 +1123,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
               children: [
+                _locationChip(),
                 for (final layer in layers.availableLayers)
                   chip(
                     key: ValueKey('map-chip-${layer.name}'),
@@ -1053,7 +1230,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         useSafeArea: true,
         builder: (sheetContext) => PointerInterceptor(
           child: SizedBox(
-            height: math.min(720, MediaQuery.sizeOf(sheetContext).height * 0.88),
+            height: math.min(
+              720,
+              MediaQuery.sizeOf(sheetContext).height * 0.88,
+            ),
             child: Consumer(
               builder: (context, ref, child) {
                 final viewport = ref.watch(viewportControllerProvider);
@@ -1183,51 +1363,50 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   ) {
     final strings = AppLocalizations.of(context);
     return [
-          if (state.layers.isEmpty)
-            Text(strings.mapNoLayersSelected)
-          else if (state.isOutsideService)
-            Text(strings.mapScreenOutsideService)
-          else if (state.isCameraMoving)
-            Text(strings.mapScreenWaitingArea)
-          else if (state.bbox == null)
-            Text(strings.mapScreenWaitingArea)
-          else if (!_usesVisibleRegion)
-            Text(strings.mapScreenServiceArea),
-          if (state.blockedLayers.isNotEmpty)
-            Text(strings.mapScreenFilterRequired),
-          if (_regionReadFailed) ...[
-            Text(strings.mapScreenRegionError),
-            TextButton(
-              onPressed: () => unawaited(_readVisibleRegion()),
-              child: Text(strings.mapRetry),
+      if (state.layers.isEmpty)
+        Text(strings.mapNoLayersSelected)
+      else if (state.isOutsideService)
+        Text(strings.mapScreenOutsideService)
+      else if (state.isCameraMoving)
+        Text(strings.mapScreenWaitingArea)
+      else if (state.bbox == null)
+        Text(strings.mapScreenWaitingArea)
+      else if (!_usesVisibleRegion)
+        Text(strings.mapScreenServiceArea),
+      if (state.blockedLayers.isNotEmpty) Text(strings.mapScreenFilterRequired),
+      if (_regionReadFailed) ...[
+        Text(strings.mapScreenRegionError),
+        TextButton(
+          onPressed: () => unawaited(_readVisibleRegion()),
+          child: Text(strings.mapRetry),
+        ),
+      ],
+      if (state.isLoading)
+        Text(
+          state.response == null
+              ? strings.mapStatusLoading
+              : strings.mapStatusRefreshing,
+        ),
+      if (state.error != null) ...[
+        Text(strings.mapStatusClientError),
+        if (state.response != null) Text(strings.mapRetainedData),
+        if (state.canRetry)
+          TextButton(
+            key: const ValueKey('map-viewport-retry'),
+            onPressed: () => unawaited(
+              ref.read(viewportControllerProvider.notifier).retry(),
             ),
-          ],
-          if (state.isLoading)
-            Text(
-              state.response == null
-                  ? strings.mapStatusLoading
-                  : strings.mapStatusRefreshing,
-            ),
-          if (state.error != null) ...[
-            Text(strings.mapStatusClientError),
-            if (state.response != null) Text(strings.mapRetainedData),
-            if (state.canRetry)
-              TextButton(
-                key: const ValueKey('map-viewport-retry'),
-                onPressed: () => unawaited(
-                  ref.read(viewportControllerProvider.notifier).retry(),
-                ),
-                child: Text(strings.mapRetry),
-              ),
-          ],
-          if (state.hasPartialResults) Text(strings.mapPartialScope),
-          if (state.response != null && !state.matchesResponseWindow)
-            Text(strings.mapScreenPreviousWindow),
-          if (catalog.hasError && state.bbox == null)
-            TextButton(
-              onPressed: () => ref.invalidate(mapLayerCatalogProvider),
-              child: Text(strings.mapScreenRetryCatalog),
-            ),
+            child: Text(strings.mapRetry),
+          ),
+      ],
+      if (state.hasPartialResults) Text(strings.mapPartialScope),
+      if (state.response != null && !state.matchesResponseWindow)
+        Text(strings.mapScreenPreviousWindow),
+      if (catalog.hasError && state.bbox == null)
+        TextButton(
+          onPressed: () => ref.invalidate(mapLayerCatalogProvider),
+          child: Text(strings.mapScreenRetryCatalog),
+        ),
     ];
   }
 

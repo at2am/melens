@@ -1757,12 +1757,6 @@ abstract class AppLocalizations {
   /// **'ignored'**
   String get chatActionIgnored;
 
-  /// Outcome of a UI action the app does not implement yet.
-  ///
-  /// In en, this message translates to:
-  /// **'not supported yet'**
-  String get chatActionUnsupported;
-
   /// Outcome of a UI action read back from a stored turn; it is not applied again.
   ///
   /// In en, this message translates to:
@@ -2872,6 +2866,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add your name'**
   String get settingsNameUnset;
+
+  /// Chip over the map describing the route the agent drew: duration, distance and how to travel.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min · {distance} km, {mode, select, transit{public transport} other{walk}}'**
+  String mapRouteSummary(String minutes, String distance, String mode);
+
+  /// Chip over the map for a route with no duration or distance.
+  ///
+  /// In en, this message translates to:
+  /// **'{mode, select, transit{Public transport route} other{Walking route}}'**
+  String mapRouteSummaryBare(String mode);
+
+  /// Tooltip of the button that removes the agent's route from the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove route'**
+  String get mapRouteRemove;
+
+  /// Info window title of an unnamed stop on the agent's route.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {number}'**
+  String mapRouteStop(String number);
+
+  /// Chip on the map that shares and shows the user's position.
+  ///
+  /// In en, this message translates to:
+  /// **'My location'**
+  String get mapMyLocation;
+
+  /// Chip label while the device position is being read.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding you…'**
+  String get mapMyLocationLocating;
+
+  /// Info window title of the user's position marker.
+  ///
+  /// In en, this message translates to:
+  /// **'You are here'**
+  String get mapMyLocationHere;
+
+  /// Shown when the user refused the location permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission was refused. Allow it in your browser\'s site settings to use My location.'**
+  String get mapMyLocationDenied;
+
+  /// Shown when the device could not work out a position.
+  ///
+  /// In en, this message translates to:
+  /// **'Your position could not be found. Try again in a moment.'**
+  String get mapMyLocationUnavailable;
+
+  /// Shown when the position request timed out.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding your position took too long. Try again.'**
+  String get mapMyLocationTimeout;
+
+  /// Shown on platforms with no location support.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is not available on this device or in this build.'**
+  String get mapMyLocationUnsupported;
+
+  /// Settings section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get settingsLocation;
+
+  /// Settings switch that turns on My location.
+  ///
+  /// In en, this message translates to:
+  /// **'Share my location with the assistant'**
+  String get settingsLocationShare;
+
+  /// Subtitle of the location switch while off.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. The assistant does not know where you are, so “near me” needs a map selection.'**
+  String get settingsLocationOff;
+
+  /// Subtitle of the location switch while on.
+  ///
+  /// In en, this message translates to:
+  /// **'On. Your position is sent with your questions while this is on, and never stored.'**
+  String get settingsLocationOn;
 }
 
 class _AppLocalizationsDelegate

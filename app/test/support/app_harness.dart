@@ -7,6 +7,8 @@ import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/agent/state/agent_providers.dart';
 import 'package:melens/features/events/data/user_event_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
+import 'package:melens/features/location/data/device_location.dart';
+import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/map_providers.dart';
@@ -57,8 +59,11 @@ ProviderContainer appContainer({
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
   MapRepository? mapRepository,
+  DeviceLocationReader? deviceLocation,
 }) => ProviderContainer.test(
   overrides: [
+    if (deviceLocation != null)
+      deviceLocationReaderProvider.overrideWithValue(deviceLocation),
     mapRepositoryProvider.overrideWithValue(
       mapRepository ?? SampleMapRepository(),
     ),

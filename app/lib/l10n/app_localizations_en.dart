@@ -980,9 +980,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatActionIgnored => 'ignored';
 
   @override
-  String get chatActionUnsupported => 'not supported yet';
-
-  @override
   String get chatActionRestored => 'from history';
 
   @override
@@ -1619,4 +1616,69 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsNameUnset => 'Add your name';
+
+  @override
+  String mapRouteSummary(String minutes, String distance, String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'transit': 'public transport',
+      'other': 'walk',
+    });
+    return '$minutes min · $distance km, $_temp0';
+  }
+
+  @override
+  String mapRouteSummaryBare(String mode) {
+    String _temp0 = intl.Intl.selectLogic(mode, {
+      'transit': 'Public transport route',
+      'other': 'Walking route',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get mapRouteRemove => 'Remove route';
+
+  @override
+  String mapRouteStop(String number) {
+    return 'Stop $number';
+  }
+
+  @override
+  String get mapMyLocation => 'My location';
+
+  @override
+  String get mapMyLocationLocating => 'Finding you…';
+
+  @override
+  String get mapMyLocationHere => 'You are here';
+
+  @override
+  String get mapMyLocationDenied =>
+      'Location permission was refused. Allow it in your browser\'s site settings to use My location.';
+
+  @override
+  String get mapMyLocationUnavailable =>
+      'Your position could not be found. Try again in a moment.';
+
+  @override
+  String get mapMyLocationTimeout =>
+      'Finding your position took too long. Try again.';
+
+  @override
+  String get mapMyLocationUnsupported =>
+      'Location is not available on this device or in this build.';
+
+  @override
+  String get settingsLocation => 'Location';
+
+  @override
+  String get settingsLocationShare => 'Share my location with the assistant';
+
+  @override
+  String get settingsLocationOff =>
+      'Off. The assistant does not know where you are, so “near me” needs a map selection.';
+
+  @override
+  String get settingsLocationOn =>
+      'On. Your position is sent with your questions while this is on, and never stored.';
 }

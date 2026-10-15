@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/events/state/user_events_providers.dart';
 import 'package:melens/features/feed/data/feed_models.dart';
 import 'package:melens/features/feed/state/feed_providers.dart';
+import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/shell/state/shell_providers.dart';
 
 import '../../support/app_harness.dart';
@@ -69,6 +71,32 @@ void main() {
       container.read(feedSubscriptionsProvider),
       isNot(contains(FeedTopic.community)),
     );
+  });
+
+  testWidgets('the location switch shares the position only while on', (
+    tester,
+  ) async {
+    final container = appContainer(
+      deviceLocation: () async => const AgentLatLng(lat: -37.81, lng: 144.96),
+    );
+    addTearDown(container.dispose);
+    await pumpApp(tester, container, size: const Size(390, 1600));
+    await openSettings(tester);
+
+    expect(container.read(userLocationProvider).point, isNull);
+    await tester.scrollUntilVisible(
+      key('settings-location'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(key('settings-location'));
+    await tester.pumpAndSettle();
+    expect(container.read(userLocationProvider).point?.lat, -37.81);
+    expect(find.textContaining('never stored'), findsOneWidget);
+
+    await tester.tap(key('settings-location'));
+    await tester.pumpAndSettle();
+    expect(container.read(userLocationProvider).point, isNull);
   });
 
   testWidgets('the theme choice restyles the app', (tester) async {

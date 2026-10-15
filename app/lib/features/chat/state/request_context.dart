@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/time/melbourne_time.dart';
 import '../../agent/data/agent_models.dart';
+import '../../location/state/user_location.dart';
 import '../../map/data/map_models.dart';
 import '../../map/state/layer_controller.dart';
 import '../../map/state/selection_controller.dart';
@@ -78,4 +79,5 @@ RequestContextBuilder requestContextBuilder(Ref ref) =>
       selection: ref.read(selectionControllerProvider),
       clock: ref.read(melbourneClockProvider),
       openCardId: openCardId,
+      userLocation: ref.read(userLocationProvider).point,
     );
