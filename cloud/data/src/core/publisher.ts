@@ -52,6 +52,10 @@ const auditFields = new Set(['batch_id', 'fetched_at', 'raw_uri', 'first_accessi
 /** Each batch is the whole current state; version checks apply within the batch only. */
 const COMPLETE_SNAPSHOT_SOURCES: ReadonlySet<string> = new Set([
   'ticketmaster.events', 'victoria.council.engagement',
+  // Every road read is all pages of the provider's current set, and every GTFS-R read is both
+  // FULL_DATASET feeds. Unplanned roads often have no verified update time, so a record whose
+  // content changed would look ambiguous against its history, and that history grows every run.
+  'victoria.transport.road_planned', 'victoria.transport.road_unplanned', 'victoria.transport.gtfs_realtime',
 ]);
 
 function canonical(value: unknown): string {

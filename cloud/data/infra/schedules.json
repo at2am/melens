@@ -479,7 +479,7 @@
       "snapshot_revision": null,
       "backfill_strategy": "manual_serial_contiguous_windows",
       "request_cap_per_day": 1440,
-      "maximum_bytes_billed": 500000000,
+      "maximum_bytes_billed": 1000000000,
       "secret_names": [
         "transport_victoria_key_id"
       ],
@@ -502,7 +502,7 @@
       "snapshot_revision": null,
       "backfill_strategy": "manual_serial_contiguous_windows",
       "request_cap_per_day": 1440,
-      "maximum_bytes_billed": 500000000,
+      "maximum_bytes_billed": 1000000000,
       "secret_names": [
         "transport_victoria_key_id"
       ],
