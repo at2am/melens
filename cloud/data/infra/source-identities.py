@@ -34,11 +34,13 @@ SOURCES = DEFAULT_SOURCES | frozenset({
     "melbourne.parking.restrictions", "gdelt.news",
     "victoria.csa.recorded_offences", "ticketmaster.events",
     "user.events", "victoria.transport.road_planned", "victoria.transport.road_unplanned",
+    "victoria.transport.gtfs_static", "victoria.transport.gtfs_realtime",
 })
 SOURCE_SECRETS = {
     "ticketmaster.events": ["ticketmaster_discovery_api_key"],
     "victoria.transport.road_planned": ["transport_victoria_key_id"],
     "victoria.transport.road_unplanned": ["transport_victoria_key_id"],
+    "victoria.transport.gtfs_realtime": ["transport_victoria_key_id"],
 }
 # Content under a provider or user licence rather than an open-data licence.
 RESTRICTED_SOURCES = frozenset({"ticketmaster.events", "user.events"})

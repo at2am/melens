@@ -280,7 +280,10 @@ function failure(input: ConnectorInput, code: ConnectorFailure['code'], fetchedF
 export function singlePeriod(alert: ParsedAlert): AlertPeriod | null {
   // active_period is the display window. It cannot substitute for a service
   // impact interval when deriving the fact's valid time.
-  return alert.impactPeriods.length === 1 ? alert.impactPeriods[0] ?? null : null;
+  const period = alert.impactPeriods.length === 1 ? alert.impactPeriods[0] ?? null : null;
+  // The map contract has no empty interval: an end at the start instant is an unknown end.
+  return period && period.start !== null && period.end !== null && period.end <= period.start
+    ? { ...period, end: null } : period;
 }
 
 export function deriveAlertFeedsRevision(feeds: readonly {
@@ -323,7 +326,7 @@ export function normalizeAlertFeeds(feeds: readonly {
       time_missing_reason: 'Feed timestamp is publication time, not an event occurrence time',
       valid_from: null, valid_to: null, source_updated_at: update,
       source_version_ordinal: null, record_status: 'active', assertion_kind: 'report',
-      rights_status: 'review_required' });
+      rights_status: 'verified_open' });
     for (const alert of feed.parsed.alerts) {
       const alertId = sourceRecordId({ sourceId: SOURCE_ID,
         nativeId: `alert:${feed.mode}:${alert.id}`, originalUrl: feed.resourceUrl,
@@ -340,7 +343,7 @@ export function normalizeAlertFeeds(feeds: readonly {
         valid_from: period?.start ?? null, valid_to: period?.end ?? null,
         source_updated_at: update, source_version_ordinal: null,
         record_status: 'active', assertion_kind: 'report',
-        rights_status: 'review_required' });
+        rights_status: 'verified_open' });
       geoRecords.push({ ...provenance, geo_record_id: alertId, version_id: version,
         topic: 'transport', assertion_kind: 'report', title: alert.header,
         summary: JSON.stringify({ mode: feed.mode, feed_timestamp: update,
@@ -356,8 +359,8 @@ export function normalizeAlertFeeds(feeds: readonly {
         published_at: null, observed_at: null, valid_from: period?.start ?? null,
         valid_to: period?.end ?? null, source_updated_at: update,
         source_version_ordinal: null, freshness_state: 'unknown',
-        record_status: 'active', rights_status: 'review_required',
-        public_query_allowed: false });
+        record_status: 'active', rights_status: 'verified_open',
+        public_query_allowed: true });
       for (const link of [
         { source_record_id: parentId, source_version_id: parentVersion,
           evidence_role: 'parent_feed_snapshot' },

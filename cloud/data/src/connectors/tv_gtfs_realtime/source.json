@@ -7,28 +7,28 @@
   "api_endpoint": "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/{metro,tram}/service-alerts",
   "topic": "transport",
   "scope": "victoria",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": ["ASGS_GCCSA:2GMEL:2021"],
+  "coverage_from": "2026-10-16T00:00:00Z",
   "coverage_to": null,
-  "cadence_seconds": 60,
-  "check_interval_seconds": 60,
+  "cadence_seconds": 600,
+  "check_interval_seconds": 600,
   "requires_monitoring": true,
-  "license_status": "review_required",
+  "license_status": "verified_open",
   "license_url": "https://creativecommons.org/licenses/by/4.0/",
-  "access_status": "candidate",
+  "access_status": "active",
   "record_granularity": "full_feed_snapshot_and_alert_entity",
   "connector_owner": "melens integration",
   "admission_evidence": {
     "dataset_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime",
     "native_record_key": "feed mode + FeedEntity.id; each mode has a parent feed snapshot",
     "completeness_rule": "Both advertised Metro Train and Yarra Trams Service Alerts FULL_DATASET protobuf feeds must parse; no partial mode publication",
-    "quota_requests_per_day": 2880,
+    "quota_requests_per_day": 288,
     "secret_names": ["transport_victoria_key_id"],
     "allowed_fields": ["header.gtfs_realtime_version", "header.incrementality", "header.timestamp", "header.feed_version", "entity.id", "entity.alert.active_period", "entity.alert.communication_period", "entity.alert.impact_period", "entity.alert.informed_entity", "entity.alert.cause", "entity.alert.effect", "entity.alert.url", "entity.alert.header_text", "entity.alert.description_text"],
     "raw_retention_days": 0,
     "staging_retention_days": 1,
     "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime",
-    "reviewed_at": "2026-09-30T00:00:00Z"
+    "reviewed_at": "2026-10-16T00:00:00Z"
   },
-  "notes": "Public listing advertises Metro Train and Yarra Trams Service Alerts only; Bus has Trip Updates and Vehicle Positions, not a Service Alerts feed. Thus absent bus alerts never mean no bus disruption. KeyID must be provided by Secret Manager at deployment. FULL_DATASET disappearance is resolved using the latest successful snapshot per mode, not inferred as an explicit cancellation in this connector. NO_SERVICE describes service effect, not an alert tombstone. Static GTFS join must resolve route/stop IDs before assigning geometry."
+  "notes": "Admission 2026-10-16: CC BY 4.0 per the landing page; the stored KeyID returned HTTP 200 for both feeds. Runs every 10 minutes, not every minute, because each publication rebuilds this source's geo_records_current rows (~0.5 GB billed); 2 requests a run. The static archive has no feed_info, so alerts match the newest published static schedule (matchRule latest_published_archive) instead of a publisher feed version; a stop alert is placed at its stop and a named-route alert is drawn along the routes' shapes. Public listing advertises Metro Train and Yarra Trams Service Alerts only; Bus has Trip Updates and Vehicle Positions, not a Service Alerts feed. Thus absent bus alerts never mean no bus disruption. KeyID must be provided by Secret Manager at deployment. FULL_DATASET disappearance is resolved using the latest successful snapshot per mode, not inferred as an explicit cancellation in this connector. NO_SERVICE describes service effect, not an alert tombstone. Static GTFS join must resolve route/stop IDs before assigning geometry."
 }

@@ -169,7 +169,7 @@ class SourceIdentityTest(unittest.TestCase):
             self.assertEqual(result["mode"], "plan")
             self.assertFalse(result["sources"][0]["dedicated_identity_permissions_verified"])
         with self.assertRaisesRegex(ValueError, "unreviewed"):
-            source_identities.plan(PROJECT, "dev", BUCKET, ["victoria.transport.gtfs_realtime"])
+            source_identities.plan(PROJECT, "dev", BUCKET, ["victoria.vicmap.planning"])
 
     def test_apply_requires_explicit_sources_and_exact_confirmation(self):
         base = ["--project", PROJECT, "--environment", "dev", "--bucket", BUCKET, "--apply"]

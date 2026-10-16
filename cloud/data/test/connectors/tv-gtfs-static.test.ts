@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { strToU8, zipSync } from 'fflate';
 
 import { fetchOfficialGtfsArchive } from '../../src/connectors/tv_gtfs_static/archive.js';
+import { MAX_SHAPES_PER_ROUTE, ShapeCollector } from '../../src/connectors/tv_gtfs_static/shapes.js';
 import {
   SOURCE_ID,
   TvGtfsStaticConnector,
@@ -35,14 +36,14 @@ async function loadFixture(): Promise<GtfsStaticSnapshot> {
   return parseGtfsSnapshot(JSON.parse(content));
 }
 
-test('registry discovers tv_gtfs_static with review_required status', async () => {
+test('registry discovers tv_gtfs_static as admitted open data', async () => {
   const manifestUrl = new URL('../../src/connectors/tv_gtfs_static/source.json', import.meta.url);
   const manifest = JSON.parse(await readFile(fileURLToPath(manifestUrl), 'utf8'));
   const dataSource = parseSourceManifest(manifest);
 
   assert.equal(dataSource.source_id, SOURCE_ID);
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.equal(dataSource.access_status, 'active');
   assert.equal(dataSource.topic, 'transport');
   assert.equal(dataSource.scope, 'victoria');
 
@@ -103,14 +104,14 @@ test('fixture parses timetable version, routes, stops, and links modes to stops'
   assert.deepEqual(melbCentralBus.route_ids, ['4-200']);
 });
 
-test('normalized records produce valid geography and retain review_required gate', async () => {
+test('normalized stop records produce valid geography as open reference data', async () => {
   const snapshot = await loadFixture();
   const normalized = normalizeGtfsSnapshot(snapshot, input, fetchedAt);
 
   assert.equal(normalized.geoRecords.length, snapshot.stops.length);
   for (const geo of normalized.geoRecords) {
-    assert.equal(geo.rights_status, 'review_required');
-    assert.equal(geo.public_query_allowed, false);
+    assert.equal(geo.rights_status, 'verified_open');
+    assert.equal(geo.public_query_allowed, true);
     assert.equal(geo.topic, 'transport');
     assert.equal(geo.location_role, 'sensor_site');
     assert.equal(geo.location_confidence, 'source_coordinate');
@@ -123,7 +124,7 @@ test('normalized records produce valid geography and retain review_required gate
   // Check source records integrity
   assert.equal(normalized.sourceRecords.length, 1 + snapshot.routes.length + snapshot.stops.length);
   for (const record of normalized.sourceRecords) {
-    assert.equal(record.rights_status, 'review_required');
+    assert.equal(record.rights_status, 'verified_open');
     assert.equal(record.record_status, 'active');
     assert.ok(record.source_record_id.startsWith(SOURCE_ID));
   }
@@ -494,4 +495,51 @@ test('missing feed_info in official archive fails closed on calendar validity an
   });
   assert.equal(etagJoined.mappings[0]?.status, 'version_unverified');
   assert.equal(etagJoined.geoRecords[0]?.geometry_geojson, null);
+});
+
+test('shapes are simplified, deduplicated and capped per route, then drawn as route records', async () => {
+  const shapes = new ShapeCollector();
+  // A straight run with a redundant midpoint, the same path again under another shape id, and a bend.
+  for (const [id, points] of [
+    ['S1', [[-37.80, 144.96], [-37.805, 144.96], [-37.81, 144.96]]],
+    ['S2', [[-37.80, 144.96], [-37.805, 144.96], [-37.81, 144.96]]],
+    ['S3', [[-37.80, 144.96], [-37.80, 144.97], [-37.81, 144.97]]],
+  ] as const) points.forEach(([lat, lon], index) => shapes.add(id, index + 1, lat, lon));
+  const routes = shapes.routeShapes([
+    { route_id: '2-FLI', shape_id: 'S1' }, { route_id: '2-FLI', shape_id: 'S2' },
+    { route_id: '2-FLI', shape_id: 'S3' }, { route_id: '3-96', shape_id: null },
+  ]);
+  assert.deepEqual(routes, [{ route_id: '2-FLI', lines: [
+    [[144.96, -37.8], [144.97, -37.8], [144.97, -37.81]],
+    [[144.96, -37.8], [144.96, -37.81]],
+  ] }]);
+  assert.throws(() => shapes.add('S4', 1, 91, 144.9), /Invalid GTFS shape point/);
+  const many = new ShapeCollector();
+  for (let i = 0; i <= MAX_SHAPES_PER_ROUTE; i += 1) {
+    many.add(`V${i}`, 1, -37.8, 144.9);
+    many.add(`V${i}`, 2, -37.8 - (i + 1) / 1000, 144.9);
+  }
+  const capped = many.routeShapes(Array.from({ length: MAX_SHAPES_PER_ROUTE + 1 }, (_, i) =>
+    ({ route_id: 'R', shape_id: `V${i}` })));
+  assert.equal(capped[0]?.lines.length, MAX_SHAPES_PER_ROUTE);
+
+  const snapshot = parseGtfsSnapshot({ ...(await loadFixture()), route_shapes: routes });
+  const normalized = normalizeGtfsSnapshot(snapshot, input, fetchedAt);
+  const route = normalized.geoRecords.find(geo => geo.geo_record_id === `${SOURCE_ID}:route:2-FLI`);
+  assert.ok(route);
+  assert.deepEqual(JSON.parse(route.geometry_geojson ?? 'null'), { type: 'MultiLineString', coordinates: routes[0]?.lines });
+  assert.equal(validateGeoRecordGeography(route).valid, true);
+  assert.equal(route.public_query_allowed, true);
+  assert.equal(JSON.parse(route.summary ?? '{}').kind, 'gtfs_static_route_shape');
+  const fact = normalized.sourceRecords.find(record => record.source_record_id === route.geo_record_id);
+  assert.equal(fact?.version_id, route.version_id);
+  assert.ok(normalized.geoRecordSources.some(link => link.geo_record_id === route.geo_record_id
+    && link.evidence_role === 'official_route_shape' && link.source_version_id === route.version_id));
+  // A shape changes the route's version, so an alert drawn along it can be traced to that shape.
+  const plain = normalizeGtfsSnapshot(await loadFixture(), input, fetchedAt).sourceRecords
+    .find(record => record.source_record_id === route.geo_record_id);
+  assert.notEqual(plain?.version_id, route.version_id);
+  assert.throws(() => normalizeGtfsSnapshot(parseGtfsSnapshot({ ...snapshot,
+    route_shapes: [{ route_id: 'missing', lines: [[[144.9, -37.8], [144.91, -37.81]]] }] }), input, fetchedAt),
+  /unknown route/);
 });

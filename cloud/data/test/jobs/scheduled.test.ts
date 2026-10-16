@@ -73,7 +73,7 @@ test('snapshot revision is explicit', () => {
 
 test('scheduled execution refuses a source still awaiting admission', async () => {
   await assert.rejects(scheduledRun({
-    MELENS_SCHEDULE_MODE: 'snapshot', MELENS_SOURCE_ID: 'victoria.transport.gtfs_static',
+    MELENS_SCHEDULE_MODE: 'snapshot', MELENS_SOURCE_ID: 'victoria.vicmap.planning',
     MELENS_SNAPSHOT_REVISION: 'latest', ...caps,
   }), /Source admission is incomplete/);
 });

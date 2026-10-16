@@ -38,12 +38,26 @@ const summarySchema = z.object({
 type AlertSummary = z.infer<typeof summarySchema>;
 type AlertSelector = AlertSummary['selectors'][number];
 
+/** A published route's drawn shape and the route source fact it came from. */
+export interface RouteShapeReference {
+  geometryGeojson: string;
+  record: SourceRecord;
+  feedVersion: string;
+}
+
 export interface StaticGtfsVersion {
   /** Both values must describe the same downloaded GTFS archive. */
   snapshot: GtfsStaticSnapshot;
   normalized: NormalizedGtfsResult;
   /** Runtime references require a publisher archive relationship for this mode. */
   publisherMode?: AlertMode;
+  /**
+   * Without feed_info no alert can name its schedule version. The runtime then loads only the newest
+   * published schedule and marks it as the one in service; alerts match it by being current.
+   */
+  matchRule?: 'latest_published_archive';
+  /** Route shapes from the same published schedule, by route_id. */
+  routeShapes?: ReadonlyMap<string, RouteShapeReference>;
 }
 
 export type GtfsMappingStatus =
@@ -108,6 +122,10 @@ function publisherFeedVersion(staticFeed: PreparedStatic): string | null {
 function versionMatches(alert: AlertSummary, staticFeed: PreparedStatic): boolean {
   if (staticFeed.version.publisherMode !== undefined
     && staticFeed.version.publisherMode !== alert.mode) return false;
+  if (staticFeed.version.matchRule === 'latest_published_archive') {
+    return alert.feed_timestamp !== null && Number.isFinite(Date.parse(alert.feed_timestamp))
+      && staticFeed.version.normalized.feedVersion.startsWith('archive-sha256:');
+  }
   if (alert.feed_version === null || alert.feed_timestamp === null
     || alert.feed_version !== publisherFeedVersion(staticFeed)) return false;
   const timestamp = Date.parse(alert.feed_timestamp);
@@ -198,8 +216,8 @@ function parseSummary(row: GeoRecord): AlertSummary | null {
 }
 
 /**
- * Enrich only an exact stop match in the same static feed version and mode.
- * A route, agency, or mode selector alone has no defensible point geometry.
+ * Place an exact stop match at its stop, and a match on named routes along those routes' shapes,
+ * both from the matched static schedule. An agency or mode selector alone stays unlocated.
  * Call this before publishing the realtime batch, with an admitted static feed.
  */
 export function joinGtfsAlertLocations(input: {
@@ -274,6 +292,24 @@ export function joinGtfsAlertLocations(input: {
           centroid_lat: stopGeo.centroid_lat, centroid_lon: stopGeo.centroid_lon,
           location_role: 'event_site', location_confidence: 'official_join' };
       }
+    }
+    // A route alert is drawn along every named route when each has a shape in the same schedule.
+    const shapes = status === 'route_only' && staticFeed !== null && alertSelfLink
+      ? routeIds.map(routeId => staticFeed!.version.routeShapes?.get(routeId)) : [];
+    if (shapes.length > 0 && shapes.every(shape => shape !== undefined
+      && shape.feedVersion === staticFeed!.version.normalized.feedVersion)) {
+      const found = shapes as RouteShapeReference[];
+      const geometry = JSON.stringify({ type: 'MultiLineString', coordinates: found.flatMap(shape =>
+        (JSON.parse(shape.geometryGeojson) as { coordinates: unknown[] }).coordinates) });
+      const versionId = sourceVersionId(original.source_updated_at, {
+        alertSourceVersionId: alertSelfLink!.source_version_id,
+        staticFeedVersion: staticFeed!.version.normalized.feedVersion,
+        staticRouteVersionIds: found.map(shape => shape.record.version_id),
+        geometry,
+      });
+      record = { ...original, version_id: versionId, geometry_geojson: geometry,
+        centroid_lat: null, centroid_lon: null,
+        location_role: 'event_site', location_confidence: 'official_join' };
     }
     geoRecords.push(record);
     geoRecordSources.push(...originalLinks.map(link => ({ ...link, version_id: record.version_id })));

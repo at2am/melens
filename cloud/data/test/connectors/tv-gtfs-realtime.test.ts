@@ -79,7 +79,8 @@ test('normalization keeps each mode snapshot parent and does not invent a stop p
   assert.equal(metro?.location_confidence, 'unverified');
   assert.equal(metro?.valid_from, '2026-09-28T00:10:00.000Z');
   assert.equal(metro?.valid_to, '2026-09-28T00:30:00.000Z');
-  assert.equal(metro?.public_query_allowed, false);
+  assert.equal(metro?.public_query_allowed, true);
+  assert.equal(metro?.rights_status, 'verified_open');
   const tram = normalized.geoRecords[1];
   assert.equal(tram?.valid_from, null);
   assert.equal(tram?.valid_to, null);
@@ -150,7 +151,7 @@ test('partial, differential, deleted, and truncated feeds fail closed', async ()
   }
 });
 
-test('SourceRegistry admission: registers victoria.transport.gtfs_realtime with review_required and candidate status', async () => {
+test('SourceRegistry admission: registers victoria.transport.gtfs_realtime as admitted open data on a 10-minute cadence', async () => {
   const connectorsRoot = join(__dirname, '../../src/connectors');
   const registry = await loadSourceRegistry(connectorsRoot);
   const entry = registry.get(SOURCE_ID);
@@ -159,10 +160,10 @@ test('SourceRegistry admission: registers victoria.transport.gtfs_realtime with 
   assert.equal(entry.dataSource.provider, 'Transport Victoria');
   assert.equal(entry.dataSource.topic, 'transport');
   assert.equal(entry.dataSource.scope, 'victoria');
-  assert.equal(entry.dataSource.cadence_seconds, 60);
-  assert.equal(entry.dataSource.check_interval_seconds, 60);
-  assert.equal(entry.dataSource.license_status, 'review_required');
-  assert.equal(entry.dataSource.access_status, 'candidate');
+  assert.equal(entry.dataSource.cadence_seconds, 600);
+  assert.equal(entry.dataSource.check_interval_seconds, 600);
+  assert.equal(entry.dataSource.license_status, 'verified_open');
+  assert.equal(entry.dataSource.access_status, 'active');
   assert.deepEqual(entry.dataSource.admission_evidence.secret_names, ['transport_victoria_key_id']);
   assert.equal(entry.dataSource.record_granularity, 'full_feed_snapshot_and_alert_entity');
   const loaded = await loadConnector(entry);

@@ -18,11 +18,12 @@ const config: DataConfig = { projectId: 'melens-fixture', region: 'australia-sou
 const timestamp = '2026-09-28T00:05:00.000Z';
 const fetchedAt = '2026-09-28T00:06:00.000Z';
 
-function realtime(feedVersion = 'PTV_GTFS_20260928_v1'): ConnectorSuccess {
+function realtime(feedVersion: string | null = 'PTV_GTFS_20260928_v1',
+  selector: { routeId: string | null; stopId: string | null } = { routeId: '2-FLI', stopId: '19499' }): ConnectorSuccess {
   const metro: ParsedAlertFeed = { feedVersion, feedTimestamp: timestamp, gtfsRealtimeVersion: '2.0',
     alerts: [{ id: 'M-17', activePeriods: [], communicationPeriods: [], impactPeriods: [],
       cause: null, effect: 1, header: 'Disruption', description: null, url: null,
-      selectors: [{ agencyId: null, routeId: '2-FLI', routeType: 2, stopId: '19499',
+      selectors: [{ agencyId: null, ...selector, routeType: 2,
         directionId: null, tripId: null, tripRouteId: null, tripStartDate: null, tripStartTime: null }] }] };
   const normalized = normalizeAlertFeeds([
     { mode: 'metro_train', resourceUrl: 'https://example.test/metro', parsed: metro, fetchedAt },
@@ -38,12 +39,22 @@ function realtime(feedVersion = 'PTV_GTFS_20260928_v1'): ConnectorSuccess {
     sensorLocations: [], pedestrianObservations: [], retainableRawRecords: null };
 }
 
-async function references(publisherMode: 'metro_train' | 'yarra_tram' | null = null) {
-  const snapshot = parseGtfsSnapshot(JSON.parse(await readFile(
-    new URL('../fixtures/tv_gtfs_static.json', import.meta.url), 'utf8')));
+async function references(publisherMode: 'metro_train' | 'yarra_tram' | null = null,
+  official?: { routeShapes: { route_id: string; lines: [number, number][][] }[] }) {
+  const snapshot = parseGtfsSnapshot({ ...JSON.parse(await readFile(
+    new URL('../fixtures/tv_gtfs_static.json', import.meta.url), 'utf8')),
+    ...(official ? { feed_info: [], route_shapes: official.routeShapes } : {}) });
   const normalized = normalizeGtfsSnapshot(snapshot, parseConnectorInput({ sourceId: STATIC_SOURCE_ID,
-    window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null, runId: 'published-static' }), fetchedAt);
-  return normalized.geoRecords.map(geo => {
+    window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null, runId: 'published-static' }), fetchedAt,
+    // The official reader: no feed_info, a version derived from the archive's HTTP validator.
+    official ? { feedVersion: 'archive-sha256:fixture', sourceUpdatedAt: fetchedAt, tripStopMembershipComplete: false }
+      : undefined);
+  const shapes = normalized.geoRecords.filter(geo => geo.geo_record_id.includes(':route:')).map(geo => {
+    const record = normalized.sourceRecords.find(item => item.source_record_id === geo.geo_record_id);
+    assert.ok(record);
+    return { kind: 'route_shape' as const, source: record, summary: geo.summary ?? '', geometry_geojson: geo.geometry_geojson ?? '' };
+  });
+  return [...normalized.geoRecords.filter(geo => geo.geo_record_id.includes(':stop:')).map(geo => {
     const record = normalized.sourceRecords.find(item => item.source_record_id === geo.geo_record_id);
     assert.ok(record);
     const summary = JSON.parse(geo.summary ?? '{}');
@@ -57,11 +68,11 @@ async function references(publisherMode: 'metro_train' | 'yarra_tram' | null = n
     const routeIds = new Set(normalized.geoRecordSources.filter(item =>
       item.geo_record_id === geo.geo_record_id && item.evidence_role === 'serving_route')
       .map(item => item.source_record_id));
-    return { source: { ...record, rights_status: 'verified_open' }, summary: JSON.stringify(summary),
+    return { kind: 'stop' as const, source: { ...record, rights_status: 'verified_open' }, summary: JSON.stringify(summary),
       geometry_geojson: geo.geometry_geojson, centroid_lat: geo.centroid_lat, centroid_lon: geo.centroid_lon,
       route_records: normalized.sourceRecords.filter(item => routeIds.has(item.source_record_id))
         .map(item => ({ ...item, rights_status: 'verified_open' })) };
-  });
+  }), ...shapes];
 }
 
 test('runtime loads published static references and keeps official mode/version uncertainty unlocated', async t => {
@@ -107,6 +118,42 @@ test('explicit published per-mode references preserve exact source versions in a
   const wrongMode = await withPublishedGtfsLocations(realtime(), config, bq);
   assert.equal(wrongMode.geoRecords[0]?.geometry_geojson, null);
   assert.equal(JSON.parse(wrongMode.geoRecords[0]?.summary ?? '{}').gtfs_mapping_status, 'version_unverified');
+});
+
+test('the official archive schedule places stop alerts at the stop and route alerts along the route', async t => {
+  const bq = new BigQuery({ projectId: config.projectId });
+  const line: [number, number][] = [[144.9671, -37.8183], [144.9625, -37.8102], [144.9568, -37.7995]];
+  const rows = await references(null, { routeShapes: [{ route_id: '2-FLI', lines: [line] }] });
+  assert.equal(rows.filter(row => row.kind === 'route_shape').length, 1);
+  t.mock.method(bq, 'query', async (options: { query: string }) => {
+    assert.match(options.query, /QUALIFY ROW_NUMBER\(\) OVER \(ORDER BY b\.published_at DESC, b\.batch_id DESC\) = 1/);
+    assert.match(options.query, /CONCAT\(@sourceId, ':route:'\)/);
+    return [rows.map(reference => ({ reference: JSON.stringify(reference) }))];
+  });
+  // Transport Victoria's alerts carry no feed version that a schedule could be checked against.
+  const atStop = await withPublishedGtfsLocations(realtime(null), config, bq);
+  const point = atStop.geoRecords[0];
+  assert.equal(JSON.parse(point?.summary ?? '{}').gtfs_mapping_status, 'located');
+  assert.equal(JSON.parse(point?.summary ?? '{}').static_feed_version, 'archive-sha256:fixture');
+  assert.equal(point?.centroid_lat, -37.8183);
+  assert.equal(point?.location_confidence, 'official_join');
+
+  const onRoute = await withPublishedGtfsLocations(realtime(null, { routeId: '2-FLI', stopId: null }), config, bq);
+  const drawn = onRoute.geoRecords[0];
+  assert.ok(drawn);
+  assert.equal(JSON.parse(drawn.summary ?? '{}').gtfs_mapping_status, 'route_only');
+  assert.deepEqual(JSON.parse(drawn.geometry_geojson ?? 'null'), { type: 'MultiLineString', coordinates: [line] });
+  assert.equal(drawn.centroid_lat, null);
+  assert.equal(drawn.location_role, 'event_site');
+  assert.equal(drawn.location_confidence, 'official_join');
+  const routeEvidence = onRoute.geoRecordSources.find(link => link.evidence_role === 'gtfs_static_route_id');
+  assert.equal(routeEvidence?.source_record_id, `${STATIC_SOURCE_ID}:route:2-FLI`);
+  assert.equal(onRoute.geoRecordSources.every(link => link.version_id === drawn.version_id), true);
+
+  // A route with no shape in the schedule stays unlocated rather than guessed.
+  const noShape = await withPublishedGtfsLocations(realtime(null, { routeId: '2-LIL', stopId: null }), config, bq);
+  assert.equal(noShape.geoRecords[0]?.geometry_geojson, null);
+  assert.equal(JSON.parse(noShape.geoRecords[0]?.summary ?? '{}').gtfs_mapping_status, 'route_only');
 });
 
 test('empty complete snapshots do not require static queries but still require two upstream timestamps', async t => {

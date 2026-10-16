@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { gtfsRouteTypeToMode, SOURCE_ID as STATIC_SOURCE_ID,
   type GtfsStaticSnapshot, type NormalizedGtfsResult } from '../connectors/tv_gtfs_static/index.js';
 import { SOURCE_ID as REALTIME_SOURCE_ID } from '../connectors/tv_gtfs_realtime/index.js';
-import { joinGtfsAlertLocations, type StaticGtfsVersion } from '../normalization/gtfs-alerts.js';
+import { joinGtfsAlertLocations, type RouteShapeReference, type StaticGtfsVersion } from '../normalization/gtfs-alerts.js';
 import { sourceRecordSchema, sourceVersionId } from '../validation/record.js';
 import type { ConnectorSuccess } from './connector.js';
 import type { DataConfig } from './config.js';
@@ -27,12 +27,18 @@ const referenceSchema = z.union([
   referenceBase.extend({ publisher_mode: z.null(), publisher_feed_info: z.null() }).strict(),
   referenceBase.extend({ publisher_mode: mode, publisher_feed_info: feedInfo }).strict(),
 ]);
-const publishedReferenceSchema = z.object({ source: sourceRecordSchema,
+const publishedReferenceSchema = z.object({ kind: z.literal('stop'), source: sourceRecordSchema,
   summary: z.string().nullable(), geometry_geojson: z.string().nullable(),
   centroid_lat: z.number().nullable(), centroid_lon: z.number().nullable(),
   route_records: z.array(sourceRecordSchema).max(10_000) }).strict();
+const routeShapeSummarySchema = z.object({ kind: z.literal('gtfs_static_route_shape'), schema_version: z.literal(1),
+  feed_version: z.string().min(1), route }).strict();
+const publishedRouteShapeSchema = z.object({ kind: z.literal('route_shape'), source: sourceRecordSchema,
+  summary: z.string(), geometry_geojson: z.string() }).strict();
 const maximumReferences = 50_000;
 const pointSchema = z.object({ type: z.literal('Point'), coordinates: z.tuple([z.number(), z.number()]) });
+const multiLineSchema = z.object({ type: z.literal('MultiLineString'),
+  coordinates: z.array(z.array(z.tuple([z.number(), z.number()])).min(2)).min(1) }).strict();
 
 function referenceFromSummary(summary: string | null) {
   if (summary === null || !summary.trim().startsWith('{')) return null;
@@ -40,7 +46,11 @@ function referenceFromSummary(summary: string | null) {
   return parsed.success ? parsed.data : null;
 }
 
-/** Complete references must keep their original published source-record versions. */
+/**
+ * The latest published static schedule, with its original published source-record versions.
+ * Transport Victoria's archive carries no feed_info, so an alert cannot name the schedule it was
+ * written against; the newest published schedule is the one in service, and only it is loaded.
+ */
 export async function loadPublishedStaticGtfsVersions(config: DataConfig,
   bigquery: Pick<BigQuery, 'query'>): Promise<StaticGtfsVersion[]> {
   if (!config.maxBytesBilled) throw new Error('GTFS reference loading requires a billed-byte ceiling');
@@ -61,8 +71,7 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
         SELECT b.* FROM batch_states b JOIN source_states s USING (source_id)
         WHERE b.state = 'published' AND b.published_at IS NOT NULL
           AND s.access_status = 'active' AND s.license_status IN ('verified_open', 'restricted')
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY b.source_revision
-          ORDER BY b.published_at DESC, b.batch_id DESC) = 1
+        QUALIFY ROW_NUMBER() OVER (ORDER BY b.published_at DESC, b.batch_id DESC) = 1
       ), published_stops AS (
         SELECT g.*, r AS source_record, b.published_at AS batch_published_at
         FROM ${path('geo_records')} g JOIN published_batches b USING (batch_id, source_id)
@@ -86,12 +95,28 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
       ), related_routes AS (
         SELECT batch_id, geo_record_id, version_id, ARRAY_AGG(source_record) AS records
         FROM route_evidence GROUP BY batch_id, geo_record_id, version_id
+      ), published_route_shapes AS (
+        SELECT g.*, r AS source_record
+        FROM ${path('geo_records')} g JOIN published_batches b USING (batch_id, source_id)
+        JOIN ${path('source_records')} r ON r.batch_id = g.batch_id AND r.source_id = g.source_id
+          AND r.source_record_id = g.geo_record_id AND r.version_id = g.version_id
+        WHERE g.source_id = @sourceId AND STARTS_WITH(g.geo_record_id, CONCAT(@sourceId, ':route:'))
+          AND g.geometry_geojson IS NOT NULL
+          AND g.public_query_allowed AND g.rights_status IN ('verified_open', 'restricted')
+          AND r.rights_status IN ('verified_open', 'restricted')
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY g.batch_id, g.geo_record_id, g.version_id
+          ORDER BY g.fetched_at DESC) = 1
       )
-      SELECT TO_JSON_STRING(STRUCT(g.source_record AS source, g.summary,
-        g.geometry_geojson, g.centroid_lat, g.centroid_lon,
-        IFNULL(routes.records, []) AS route_records)) AS reference
-      FROM published_stops g LEFT JOIN related_routes routes USING (batch_id, geo_record_id, version_id)
-      ORDER BY g.geo_record_id, g.version_id LIMIT ${maximumReferences + 1}`,
+      SELECT reference FROM (
+        SELECT g.geo_record_id, g.version_id, TO_JSON_STRING(STRUCT('stop' AS kind, g.source_record AS source,
+          g.summary, g.geometry_geojson, g.centroid_lat, g.centroid_lon,
+          IFNULL(routes.records, []) AS route_records)) AS reference
+        FROM published_stops g LEFT JOIN related_routes routes USING (batch_id, geo_record_id, version_id)
+        UNION ALL
+        SELECT g.geo_record_id, g.version_id, TO_JSON_STRING(STRUCT('route_shape' AS kind,
+          g.source_record AS source, g.summary, g.geometry_geojson)) AS reference
+        FROM published_route_shapes g
+      ) ORDER BY geo_record_id, version_id LIMIT ${maximumReferences + 1}`,
       params: { sourceId: STATIC_SOURCE_ID }, location: config.region,
       maximumBytesBilled: config.maxBytesBilled,
     });
@@ -99,17 +124,33 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'GTFS reference query failed');
   }
-  const loaded = z.array(z.object({ reference: z.string() })).max(maximumReferences).parse(rows)
-    .map(row => publishedReferenceSchema.parse(JSON.parse(row.reference)));
-  const grouped = new Map<string, { publisherMode: z.infer<typeof mode>;
-    feedVersion: string; feedInfo: z.infer<typeof feedInfo>;
+  const parsedRows = z.array(z.object({ reference: z.string() })).max(maximumReferences).parse(rows)
+    .map(row => z.discriminatedUnion('kind', [publishedReferenceSchema, publishedRouteShapeSchema])
+      .parse(JSON.parse(row.reference)));
+  const loaded = parsedRows.flatMap(row => row.kind === 'stop' ? [row] : []);
+  const shapesByBatch = new Map<string, Map<string, RouteShapeReference>>();
+  for (const stored of parsedRows) {
+    if (stored.kind !== 'route_shape') continue;
+    const summary = routeShapeSummarySchema.parse(JSON.parse(stored.summary));
+    if (stored.source.source_id !== STATIC_SOURCE_ID
+      || stored.source.source_record_id !== `${STATIC_SOURCE_ID}:route:${summary.route.route_id}`) {
+      throw new Error('Published GTFS route shape has inconsistent provenance');
+    }
+    multiLineSchema.parse(JSON.parse(stored.geometry_geojson));
+    let shapes = shapesByBatch.get(stored.source.batch_id);
+    if (!shapes) { shapes = new Map(); shapesByBatch.set(stored.source.batch_id, shapes); }
+    if (shapes.has(summary.route.route_id)) throw new Error('Published GTFS route has conflicting shapes');
+    shapes.set(summary.route.route_id, { geometryGeojson: stored.geometry_geojson, record: stored.source,
+      feedVersion: summary.feed_version });
+  }
+  const grouped = new Map<string, { publisherMode: z.infer<typeof mode> | null;
+    feedVersion: string; feedInfo: z.infer<typeof feedInfo> | null; batchId: string;
     rows: { stored: z.infer<typeof publishedReferenceSchema>; reference: z.infer<typeof referenceSchema> }[] }>();
   for (const stored of loaded) {
     const reference = referenceFromSummary(stored.summary);
-    // Neither an archive validator nor flattened feed_info proves a mode version.
-    if (reference === null || reference.publisher_mode === null
-      || reference.feed_version.startsWith('archive-sha256:')
-      || reference.publisher_feed_info.feed_version !== reference.feed_version) continue;
+    // A claimed publisher version must agree with its own feed_info; an archive version claims none.
+    if (reference === null || (reference.publisher_feed_info !== null
+      && reference.publisher_feed_info.feed_version !== reference.feed_version)) continue;
     if (stored.source.source_id !== STATIC_SOURCE_ID
       || stored.source.source_record_id !== `${STATIC_SOURCE_ID}:stop:${reference.stop.stop_id}`) {
       throw new Error('Published GTFS stop reference has inconsistent provenance');
@@ -136,7 +177,7 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
       }
       existing.rows.push({ stored, reference });
     } else grouped.set(key, { publisherMode: reference.publisher_mode, feedVersion: reference.feed_version,
-      feedInfo: reference.publisher_feed_info, rows: [{ stored, reference }] });
+      feedInfo: reference.publisher_feed_info, batchId: stored.source.batch_id, rows: [{ stored, reference }] });
   }
   const versions: StaticGtfsVersion[] = [];
   for (const group of grouped.values()) {
@@ -157,7 +198,8 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
     const stops = group.rows.map(row => ({ ...row.reference.stop,
       route_ids: row.reference.routes.map(item => item.route_id).sort(),
       modes: [...new Set(row.reference.routes.map(item => gtfsRouteTypeToMode(item.route_type)))].sort() }));
-    const snapshot: GtfsStaticSnapshot = { feed_info: [group.feedInfo], routes, stops, trips: [], stop_times: [] };
+    const snapshot: GtfsStaticSnapshot = { feed_info: group.feedInfo === null ? [] : [group.feedInfo],
+      routes, stops, trips: [], stop_times: [], route_shapes: [] };
     const sourceRecords = [...new Map(group.rows.flatMap(row => [row.stored.source, ...row.stored.route_records])
       .map(item => [`${item.source_record_id}\u0000${item.version_id}`, item])).values()];
     const geoRecords: GeoRecord[] = group.rows.map(({ stored, reference }) => ({
@@ -179,7 +221,12 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
       feedVersion: group.feedVersion, validFrom: first.stored.source.valid_from,
       validTo: first.stored.source.valid_to, routes, stops,
       sourceUpdatedAt: first.stored.source.source_updated_at, tripStopMembershipComplete: false };
-    versions.push({ snapshot, normalized, publisherMode: group.publisherMode });
+    const routeShapes = new Map([...(shapesByBatch.get(group.batchId) ?? new Map<string, RouteShapeReference>())]
+      .filter(([, shape]) => shape.feedVersion === group.feedVersion));
+    versions.push({ snapshot, normalized, routeShapes,
+      ...(group.publisherMode === null ? {} : { publisherMode: group.publisherMode }),
+      // Only the newest published schedule is loaded, so an archive version stands for the one in service.
+      ...(group.feedVersion.startsWith('archive-sha256:') ? { matchRule: 'latest_published_archive' as const } : {}) });
   }
   return versions;
 }
