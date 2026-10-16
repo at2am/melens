@@ -41,7 +41,7 @@ export interface ParkingHistoryReader {
 const count = z.string().regex(/^\d+$/).transform(Number)
   .pipe(z.number().int().min(0).max(maximumParkingHistory));
 const latestSnapshotSchema = z.array(z.object({ batch_id: nonEmpty,
-  source_revision: nonEmpty, input_count: count, output_count: count,
+  source_revision: nonEmpty, input_count: count, output_count: count, started_at: nonEmpty,
 }).strict()).max(1);
 const recoveredSnapshotSchema = z.array(z.object({ proof_count: count,
   member_count: count, history: parkingRuntimeHistorySchema,
@@ -161,7 +161,8 @@ export async function withPublishedParkingState(result: ConnectorSuccess,
       QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC) = 1
     )
     SELECT batch_id, source_revision, CAST(input_count AS STRING) AS input_count,
-      CAST(output_count AS STRING) AS output_count
+      CAST(output_count AS STRING) AS output_count,
+      FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E6SZ', started_at) AS started_at
     FROM states WHERE state = 'published' AND published_at IS NOT NULL
     ORDER BY started_at DESC, batch_id DESC LIMIT 1`, { sourceId }))[0];
   let history: ParkingRuntimeHistoryEntry[] = [];
@@ -174,7 +175,9 @@ export async function withPublishedParkingState(result: ConnectorSuccess,
             SELECT sensor_id, business_source_record_id, business_state_hash, business_version_id,
               business_batch_id, snapshot_source_record_id, snapshot_version_id
             FROM ${table('parking_sensor_memberships')}
+            -- A parking batch starts when it is fetched; its members sit in that day's partition.
             WHERE source_id = @sourceId AND batch_id = @batchId
+              AND fetched_at >= TIMESTAMP_SUB(TIMESTAMP(@startedAt), INTERVAL 1 DAY)
           ), records AS (
             SELECT source_record_id, version_id, batch_id,
               ANY_VALUE(record_status) AS record_status, ANY_VALUE(rights_status) AS rights_status,
@@ -207,7 +210,7 @@ export async function withPublishedParkingState(result: ConnectorSuccess,
                 AND r.rights_status IN ('verified_open', 'restricted') AND r.record_status IN ('active', 'corrected')
                 AND r.status_variants = 1
               ORDER BY m.sensor_id LIMIT ${maximumParkingHistory + 1}) AS history`,
-    { sourceId, batchId: latest.batch_id, sourceRevision: latest.source_revision }))[0];
+    { sourceId, batchId: latest.batch_id, sourceRevision: latest.source_revision, startedAt: latest.started_at }))[0];
     if (recovered === undefined || recovered.proof_count !== 1
       || recovered.member_count !== latest.output_count || recovered.history.length !== latest.output_count) {
       throw new Error('Published parking snapshot proof or exact business references are incomplete');
