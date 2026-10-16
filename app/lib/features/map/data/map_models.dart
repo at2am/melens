@@ -107,7 +107,9 @@ enum DisruptionExtentKind { roadSegment, route, stop, area, unknown }
 
 enum NewsDedupStatus { confirmedDistinct, confirmedDuplicate, unconfirmed }
 
-enum AggregateRepresentation { cluster, coverageGrid }
+/// `areaMentions` (UC-06) is an official area drawn with the news articles
+/// that name it: an association with the area, never an event site.
+enum AggregateRepresentation { cluster, coverageGrid, areaMentions }
 
 enum MapResultScope { viewport, areaAssociation, sourceJurisdiction }
 
@@ -2413,8 +2415,17 @@ void _validateItem(MapItem item) {
           'Only matched statistical areas are drawable.',
         );
       }
-    case AggregateMapItem():
+    case AggregateMapItem(:final details):
       _require(item.geometry != null, 'Geographic aggregates need geometry.');
+      if (details.representation == AggregateRepresentation.areaMentions) {
+        _require(
+          item.layerId == MapLayerId.news &&
+              item.location.role == MapLocationRole.areaAssociation &&
+              (item.geometry is GeoJsonPolygon ||
+                  item.geometry is GeoJsonMultiPolygon),
+          'Area mentions are news area associations drawn as polygons.',
+        );
+      }
   }
 }
 

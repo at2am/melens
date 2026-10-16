@@ -33,7 +33,8 @@ function newsRow(extra: ViewRow = {}): ViewRow {
 }
 
 test('GDELT keeps the original link, attribution, unknown clocks, mention precision and unconfirmed grouping', () => {
-  const item = adaptNewsRow(newsRow({ centroid_lat: -37.81, centroid_lon: 144.96 }), { source });
+  const item = adaptNewsRow(newsRow({ centroid_lat: -37.81, centroid_lon: 144.96,
+    source_updated_at: '2026-10-01T00:45:00Z' }), { source });
   assert.equal(item.geometry, null);
   assert.equal(item.location.role, 'mention');
   assert.equal(item.location.precision, 'unlocated');
@@ -48,7 +49,7 @@ test('GDELT keeps the original link, attribution, unknown clocks, mention precis
   assert.match(item.sources[1]?.attribution ?? '', /The GDELT Project/);
   assert.equal(item.details.dedupStatus, 'unconfirmed');
   assert.equal(item.details.summary, null);
-  assert.doesNotMatch(JSON.stringify(item), /private-body-marker|gdelt_processed_at/);
+  assert.doesNotMatch(JSON.stringify(item), /private-body-marker|gdelt_processed_at|2026-10-01T00:45/);
   const batch = adaptNewsRows([newsRow()], { resolveSource: () => source });
   assert.equal(batch.items.length, 0); assert.equal(batch.unlocatedItems.length, 1);
 });
@@ -85,9 +86,17 @@ test('news uses fixed published views with source admission, temporal scope, nul
   const list = prepareUnlocatedQuery({ queryId: 'news', request: unlocated, config, pageSize: 10,
     approvedScope: { sourceIds: [source.sourceId], areaRefs: ['com:municipal'], sourceJurisdiction: null } });
   assert.match(list.query, /g.geometry IS NULL/);
-  assert.match(list.query, /COALESCE\(g.published_at, g.observed_at\) >= @from/);
-  assert.match(list.query, /COALESCE\(g.published_at, g.observed_at\) IS NULL/);
+  // GDELT has no article clock: its processing time bounds the article for current news (the last
+  // week to the window end) and newest-first order, and is never shown as the publication time.
+  const reported = 'COALESCE\\(g.published_at, g.observed_at, g.source_updated_at\\)';
+  assert.match(list.query, new RegExp(`${reported} >= TIMESTAMP_SUB\\(@to, INTERVAL 7 DAY\\) AND ${reported} < @to`));
+  assert.match(list.query, new RegExp(`${reported} IS NULL`));
+  assert.match(list.query, new RegExp(`ORDER BY ${reported} DESC`));
   assert.doesNotMatch(list.query, /ST_INTERSECTSBOX|gdelt_processed_at|fetched_at >=/);
+  const history = prepareUnlocatedQuery({ queryId: 'news', request: { ...unlocated, mode: 'historical' }, config,
+    pageSize: 10, approvedScope: { sourceIds: [source.sourceId], areaRefs: ['com:municipal'], sourceJurisdiction: null } });
+  assert.match(history.query, new RegExp(`${reported} >= @from AND ${reported} < @to`));
+  assert.doesNotMatch(history.query, new RegExp(`${reported} IS NULL`));
   const proof = preparePublicRecordQuery({ queryId: 'news', request, config, pageSize: 10,
     recordKeys: [{ id: 'news:article1', versionId: 'article-version1', sourceId: source.sourceId }] });
   assert.match(proof.query, /v_geo_records_current/);

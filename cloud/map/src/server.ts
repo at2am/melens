@@ -235,7 +235,8 @@ export async function startMapServer(env: Readonly<Record<string, string | undef
   const port = z.coerce.number().int().min(0).max(65_535).parse(env.PORT ?? '8080');
   const allowedOrigins = (env.MAP_ALLOWED_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
   const publicSources = env.MAP_PUBLIC_SOURCES_FILE === undefined ? [] : await loadPublicSources(env.MAP_PUBLIC_SOURCES_FILE);
-  const server = createMapHttpServer({ service: createMapService({ config: loadMapConfig(env), publicSources }), allowedOrigins });
+  const service = createMapService({ config: loadMapConfig(env), publicSources, prewarmNewsAreas: true });
+  const server = createMapHttpServer({ service, allowedOrigins });
   server.on('error', () => {
     process.stderr.write(`${JSON.stringify({ severity: 'ERROR', event: 'mapServerFailed' })}\n`);
     process.exitCode = 1;
@@ -244,6 +245,8 @@ export async function startMapServer(env: Readonly<Record<string, string | undef
   process.once('SIGINT', close);
   process.once('SIGTERM', close);
   server.listen(port, '0.0.0.0', () => {
+    // Startup has CPU; the first news copy loads while the instance waits for its first request.
+    service.warmNewsAreas();
     const address = server.address();
     if (address !== null && typeof address !== 'string') {
       process.stdout.write(`${JSON.stringify({ severity: 'INFO', event: 'mapServerListening', port: address.port })}\n`);

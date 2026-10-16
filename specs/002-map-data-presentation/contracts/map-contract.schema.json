@@ -1696,7 +1696,8 @@
           "type": "string",
           "enum": [
             "cluster",
-            "coverageGrid"
+            "coverageGrid",
+            "areaMentions"
           ]
         },
         "memberIds": {
