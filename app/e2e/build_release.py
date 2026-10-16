@@ -12,7 +12,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 
-from provenance import APP, bundle_files, source_stamp, validate_assets
+from provenance import APP, bundle_files, fingerprint_fonts, source_stamp, validate_assets
 
 PROJECT = "melens-510012"
 FORMAT_VERSION = 1
