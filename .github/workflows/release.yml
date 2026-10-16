@@ -131,6 +131,20 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      # The deploy audits parse bq JSON. On a fresh runner bq has no ~/.bigqueryrc and prints its
+      # interactive first-run text instead, so create it and prove bq returns JSON before deploying.
+      - name: Initialise bq
+        run: |
+          printf 'project_id = %s\n' "$PROJECT_ID" > "$HOME/.bigqueryrc"
+          out=$(bq --project_id="$PROJECT_ID" show --format=json "$PROJECT_ID:melens_query" < /dev/null 2>&1) || true
+          if python3 -c 'import json, sys; json.loads(sys.argv[1])' "$out" 2>/dev/null; then
+            echo "bq ready"
+          else
+            # Not JSON, so a CLI message rather than dataset metadata.
+            echo "bq did not return JSON: ${out:0:600}" >&2
+            exit 1
+          fi
+
       - name: Build the image with Cloud Build
         id: image
         env:
