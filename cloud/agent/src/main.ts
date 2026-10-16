@@ -20,6 +20,10 @@ import { FEED_LIMITS } from './feeds/schemas.js';
 import { FeedService } from './feeds/service.js';
 import { InMemoryFeedStore } from './feeds/store.js';
 import { createSharedFeatureReader } from './features/reader.js';
+import { createFirestorePlanStore } from './plans/firestore-store.js';
+import { PLAN_LIMITS } from './plans/schemas.js';
+import { PlanService } from './plans/service.js';
+import { InMemoryPlanStore } from './plans/store.js';
 import { createRateLimiter } from './rate-limit.js';
 import { createRoutesClient } from './routes/routes-client.js';
 import { createAgentHttpServer } from './server.js';
@@ -57,7 +61,11 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
   const feeds = new FeedService({ writeLimiter: createRateLimiter(FEED_LIMITS.writesPerHour),
     store: development ? new InMemoryFeedStore()
       : createFirestoreFeedStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
-  const server = createAgentHttpServer({ store, verifier, runner, events, feeds, rateLimiter: createRateLimiter(config.turnsPerHour),
+  // Saved plans (UC-03) likewise; they copy cards out of the session store.
+  const plans = new PlanService({ sessions: store, writeLimiter: createRateLimiter(PLAN_LIMITS.writesPerHour),
+    store: development ? new InMemoryPlanStore()
+      : createFirestorePlanStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
+  const server = createAgentHttpServer({ store, verifier, runner, events, feeds, plans, rateLimiter: createRateLimiter(config.turnsPerHour),
     allowedOrigins: config.allowedOrigins, turnTimeoutMs: config.turnTimeoutMs });
   server.on('error', (error: NodeJS.ErrnoException) => {
     log({ severity: 'ERROR', event: 'agentServerFailed', reason: error.code ?? error.message, port });

@@ -32,6 +32,8 @@ export const turnInputSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('area'), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
   z.strictObject({ kind: z.literal('analyse'), featureId: identifierSchema }),
   z.strictObject({ kind: z.literal('answer'), questionId: identifierSchema, value: z.string().trim().min(1).max(200) }),
+  /** The user asks to change a plan card of this session: what to change, and which card. */
+  z.strictObject({ kind: z.literal('refine'), cardId: identifierSchema, text: z.string().trim().min(1).max(2_000) }),
 ]);
 export type TurnInput = z.infer<typeof turnInputSchema>;
 
