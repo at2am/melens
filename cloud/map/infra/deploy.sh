@@ -108,6 +108,9 @@ reviewed = {
     # ABS ASGS 2021/2026 boundaries (CC BY 4.0), added 2026-10-16 so UC-06 can draw the areas news articles
     # name; it also serves the boundary layer, whose items needed this reference.
     'abs.asgs.boundaries': ('verified_open', 'www.abs.gov.au'),
+    # Transport Victoria road disruptions (UC-05), CC BY 4.0, admitted 2026-10-16 for the disruption layer.
+    'victoria.transport.road_planned': ('verified_open', 'opendata.transport.vic.gov.au'),
+    'victoria.transport.road_unplanned': ('verified_open', 'opendata.transport.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:

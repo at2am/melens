@@ -7,14 +7,15 @@
   "api_endpoint": "https://api.opendata.transport.vic.gov.au/opendata/roads/disruptions/planned/v1/",
   "topic": "road_disruption",
   "scope": "victoria",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": ["ASGS_STE:2:2021"],
+  "coverage_from": "2026-10-16T00:00:00Z",
   "coverage_to": null,
   "cadence_seconds": 1800,
   "check_interval_seconds": 1800,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "verified_open",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "access_status": "active",
   "record_granularity": "planned_disruption_snapshot_and_geometry",
   "connector_owner": "melens integration",
   "admission_evidence": {
@@ -33,7 +34,8 @@
     ],
     "raw_retention_days": 0,
     "staging_retention_days": 1,
-    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road"
+    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road",
+    "reviewed_at": "2026-10-16T00:00:00Z"
   },
-  "notes": "Review 2026-10-01: official resource HTML Data Dictionary documents Victorian local time for lastUpdated and duration start/end. Offsetless clocks are strictly resolved in Australia/Melbourne; ambiguous/nonexistent DST clocks retain original strings and null absolute times. Explicit offsets remain authoritative. Provider Pending remains planned and Active remains source Active with unknown freshness on time conflict; recurrences remain separate from overall plan validity. The current landing page states CC BY 4.0, KeyID, 20 calls/minute and 30-minute refresh; linked older OpenAPI describes token pagination and 10/minute, so inter-page delay uses 6.1 seconds and each HTTP request has one attempt. Shared KeyID per-minute coordination across jobs remains unimplemented and is an admission requirement; the daily ledger alone is insufficient. KeyID never follows redirects. Successful collections include complete-road-snapshot-v1 membership proof, including empty snapshots, without inventing cancellation on disappearance. The daily cap is operational, not a documented provider daily entitlement. Candidate/review_required remains until revised cloud probe, admission/retention/quota review and publication/current-view verification; prior 9450/9452-event private reads used older code. Official evidence: https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road/resource/337dcdcd-defd-427f-b3f7-e06954b853d8 ."
+  "notes": "Review 2026-10-01: official resource HTML Data Dictionary documents Victorian local time for lastUpdated and duration start/end. Offsetless clocks are strictly resolved in Australia/Melbourne; ambiguous/nonexistent DST clocks retain original strings and null absolute times. Explicit offsets remain authoritative. Provider Pending remains planned and Active remains source Active with unknown freshness on time conflict; recurrences remain separate from overall plan validity. The current landing page states CC BY 4.0, KeyID, 20 calls/minute and 30-minute refresh; linked older OpenAPI describes token pagination and 10/minute, so inter-page delay uses 6.1 seconds and each HTTP request has one attempt. Shared KeyID per-minute coordination across jobs remains unimplemented and is an admission requirement; the daily ledger alone is insufficient. KeyID never follows redirects. Successful collections include complete-road-snapshot-v1 membership proof, including empty snapshots, without inventing cancellation on disappearance. The daily cap is operational, not a documented provider daily entitlement. Candidate/review_required remains until revised cloud probe, admission/retention/quota review and publication/current-view verification; prior 9450/9452-event private reads used older code. Official evidence: https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road/resource/337dcdcd-defd-427f-b3f7-e06954b853d8 . Admission 2026-10-16: CC BY 4.0 per the landing page. A read with the stored KeyID followed the token chain through 21 pages of up to 500, 10,437 events statewide. The provider caps pages at 500 whatever the limit. There is still no cross-job KeyID coordinator. Instead the schedules keep the shared 20-calls-per-minute key near a peak of 16: this job makes about 10 calls a minute at 6.1-second spacing, unplanned roads 4 per 10-minute run, GTFS-R 2 a minute."
 }

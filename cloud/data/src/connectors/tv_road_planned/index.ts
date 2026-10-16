@@ -16,7 +16,7 @@ export const MAX_PAGES = 1000;
 // The linked OpenAPI still says 10/minute while the landing page says 20/minute.
 export const PAGE_DELAY_MS = 6100;
 const MAX_SOURCE_CLOCK_SKEW_MS = 300_000;
-const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v2';
+const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v3';
 const localClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
@@ -184,7 +184,10 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
       throw new Error('Planned road update timestamp is more than five minutes after fetch time');
     }
     const start = parseVictorianTimestamp(p.duration?.start);
-    const end = parseVictorianTimestamp(p.duration?.end);
+    const sourceEnd = parseVictorianTimestamp(p.duration?.end);
+    // Some recurring plans give one instant as both start and end; their real impact times are in
+    // the recurrence schedule, so the overall end is unknown rather than an empty interval.
+    const end = start !== null && sourceEnd === start ? null : sourceEnd;
     const localTimeUnresolved = [p.lastUpdated, p.duration?.start, p.duration?.end]
       .some(hasUnresolvedLocalTime);
     if (start !== null && end !== null && end < start) {
@@ -225,7 +228,7 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         : 'Source does not provide an event creation time',
       valid_from: start, valid_to: end, source_updated_at: updatedAt,
       source_version_ordinal: null, record_status: sourceRecordStatus, assertion_kind: 'plan',
-      rights_status: 'review_required' });
+      rights_status: 'verified_open' });
     const geoms = geometriesFor(feature);
     for (const [index, geometry] of geoms.entries()) {
       const geoId = sourceRecordId({ sourceId: SOURCE_ID,
@@ -246,8 +249,8 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
         area_refs: [], published_at: null, observed_at: null,
         valid_from: start, valid_to: end, source_updated_at: updatedAt,
         source_version_ordinal: null, freshness_state: 'unknown',
-        record_status: geoRecordStatus, rights_status: 'review_required',
-        public_query_allowed: false });
+        record_status: geoRecordStatus, rights_status: 'verified_open',
+        public_query_allowed: true });
       geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID,
         schema_version: 1, fetched_at: fetchedAt, geo_record_id: geoId,
         version_id: geoVersion, source_record_id: sourceId,
@@ -267,7 +270,7 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
     first_accessible_at: fetchedAt,
     time_missing_reason: 'Complete fetch snapshot membership; fetch time is not event time',
     valid_from: null, valid_to: null, source_updated_at: null, source_version_ordinal: null,
-    record_status: 'active', assertion_kind: 'observation', rights_status: 'review_required' });
+    record_status: 'active', assertion_kind: 'observation', rights_status: 'verified_open' });
   for (const row of geoRecords) {
     geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
       fetched_at: fetchedAt, geo_record_id: row.geo_record_id, version_id: row.version_id,

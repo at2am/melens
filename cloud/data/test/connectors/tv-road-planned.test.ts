@@ -45,7 +45,7 @@ test('planned works retain schedule, affected segment, source status and geometr
   assert.equal(normalized.geoRecords[0]?.geometry_geojson?.includes('LineString'), true);
   assert.equal(normalized.geoRecords[1]?.geometry_geojson?.includes('Point'), true);
   assert.equal(normalized.geoRecords[2]?.record_status, 'active');
-  assert.equal(normalized.geoRecords[0]?.public_query_allowed, false);
+  assert.equal(normalized.geoRecords[0]?.public_query_allowed, true);
   normalized.sourceRecords.forEach(row => assert.deepEqual(parseSourceRecord(row), row));
   normalized.geoRecords.forEach(row => assert.equal(validateGeoRecordGeography(row).valid, true));
   const details = JSON.parse(normalized.geoRecords[0]?.summary ?? '{}');
@@ -116,6 +116,19 @@ test('classifyPlannedStatus correctly maps future, pending, active, cancelled, r
     geoRecordStatus: 'resolved',
   });
   assert.throws(() => classifyPlannedStatus('UnknownStatus', null, '2026-09-28T00:00:00Z'), /Undocumented planned disruption status/);
+});
+
+test('a plan whose overall start and end are one instant keeps its start and an unknown end', async () => {
+  const page = await fixture();
+  const first = page.data.features[0]!;
+  const instant = { ...first, properties: { ...first.properties,
+    duration: { ...first.properties.duration, start: '2026-10-18T00:00:00Z', end: '2026-10-18T00:00:00Z' } } };
+  const normalized = normalizePlannedRoadSnapshot([instant], input, fetchedAt);
+  assert.equal(normalized.geoRecords[0]?.valid_from, '2026-10-18T00:00:00.000Z');
+  assert.equal(normalized.geoRecords[0]?.valid_to, null);
+  assert.equal(normalized.sourceRecords[0]?.valid_to, null);
+  const details = JSON.parse(normalized.geoRecords[0]?.summary ?? '{}');
+  assert.equal(details.duration.end, '2026-10-18T00:00:00Z');
 });
 
 test('cancelled disruption retains schedule, geometry and segment facts with cancelled status', async () => {
@@ -348,12 +361,12 @@ test('mismatched sourceId fails with validation_failed', async () => {
   if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
 });
 
-test('source manifest enforces review_required, candidate, and KeyID secret requirement', async () => {
+test('source manifest is admitted as open data and requires the KeyID secret', async () => {
   const bytes = await readFile(new URL('../../src/connectors/tv_road_planned/source.json', import.meta.url), 'utf8');
   const manifest = JSON.parse(bytes);
   assert.equal(manifest.source_id, SOURCE_ID);
-  assert.equal(manifest.license_status, 'review_required');
-  assert.equal(manifest.access_status, 'candidate');
+  assert.equal(manifest.license_status, 'verified_open');
+  assert.equal(manifest.access_status, 'active');
   assert.deepEqual(manifest.admission_evidence.secret_names, ['transport_victoria_key_id']);
   assert.equal(manifest.topic, 'road_disruption');
   assert.equal(manifest.scope, 'victoria');

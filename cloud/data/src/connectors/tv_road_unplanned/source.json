@@ -7,20 +7,22 @@
   "api_endpoint": "https://api.opendata.transport.vic.gov.au/api/opendata/roads/disruptions/unplanned/v3",
   "topic": "road_disruption",
   "scope": "victoria",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": ["ASGS_STE:2:2021"],
+  "coverage_from": "2026-10-16T00:00:00Z",
   "coverage_to": null,
-  "cadence_seconds": 60,
-  "check_interval_seconds": 60,
+  "cadence_seconds": 600,
+  "check_interval_seconds": 600,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "verified_open",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "access_status": "active",
   "record_granularity": "incident_and_impact_snapshot",
   "connector_owner": "melens integration",
   "admission_evidence": {
     "dataset_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road/resource/1b185c7f-d4b2-404d-a65c-b5a80da7582d",
     "native_record_key": "properties.id + properties.impactId",
     "completeness_rule": "All v3 pages must agree on total_records and total_pages; unique incident-impact IDs required",
+    "quota_requests_per_day": 1440,
     "secret_names": [
       "transport_victoria_key_id"
     ],
@@ -31,7 +33,8 @@
     ],
     "raw_retention_days": 0,
     "staging_retention_days": 1,
-    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road"
+    "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road",
+    "reviewed_at": "2026-10-16T00:00:00Z"
   },
-  "notes": "The public page states CC BY 4.0, KeyID header, 20 calls per 60 seconds and a 60-second refresh. Account access was demonstrated by private probes; production quota, attribution and retention still require admission review. v3 endTime and nextUpdateDue are estimates, not evidence that an incident resolved. Review 2026-10-01: this source's own HTML dictionary and OpenAPI do not specify offsetless timestamp timezone; source_updated_at and absolute event times remain null for those values, and original fields remain in JSON summary. Unknown status and conflicting parent incident versions reject a snapshot. Every complete read, including empty, emits a complete-road-snapshot-v1 SourceRecord and road_snapshot_membership links; new fetches produce new snapshot revisions while business versions stay stable. Disappearance means absent from current snapshot, not resolved. KeyID requests reject redirects and allow one HTTP attempt per page; callers receive Retry-After on rate limiting. See cloud/data/docs/source-policies/transport-unplanned-roads.md."
+  "notes": "The public page states CC BY 4.0, KeyID header, 20 calls per 60 seconds and a 60-second refresh. Account access was demonstrated by private probes; production quota, attribution and retention still require admission review. v3 endTime and nextUpdateDue are estimates, not evidence that an incident resolved. Review 2026-10-01: this source's own HTML dictionary and OpenAPI do not specify offsetless timestamp timezone; source_updated_at and absolute event times remain null for those values, and original fields remain in JSON summary. Unknown status and conflicting parent incident versions reject a snapshot. Every complete read, including empty, emits a complete-road-snapshot-v1 SourceRecord and road_snapshot_membership links; new fetches produce new snapshot revisions while business versions stay stable. Disappearance means absent from current snapshot, not resolved. KeyID requests reject redirects and allow one HTTP attempt per page; callers receive Retry-After on rate limiting. See cloud/data/docs/source-policies/transport-unplanned-roads.md. Admission 2026-10-16: CC BY 4.0 per the landing page; the stored KeyID returned HTTP 200 on 2026-10-16, with 309 records on 4 pages of 100. The cadence is 10 minutes, not the provider's 60 seconds, because every road publication rebuilds this source's geo_records_current rows (about 0.5 GB billed); one-minute runs would bill about 0.7 TB a day. The three Transport Victoria jobs share one KeyID limited to 20 calls per 60 seconds. Instead of a cross-job coordinator, the schedules keep the combined peak near 16: planned roads at about 10 a minute, unplanned roads 4 pages a run, GTFS-R 2 feeds."
 }

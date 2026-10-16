@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { loadMapConfig } from '../src/config.js';
 import type { PreparedViewQuery } from '../src/query/bigquery-adapter.js';
-import { createCurrentLayerCache, instantMicros } from '../src/query/current-layer-cache.js';
+import { createCurrentLayerCache, instantMicros, prepareLayerLoad } from '../src/query/current-layer-cache.js';
 import { intersectsBox, prepareGeometry } from '../src/query/geo-box.js';
 import { MapQueryError, type ViewQueryResult } from '../src/query/query-runner.js';
 import { cacheSourceCoverage, type PublicSourceCoverage, type SourceCoverageSnapshot } from '../src/query/source-coverage.js';
@@ -32,6 +32,12 @@ test('box intersection matches ST_INTERSECTSBOX for points, crossing lines and e
   assert.equal(intersectsBox(prepareGeometry(JSON.stringify({ type: 'Polygon', coordinates: [outer, hole] })), box), false);
   assert.equal(intersectsBox(prepareGeometry(JSON.stringify({ type: 'MultiPolygon', coordinates: [[hole]] })), box), true);
   assert.throws(() => prepareGeometry(JSON.stringify({ type: 'Point', coordinates: ['x', 1] })));
+});
+
+test('a disruption load keeps live reports and works in progress ahead of pending works', () => {
+  const load = prepareLayerLoad('disruption', config, 100);
+  assert.match(load.query, /ORDER BY CASE WHEN g\.assertion_kind = 'report' THEN 0\s+WHEN g\.record_status = 'active' THEN 1 ELSE 2 END, g\.geo_record_id/);
+  assert.match(prepareLayerLoad('planning', config, 100).query, /ORDER BY g\.geo_record_id, g\.version_id/);
 });
 
 test('instants keep BigQuery microseconds', () => {
