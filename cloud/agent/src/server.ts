@@ -18,6 +18,9 @@ export const MAX_REQUEST_BYTES = 64 * 1024 + ATTACHMENT_LIMITS.perTurn * Math.ce
 /** How long a new message waits for the running turn it interrupts to stop and store itself before taking its lease. */
 export const SUPERSEDE_WAIT_MS = 5_000;
 
+/** The longest a saved plan's stop refresh may read the sensors and the area's rules. */
+const STOP_REFRESH_TIMEOUT_MS = 60_000;
+
 export interface TurnContext {
   readonly uid: string;
   readonly session: SessionRecord;
@@ -30,8 +33,11 @@ export interface TurnContext {
   readonly history: readonly StoredTurn[];
   /** The photos of the last `SESSION_LIMITS.promptImageTurns` history turns, by attachment id. */
   readonly historyImages: ReadonlyMap<string, TurnImage>;
-  /** For a `refine` input, the plan card being changed, as stored. */
-  readonly refineCard?: Card;
+  /**
+   * The plan card this turn changes, as stored: the card a `refine` input names, or the plan the pending question was
+   * about when the input may answer it (an `answer`, `answers` or `text` input).
+   */
+  readonly planCard?: Card;
   readonly sink: EventSink;
   readonly signal: AbortSignal;
   readonly startedAt: Date;
@@ -58,7 +64,8 @@ type Route =
   | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string }
   | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' }
   | { readonly kind: 'plans'; readonly method: 'GET' | 'POST' }
-  | { readonly kind: 'plan'; readonly planId: string };
+  | { readonly kind: 'plan'; readonly planId: string }
+  | { readonly kind: 'planStopRefresh'; readonly planId: string; readonly index: number };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -90,6 +97,8 @@ function matchRoute(method: string, pathname: string): Route | null {
   if (pathname === '/v1/plans' && (method === 'GET' || method === 'POST')) return { kind: 'plans', method };
   const plan = /^\/v1\/plans\/([^/]+)$/.exec(pathname);
   if (plan !== null && ID.test(plan[1]!) && method === 'DELETE') return { kind: 'plan', planId: plan[1]! };
+  const stop = /^\/v1\/plans\/([^/]+)\/stops\/(\d{1,2})\/refresh$/.exec(pathname);
+  if (stop !== null && ID.test(stop[1]!) && method === 'POST') return { kind: 'planStopRefresh', planId: stop[1]!, index: Number(stop[2]) };
   if (pathname === '/v1/sessions' && (method === 'GET' || method === 'POST')) return { kind: 'sessions', method };
   const session = /^\/v1\/sessions\/([^/]+)$/.exec(pathname);
   if (session !== null && ID.test(session[1]!) && (method === 'GET' || method === 'DELETE')) {
@@ -258,6 +267,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     const images = decodeImages(parsed.data.attachments ?? [], ATTACHMENT_LIMITS.bytes);
     if (!options.rateLimiter.allow(uid, clock())) throw new AgentServiceError('rateLimited');
     const refineCard = parsed.data.input.kind === 'refine' ? await storedPlanCard(uid, sessionId, parsed.data.input.cardId) : undefined;
+    let planCard = refineCard;
 
     // The client leaving, the stop button, a newer message or the Cloud Run deadline cancels the run, so it
     // stops spending tokens. The client may already leave while this request waits for an interrupted turn.
@@ -284,6 +294,11 @@ export function createAgentHttpServer(options: AgentServerOptions) {
       const record = await options.store.get(uid, sessionId);
       if (record === null) throw new AgentServiceError('notFound');
       session = record;
+      // An answer to a question about a plan changes that plan, so the model gets the whole card, as for a refine turn.
+      const aboutPlan = record.pendingQuestion?.planCardId;
+      if (planCard === undefined && aboutPlan !== undefined && ['answer', 'answers', 'text'].includes(parsed.data.input.kind)) {
+        planCard = await storedPlanCard(uid, sessionId, aboutPlan).catch(() => undefined);
+      }
       history = await options.store.listTurns(uid, sessionId, SESSION_LIMITS.promptTurns);
       historyImages = await loadHistoryImages(uid, sessionId, history);
     } catch (error) {
@@ -302,7 +317,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     const sink = openSseStream(response, turnId);
     try {
       const turn = await options.runner.run({ uid, session, turnId, seq: session.turnCount + 1, request: parsed.data, images,
-        history, historyImages, sink, signal: controller.signal, startedAt, ...(refineCard === undefined ? {} : { refineCard }) });
+        history, historyImages, sink, signal: controller.signal, startedAt, ...(planCard === undefined ? {} : { planCard }) });
       await options.store.completeTurn(uid, sessionId, turn, clock(), images);
     } catch (error) {
       if (!sink.sent.some((event) => event.event === 'done' || event.event === 'error')) {
@@ -423,6 +438,18 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           await options.plans.remove(uid, route.planId);
           writeNoContent(response);
           return;
+        case 'planStopRefresh': {
+          // The read stops when the caller leaves, and after a minute in any case.
+          const controller = new AbortController();
+          const onClose = () => { if (!response.writableEnded) controller.abort(); };
+          response.on('close', onClose);
+          try {
+            const body = await readJsonBody(request);
+            const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(STOP_REFRESH_TIMEOUT_MS)]);
+            writeJson(response, 200, { plan: await options.plans.refreshStop(uid, route.planId, route.index, body, signal) });
+          } finally { response.off('close', onClose); }
+          return;
+        }
       }
     } catch (error) {
       const { code, reason } = errorOf(error);

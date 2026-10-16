@@ -106,7 +106,7 @@ Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](to
 | Workflow | `area_brief`, `analyse_anomaly`, `find_parking` | Run a known multi-step procedure in one call |
 | Grounding | `maps_grounding`, `search_grounding` | Answer what our data does not cover; a fallback after the data tools, or a supplement where they leave a gap, never a routine step |
 | UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
-| Conversation | `ask_user` | Ask one question when the context cannot resolve the request |
+| Conversation | `ask_user` | Ask one question when the context cannot resolve the request, or up to three about a plan just shown |
 
 UI action tools return to the model straight away and send a `ui_action` or `card` event to the app without waiting for a reply. The next turn's request context reports the real map state.
 
@@ -126,6 +126,7 @@ The agent acts first and states its assumptions. It asks only when acting would 
 - **Ask** when the request is ambiguous and the request context cannot resolve it (which of several gardens, which of two anomaly markers), or when a required input has no sensible default (no location and a city-wide viewport).
 - **Do not ask** about preferences it can assume, or for confirmation. UI changes are reversible and the agent never writes data, so there is nothing to approve.
 - One question per turn, with 2–4 options. `ask_user` ends the turn, and the pending question goes into the next turn's prompt.
+- **Plans are the exception (UC-03, since 2026-10-16).** The agent still plans at once with stated assumptions (leave now, two to three hours, on foot and public transport) and shows the plan first. Then it may ask up to three questions about what the request left open and would change the plan: when the user leaves, how long they have, how they travel. Each question names the plan card. The answers, chosen together in the app, come back as one turn that carries the whole plan, so the agent revises it once; it may ask again about what is still open, and the user can keep iterating with Change plan. Answering "drive" sets the plan's `travel_mode`, and code adds the live parking at each stop ([tools.md](tools.md#show_card)).
 - Workflows never ask, because their entry points supply every input.
 
 ### Budget and context hygiene

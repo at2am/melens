@@ -30,6 +30,7 @@ function scriptedRunner(script: (turn: Parameters<TurnRunner['run']>[0]) => Prom
     const question = turn.sink.sent.find((event) => event.event === 'question');
     const turnRecord: StoredTurn = { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input,
       attachments: turn.images.map(attachmentRefOf), text, cards: [], uiActions: [], question: question?.event === 'question' ? question.question : null,
+      questions: question?.event === 'question' ? [question.question] : [],
       stop: question === undefined ? stop : 'asked', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
     return turnRecord;
   } };
@@ -199,7 +200,7 @@ test('a failed runner frees the lease and stores nothing', async () => {
     if (calls === 1) throw new Error('model unavailable');
     turn.sink.emit({ event: 'done', stop: 'end', usage: { ...zeroUsage(), complete: true } });
     return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input, attachments: [], text: '', cards: [],
-      uiActions: [], question: null, stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
+      uiActions: [], question: null, questions: [], stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
   } };
   const { call, close } = await start(runner);
   try {

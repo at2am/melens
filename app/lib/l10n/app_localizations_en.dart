@@ -2256,4 +2256,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get planRemoveFailed => 'The plan could not be removed. Try again.';
+
+  @override
+  String chatInputAnswers(String values) {
+    return 'Answers: $values';
+  }
+
+  @override
+  String get chatQuestionsAboutPlan =>
+      'A few questions to fit the plan to you. Answer any of them.';
+
+  @override
+  String get chatQuestionsSend => 'Update the plan';
+
+  @override
+  String get chatQuestionsFreeText => 'Or type what you have in mind below.';
+
+  @override
+  String get cardTravelWalk => 'On foot';
+
+  @override
+  String get cardTravelTransit => 'By public transport';
+
+  @override
+  String get cardTravelDrive => 'By car';
+
+  @override
+  String get cardTravelCycle => 'By bike';
+
+  @override
+  String get stopParkingTitle => 'Parking near this stop';
+
+  @override
+  String stopParkingNearest(String distance, int minutes) {
+    return 'Nearest free bay $distance away, about $minutes min walk';
+  }
+
+  @override
+  String stopParkingNone(String radius) {
+    return 'No bay reads free within $radius.';
+  }
+
+  @override
+  String stopParkingCounts(int vacant, int occupied, String radius) {
+    return '$vacant free, $occupied taken within $radius';
+  }
+
+  @override
+  String stopParkingChecked(String time) {
+    return 'Checked $time';
+  }
+
+  @override
+  String stopParkingBay(String distance, int minutes) {
+    return '$distance · $minutes min';
+  }
+
+  @override
+  String get stopParkingBayTitle => 'Free parking bay';
+
+  @override
+  String get stopParkingSensorNote =>
+      'A free sensor shows no car on the bay, not that parking is allowed now.';
+
+  @override
+  String get stopParkingRefresh => 'Refresh parking';
+
+  @override
+  String get stopParkingFind => 'Find parking here';
+
+  @override
+  String get stopParkingRefreshFailed =>
+      'Parking could not be refreshed. Try again.';
 }

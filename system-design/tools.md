@@ -24,7 +24,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | [`draw_route`](#draw_route) | UI action | Haoyuan | UC-03, UC-13 |
 | [`highlight_features`](#highlight_features) | UI action | Haoyuan | UC-02, UC-03, UC-08, UC-13 |
 | [`show_card`](#show_card) | UI action | Haoyuan (validation), Wasabii (card content) | UC-02, UC-03, UC-08, UC-13 |
-| [`ask_user`](#ask_user) | Conversation | Haoyuan | UC-13 |
+| [`ask_user`](#ask_user) | Conversation | Haoyuan | UC-03, UC-13 |
 
 ## Conventions
 
@@ -374,13 +374,14 @@ Returns `{ "ok": true, "missing": [FeatureId] }`. `missing` lists ids the server
 
 Status line: none. Cost: none; validation runs on the server.
 
-**Description for the model:** Show the user a result card. Every specific recommendation (a place, an event, a stop on a walk, a historical fact about a place) goes in a card, not in plain text. Each item must cite a feature id or a URL that a tool returned in this turn.
+**Description for the model:** Show the user a result card. Every specific recommendation (a place, an event, a stop on a walk, a historical fact about a place) goes in a card, not in plain text. Each item must cite a feature id or a URL that a tool returned in this turn. Keep getting_there under 80 characters and give times as full ISO 8601 with an offset, or leave time out. A plan gives each stop its location and says how the user travels in travel_mode; with "drive" the card adds the live parking near each stop by itself.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | `"plan"`, `"history"` or `"list"` | Yes | `area_brief` and `anomaly_analysis` cards come only from their workflows |
 | `title` | string | Yes | At most 80 characters |
 | `intro` | string | No | At most 300 characters |
+| `travel_mode` | `"walk"`, `"transit"`, `"drive"` or `"cycle"` | No | Plans only (ignored on other types); stored on the card. `drive` adds `stop_parking` to each located stop (below) |
 | `items` | `CardItem[]` | Yes | 1–13; the order is the display order, which for a `plan` is the visiting order |
 
 `CardItem`:
@@ -396,10 +397,15 @@ Status line: none. Cost: none; validation runs on the server.
 | `cost` | string | No | For example `"free"` or `"from $59"` |
 | `getting_there` | string | No | For example `"8 min walk"` or `"tram 96"` |
 | `parking` | `CardParking` | No | Only in cards from `find_parking`; `show_card` rejects it |
+| `stop_parking` | `StopParking` | No | Only on the stops of a driven plan, written by the server; `show_card` rejects it |
 
 `CardParking` (UC-15): `state` (`vacant`, `occupied`, `noData`), `recommended` (the bay the map moved to), `distance_m` (straight line to the destination), `walk_min`, `destination` (name or null), `reported_at` (when the sensor last reported, Melbourne time with offset, or null), `zone` (the zone number the sensor reports, or null), `fee`, `time_limit`, `hours`, `payment` (the area's rules, each nullable), `policy_scope` (`area` or `unknown`) and `policy_url` (the page the rules come from, or null). A `find_parking` item also fills `cost` and `getting_there`, so an app that ignores `parking` still shows the fee and the distance.
 
+`StopParking` (UC-03 with UC-15): the live parking around one stop. `checked_at` (when the sensors were read, Melbourne time with offset), `radius_m` (400, or 800 when few bays read vacant), `vacant`, `occupied`, `no_data` (sensor counts in that radius), `bays` (at most three vacant bays, nearest first: `feature_id`, `location`, `distance_m` and `walk_min` to the stop, `reported_at`), and the area's rules exactly as in `CardParking` (`fee`, `time_limit`, `hours`, `payment`, `policy_scope`, `policy_url`).
+
 Validation: the server checks every item's `source` against the feature ids and URLs that tools returned in this turn. If any item fails, the whole call is rejected with `unverified_sources` and the failing item indexes in `details.items`, so the model can drop or fix them and call again. On success it attaches the attribution that grounding requires, sends a `card` event and returns `{ "card_id": "…" }`.
+
+**Driven plans.** For a `plan` with `travel_mode` `drive`, after validation and before the card is sent, the server reads the parking around each stop it can place (the item's `location`, else the centroid of the feature it cites; at most 6 stops) in a step of its own, `plan_parking` ("Checking parking at each stop"), which the model cannot call. Each stop reads the sensors as `find_parking` does (400 m, then 800 m) and gets the area's rules from the same cached lookup; stops in the same 0.01° cell share one lookup, because the rules are published per area and each lookup is a billed web search. A stop placed from its feature keeps that point as its `location`. The result adds `parking` (each stop's title, vacant count and nearest vacant distance) and a note to mention parking in one sentence at most. A saved plan reads one stop's parking again on request ([agent-protocol.md](agent-protocol.md#saved-plans)), without a model call.
 
 ## Conversation tools
 
@@ -407,7 +413,7 @@ Validation: the server checks every item's `source` against the feature ids and 
 
 Status line: none; the question itself is the event.
 
-**Description for the model:** Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. Calling this ends your turn.
+**Description for the model:** Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. After you showed a plan card in this turn you may ask up to three questions about it (when they leave, how long they have, how they travel), all in the same response. Calling this ends your turn.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -415,7 +421,7 @@ Status line: none; the question itself is the event.
 | `options` | string[] | Yes | 2–4 options, each at most 40 characters |
 | `allow_free_text` | boolean | No | Default `true`; the user may type an answer instead |
 
-Sends a `question` event; the server then ends the turn with `done` and stop `asked` ([agent-protocol.md](agent-protocol.md#rules)). Other tool calls in the same step run first. The server keeps the pending question in the session and puts it in the next turn's prompt, so the model can tell an answer from a change of topic. Returns `{ "question_id": "…" }` for the trace.
+Sends a `question` event; the server then ends the turn with `done` and stop `asked` ([agent-protocol.md](agent-protocol.md#rules)). Other tool calls in the same step run first, in order, so a model response may show a plan and then ask about it. A turn asks one question; a turn that showed a `plan` card may ask up to three, each carrying `planCardId` (that card), and a call over the limit returns `invalid_arguments`. The server keeps the pending question in the session and puts it in the next turn's prompt, so the model can tell an answer from a change of topic. Returns `{ "question_id": "…" }` for the trace.
 
 ## Open questions
 

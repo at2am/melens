@@ -3060,5 +3060,123 @@
   "planRemoveFailed": "The plan could not be removed. Try again.",
   "@planRemoveFailed": {
     "description": "Shown when removing a saved plan failed."
+  },
+  "chatInputAnswers": "Answers: {values}",
+  "@chatInputAnswers": {
+    "description": "The user's bubble for several answers sent at once, joined by commas.",
+    "placeholders": {
+      "values": {
+        "type": "String"
+      }
+    }
+  },
+  "chatQuestionsAboutPlan": "A few questions to fit the plan to you. Answer any of them.",
+  "@chatQuestionsAboutPlan": {
+    "description": "Above several questions the agent asked about the plan it just showed."
+  },
+  "chatQuestionsSend": "Update the plan",
+  "@chatQuestionsSend": {
+    "description": "Sends the answers chosen under several questions about a plan."
+  },
+  "chatQuestionsFreeText": "Or type what you have in mind below.",
+  "@chatQuestionsFreeText": {
+    "description": "Under several questions: the user may type instead of choosing."
+  },
+  "cardTravelWalk": "On foot",
+  "@cardTravelWalk": {
+    "description": "A plan's travel mode: walking."
+  },
+  "cardTravelTransit": "By public transport",
+  "@cardTravelTransit": {
+    "description": "A plan's travel mode: public transport."
+  },
+  "cardTravelDrive": "By car",
+  "@cardTravelDrive": {
+    "description": "A plan's travel mode: driving."
+  },
+  "cardTravelCycle": "By bike",
+  "@cardTravelCycle": {
+    "description": "A plan's travel mode: cycling."
+  },
+  "stopParkingTitle": "Parking near this stop",
+  "@stopParkingTitle": {
+    "description": "Heading of the live parking section under a plan stop."
+  },
+  "stopParkingNearest": "Nearest free bay {distance} away, about {minutes} min walk",
+  "@stopParkingNearest": {
+    "description": "The nearest vacant bay to a plan stop.",
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "stopParkingNone": "No bay reads free within {radius}.",
+  "@stopParkingNone": {
+    "description": "No vacant sensor around a plan stop.",
+    "placeholders": {
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "stopParkingCounts": "{vacant} free, {occupied} taken within {radius}",
+  "@stopParkingCounts": {
+    "description": "How many sensors around a plan stop read vacant and occupied.",
+    "placeholders": {
+      "vacant": {
+        "type": "int"
+      },
+      "occupied": {
+        "type": "int"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "stopParkingChecked": "Checked {time}",
+  "@stopParkingChecked": {
+    "description": "When the sensors around a plan stop were read, in Melbourne time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "stopParkingBay": "{distance} · {minutes} min",
+  "@stopParkingBay": {
+    "description": "A vacant bay chip under a plan stop: distance and walking minutes. Tapping it shows the bay on the map.",
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "stopParkingBayTitle": "Free parking bay",
+  "@stopParkingBayTitle": {
+    "description": "Title of a vacant bay opened on the map from a plan stop."
+  },
+  "stopParkingSensorNote": "A free sensor shows no car on the bay, not that parking is allowed now.",
+  "@stopParkingSensorNote": {
+    "description": "Always under a plan stop's parking."
+  },
+  "stopParkingRefresh": "Refresh parking",
+  "@stopParkingRefresh": {
+    "description": "Reads the parking sensors around a saved plan's stop again."
+  },
+  "stopParkingFind": "Find parking here",
+  "@stopParkingFind": {
+    "description": "Reads the parking around a saved plan's stop that has none yet."
+  },
+  "stopParkingRefreshFailed": "Parking could not be refreshed. Try again.",
+  "@stopParkingRefreshFailed": {
+    "description": "Shown when refreshing a saved plan stop's parking failed."
   }
 }

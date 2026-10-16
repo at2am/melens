@@ -34,6 +34,9 @@ export const turnInputSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('answer'), questionId: identifierSchema, value: z.string().trim().min(1).max(200) }),
   /** The user asks to change a plan card of this session: what to change, and which card. */
   z.strictObject({ kind: z.literal('refine'), cardId: identifierSchema, text: z.string().trim().min(1).max(2_000) }),
+  /** The user answers several questions of the previous turn at once: the questions a plan turn asked about that plan. */
+  z.strictObject({ kind: z.literal('answers'), answers: z.array(z.strictObject({ questionId: identifierSchema, value: z.string().trim().min(1).max(200) }))
+    .min(1).max(3).refine((answers) => new Set(answers.map((answer) => answer.questionId)).size === answers.length, 'One answer per question') }),
 ]);
 export type TurnInput = z.infer<typeof turnInputSchema>;
 
@@ -111,15 +114,54 @@ export const modelCardItemSchema = z.strictObject({
   cost: z.string().max(40).optional(),
   getting_there: z.string().max(80).optional(),
 });
-export const cardItemSchema = modelCardItemSchema.extend({ parking: cardParkingSchema.optional() });
+/** One parking bay near a plan stop, nearest vacant first. */
+export const stopParkingBaySchema = z.strictObject({
+  feature_id: identifierSchema,
+  location: latLngSchema,
+  /** Straight-line metres from the sensor to the stop. */
+  distance_m: count,
+  /** Walking minutes at 80 m a minute over that straight line. */
+  walk_min: z.number().int().positive(),
+  reported_at: localTime.nullable(),
+});
+
+/**
+ * Live parking around one stop of a plan the user drives to (UC-03 with UC-15), written only by code: when the plan is
+ * shown with `travel_mode` `drive`, and again whenever the user refreshes that stop of a saved plan. The counts and bays
+ * are the sensor readings at `checked_at`; fee, time limit, hours and payment are the area's published rules from one
+ * cited web source (`policy_scope: 'area'`), never one bay's: the sign at the bay decides.
+ */
+export const stopParkingSchema = z.strictObject({
+  checked_at: localTime,
+  radius_m: count,
+  vacant: count,
+  occupied: count,
+  no_data: count,
+  /** At most three vacant bays, nearest first; empty when none reads vacant. */
+  bays: z.array(stopParkingBaySchema).max(3),
+  fee: z.string().min(1).max(120).nullable(),
+  time_limit: z.string().min(1).max(80).nullable(),
+  hours: z.string().min(1).max(80).nullable(),
+  payment: z.string().min(1).max(80).nullable(),
+  policy_scope: z.enum(['area', 'unknown']),
+  policy_url: z.url({ protocol: /^https?$/ }).nullable(),
+});
+export type StopParking = z.infer<typeof stopParkingSchema>;
+
+export const cardItemSchema = modelCardItemSchema.extend({ parking: cardParkingSchema.optional(), stop_parking: stopParkingSchema.optional() });
 export type CardItem = z.infer<typeof cardItemSchema>;
 
 export const cardTypeSchema = z.enum(['area_brief', 'anomaly_analysis', 'plan', 'history', 'list']);
+/** How the user travels between the stops of a plan; `drive` adds live parking to each located stop. */
+export const travelModeSchema = z.enum(['walk', 'transit', 'drive', 'cycle']);
+export type TravelMode = z.infer<typeof travelModeSchema>;
 export const cardSchema = z.strictObject({
   id: identifierSchema,
   type: cardTypeSchema,
   title: z.string().min(1).max(80),
   intro: z.string().max(300).optional(),
+  /** A plan's travel mode, when the plan states one. */
+  travel_mode: travelModeSchema.optional(),
   items: z.array(cardItemSchema).min(1).max(13),
   attribution: z.record(z.string(), z.unknown()).optional(),
 });
@@ -149,8 +191,13 @@ export type StopReason = z.infer<typeof stopReasonSchema>;
 export const questionSchema = z.strictObject({
   id: identifierSchema, text: z.string().min(1).max(200),
   options: z.array(z.string().min(1).max(40)).min(2).max(4), allowFreeText: z.boolean(),
+  /** The plan card of the same turn this question refines (UC-03); its answer changes that plan. */
+  planCardId: identifierSchema.optional(),
 });
 export type Question = z.infer<typeof questionSchema>;
+
+/** A turn asks one question, or up to this many about the plan it just showed. */
+export const QUESTION_LIMITS = { perTurn: 1, perPlanTurn: 3 } as const;
 
 /** Where a tool call is: `running` when it starts, then `done` or `failed` (a tool error) when it ends. */
 export const stepStateSchema = z.enum(['running', 'done', 'failed']);
@@ -199,7 +246,10 @@ export const storedTurnSchema = z.strictObject({
   text: z.string(),
   cards: z.array(cardSchema),
   uiActions: z.array(z.strictObject({ action: uiActionNameSchema, args: z.record(z.string(), z.unknown()) })),
+  /** The first question the turn asked; `questions` holds them all. */
   question: questionSchema.nullable(),
+  /** Every question, in order; turns stored before several questions existed have none here. */
+  questions: z.array(questionSchema).max(QUESTION_LIMITS.perPlanTurn).default([]),
   stop: stopReasonSchema,
   trace: z.array(traceEntrySchema).max(200),
   usage: finalUsageSchema.extend({ perCall: z.array(callUsageSchema).max(64) }),

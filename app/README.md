@@ -79,7 +79,7 @@ lib/
   features/agent/       the agent protocol: models and the SSE client
   features/location/    the user's position, only on request (My location)
   features/chat/        the chat panel: controller, session list, turn views, the Change plan mode
-  features/plans/       saved plans (UC-03): the service client, the Change plan and Save plan buttons, the Home tab section, the plan page
+  features/plans/       saved plans (UC-03): the service client, the Change plan and Save plan buttons, the Home tab section, the plan page with each driven stop's Refresh parking
   features/cards/       the card registry, one widget per card type
   l10n/                 app_en.arb and the generated AppLocalizations
 test/                   mirrors lib/

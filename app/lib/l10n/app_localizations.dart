@@ -3980,6 +3980,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The plan could not be removed. Try again.'**
   String get planRemoveFailed;
+
+  /// The user's bubble for several answers sent at once, joined by commas.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers: {values}'**
+  String chatInputAnswers(String values);
+
+  /// Above several questions the agent asked about the plan it just showed.
+  ///
+  /// In en, this message translates to:
+  /// **'A few questions to fit the plan to you. Answer any of them.'**
+  String get chatQuestionsAboutPlan;
+
+  /// Sends the answers chosen under several questions about a plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the plan'**
+  String get chatQuestionsSend;
+
+  /// Under several questions: the user may type instead of choosing.
+  ///
+  /// In en, this message translates to:
+  /// **'Or type what you have in mind below.'**
+  String get chatQuestionsFreeText;
+
+  /// A plan's travel mode: walking.
+  ///
+  /// In en, this message translates to:
+  /// **'On foot'**
+  String get cardTravelWalk;
+
+  /// A plan's travel mode: public transport.
+  ///
+  /// In en, this message translates to:
+  /// **'By public transport'**
+  String get cardTravelTransit;
+
+  /// A plan's travel mode: driving.
+  ///
+  /// In en, this message translates to:
+  /// **'By car'**
+  String get cardTravelDrive;
+
+  /// A plan's travel mode: cycling.
+  ///
+  /// In en, this message translates to:
+  /// **'By bike'**
+  String get cardTravelCycle;
+
+  /// Heading of the live parking section under a plan stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Parking near this stop'**
+  String get stopParkingTitle;
+
+  /// The nearest vacant bay to a plan stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest free bay {distance} away, about {minutes} min walk'**
+  String stopParkingNearest(String distance, int minutes);
+
+  /// No vacant sensor around a plan stop.
+  ///
+  /// In en, this message translates to:
+  /// **'No bay reads free within {radius}.'**
+  String stopParkingNone(String radius);
+
+  /// How many sensors around a plan stop read vacant and occupied.
+  ///
+  /// In en, this message translates to:
+  /// **'{vacant} free, {occupied} taken within {radius}'**
+  String stopParkingCounts(int vacant, int occupied, String radius);
+
+  /// When the sensors around a plan stop were read, in Melbourne time.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {time}'**
+  String stopParkingChecked(String time);
+
+  /// A vacant bay chip under a plan stop: distance and walking minutes. Tapping it shows the bay on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} · {minutes} min'**
+  String stopParkingBay(String distance, int minutes);
+
+  /// Title of a vacant bay opened on the map from a plan stop.
+  ///
+  /// In en, this message translates to:
+  /// **'Free parking bay'**
+  String get stopParkingBayTitle;
+
+  /// Always under a plan stop's parking.
+  ///
+  /// In en, this message translates to:
+  /// **'A free sensor shows no car on the bay, not that parking is allowed now.'**
+  String get stopParkingSensorNote;
+
+  /// Reads the parking sensors around a saved plan's stop again.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh parking'**
+  String get stopParkingRefresh;
+
+  /// Reads the parking around a saved plan's stop that has none yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Find parking here'**
+  String get stopParkingFind;
+
+  /// Shown when refreshing a saved plan stop's parking failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Parking could not be refreshed. Try again.'**
+  String get stopParkingRefreshFailed;
 }
 
 class _AppLocalizationsDelegate

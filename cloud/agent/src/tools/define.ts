@@ -44,8 +44,8 @@ export class TurnRegistry {
   invalidCalls = 0;
   toolsDisabled = false;
   budgetForced = false;
-  asked: Question | null = null;
-  private questions = 0;
+  /** The questions `ask_user` asked, in order; asking ends the turn. */
+  readonly questions: Question[] = [];
   private steps = 0;
 
   constructor(readonly turn: {
@@ -85,7 +85,10 @@ export class TurnRegistry {
     }
   }
 
-  nextQuestionId(): string { this.questions += 1; return `q_${this.turn.turnId}_${this.questions}`; }
+  /** The first question asked, or null while none was. */
+  get asked(): Question | null { return this.questions[0] ?? null; }
+
+  nextQuestionId(): string { return `q_${this.turn.turnId}_${this.questions.length + 1}`; }
   nextStepId(): string { this.steps += 1; return `s_${this.turn.turnId}_${this.steps}`; }
   nextCardId(): string { return `c_${this.turn.turnId}_${this.cards.length + 1}`; }
 

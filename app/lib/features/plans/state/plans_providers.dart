@@ -53,6 +53,21 @@ class SavedPlans extends _$SavedPlans {
     return plan;
   }
 
+  /// Reads the live parking around stop [index] of plan [id] again and
+  /// keeps the plan the service returns. Throws the [AgentClientException]
+  /// family for the caller to report.
+  Future<SavedPlan> refreshStop(String id, int index) async {
+    final plan = await ref.read(plansClientProvider).refreshStop(id, index);
+    if (!ref.mounted) return plan;
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData([
+        for (final old in current) old.id == plan.id ? plan : old,
+      ]);
+    }
+    return plan;
+  }
+
   /// Removes the plan at once and then on the service; a failure puts it
   /// back and rethrows. A plan the service no longer has stays removed.
   Future<void> remove(String id) async {

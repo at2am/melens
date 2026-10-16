@@ -115,6 +115,23 @@ final class RequestContext {
   Map<String, dynamic> toJson() => _$RequestContextToJson(this);
 }
 
+/// One answer of an `answers` input: the question and the option chosen.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class QuestionAnswer {
+  const QuestionAnswer({required this.questionId, required this.value});
+
+  @JsonKey(required: true)
+  final String questionId;
+
+  @JsonKey(required: true)
+  final String value;
+
+  factory QuestionAnswer.fromJson(Map<String, dynamic> json) =>
+      _$QuestionAnswerFromJson(json);
+
+  Map<String, dynamic> toJson() => _$QuestionAnswerToJson(this);
+}
+
 /// What the user did: typed, selected a point, tapped Analyse, answered or
 /// asked to change a plan.
 @Freezed(unionKey: 'kind', fromJson: true, toJson: true)
@@ -148,6 +165,13 @@ sealed class TurnInput with _$TurnInput {
     @JsonKey(required: true) required String cardId,
     @JsonKey(required: true) required String text,
   }) = RefineTurnInput;
+
+  /// Answers several questions of the previous turn at once: the questions
+  /// a plan turn asked about that plan (UC-03).
+  @FreezedUnionValue('answers')
+  const factory TurnInput.answers({
+    @JsonKey(required: true) required List<QuestionAnswer> answers,
+  }) = AnswersTurnInput;
 
   factory TurnInput.fromJson(Map<String, dynamic> json) =>
       _$TurnInputFromJson(json);
@@ -393,6 +417,100 @@ final class CardParking {
   Map<String, dynamic> toJson() => _$CardParkingToJson(this);
 }
 
+/// One vacant bay near a plan stop, nearest first.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class StopParkingBay {
+  const StopParkingBay({
+    required this.featureId,
+    required this.location,
+    required this.distanceMetres,
+    required this.walkMinutes,
+    this.reportedAt,
+  });
+
+  @JsonKey(name: 'feature_id', required: true)
+  final String featureId;
+
+  @JsonKey(required: true)
+  final AgentLatLng location;
+
+  /// Straight-line metres from the sensor to the stop.
+  @JsonKey(name: 'distance_m', required: true)
+  final int distanceMetres;
+
+  @JsonKey(name: 'walk_min', required: true)
+  final int walkMinutes;
+
+  @JsonKey(name: 'reported_at')
+  final String? reportedAt;
+
+  factory StopParkingBay.fromJson(Map<String, dynamic> json) =>
+      _$StopParkingBayFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StopParkingBayToJson(this);
+}
+
+/// The live parking around one stop of a plan the user drives to (UC-03
+/// with UC-15), read by the agent service when it shows the plan and again
+/// whenever the user refreshes that stop of a saved plan. The counts and bays
+/// are the sensors at [checkedAt]; fee, time limit, hours and payment are
+/// the area's rules, never one bay's, so the sign at the bay decides.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class StopParking {
+  const StopParking({
+    required this.checkedAt,
+    required this.radiusMetres,
+    required this.vacant,
+    required this.occupied,
+    required this.noData,
+    required this.bays,
+    required this.policyScope,
+    this.fee,
+    this.timeLimit,
+    this.hours,
+    this.payment,
+    this.policyUrl,
+  });
+
+  @JsonKey(name: 'checked_at', required: true)
+  final String checkedAt;
+
+  @JsonKey(name: 'radius_m', required: true)
+  final int radiusMetres;
+
+  @JsonKey(required: true)
+  final int vacant;
+
+  @JsonKey(required: true)
+  final int occupied;
+
+  @JsonKey(name: 'no_data', required: true)
+  final int noData;
+
+  /// At most three vacant bays, nearest first; empty when none reads vacant.
+  @JsonKey(required: true)
+  final List<StopParkingBay> bays;
+
+  final String? fee;
+
+  @JsonKey(name: 'time_limit')
+  final String? timeLimit;
+
+  final String? hours;
+  final String? payment;
+
+  @JsonKey(name: 'policy_scope', required: true)
+  final CardParkingPolicyScope policyScope;
+
+  @JsonKey(name: 'policy_url')
+  final String? policyUrl;
+
+  factory StopParking.fromJson(Map<String, dynamic> json) =>
+      _$StopParkingFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StopParkingToJson(this);
+}
+
 @JsonSerializable(checked: true, explicitToJson: true)
 final class CardItem {
   const CardItem({
@@ -405,6 +523,7 @@ final class CardItem {
     this.cost,
     this.gettingThere,
     this.parking,
+    this.stopParking,
   });
 
   @JsonKey(required: true)
@@ -436,11 +555,18 @@ final class CardItem {
   @JsonKey(includeIfNull: false)
   final CardParking? parking;
 
+  /// The live parking around a stop of a plan the user drives to.
+  @JsonKey(name: 'stop_parking', includeIfNull: false)
+  final StopParking? stopParking;
+
   factory CardItem.fromJson(Map<String, dynamic> json) =>
       _$CardItemFromJson(json);
 
   Map<String, dynamic> toJson() => _$CardItemToJson(this);
 }
+
+/// How the user travels between the stops of a plan.
+enum TravelMode { walk, transit, drive, cycle }
 
 /// Each card type maps to a use case and has its own widget.
 enum CardType {
@@ -461,6 +587,7 @@ final class AgentCard {
     required this.title,
     required this.items,
     this.intro,
+    this.travelMode,
     this.attribution,
   });
 
@@ -475,6 +602,15 @@ final class AgentCard {
 
   @JsonKey(includeIfNull: false)
   final String? intro;
+
+  /// A plan's travel mode, when it states one; a mode this build does not
+  /// know reads as none.
+  @JsonKey(
+    name: 'travel_mode',
+    includeIfNull: false,
+    unknownEnumValue: JsonKey.nullForUndefinedEnumValue,
+  )
+  final TravelMode? travelMode;
 
   @JsonKey(required: true)
   final List<CardItem> items;
@@ -632,6 +768,7 @@ final class AgentQuestion {
     required this.text,
     required this.options,
     required this.allowFreeText,
+    this.planCardId,
   });
 
   @JsonKey(required: true)
@@ -645,6 +782,10 @@ final class AgentQuestion {
 
   @JsonKey(required: true)
   final bool allowFreeText;
+
+  /// The plan card of the same turn this question refines (UC-03).
+  @JsonKey(includeIfNull: false)
+  final String? planCardId;
 
   factory AgentQuestion.fromJson(Map<String, dynamic> json) =>
       _$AgentQuestionFromJson(json);
@@ -806,6 +947,7 @@ final class StoredTurn {
     required this.trace,
     required this.usage,
     this.attachments = const [],
+    this.questions = const [],
   });
 
   @JsonKey(required: true)
@@ -833,8 +975,18 @@ final class StoredTurn {
   @JsonKey(required: true)
   final List<UiAction> uiActions;
 
+  /// The first question the turn asked; [questions] holds them all.
   @JsonKey(required: true)
   final AgentQuestion? question;
+
+  /// Every question, in order; turns stored before several questions
+  /// existed have none here.
+  @JsonKey(defaultValue: <AgentQuestion>[])
+  final List<AgentQuestion> questions;
+
+  /// Every question the turn asked, also for a turn stored with only one.
+  List<AgentQuestion> get allQuestions =>
+      questions.isNotEmpty ? questions : [?question];
 
   @JsonKey(required: true)
   final StopReason stop;

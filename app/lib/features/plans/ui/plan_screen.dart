@@ -104,6 +104,19 @@ class PlanScreen extends ConsumerWidget {
                   card: plan.card,
                   icon: Icons.route_outlined,
                   numbered: true,
+                  // A stop the user drives to can read its parking again,
+                  // for example on reaching the stop before it.
+                  itemFooter: (index, item) =>
+                      item.location != null &&
+                          (plan.card.travelMode == TravelMode.drive ||
+                              item.stopParking != null)
+                      ? StopParkingRefresh(
+                          key: ValueKey('plan-stop-refresh-$index'),
+                          planId: plan.id,
+                          index: index,
+                          hasParking: item.stopParking != null,
+                        )
+                      : null,
                   onItemTap: (item) {
                     ref.read(cardItemRequestsProvider.notifier).request(item);
                     context.go(AppRoutes.discover);
@@ -136,6 +149,81 @@ class PlanScreen extends ConsumerWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// Reads the live parking around one stop of a saved plan again, or for
+/// the first time, and says when that failed.
+class StopParkingRefresh extends ConsumerStatefulWidget {
+  const StopParkingRefresh({
+    required this.planId,
+    required this.index,
+    required this.hasParking,
+    super.key,
+  });
+
+  final String planId;
+  final int index;
+  final bool hasParking;
+
+  @override
+  ConsumerState<StopParkingRefresh> createState() => _StopParkingRefreshState();
+}
+
+class _StopParkingRefreshState extends ConsumerState<StopParkingRefresh> {
+  bool _busy = false;
+  bool _failed = false;
+
+  Future<void> _refresh() async {
+    setState(() {
+      _busy = true;
+      _failed = false;
+    });
+    try {
+      await ref
+          .read(savedPlansProvider.notifier)
+          .refreshStop(widget.planId, widget.index);
+    } on AgentClientException {
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: _busy ? null : () => unawaited(_refresh()),
+          icon: _busy
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  widget.hasParking ? Icons.refresh : Icons.local_parking,
+                  size: 18,
+                ),
+          label: Text(
+            widget.hasParking
+                ? strings.stopParkingRefresh
+                : strings.stopParkingFind,
+          ),
+        ),
+        if (_failed)
+          Text(
+            strings.stopParkingRefreshFailed,
+            key: ValueKey('plan-stop-refresh-failed-${widget.index}'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+      ],
     );
   }
 }

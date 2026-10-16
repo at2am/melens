@@ -104,6 +104,22 @@ Map<String, dynamic> _$RequestContextToJson(RequestContext instance) =>
       'localTime': instance.localTime,
     };
 
+QuestionAnswer _$QuestionAnswerFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('QuestionAnswer', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['questionId', 'value']);
+      final val = QuestionAnswer(
+        questionId: $checkedConvert('questionId', (v) => v as String),
+        value: $checkedConvert('value', (v) => v as String),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$QuestionAnswerToJson(QuestionAnswer instance) =>
+    <String, dynamic>{
+      'questionId': instance.questionId,
+      'value': instance.value,
+    };
+
 TurnAttachment _$TurnAttachmentFromJson(Map<String, dynamic> json) =>
     $checkedCreate('TurnAttachment', json, ($checkedConvert) {
       $checkKeys(json, requiredKeys: const ['kind', 'mimeType', 'data']);
@@ -258,6 +274,111 @@ const _$CardParkingPolicyScopeEnumMap = {
   CardParkingPolicyScope.unknown: 'unknown',
 };
 
+StopParkingBay _$StopParkingBayFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate(
+  'StopParkingBay',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
+      json,
+      requiredKeys: const ['feature_id', 'location', 'distance_m', 'walk_min'],
+    );
+    final val = StopParkingBay(
+      featureId: $checkedConvert('feature_id', (v) => v as String),
+      location: $checkedConvert(
+        'location',
+        (v) => AgentLatLng.fromJson(v as Map<String, dynamic>),
+      ),
+      distanceMetres: $checkedConvert('distance_m', (v) => (v as num).toInt()),
+      walkMinutes: $checkedConvert('walk_min', (v) => (v as num).toInt()),
+      reportedAt: $checkedConvert('reported_at', (v) => v as String?),
+    );
+    return val;
+  },
+  fieldKeyMap: const {
+    'featureId': 'feature_id',
+    'distanceMetres': 'distance_m',
+    'walkMinutes': 'walk_min',
+    'reportedAt': 'reported_at',
+  },
+);
+
+Map<String, dynamic> _$StopParkingBayToJson(StopParkingBay instance) =>
+    <String, dynamic>{
+      'feature_id': instance.featureId,
+      'location': instance.location.toJson(),
+      'distance_m': instance.distanceMetres,
+      'walk_min': instance.walkMinutes,
+      'reported_at': instance.reportedAt,
+    };
+
+StopParking _$StopParkingFromJson(Map<String, dynamic> json) => $checkedCreate(
+  'StopParking',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
+      json,
+      requiredKeys: const [
+        'checked_at',
+        'radius_m',
+        'vacant',
+        'occupied',
+        'no_data',
+        'bays',
+        'policy_scope',
+      ],
+    );
+    final val = StopParking(
+      checkedAt: $checkedConvert('checked_at', (v) => v as String),
+      radiusMetres: $checkedConvert('radius_m', (v) => (v as num).toInt()),
+      vacant: $checkedConvert('vacant', (v) => (v as num).toInt()),
+      occupied: $checkedConvert('occupied', (v) => (v as num).toInt()),
+      noData: $checkedConvert('no_data', (v) => (v as num).toInt()),
+      bays: $checkedConvert(
+        'bays',
+        (v) => (v as List<dynamic>)
+            .map((e) => StopParkingBay.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+      policyScope: $checkedConvert(
+        'policy_scope',
+        (v) => $enumDecode(_$CardParkingPolicyScopeEnumMap, v),
+      ),
+      fee: $checkedConvert('fee', (v) => v as String?),
+      timeLimit: $checkedConvert('time_limit', (v) => v as String?),
+      hours: $checkedConvert('hours', (v) => v as String?),
+      payment: $checkedConvert('payment', (v) => v as String?),
+      policyUrl: $checkedConvert('policy_url', (v) => v as String?),
+    );
+    return val;
+  },
+  fieldKeyMap: const {
+    'checkedAt': 'checked_at',
+    'radiusMetres': 'radius_m',
+    'noData': 'no_data',
+    'policyScope': 'policy_scope',
+    'timeLimit': 'time_limit',
+    'policyUrl': 'policy_url',
+  },
+);
+
+Map<String, dynamic> _$StopParkingToJson(StopParking instance) =>
+    <String, dynamic>{
+      'checked_at': instance.checkedAt,
+      'radius_m': instance.radiusMetres,
+      'vacant': instance.vacant,
+      'occupied': instance.occupied,
+      'no_data': instance.noData,
+      'bays': instance.bays.map((e) => e.toJson()).toList(),
+      'fee': instance.fee,
+      'time_limit': instance.timeLimit,
+      'hours': instance.hours,
+      'payment': instance.payment,
+      'policy_scope': _$CardParkingPolicyScopeEnumMap[instance.policyScope]!,
+      'policy_url': instance.policyUrl,
+    };
+
 CardItem _$CardItemFromJson(Map<String, dynamic> json) => $checkedCreate(
   'CardItem',
   json,
@@ -289,10 +410,19 @@ CardItem _$CardItemFromJson(Map<String, dynamic> json) => $checkedCreate(
         (v) =>
             v == null ? null : CardParking.fromJson(v as Map<String, dynamic>),
       ),
+      stopParking: $checkedConvert(
+        'stop_parking',
+        (v) =>
+            v == null ? null : StopParking.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
-  fieldKeyMap: const {'placeId': 'place_id', 'gettingThere': 'getting_there'},
+  fieldKeyMap: const {
+    'placeId': 'place_id',
+    'gettingThere': 'getting_there',
+    'stopParking': 'stop_parking',
+  },
 );
 
 Map<String, dynamic> _$CardItemToJson(CardItem instance) => <String, dynamic>{
@@ -305,6 +435,7 @@ Map<String, dynamic> _$CardItemToJson(CardItem instance) => <String, dynamic>{
   'cost': ?instance.cost,
   'getting_there': ?instance.gettingThere,
   'parking': ?instance.parking?.toJson(),
+  'stop_parking': ?instance.stopParking?.toJson(),
 };
 
 AgentCard _$AgentCardFromJson(Map<String, dynamic> json) =>
@@ -321,19 +452,28 @@ AgentCard _$AgentCardFromJson(Map<String, dynamic> json) =>
               .toList(),
         ),
         intro: $checkedConvert('intro', (v) => v as String?),
+        travelMode: $checkedConvert(
+          'travel_mode',
+          (v) => $enumDecodeNullable(
+            _$TravelModeEnumMap,
+            v,
+            unknownValue: JsonKey.nullForUndefinedEnumValue,
+          ),
+        ),
         attribution: $checkedConvert(
           'attribution',
           (v) => v as Map<String, dynamic>?,
         ),
       );
       return val;
-    });
+    }, fieldKeyMap: const {'travelMode': 'travel_mode'});
 
 Map<String, dynamic> _$AgentCardToJson(AgentCard instance) => <String, dynamic>{
   'id': instance.id,
   'type': _$CardTypeEnumMap[instance.type]!,
   'title': instance.title,
   'intro': ?instance.intro,
+  'travel_mode': ?_$TravelModeEnumMap[instance.travelMode],
   'items': instance.items.map((e) => e.toJson()).toList(),
   'attribution': ?instance.attribution,
 };
@@ -344,6 +484,13 @@ const _$CardTypeEnumMap = {
   CardType.plan: 'plan',
   CardType.history: 'history',
   CardType.list: 'list',
+};
+
+const _$TravelModeEnumMap = {
+  TravelMode.walk: 'walk',
+  TravelMode.transit: 'transit',
+  TravelMode.drive: 'drive',
+  TravelMode.cycle: 'cycle',
 };
 
 UiAction _$UiActionFromJson(Map<String, dynamic> json) =>
@@ -481,6 +628,7 @@ AgentQuestion _$AgentQuestionFromJson(Map<String, dynamic> json) =>
           (v) => (v as List<dynamic>).map((e) => e as String).toList(),
         ),
         allowFreeText: $checkedConvert('allowFreeText', (v) => v as bool),
+        planCardId: $checkedConvert('planCardId', (v) => v as String?),
       );
       return val;
     });
@@ -491,6 +639,7 @@ Map<String, dynamic> _$AgentQuestionToJson(AgentQuestion instance) =>
       'text': instance.text,
       'options': instance.options,
       'allowFreeText': instance.allowFreeText,
+      'planCardId': ?instance.planCardId,
     };
 
 TraceEntry _$TraceEntryFromJson(Map<String, dynamic> json) =>
@@ -595,6 +744,14 @@ StoredTurn _$StoredTurnFromJson(
               .toList() ??
           [],
     ),
+    questions: $checkedConvert(
+      'questions',
+      (v) =>
+          (v as List<dynamic>?)
+              ?.map((e) => AgentQuestion.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    ),
   );
   return val;
 });
@@ -610,6 +767,7 @@ Map<String, dynamic> _$StoredTurnToJson(StoredTurn instance) =>
       'cards': instance.cards.map((e) => e.toJson()).toList(),
       'uiActions': instance.uiActions.map((e) => e.toJson()).toList(),
       'question': instance.question?.toJson(),
+      'questions': instance.questions.map((e) => e.toJson()).toList(),
       'stop': _$StopReasonEnumMap[instance.stop]!,
       'trace': instance.trace.map((e) => e.toJson()).toList(),
       'usage': instance.usage.toJson(),
@@ -761,6 +919,27 @@ Map<String, dynamic> _$RefineTurnInputToJson(RefineTurnInput instance) =>
     <String, dynamic>{
       'cardId': instance.cardId,
       'text': instance.text,
+      'kind': instance.$type,
+    };
+
+AnswersTurnInput _$AnswersTurnInputFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('AnswersTurnInput', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['answers']);
+      final val = AnswersTurnInput(
+        answers: $checkedConvert(
+          'answers',
+          (v) => (v as List<dynamic>)
+              .map((e) => QuestionAnswer.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
+        $type: $checkedConvert('kind', (v) => v as String?),
+      );
+      return val;
+    }, fieldKeyMap: const {r'$type': 'kind'});
+
+Map<String, dynamic> _$AnswersTurnInputToJson(AnswersTurnInput instance) =>
+    <String, dynamic>{
+      'answers': instance.answers.map((e) => e.toJson()).toList(),
       'kind': instance.$type,
     };
 

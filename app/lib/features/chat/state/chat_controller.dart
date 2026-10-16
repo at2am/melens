@@ -56,6 +56,8 @@ class ChatController extends _$ChatController {
     List<ChatPhoto> photos = const [],
   }) async {
     if (!state.canSend) return;
+    // An answer to a question about a plan is about that plan's card.
+    final aboutPlan = state.pendingQuestion?.planCardId;
     final normalised = switch (input) {
       TextTurnInput(:final text) => TurnInput.text(text: text.trim()),
       RefineTurnInput(:final cardId, :final text) => TurnInput.refine(
@@ -119,7 +121,7 @@ class ChatController extends _$ChatController {
     final context = ref.read(requestContextBuilderProvider)(
       openCardId: switch (normalised) {
         RefineTurnInput(:final cardId) => cardId,
-        _ => _openCardId(),
+        _ => aboutPlan ?? _openCardId(),
       },
     );
     try {
@@ -184,6 +186,19 @@ class ChatController extends _$ChatController {
   /// Answers the pending question with one of its options.
   Future<void> answer(AgentQuestion question, String option) =>
       send(TurnInput.answer(questionId: question.id, value: option));
+
+  /// Answers several questions of the last turn at once, for example the
+  /// questions the agent asked about the plan it showed. A single answer
+  /// goes as an ordinary one.
+  Future<void> answerAll(List<QuestionAnswer> answers) {
+    if (answers.isEmpty) return Future.value();
+    if (answers case [final only]) {
+      return send(
+        TurnInput.answer(questionId: only.questionId, value: only.value),
+      );
+    }
+    return send(TurnInput.answers(answers: answers));
+  }
 
   /// Sends the last failed or cancelled input again, with its photos; a
   /// restored turn's photos are downloaded first.
@@ -348,8 +363,8 @@ class ChatController extends _$ChatController {
       case AgentCardEvent(:final card):
         next = next.copyWith(cards: [...next.cards, card]);
       case AgentQuestionEvent(:final question):
-        next = next.copyWith(question: question);
-        pending = question;
+        next = next.copyWith(questions: [...next.questions, question]);
+        pending = next.questions.first;
       case AgentUsageEvent(turn: final usage):
         next = next.copyWith(usage: usage);
       case AgentDoneEvent(:final stop, :final usage):
@@ -538,7 +553,7 @@ class ChatController extends _$ChatController {
       text: turn.text,
       actions: actions,
       cards: turn.cards,
-      question: turn.question,
+      questions: turn.allQuestions,
       usage: turn.usage,
       stop: turn.stop,
     );

@@ -1,7 +1,7 @@
-import { AgentServiceError } from '../protocol/schemas.js';
+import { AgentServiceError, type LatLng, type StopParking } from '../protocol/schemas.js';
 import type { RateLimiter } from '../rate-limit.js';
 import type { SessionStore } from '../sessions/store.js';
-import { PLAN_LIMITS, savePlanBodySchema, turnIdOfCard, type SavedPlan } from './schemas.js';
+import { PLAN_LIMITS, refreshStopBodySchema, savePlanBodySchema, turnIdOfCard, type SavedPlan } from './schemas.js';
 import type { PlanStore } from './store.js';
 
 export interface PlanServiceOptions {
@@ -10,6 +10,9 @@ export interface PlanServiceOptions {
   readonly sessions: SessionStore;
   /** Every save or delete of a uid counts; reads are free. */
   readonly writeLimiter: RateLimiter;
+  /** Reads the live parking around a stop again (`refreshStopParking`); without it a refresh answers `serviceUnavailable`. */
+  readonly refreshParking?: ((request: { readonly uid: string; readonly point: LatLng; readonly name: string;
+    readonly previous?: StopParking | undefined; readonly signal: AbortSignal }) => Promise<StopParking>) | null;
   readonly clock?: () => Date;
 }
 
@@ -18,12 +21,14 @@ export class PlanService {
   private readonly store: PlanStore;
   private readonly sessions: SessionStore;
   private readonly writeLimiter: RateLimiter;
+  private readonly refreshParking: PlanServiceOptions['refreshParking'];
   private readonly clock: () => Date;
 
   constructor(options: PlanServiceOptions) {
     this.store = options.store;
     this.sessions = options.sessions;
     this.writeLimiter = options.writeLimiter;
+    this.refreshParking = options.refreshParking ?? null;
     this.clock = options.clock ?? (() => new Date());
   }
 
@@ -56,6 +61,30 @@ export class PlanService {
       ...(route === undefined ? {} : { route }) };
     await this.store.put(uid, plan);
     return plan;
+  }
+
+  /**
+   * Reads one live part of a saved plan's stop again and keeps it with the plan: today the parking around the stop,
+   * for a user who reached the previous stop and drives on. Any located stop can be refreshed, also in a plan that was
+   * not driven, so a user who changes their mind gets parking too. Counts as a write.
+   */
+  async refreshStop(uid: string, planId: string, index: number, body: unknown, signal: AbortSignal): Promise<SavedPlan> {
+    const parsed = refreshStopBodySchema.safeParse(body);
+    if (!parsed.success) throw new AgentServiceError('invalidRequest');
+    const plan = await this.store.get(uid, planId);
+    const item = plan?.card.items[index];
+    if (plan === null || item === undefined) throw new AgentServiceError('notFound');
+    const point = item.location;
+    if (point === undefined) throw new AgentServiceError('invalidRequest', 'no_location');
+    if (this.refreshParking == null) throw new AgentServiceError('serviceUnavailable');
+    if (!this.writeLimiter.allow(uid, this.clock())) throw new AgentServiceError('rateLimited');
+    const parking = await this.refreshParking({ uid, point, name: item.title, previous: item.stop_parking, signal });
+    // The plan may have been removed while the sensors were read; a refresh never brings it back.
+    if (await this.store.get(uid, planId) === null) throw new AgentServiceError('notFound');
+    const refreshed: SavedPlan = { ...plan, card: { ...plan.card,
+      items: plan.card.items.map((stop, position) => position === index ? { ...stop, stop_parking: parking } : stop) } };
+    await this.store.put(uid, refreshed);
+    return refreshed;
   }
 
   async remove(uid: string, planId: string): Promise<void> {
