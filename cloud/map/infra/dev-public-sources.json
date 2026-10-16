@@ -52,5 +52,17 @@
     "url": "https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs/edition-4-july-2026-june-2031/access-and-downloads/geospatial-web-services",
     "attribution": "Australian Bureau of Statistics — ASGS boundaries (CC BY 4.0)",
     "versionRef": null
+  },
+  {
+    "sourceId": "victoria.transport.road_planned",
+    "url": "https://opendata.transport.vic.gov.au/dataset/planned-disruptions-road",
+    "attribution": "Transport Victoria — Planned disruptions, road (CC BY 4.0)",
+    "versionRef": null
+  },
+  {
+    "sourceId": "victoria.transport.road_unplanned",
+    "url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road",
+    "attribution": "Transport Victoria — Unplanned disruptions, road (CC BY 4.0)",
+    "versionRef": null
   }
 ]
