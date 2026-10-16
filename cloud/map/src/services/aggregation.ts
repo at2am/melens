@@ -4,6 +4,7 @@ import {
   normalizedInstant as canonicalInstant,
 } from '@melens/shared/contracts/map-contract';
 import type { Bbox, LayerResult, MapItem, TimeWindow } from '@melens/shared/contracts/map-contract';
+import { REPLAY_TITLE_PREFIX } from '@melens/shared/query/anomalies';
 import { deepFreeze, jsonBytes } from '../util.js';
 
 export type ZoomBand = 'overview' | 'district' | 'neighbourhood' | 'closeUp';
@@ -212,6 +213,8 @@ function createAggregate(members: readonly PointItem[], layer: LayerResult, view
   if (first === undefined) throw new TypeError('An aggregate needs members');
   const memberIds = members.map((item) => item.id);
   const metric = groupMetric(members);
+  // A group of replayed anomaly results says so, as each of its results does (anomalies.ts).
+  const replay = first.kind === 'anomaly' && members.every((member) => member.title.startsWith(REPLAY_TITLE_PREFIX));
   const id = `aggregate.${first.layerId}.${cellKey}`;
   const sources = [...new Map(members.flatMap((item) => item.sources).map((source) => [JSON.stringify(source), source])).values()]
     .sort((left, right) => compareStrings(JSON.stringify(left), JSON.stringify(right)));
@@ -222,7 +225,7 @@ function createAggregate(members: readonly PointItem[], layer: LayerResult, view
   }
   const aggregate = {
     id, versionId: `aggregate-v1.${digest([members.map((member) => [member.id, member.versionId]), layer.completeness, layer.coverage])}`,
-    layerId: first.layerId, kind: 'aggregate', title: metric.label,
+    layerId: first.layerId, kind: 'aggregate', title: replay ? `${REPLAY_TITLE_PREFIX}${metric.label}` : metric.label,
     geometry: { type: 'MultiPoint', coordinates: members.map((member) => [...member.geometry.coordinates]) },
     location: { precision: 'point', role: 'unknown',
       evidence: 'Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area.' },
