@@ -75,9 +75,17 @@ export const GEO_ORDER = 'ORDER BY g.geo_record_id, g.version_id LIMIT @resultLi
 export const NEWS_REPORTED_AT = 'COALESCE(g.published_at, g.observed_at, g.source_updated_at)';
 /** Current news is the reporting of the last week up to the window end, not the map's 15-minute window. */
 export const CURRENT_NEWS_LOOKBACK_DAYS = 7;
-/** Newest first, so a row limit keeps the latest reports. Every page is still returned in id order. */
+/**
+ * Disruptions that are happening keep their place under a row or byte limit: live incident
+ * reports first, then works in progress, then pending works (thousands statewide).
+ */
+export const DISRUPTION_PRIORITY = `CASE WHEN g.assertion_kind = 'report' THEN 0
+  WHEN g.record_status = 'active' THEN 1 ELSE 2 END`;
+/** News is newest first, so a row limit keeps the latest reports. Every page is still returned in id order. */
 export const geoOrder = (queryId: GeoQueryId): string => queryId === 'news'
-  ? `ORDER BY ${NEWS_REPORTED_AT} DESC, g.geo_record_id, g.version_id LIMIT @resultLimit` : GEO_ORDER;
+  ? `ORDER BY ${NEWS_REPORTED_AT} DESC, g.geo_record_id, g.version_id LIMIT @resultLimit`
+  : queryId === 'disruption'
+    ? `ORDER BY ${DISRUPTION_PRIORITY}, g.geo_record_id, g.version_id LIMIT @resultLimit` : GEO_ORDER;
 export const PEDESTRIAN_ORDER = 'ORDER BY p.source_id, p.sensor_id, p.observed_at, p.batch_id LIMIT @resultLimit';
 export const BOUNDARY_ORDER = 'ORDER BY b.boundary_id, b.version_id LIMIT @resultLimit';
 export const PARKING_ORDER = 'ORDER BY s.sensor_id LIMIT @resultLimit';
