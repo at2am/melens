@@ -6,6 +6,7 @@ import { createCurrentLayerCache, prepareStateLoad } from '@melens/shared/query/
 import { createAnomalyLayerLoader, consumeVerifiedAnomalyBatch, failSoftAnomalyLayerLoader } from '@melens/shared/query/anomalies';
 import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createUnlocatedLayerLoader, createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
+import { createNewsAreaLoader } from '@melens/shared/query/news-areas';
 import { createViewQueryRunner } from '@melens/shared/query/query-runner';
 import { cacheSourceCoverage, createSourceCoverageReader, findPublicSource, type CoverageAreaResolver, type SourceCoverageSnapshot }
   from '@melens/shared/query/source-coverage';
@@ -42,14 +43,16 @@ export function createMapService(options: {
   readonly currentLayerCache?: boolean;
   /** Prove current geo rights from the refreshed copy while it reflects every source's latest batch (default on). */
   readonly copyRightsRead?: boolean;
+  /** Draw current news as the official areas the articles name (UC-06, default on). */
+  readonly newsAreas?: boolean;
 }) {
   const clock = options.clock ?? (() => new Date());
   const references = new Map((options.publicSources ?? []).map((source) => {
     const reference = sourceReferenceSchema.parse(source);
     return [reference.sourceId, reference] as const;
   }));
-  const runner = createViewQueryRunner({ config: options.config,
-    adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
+  const adapter = options.adapter ?? createBigQueryViewAdapter(options.config);
+  const runner = createViewQueryRunner({ config: options.config, adapter });
   const readCoverage = cacheSourceCoverage(createSourceCoverageReader({ runner }).read, {
     ttlMs: options.coverageCacheTtlMs ?? COVERAGE_CACHE_TTL_MS, staleMs: options.coverageStaleMs ?? COVERAGE_STALE_MS, clock });
   // Current layer rows are shared across viewport loads for the same publication.
@@ -110,8 +113,12 @@ export function createMapService(options: {
   const checkPublicRecords = createPublicRecordChecker({ runQuery, resolveSource, external: externalChecker,
     supplementalVerifier: options.checkPublicRecords !== undefined,
     ...(options.copyRightsRead === false ? {} : { readCopyState }), clock });
+  // The news area copy loads in the background with the longest query time allowed (about 10 s at
+  // 7,000 articles); requests read it from memory.
+  const loadNewsAreas = options.newsAreas === false ? undefined : createNewsAreaLoader({ config: options.config, clock,
+    runner: createViewQueryRunner({ config: { ...options.config, queryTimeoutMs: 30_000 }, adapter }) });
   const loaders = { runQuery, resolveSource, clock, externalVerifier: options.checkPublicRecords !== undefined,
-    resolveArea: options.resolveArea, loadAnomalyLayer };
+    resolveArea: options.resolveArea, loadAnomalyLayer, loadNewsAreas };
   const shared = { store, readCoverage, clock, checkPublicRecords, maxResponseBytes: options.config.maxResponseBytes };
   const viewport = createViewportService({ ...shared,
     resultEnvelopeReserveBytes: options.config.responseEnvelopeReserveBytes,

@@ -117,3 +117,44 @@ test('map service serves scoped news and rechecks it without an external verifie
   await assert.rejects(service.getItem('news:article1', { requestId: 'withdrawn', snapshotId: page.snapshotId }),
     (error: unknown) => error instanceof Error && 'code' in error && error.code === 'notAvailable');
 });
+
+test('current news reaches the map as the areas the articles name, with their articles as members', async () => {
+  const boundarySource: PublicSourceReference = { sourceId: 'abs.asgs', url: 'https://www.abs.gov.au/',
+    attribution: 'Australian Bureau of Statistics', versionRef: null };
+  const registry = (sourceId: string, topic: string) => ({ source_id: sourceId, topic, scope: 'victoria',
+    coverage_area_refs: [], coverage_from: null, coverage_to: null, license_status: 'verified_open', access_status: 'active',
+    health_state: 'current', latest_published_batch_id: 'batch1', latest_published_at: '2026-10-01T01:01:00Z',
+    latest_published_window_from: null, latest_published_window_to: null, latest_published_output_count: 1,
+    coverage_evidence_state: 'unknown' });
+  const area = 'ASGS_LGA:24600:2025';
+  const articles = ['news:a', 'news:b'].map((id, index) => newsRow({ geo_record_id: id, version_id: `${id}-v1`,
+    title: `Headline ${id}`, summary: null, area_refs: [area], source_updated_at: `2026-10-01T0${index}:00:00Z` }));
+  const boundary = { boundary_id: area, version_id: 'boundary-v1', name: 'Melbourne', source_id: boundarySource.sourceId,
+    geometry_geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[144.9, -37.9], [145.0, -37.9], [145.0, -37.8],
+      [144.9, -37.8], [144.9, -37.9]]] }) };
+  const adapter: BigQueryViewAdapter = { async dryRun() { return { bytesProcessed: 1n }; },
+    async startQuery(query) {
+      const rows = query.query.includes('v_source_coverage') ? [registry(source.sourceId, 'news'), registry('abs.asgs', 'boundary')]
+        : query.query.includes('v_geo_records_current_state') ? [{ source_id: source.sourceId, batch_id: 'batch1' }]
+          : query.query.includes('v_boundaries') ? [boundary]
+            : query.query.includes('ARRAY_LENGTH(g.area_refs)') || query.query.includes('@publicRecordKeysJson') ? articles : [];
+      return { async readPage() { return { rows: rows.map((row) => ({ record: JSON.stringify(row) })),
+        complete: true, hasMore: false }; }, async cancel() {} };
+    } };
+  const service = createMapService({ config, adapter, currentLayerCache: false, publicSources: [source, boundarySource],
+    clock: () => new Date('2026-10-01T02:00:00Z') });
+  const viewport = await service.queryViewport(request);
+  const [item] = viewport.layers[0]?.items ?? [];
+  assert.equal(item?.kind, 'aggregate');
+  if (item?.kind !== 'aggregate') return;
+  assert.equal(item.id, `aggregate.news.area.${area}`);
+  assert.equal(item.details.representation, 'areaMentions');
+  assert.equal(item.details.metric.value, 2);
+  assert.equal(item.location.role, 'areaAssociation');
+  const members = await service.getMembers(item.id, { requestId: 'area-members', snapshotId: viewport.snapshotId });
+  assert.deepEqual(members.items.map((member) => member.id), ['news:a', 'news:b']);
+  assert.ok(members.items.every((member) => member.geometry === null && member.sources[0]?.url === articleUrl));
+  assert.equal(members.totalMatching, 2);
+  const detail = await service.getItem(item.id, { requestId: 'area-detail', snapshotId: viewport.snapshotId });
+  assert.equal(detail.item.id, item.id);
+});
