@@ -9,8 +9,17 @@ import {
 import type { ViewRow } from './query-runner.js';
 
 export type DisruptionItem = Extract<MapItem, { kind: 'disruption' }>;
+/** GTFS Realtime Alert.Effect, which service alerts carry as its enum number. */
+const GTFS_EFFECTS: Readonly<Record<number, string>> = {
+  1: 'No service', 2: 'Reduced service', 3: 'Significant delays', 4: 'Detour', 5: 'Additional service',
+  6: 'Modified service', 7: 'Other effect', 8: 'Unknown effect', 9: 'Stop moved', 10: 'No effect',
+  11: 'Accessibility issue',
+};
+const effectSchema = z.union([z.string(), z.number().int()
+  .transform((value) => GTFS_EFFECTS[value] ?? null)]).nullish();
+
 const detailSchema = z.object({
-  description: z.string().nullish(), effect: z.string().nullish(),
+  description: z.string().nullish(), effect: effectSchema,
   impact: z.object({ impactType: z.string().nullish(), direction: z.string().nullish(),
     delay: z.string().nullish(), numberLanesImpacted: z.string().nullish(),
     speedLimitOnSite: z.string().nullish() }).nullish(),
