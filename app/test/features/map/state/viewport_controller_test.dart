@@ -101,6 +101,33 @@ void main() {
     expect(container.read(viewportControllerProvider).response, isNull);
   });
 
+  test('parking is read only once the camera is zoomed in', () {
+    controller.setLayers([
+      MapLayerId.pedestrian,
+      MapLayerId.parking,
+    ], debounce: false);
+    controller.setRegion(t017Region, parkingMinZoom - 1, debounce: false);
+    var state = container.read(viewportControllerProvider);
+    expect(state.parkingNeedsZoom, isTrue);
+    expect(state.filterBlockedLayers, isEmpty);
+    expect(repository.queries.last.query.layers, [MapLayerId.pedestrian]);
+
+    controller.setRegion(t017Region, parkingMinZoom, debounce: false);
+    state = container.read(viewportControllerProvider);
+    expect(state.parkingNeedsZoom, isFalse);
+    expect(repository.queries.last.query.layers, [
+      MapLayerId.pedestrian,
+      MapLayerId.parking,
+    ]);
+
+    // Parking alone, zoomed out, sends nothing.
+    controller.setLayers([MapLayerId.parking], debounce: false);
+    final sent = repository.queries.length;
+    controller.setRegion(t017Region, parkingMinZoom - 2, debounce: false);
+    expect(repository.queries, hasLength(sent));
+    expect(container.read(viewportControllerProvider).response, isNull);
+  });
+
   test(
     'visible bounds intersect contract envelope without invented coverage',
     () {

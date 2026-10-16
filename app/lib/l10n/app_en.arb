@@ -989,6 +989,10 @@
   "@mapScreenFilterRequired": {
     "description": "Layers lacking required approved filters are blocked."
   },
+  "mapParkingZoomIn": "Zoom in to see parking.",
+  "@mapParkingZoomIn": {
+    "description": "The parking layer is on, but the map is zoomed out too far to read it."
+  },
   "mapScreenRegionError": "The visible map area could not be read.",
   "@mapScreenRegionError": {
     "description": "Safe visible-region failure."
