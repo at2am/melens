@@ -10,7 +10,8 @@ import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 
-from provenance import APP, PROVENANCE_VERSION, bundle_files, source_stamp, validate_assets, validate_build
+from provenance import (APP, PROVENANCE_VERSION, bundle_files, fingerprint_fonts, source_stamp,
+                        validate_assets, validate_build)
 
 
 def build_variant(mode):
@@ -34,6 +35,7 @@ def build_variant(mode):
             f"--dart-define-from-file={config}",
         ], cwd=APP, check=True)
         validate_assets(generated)
+        fingerprint_fonts(generated)
         if source_stamp() != stamp or hashlib.sha256(config.read_bytes()).hexdigest() != config_hash:
             raise ValueError("App source or configuration changed during the build. Build again after edits finish.")
         with TemporaryDirectory(prefix=f".web-e2e-{mode}-", dir=build_root) as temporary:

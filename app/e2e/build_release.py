@@ -121,6 +121,7 @@ def build_release(identity):
         subprocess.run(["fvm", "flutter", "build", "web", "--release", "--no-web-resources-cdn",
                         f"--dart-define-from-file={config}"], cwd=APP, check=True)
         validate_assets(generated)
+        fingerprint_fonts(generated)
         if source_stamp() != stamp or input_hashes(config) != hashes:
             raise ValueError("Source or release configuration changed during compilation. Build again.")
         with TemporaryDirectory(prefix=".web-cloud-release-", dir=build_root) as temporary:
