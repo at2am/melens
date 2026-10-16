@@ -226,7 +226,7 @@ Returns `{ "card_id": "…", "summary": "…" }`; `card_id` is null, with no car
 
 ### `find_parking`
 
-Status lines: "Looking for free parking", then the lines of the tools it runs. Cost: one or two parking map reads, plus one Search grounding call and one generation for the area's rules, both cached across users by question and date. The card itself is never cached: sensor readings change every 2 minutes.
+Status lines: "Looking for free parking", then the lines of the tools it runs. Cost: one or two parking map reads, plus one Search grounding call and one generation for the area's rules, both cached across users by question and date. The card itself is never cached: sensor readings are refreshed every 5 minutes.
 
 **Description for the model:** Find free on-street parking near a destination. It searches the live bay sensors within a short walk (widening when few are free), turns the parking layer on, moves the map to the nearest vacant bay, highlights the other candidates, and shows the parking card with each bay's distance to the destination and the area's published fee, time limit and hours. Use it for any request to find or check parking. It shows the card itself: do not also call show_card, focus_map or search_grounding for the same request.
 
