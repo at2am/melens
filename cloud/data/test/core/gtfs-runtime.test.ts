@@ -19,7 +19,8 @@ const timestamp = '2026-09-28T00:05:00.000Z';
 const fetchedAt = '2026-09-28T00:06:00.000Z';
 
 function realtime(feedVersion: string | null = 'PTV_GTFS_20260928_v1',
-  selector: { routeId: string | null; stopId: string | null; agencyId?: string; routeType?: number | null } =
+  selector: { routeId: string | null; stopId: string | null; agencyId?: string; routeType?: number | null;
+    directionId?: number | null } =
   { routeId: '2-FLI', stopId: '19499' }): ConnectorSuccess {
   const metro: ParsedAlertFeed = { feedVersion, feedTimestamp: timestamp, gtfsRealtimeVersion: '2.0',
     alerts: [{ id: 'M-17', activePeriods: [], communicationPeriods: [], impactPeriods: [],
@@ -143,9 +144,9 @@ test('the official archive schedule places stop alerts at the stop and route ale
   assert.equal(point?.centroid_lat, -37.8183);
   assert.equal(point?.location_confidence, 'official_join');
 
-  // As the live feed sends them: agency "1", no route type, the route id alone.
+  // As the live feed sends them: agency "1", no route type, the route id and a direction.
   const onRoute = await withPublishedGtfsLocations(realtime(null,
-    { routeId: '2-FLI', stopId: null, agencyId: '1', routeType: null }), config, bq);
+    { routeId: '2-FLI', stopId: null, agencyId: '1', routeType: null, directionId: 1 }), config, bq);
   const drawn = onRoute.geoRecords[0];
   assert.ok(drawn);
   assert.equal(JSON.parse(drawn.summary ?? '{}').gtfs_mapping_status, 'route_only');

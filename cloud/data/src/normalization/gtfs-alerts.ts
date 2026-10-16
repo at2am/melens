@@ -61,7 +61,7 @@ export interface StaticGtfsVersion {
 }
 
 export type GtfsMappingStatus =
-  | 'located' | 'route_only' | 'unmapped' | 'ambiguous'
+  | 'located' | 'route_only' | 'route_with_stops' | 'unmapped' | 'ambiguous'
   | 'version_unverified' | 'trip_instance_unverified' | 'invalid_alert';
 
 export interface GtfsAlertMapping {
@@ -86,6 +86,24 @@ interface PreparedStatic {
   tripStops: Set<string>;
   records: Map<string, SourceRecord>;
   stopGeography: Map<string, GeoRecord>;
+  /** Routes serving a stop, a station counting the routes of its platforms. */
+  servedRoutes: Map<string, Set<string>>;
+}
+
+function servedRoutes(stops: NormalizedGtfsResult['stops']): Map<string, Set<string>> {
+  const served = new Map<string, Set<string>>();
+  const add = (stopId: string, routeIds: readonly string[]) => {
+    let set = served.get(stopId);
+    if (!set) { set = new Set(); served.set(stopId, set); }
+    for (const routeId of routeIds) set.add(routeId);
+  };
+  for (const stop of stops) {
+    add(stop.stop_id, stop.route_ids);
+    // Alerts name stations (location_type 1), while stop_times name their platforms.
+    const parent = stop.parent_station?.trim();
+    if (parent) add(parent, stop.route_ids);
+  }
+  return served;
 }
 
 function prepare(version: StaticGtfsVersion): PreparedStatic {
@@ -98,7 +116,8 @@ function prepare(version: StaticGtfsVersion): PreparedStatic {
     [record.source_record_id, record]));
   const stopGeography = new Map(version.normalized.geoRecords.map(record =>
     [record.geo_record_id, record]));
-  return { version, routes, stops, trips, tripStops, records, stopGeography };
+  return { version, routes, stops, trips, tripStops, records, stopGeography,
+    servedRoutes: servedRoutes(version.normalized.stops) };
 }
 
 /** Basic and extended GTFS route types: Transport Victoria publishes metro trains as 400 (urban railway). */
@@ -182,8 +201,10 @@ function resolveSelector(
     if (selector.routeType !== null && route.route_type !== selector.routeType) return false;
     // Published runtime references keep no agency; each mode feed has one agency, so an unknown one is no conflict.
     if (selector.agencyId !== null && route.agency_id != null && route.agency_id !== selector.agencyId) return false;
-    if (stop && !stop.route_ids.includes(routeId)) return false;
-    if (selector.directionId !== null) {
+    if (stop && !staticFeed.servedRoutes.get(stop.stop_id)?.has(routeId)) return false;
+    // Published runtime references carry no trips, so a direction cannot be checked there. It narrows
+    // services within the route but not where they run: the route's shape or the stop is the same.
+    if (selector.directionId !== null && (trip || snapshot.trips.length > 0)) {
       if (trip) return trip.direction_id === selector.directionId;
       if (stop && !staticFeed.version.normalized.tripStopMembershipComplete) return false;
       return snapshot.trips.some(candidate => candidate.route_id === routeId
@@ -259,11 +280,12 @@ export function joinGtfsAlertLocations(input: {
             status = 'trip_instance_unverified';
           }
           else if (matched.length === 0) status = 'unmapped';
-          else if (matched.length !== resolved.length || stopIds.length > 1
-            || (stopIds.length === 1 && matched.some(item => item.stopId === null))) {
-            // A stop selector alongside a route or agency selector describes
-            // more than one possible location for the whole alert.
-            status = 'ambiguous';
+          else if (matched.length !== resolved.length) status = 'ambiguous';
+          else if (stopIds.length > 1 || (stopIds.length === 1 && matched.some(item => item.stopId === null))) {
+            // Several stops, or a stop beside a route selector, have no single point. When every
+            // selector names its route (works between stations on a line), the routes carry the
+            // alert; otherwise a stop may lie on a route the alert never named.
+            status = matched.every(item => item.exactRouteIds.length > 0) ? 'route_with_stops' : 'ambiguous';
           }
           else if (stopIds.length === 0) status = 'route_only';
           else {
@@ -298,7 +320,7 @@ export function joinGtfsAlertLocations(input: {
       }
     }
     // A route alert is drawn along every named route when each has a shape in the same schedule.
-    const shapes = status === 'route_only' && staticFeed !== null && alertSelfLink
+    const shapes = (status === 'route_only' || status === 'route_with_stops') && staticFeed !== null && alertSelfLink
       ? routeIds.map(routeId => staticFeed!.version.routeShapes?.get(routeId)) : [];
     if (shapes.length > 0 && shapes.every(shape => shape !== undefined
       && shape.feedVersion === staticFeed!.version.normalized.feedVersion)) {
