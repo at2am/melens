@@ -7,20 +7,22 @@
   "api_endpoint": "https://opendata.transport.vic.gov.au/dataset/3f4e292e-7f8a-4ffe-831f-1953be0fe448/resource/fb152201-859f-4882-9206-b768060b50ad/download/gtfs.zip",
   "topic": "transport",
   "scope": "victoria",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": ["ASGS_GCCSA:2GMEL:2021"],
+  "coverage_from": "2026-10-16T00:00:00Z",
   "coverage_to": null,
   "cadence_seconds": 604800,
   "check_interval_seconds": 86400,
   "requires_monitoring": true,
-  "license_status": "review_required",
-  "access_status": "candidate",
+  "license_status": "verified_open",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "access_status": "active",
   "record_granularity": "gtfs_schedule_snapshot",
   "connector_owner": "melens integration",
   "admission_evidence": {
     "dataset_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-schedule",
     "native_record_key": "archive validator-derived version + route_id / stop_id",
-    "completeness_rule": "Ranged official archive must contain mode 2 train and mode 3 tram ZIPs with routes, stops, trips and stop_times; each requested byte range, ZIP checksum and referenced ID must validate. feed_info is optional in the upstream archive.",
+    "completeness_rule": "Ranged official archive must contain mode 2 train and mode 3 tram ZIPs with routes, stops, trips and stop_times; each requested byte range, ZIP checksum and referenced ID must validate. feed_info and shapes.txt are optional in the upstream archive.",
+    "quota_requests_per_day": 10,
     "secret_names": [],
     "allowed_fields": [
       "feed_version",
@@ -36,12 +38,16 @@
       "stop_lat",
       "stop_lon",
       "location_type",
-      "parent_station"
+      "parent_station",
+      "shape_id",
+      "shape_pt_lat",
+      "shape_pt_lon",
+      "shape_pt_sequence"
     ],
     "raw_retention_days": 30,
     "staging_retention_days": 7,
     "license_evidence_url": "https://opendata.transport.vic.gov.au/dataset/gtfs-schedule",
-    "reviewed_at": "2026-09-30T00:00:00Z"
+    "reviewed_at": "2026-10-16T00:00:00Z"
   },
-  "notes": "Official schedule ZIP is about 275 MB and updated weekly or as needed. The connector fetches only train/tram mode members via validated byte ranges, deriving an archive revision from the HTTP validator and preserving Last-Modified as source_updated_at. Current upstream mode ZIPs omit feed_info, so timetable valid_from/valid_to remain unknown. Sparse stop_times represent complete route/stop associations but not complete trip/stop membership; trip-specific alert joins must fail closed. Fixtures are test-only. Source remains a review_required candidate until access and reuse admission."
+  "notes": "Admission 2026-10-16: CC BY 4.0 per the landing page; no key needed. One daily check makes 5 ranged requests. Routes with shapes.txt paths are also published as MultiLineString route records (simplified to about 5 m, at most 12 distinct paths per route) so realtime route alerts can be drawn; these and the stop references are reference data for the realtime join, excluded from the map's own layers. Official schedule ZIP is about 275 MB and updated weekly or as needed. The connector fetches only train/tram mode members via validated byte ranges, deriving an archive revision from the HTTP validator and preserving Last-Modified as source_updated_at. Current upstream mode ZIPs omit feed_info, so timetable valid_from/valid_to remain unknown. Sparse stop_times represent complete route/stop associations but not complete trip/stop membership; trip-specific alert joins must fail closed. Fixtures are test-only. Source remains a review_required candidate until access and reuse admission."
 }

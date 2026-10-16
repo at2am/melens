@@ -2,6 +2,7 @@ import { strFromU8, unzipSync } from 'fflate';
 import { z } from 'zod';
 
 import { fetchOfficialGtfsArchive, type OfficialGtfsArchive } from './archive.js';
+import { routeShapeSchema, ShapeCollector, type RouteShape } from './shapes.js';
 import { HttpFailure } from '../../core/http.js';
 import type { Connector, ConnectorCompleteness, ConnectorErrorCode, ConnectorInput, ConnectorResult } from '../../core/connector.js';
 import type { GeoRecord, GeoRecordSource, SourceRecord } from '../../core/types.js';
@@ -111,6 +112,7 @@ export const gtfsSnapshotSchema = z.object({
   stops: z.array(stopSchema),
   trips: z.array(tripSchema).default([]),
   stop_times: z.array(stopTimeSchema).default([]),
+  route_shapes: z.array(routeShapeSchema).default([]),
 }).passthrough();
 
 export type GtfsFeedInfo = z.infer<typeof feedInfoSchema>;
@@ -228,6 +230,9 @@ export function parseGtfsZip(zipBytes: Uint8Array): GtfsStaticSnapshot {
   const stopRows = parseCsvText<Record<string, string>>(stopsText);
   const tripRows = tripsText ? parseCsvText<Record<string, string>>(tripsText) : [];
   const stopTimeRows = stopTimesText ? parseCsvText<Record<string, string>>(stopTimesText) : [];
+  const shapesText = fileContents.get('shapes.txt');
+  const shapes = new ShapeCollector();
+  if (shapesText) for (const row of parseCsvText<Record<string, string>>(shapesText)) shapes.addRow(row);
 
   return parseGtfsSnapshot({
     feed_info: feedInfoRows,
@@ -235,6 +240,7 @@ export function parseGtfsZip(zipBytes: Uint8Array): GtfsStaticSnapshot {
     stops: stopRows,
     trips: tripRows,
     stop_times: stopTimeRows,
+    route_shapes: shapes.routeShapes(tripRows.map(row => ({ route_id: row.route_id ?? '', shape_id: row.shape_id }))),
   });
 }
 
@@ -352,10 +358,16 @@ export function normalizeGtfsSnapshot(
     source_version_ordinal: null,
     record_status: 'active',
     assertion_kind: 'report',
-    rights_status: 'review_required',
+    rights_status: 'verified_open',
   });
 
-  // 2. Routes
+  // 2. Routes, drawn as their shapes when shapes.txt provides them
+  const shapesByRoute = new Map<string, RouteShape>();
+  for (const shape of snapshot.route_shapes) {
+    if (!routesById.has(shape.route_id)) throw new Error(`Shape references unknown route ${shape.route_id}`);
+    if (shapesByRoute.has(shape.route_id)) throw new Error(`Duplicate shapes for route ${shape.route_id}`);
+    shapesByRoute.set(shape.route_id, shape);
+  }
   const routeRecordMap = new Map<string, { recordId: string; versionId: string }>();
   for (const route of snapshot.routes) {
     const routeRecordId = sourceRecordId({
@@ -365,6 +377,8 @@ export function normalizeGtfsSnapshot(
       sourceTime: validFrom ?? fetchedAt,
     });
     const mode = gtfsRouteTypeToMode(route.route_type);
+    const shape = shapesByRoute.get(route.route_id);
+    const shapeGeometry = shape ? JSON.stringify({ type: 'MultiLineString', coordinates: shape.lines }) : null;
     const routeContent = {
       route_id: route.route_id,
       route_short_name: route.route_short_name,
@@ -372,6 +386,7 @@ export function normalizeGtfsSnapshot(
       route_type: route.route_type,
       transport_mode: mode,
       feed_version: feedVersion,
+      ...(shapeGeometry === null ? {} : { shape_geometry: shapeGeometry }),
     };
     const routeVersionId = sourceVersionId(sourceUpdatedAt, routeContent);
     routeRecordMap.set(route.route_id, { recordId: routeRecordId, versionId: routeVersionId });
@@ -395,8 +410,30 @@ export function normalizeGtfsSnapshot(
       source_version_ordinal: null,
       record_status: 'active',
       assertion_kind: 'report',
-      rights_status: 'review_required',
+      rights_status: 'verified_open',
     });
+
+    if (shapeGeometry !== null) {
+      // The runtime draws an alert about this route along these lines; the map never shows them alone.
+      geoRecords.push({
+        batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1, fetched_at: fetchedAt,
+        geo_record_id: routeRecordId, version_id: routeVersionId, topic: 'transport', assertion_kind: 'report',
+        title: route.route_long_name ?? route.route_short_name ?? route.route_id,
+        summary: JSON.stringify({ kind: 'gtfs_static_route_shape', schema_version: 1, feed_version: feedVersion,
+          route: { route_id: route.route_id, route_short_name: route.route_short_name ?? null,
+            route_long_name: route.route_long_name ?? null, route_type: route.route_type } }),
+        original_url: LANDING_URL, geometry_geojson: shapeGeometry, centroid_lat: null, centroid_lon: null,
+        location_role: 'event_site', location_confidence: 'source_coordinate', area_refs: [],
+        published_at: null, observed_at: null, valid_from: validFrom, valid_to: validTo,
+        source_updated_at: sourceUpdatedAt, source_version_ordinal: null, freshness_state: 'unknown',
+        record_status: 'active', rights_status: 'verified_open', public_query_allowed: true,
+      });
+      geoRecordSources.push({
+        batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1, fetched_at: fetchedAt,
+        geo_record_id: routeRecordId, version_id: routeVersionId, source_record_id: routeRecordId,
+        source_version_id: routeVersionId, evidence_role: 'official_route_shape', original_url: LANDING_URL,
+      });
+    }
   }
 
   // 3. Stops
@@ -479,7 +516,7 @@ export function normalizeGtfsSnapshot(
       source_version_ordinal: null,
       record_status: 'active',
       assertion_kind: 'report',
-      rights_status: 'review_required',
+      rights_status: 'verified_open',
     });
 
     const geometry: ValidGeometry = {
@@ -514,8 +551,8 @@ export function normalizeGtfsSnapshot(
       source_version_ordinal: null,
       freshness_state: 'unknown',
       record_status: 'active',
-      rights_status: 'review_required',
-      public_query_allowed: false,
+      rights_status: 'verified_open',
+      public_query_allowed: true,
     });
 
     geoRecordSources.push({

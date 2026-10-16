@@ -362,12 +362,12 @@ test('temporal clearance progression across batches (Run 1 active -> Run 2 resol
   assert.notEqual(resultRun2.geoRecords[0]?.version_id, resultRun1.geoRecords[0]?.version_id, 'Version must update upon clearance');
 });
 
-test('source.json contract: 10-minute cadence, admitted as open data', async () => {
+test('source.json contract: 20-minute cadence, admitted as open data', async () => {
   const raw = await readFile(new URL('../../src/connectors/tv_road_unplanned/source.json', import.meta.url), 'utf8');
   const manifest = JSON.parse(raw);
   assert.equal(manifest.source_id, 'victoria.transport.road_unplanned');
-  assert.equal(manifest.cadence_seconds, 600);
-  assert.equal(manifest.check_interval_seconds, 600);
+  assert.equal(manifest.cadence_seconds, 1200);
+  assert.equal(manifest.check_interval_seconds, 1200);
   assert.equal(manifest.requires_monitoring, true);
   assert.equal(manifest.license_status, 'verified_open');
   assert.equal(manifest.access_status, 'active');

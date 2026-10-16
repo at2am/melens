@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-import type { BigQuery } from '@google-cloud/bigquery';
+import { BigQuery } from '@google-cloud/bigquery';
+import { z } from 'zod';
 
 import type { DataConfig } from './config.js';
 
@@ -40,6 +41,18 @@ export const GEO_CURRENT_SOURCES: ReadonlySet<string> = new Set([
  * their own.)
  */
 export const INCREMENTAL_GEO_SOURCES: ReadonlySet<string> = new Set(['gdelt.news', 'user.events']);
+
+/**
+ * Sources whose every published batch is the provider's complete current set, so their current rows
+ * come from the latest batch alone. Their rebuild after a publication reads only recent partitions;
+ * otherwise each run would read every earlier full copy (planned roads write about 10,000 rows a run).
+ * The retention job's full rebuild still reads everything, so the incremental path cannot drift.
+ */
+export const SNAPSHOT_GEO_SOURCES: ReadonlySet<string> = new Set([
+  'victoria.transport.road_planned', 'victoria.transport.road_unplanned', 'victoria.transport.gtfs_realtime',
+]);
+/** A day before the latest batch: covers a run that spans midnight and two-mode GTFS-R fetches. */
+const SNAPSHOT_FLOOR_MARGIN_MS = 24 * 3_600 * 1_000;
 
 const COLUMNS = ['geo_record_id', 'version_id', 'batch_id', 'source_id', 'schema_version', 'topic',
   'assertion_kind', 'is_prediction', 'title', 'summary', 'original_url', 'geometry_geojson', 'geometry',
@@ -82,14 +95,18 @@ function viewBody(sql: string, marker: string): string {
  * narrowing lets BigQuery skip other sources' blocks; it does not change the selected sources'
  * rows, because every read of those tables in the views is about the outer row's own source.
  */
-export function currentGeoRecordsSelect(viewSql: string, config: Pick<DataConfig, 'projectId' | 'ingestDataset'>): string {
+export function currentGeoRecordsSelect(viewSql: string, config: Pick<DataConfig, 'projectId' | 'ingestDataset'>,
+  options: { fetchedFloor?: boolean } = {}): string {
   const history = viewBody(viewSql, HISTORY_MARKER);
   let current = viewBody(viewSql, CURRENT_MARKER);
   if (!current.includes('`melens_query.v_geo_records_history`')) throw new Error('The current view no longer reads the history view');
   current = current.replaceAll('`melens_query.v_geo_records_history`', `(${history})`);
+  // A complete-snapshot source's current rows all sit in its latest batch, so @fetchedFloor (just
+  // before that batch) lets BigQuery skip the source's older partitions without changing the rows.
+  const floor = options.fetchedFloor ? ' AND fetched_at >= @fetchedFloor' : '';
   for (const table of SOURCE_SCOPED_TABLES) {
     current = current.replaceAll(`\`melens_ingest.${table}\``,
-      `(SELECT * FROM \`${config.projectId}.${config.ingestDataset}.${table}\` WHERE source_id IN UNNEST(@sourceIds))`);
+      `(SELECT * FROM \`${config.projectId}.${config.ingestDataset}.${table}\` WHERE source_id IN UNNEST(@sourceIds)${floor})`);
   }
   current = current.replaceAll('`melens_ingest.', `\`${config.projectId}.${config.ingestDataset}.`);
   if (/`melens_(query|ingest)\./.test(current)) throw new Error('Unqualified dataset reference left in the current view SQL');
@@ -119,13 +136,14 @@ const latestPublishedSql = (path: (name: string) => string, sourceFilter: string
   QUALIFY ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC, started_at DESC, batch_id DESC) = 1`;
 
 /** Replace the selected sources' rows with the view's current rows, and their state, in one transaction. */
-export function rebuildGeoRecordsCurrentSql(config: Pick<DataConfig, 'projectId' | 'ingestDataset'>, viewSql: string): string {
+export function rebuildGeoRecordsCurrentSql(config: Pick<DataConfig, 'projectId' | 'ingestDataset'>, viewSql: string,
+  options: { fetchedFloor?: boolean } = {}): string {
   const { path, current, state } = paths(config);
   return `/* rebuild-geo-records-current */
 BEGIN TRANSACTION;
 DELETE FROM ${current} WHERE source_id IN UNNEST(@sourceIds);
 INSERT INTO ${current} (${COLUMNS.join(', ')})
-SELECT ${COLUMNS.join(', ')} FROM (${currentGeoRecordsSelect(viewSql, config)}) AS v
+SELECT ${COLUMNS.join(', ')} FROM (${currentGeoRecordsSelect(viewSql, config, options)}) AS v
 WHERE v.source_id IN UNNEST(@sourceIds);
 DELETE FROM ${state} WHERE source_id IN UNNEST(@sourceIds);
 INSERT INTO ${state} (source_id, batch_id, published_at, refreshed_at, method)
@@ -217,12 +235,34 @@ function queryOptions(config: DataConfig, query: string, params: Record<string, 
 }
 
 export async function rebuildGeoRecordsCurrent(config: DataConfig, bigquery: Query,
-  sourceIds: readonly string[], viewSql = readCoreViewSql()): Promise<void> {
+  sourceIds: readonly string[], viewSql = readCoreViewSql(), fetchedFloor?: string): Promise<void> {
   if (sourceIds.length === 0 || sourceIds.some(id => !GEO_CURRENT_SOURCES.has(id))) {
     throw new Error('Geo current rebuild needs map geo sources');
   }
-  await bigquery.query(queryOptions(config, rebuildGeoRecordsCurrentSql(config, viewSql), { sourceIds: [...sourceIds] },
+  if (fetchedFloor !== undefined && sourceIds.some(id => !SNAPSHOT_GEO_SOURCES.has(id))) {
+    throw new Error('Only complete-snapshot sources can rebuild from recent partitions');
+  }
+  await bigquery.query(queryOptions(config,
+    rebuildGeoRecordsCurrentSql(config, viewSql, { fetchedFloor: fetchedFloor !== undefined }),
+    { sourceIds: [...sourceIds], ...(fetchedFloor === undefined ? {} : { fetchedFloor: BigQuery.timestamp(fetchedFloor) }) },
     GEO_CURRENT_REBUILD_MAX_BYTES));
+}
+
+/**
+ * The floor for a complete-snapshot source's rebuild: a day before its latest published batch
+ * started, which for these sources is when it was fetched. Null when nothing is published yet.
+ */
+async function snapshotFetchedFloor(config: DataConfig, bigquery: Query, sourceId: string): Promise<string | null> {
+  const { path } = paths(config);
+  const [rows] = await bigquery.query(queryOptions(config, `/* latest-snapshot-batch */
+    SELECT CAST(started_at AS STRING) AS started_at FROM ${path('sync_batches')} WHERE source_id = @sourceId
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC) = 1 AND state = 'published'
+    ORDER BY published_at DESC LIMIT 1`, { sourceId }));
+  const startedAt = z.array(z.object({ started_at: z.string() })).max(1).parse(rows)[0]?.started_at;
+  if (startedAt === undefined) return null;
+  const started = Date.parse(startedAt.replace(' ', 'T').replace(/\+00$/, 'Z'));
+  if (!Number.isFinite(started)) throw new Error('Latest snapshot batch has no start time');
+  return new Date(started - SNAPSHOT_FLOOR_MARGIN_MS).toISOString();
 }
 
 /**
@@ -240,6 +280,7 @@ export async function refreshGeoRecordsCurrent(config: DataConfig, bigquery: Que
       if (!(error instanceof Error) || !error.message.includes(NO_STATE_MESSAGE)) throw error;
     }
   }
-  await rebuildGeoRecordsCurrent(config, bigquery, [sourceId], viewSql);
+  const floor = SNAPSHOT_GEO_SOURCES.has(sourceId) ? await snapshotFetchedFloor(config, bigquery, sourceId) : null;
+  await rebuildGeoRecordsCurrent(config, bigquery, [sourceId], viewSql, floor ?? undefined);
   return 'rebuild';
 }

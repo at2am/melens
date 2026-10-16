@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { ConnectorFailure, ConnectorSuccess } from './connector.js';
 import type { DataConfig } from './config.js';
 import { GcsStore } from './gcs.js';
+import { SNAPSHOT_GEO_SOURCES } from './geo-records-current.js';
 import { loadNdjson } from './bigquery-load.js';
 import { writeHighFrequencyRows } from './bigquery-write.js';
 import type { DataSource, GeoRecord, SourceRecord, SyncBatch } from './types.js';
@@ -52,6 +53,10 @@ const auditFields = new Set(['batch_id', 'fetched_at', 'raw_uri', 'first_accessi
 /** Each batch is the whole current state; version checks apply within the batch only. */
 const COMPLETE_SNAPSHOT_SOURCES: ReadonlySet<string> = new Set([
   'ticketmaster.events', 'victoria.council.engagement',
+  // Every road read is all pages of the provider's current set, and every GTFS-R read is both
+  // FULL_DATASET feeds. Unplanned roads often have no verified update time, so a record whose
+  // content changed would look ambiguous against its history, and that history grows every run.
+  'victoria.transport.road_planned', 'victoria.transport.road_unplanned', 'victoria.transport.gtfs_realtime',
 ]);
 
 function canonical(value: unknown): string {
@@ -114,6 +119,19 @@ interface PlannedTable {
   name: FactTable;
   rows: readonly Record<string, unknown>[];
   expectedDistinct: number;
+}
+
+/** The earliest and latest fetch time across a batch's rows; null for a batch without rows. */
+function fetchedRange(tables: readonly PlannedTable[]): { from: string; to: string } | null {
+  let from = Infinity;
+  let to = -Infinity;
+  for (const table of tables) for (const row of table.rows) {
+    const time = typeof row.fetched_at === 'string' ? Date.parse(row.fetched_at) : NaN;
+    if (!Number.isFinite(time)) throw new Error(`Planned ${table.name} row has no fetch time`);
+    from = Math.min(from, time);
+    to = Math.max(to, time);
+  }
+  return Number.isFinite(from) ? { from: new Date(from).toISOString(), to: new Date(to).toISOString() } : null;
 }
 
 function planRows(result: ConnectorSuccess, source: DataSource, batchId: string): {
@@ -344,6 +362,9 @@ export class BigQueryPublisher {
 
   private async validateLoadedRows(batchId: string, tables: readonly PlannedTable[], source: DataSource): Promise<void> {
     const path = (name: string) => `\`${this.config.projectId}.${this.config.ingestDataset}.${name}\``;
+    const fetched = SNAPSHOT_GEO_SOURCES.has(source.source_id) ? fetchedRange(tables) : null;
+    const fetchedParams: Record<string, string> = fetched === null ? {}
+      : { fetchedFrom: fetched.from, fetchedTo: fetched.to };
     for (const table of tables) {
       // Warehouse types keep timestamp/numeric/array comparisons identical on both sides.
       const [metadata] = await this.bigquery.dataset(this.config.ingestDataset).table(table.name).getMetadata();
@@ -373,6 +394,10 @@ export class BigQueryPublisher {
       const logicalKeys = keys.filter(key => key !== 'version_id');
       const snapshotScope = table.name === 'parking_sensor_memberships'
         || COMPLETE_SNAPSHOT_SOURCES.has(source.source_id) ? 'AND t.batch_id = @batchId' : '';
+      // A transport snapshot batch holds every row it references, all fetched within its own
+      // range, so each read is held to those partitions instead of the source's whole history.
+      const fetchedWindow = (alias: string) => fetched === null ? ''
+        : ` AND ${alias}.fetched_at BETWEEN TIMESTAMP(@fetchedFrom) AND TIMESTAMP(@fetchedTo)`;
       const invalid = [
         't.source_id IS DISTINCT FROM @sourceId', 't.schema_version IS DISTINCT FROM 1', 't.fetched_at IS NULL',
         ...keys.map(key => `t.${key} IS NULL${key === 'observed_at' ? '' : ` OR TRIM(t.${key}) = ''`}`),
@@ -410,7 +435,7 @@ export class BigQueryPublisher {
       const visible = (alias: string) => `(${alias}.batch_id = @batchId OR ${alias}.batch_id IN (SELECT batch_id FROM batch_states WHERE state = 'published'))`;
       if (table.name === 'geo_record_sources') {
         invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('geo_records')} g WHERE g.source_id = @sourceId AND g.geo_record_id = t.geo_record_id
-          AND g.source_id = t.source_id AND g.version_id = t.version_id AND ${visible('g')})`);
+          AND g.source_id = t.source_id AND g.version_id = t.version_id AND ${visible('g')}${fetchedWindow('g')})`);
       }
       if (table.name !== 'source_records' && names.has('source_record_id')) {
         const sourceMatch = table.name === 'geo_record_sources'
@@ -422,11 +447,11 @@ export class BigQueryPublisher {
             : 'AND r.source_id = t.source_id';
         invalid.push(`NOT EXISTS (SELECT 1 FROM ${path('source_records')} r WHERE r.source_id = @sourceId AND r.source_record_id = t.source_record_id
           ${sourceMatch}
-          AND ${visible('r')})`);
+          AND ${visible('r')}${fetchedWindow('r')})`);
       }
       if (table.name === 'geo_records') invalid.push(`NOT EXISTS (
         SELECT 1 FROM ${path('geo_record_sources')} r WHERE r.source_id = @sourceId AND r.geo_record_id = t.geo_record_id
-          AND r.source_id = t.source_id AND r.version_id = t.version_id AND ${visible('r')})`);
+          AND r.source_id = t.source_id AND r.version_id = t.version_id AND ${visible('r')}${fetchedWindow('r')})`);
       if (table.name === 'parking_sensor_memberships') invalid.push(
         "t.source_id != 'melbourne.parking.sensors'",
         `NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
@@ -502,8 +527,8 @@ export class BigQueryPublisher {
         const rows = await this.query(`/* validate:${table.name} */
           SELECT COUNT(*) AS distinct_count, 0 AS unexpected, 0 AS invalid,
             0 AS conflicts, 0 AS ambiguous
-          FROM ${path(table.name)} WHERE source_id = @sourceId AND batch_id = @batchId`, {
-          batchId, sourceId: source.source_id, expectedRows: '[]',
+          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${fetchedWindow('t')}`, {
+          batchId, sourceId: source.source_id, expectedRows: '[]', ...fetchedParams,
         });
         const report = rows[0];
         if (['distinct_count', 'unexpected', 'invalid', 'conflicts', 'ambiguous']
@@ -524,11 +549,11 @@ export class BigQueryPublisher {
           FROM UNNEST(JSON_QUERY_ARRAY(@expectedRows)) e
         ), batch_rows AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
-          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId
+          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${fetchedWindow('t')}
         ), eligible AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
           FROM ${path(table.name)} t
-          WHERE t.source_id = @sourceId ${snapshotScope}
+          WHERE t.source_id = @sourceId ${snapshotScope}${fetchedWindow('t')}
             AND t.${logicalId} IN UNNEST(JSON_VALUE_ARRAY(@logicalIds))
             AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
             SELECT ${tuple(logicalKeys)} FROM batch_rows t
@@ -545,6 +570,7 @@ export class BigQueryPublisher {
           allowedFields: JSON.stringify(source.admission_evidence.allowed_fields ?? []),
           expectedRows: JSON.stringify(expectedRows),
           logicalIds: JSON.stringify([...new Set(expectedRows.map(row => row[logicalId]))]),
+          ...fetchedParams,
         });
         const values = rows[0];
         const number = (key: string) => count.parse(Number(values?.[key] ?? NaN));

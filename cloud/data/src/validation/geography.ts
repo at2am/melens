@@ -13,6 +13,8 @@ const ring = z.array(position).min(4).refine(points => {
 const geometry = z.discriminatedUnion('type', [
   z.object({ type: z.literal('Point'), coordinates: position }).strict(),
   z.object({ type: z.literal('LineString'), coordinates: z.array(position).min(2) }).strict(),
+  // A transit route is several drawn paths; the map contract already carries MultiLineString.
+  z.object({ type: z.literal('MultiLineString'), coordinates: z.array(z.array(position).min(2)).min(1) }).strict(),
   z.object({ type: z.literal('Polygon'), coordinates: z.array(ring).min(1) }).strict(),
 ]);
 

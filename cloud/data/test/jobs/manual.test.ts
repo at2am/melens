@@ -110,8 +110,8 @@ test('reviewed source admission and both request ceilings are checked before a l
     { message: 'Invalid manual job configuration' });
   await assert.rejects(manualRun(window, { ...env, BQ_MAXIMUM_BYTES_BILLED: undefined }, runtime),
     { message: 'Manual BigQuery query ceiling is missing' });
-  await assert.rejects(manualRun(['--source', 'victoria.transport.gtfs_static', '--revision', 'latest'], {
-    ...env, MELENS_SOURCE_ID: 'victoria.transport.gtfs_static', MELENS_SCHEDULE_MODE: 'snapshot',
+  await assert.rejects(manualRun(['--source', 'victoria.vicmap.planning', '--revision', 'latest'], {
+    ...env, MELENS_SOURCE_ID: 'victoria.vicmap.planning', MELENS_SCHEDULE_MODE: 'snapshot',
     MELENS_SNAPSHOT_REVISION: 'latest',
   }, runtime), { message: 'Manual source admission is incomplete' });
   assert.equal(created, 0);

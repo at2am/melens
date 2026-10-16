@@ -30,7 +30,7 @@ Translated from the original Chinese in the Notion table:
 ## Acceptance criteria (Draft)
 
 - [x] Road disruptions appear as red line segments on the affected roads (live in dev since 2026-10-16).
-- [ ] Tram and train disruptions appear on the affected routes or stops.
+- [x] Tram and train disruptions appear on the affected routes or stops (live in dev since 2026-10-16; 25 of 32 alerts placed on the first feed).
 - [ ] Tapping a disruption shows what happened, what is affected and the time window if known, with a source.
 - [x] Polling stays within 24 calls per 60 seconds per transport mode (the shared key's limit is 20; schedules peak near 16).
 - [ ] Disruptions are available to `map_agent` and `analyse_anomaly` through `nearby_context`.
@@ -39,10 +39,12 @@ Translated from the original Chinese in the Notion table:
 
 - Service Alerts cover trams and trains only; buses are not covered.
 - The Transport Victoria key is in Secret Manager (`transport_victoria_key_id`, version 1) and works.
-- 2026-10-16: planned and unplanned road disruptions are admitted (CC BY 4.0), scheduled and registered with the map. Unplanned roads run every 10 minutes, not every minute, because each road publication rebuilds the source's rows in `geo_records_current` (about 0.5 GB billed). Planned roads run at :07 and :37, about 10,400 events statewide on 21 pages.
-- Tram and train alerts are not enabled. The official GTFS archive has no `feed_info`, so `gtfs-alerts.ts` cannot match an alert to a static feed version and leaves every alert unlocated; route alerts also need line shapes.
+- 2026-10-16: planned and unplanned road disruptions are admitted (CC BY 4.0), scheduled and registered with the map. Unplanned roads now run every 20 minutes (first every 10, not every minute), because each road publication rebuilds the source's rows in `geo_records_current` (about 0.5 GB billed). Planned roads now run every 6 hours (first at :07 and :37), about 10,400 events statewide on 21 pages.
+- 2026-10-16: tram and train service alerts are live. The official GTFS archive has no `feed_info`, so alerts match the newest published static schedule instead of a feed version. The static job reads `shapes.txt` (daily at 01:20 UTC) and publishes each route's paths, simplified to about 5 m. An alert is placed at its station or stop, drawn along the routes it names, or, when it lists several stations on named routes, drawn along those routes (`route_with_stops`). Alerts whose selectors only partly match stay unlocated. Realtime runs every 10 minutes.
+- Road and GTFS-R batches are validated as complete snapshots, within the batch, so the version checks do not grow with history.
+- Cost, 2026-10-16: the layer billed about 300 GB a day of BigQuery, nearly all in publishing (validation and the current-table rebuild re-read each source's history; planned roads rewrote about 10,000 rows every 30 minutes). Planned roads now run every 6 hours and unplanned roads every 20 minutes. Transport snapshot validation, rebuilds and the static-schedule load read only recent partitions; an unplanned run fell from about 825 MB to 454 MB. The remaining structural fix, partitions shared by every source, is GitHub issue #9.
 
 ## Open questions
 
 - Who owns this use case?
-- Where does route geometry for highlighting tram and train lines come from? Service Alerts name routes and stops, not shapes.
+- Should a works alert between two stations be drawn as only that stretch of the line? Today the whole named route is drawn.

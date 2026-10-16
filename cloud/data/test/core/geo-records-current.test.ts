@@ -171,6 +171,29 @@ test('snapshot sources rebuild their own rows', async () => {
   assert.deepEqual(calls.map(call => call.params), [{ sourceIds: ['ticketmaster.events'] }]);
 });
 
+test('complete-snapshot transport sources rebuild from the partitions of their latest batch', async () => {
+  const calls: Call[] = [];
+  const bigquery = { query: async (options: Call) => {
+    calls.push(options);
+    return options.query.includes('latest-snapshot-batch') ? [[{ started_at: '2026-10-16 14:30:18.919+00' }]] : [[]];
+  } };
+  assert.equal(await refreshGeoRecordsCurrent(config, bigquery as never, 'victoria.transport.road_planned', readCoreViewSql()), 'rebuild');
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0]!.params, { sourceId: 'victoria.transport.road_planned' });
+  const rebuild = calls[1]!;
+  assert.match(rebuild.query, /rebuild-geo-records-current/);
+  assert.ok(rebuild.query.includes('WHERE source_id IN UNNEST(@sourceIds) AND fetched_at >= @fetchedFloor)'));
+  assert.deepEqual(rebuild.params.sourceIds, ['victoria.transport.road_planned']);
+  assert.equal((rebuild.params.fetchedFloor as { value: string }).value, '2026-10-15T14:30:18.919Z');
+  // Before anything is published there is no floor, and other sources never get one.
+  const empty = fakeBigQuery();
+  await refreshGeoRecordsCurrent(config, empty.bigquery as never, 'victoria.transport.gtfs_realtime', readCoreViewSql());
+  assert.deepEqual(empty.calls[1]!.params, { sourceIds: ['victoria.transport.gtfs_realtime'] });
+  assert.ok(!empty.calls[1]!.query.includes('@fetchedFloor'));
+  await assert.rejects(rebuildGeoRecordsCurrent(config, empty.bigquery as never, ['ticketmaster.events'],
+    readCoreViewSql(), '2026-10-15T00:00:00Z'), /Only complete-snapshot sources/);
+});
+
 test('only map geo sources can be refreshed, and a ceiling is required', async () => {
   const { bigquery } = fakeBigQuery();
   await assert.rejects(refreshGeoRecordsCurrent(config, bigquery as never, 'homes_victoria.rents'), /Not a map geo source/);

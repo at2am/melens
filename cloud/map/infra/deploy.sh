@@ -111,6 +111,9 @@ reviewed = {
     # Transport Victoria road disruptions (UC-05), CC BY 4.0, admitted 2026-10-16 for the disruption layer.
     'victoria.transport.road_planned': ('verified_open', 'opendata.transport.vic.gov.au'),
     'victoria.transport.road_unplanned': ('verified_open', 'opendata.transport.vic.gov.au'),
+    # Metro train and Yarra Trams service alerts (UC-05), CC BY 4.0, admitted 2026-10-16. The static schedule
+    # that places them is reference data and is not itself a map source.
+    'victoria.transport.gtfs_realtime': ('verified_open', 'opendata.transport.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:

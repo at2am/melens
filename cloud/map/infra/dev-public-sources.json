@@ -64,5 +64,11 @@
     "url": "https://opendata.transport.vic.gov.au/dataset/unplanned-disruptions-road",
     "attribution": "Transport Victoria — Unplanned disruptions, road (CC BY 4.0)",
     "versionRef": null
+  },
+  {
+    "sourceId": "victoria.transport.gtfs_realtime",
+    "url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime",
+    "attribution": "Transport Victoria — Metro Trains and Yarra Trams service alerts (CC BY 4.0)",
+    "versionRef": null
   }
 ]

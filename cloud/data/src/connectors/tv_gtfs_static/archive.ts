@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { crc32, inflateRawSync } from 'node:zlib';
 
 import { HttpClient, type HttpResponse } from '../../core/http.js';
+import { ShapeCollector, type RouteShape } from './shapes.js';
 
 export const ARCHIVE_URL = 'https://opendata.transport.vic.gov.au/dataset/3f4e292e-7f8a-4ffe-831f-1953be0fe448/resource/fb152201-859f-4882-9206-b768060b50ad/download/gtfs.zip';
 
@@ -26,6 +27,7 @@ export interface OfficialGtfsArchive {
     stops: Record<string, string>[];
     trips: Record<string, string>[];
     stop_times: Record<string, string>[];
+    route_shapes: RouteShape[];
   };
   archiveVersion: string;
   sourceUpdatedAt: string | null;
@@ -243,7 +245,18 @@ function parseMode(zip: Uint8Array): OfficialGtfsArchive['raw'] {
   const stop_times = sparseStopTimes(get('stop_times.txt'), tripRoutes);
   const feedInfoEntry = entries.get('feed_info.txt');
   const feed_info = feedInfoEntry ? records(innerEntry(zip, feedInfoEntry)) : [];
-  return { feed_info, routes, stops, trips, stop_times };
+  // shapes.txt is optional in GTFS; without it a route alert simply stays unlocated.
+  const shapesEntry = entries.get('shapes.txt');
+  const shapes = new ShapeCollector();
+  if (shapesEntry) {
+    csvRows(innerEntry(zip, shapesEntry), (header, values) => {
+      const at = (name: string) => values[header.indexOf(name)];
+      shapes.add(at('shape_id') ?? '', Number(at('shape_pt_sequence')),
+        Number(at('shape_pt_lat')), Number(at('shape_pt_lon')));
+    });
+  }
+  const route_shapes = shapes.routeShapes(trips.map(row => ({ route_id: row.route_id ?? '', shape_id: row.shape_id })));
+  return { feed_info, routes, stops, trips, stop_times, route_shapes };
 }
 
 /** Fetch only train and tram members from Transport Victoria's nested mode archive. */
@@ -278,7 +291,8 @@ export async function fetchOfficialGtfsArchive(http: HttpClient = new HttpClient
   const archiveVersion = `archive-sha256:${createHash('sha256').update(`${validator}\n${outer.size}`).digest('hex')}`;
   const combined = { feed_info: modes.flatMap(mode => mode.feed_info),
     routes: modes.flatMap(mode => mode.routes), stops: modes.flatMap(mode => mode.stops),
-    trips: modes.flatMap(mode => mode.trips), stop_times: modes.flatMap(mode => mode.stop_times) };
+    trips: modes.flatMap(mode => mode.trips), stop_times: modes.flatMap(mode => mode.stop_times),
+    route_shapes: modes.flatMap(mode => mode.route_shapes) };
   return { raw: combined, archiveVersion, sourceUpdatedAt, fetchedAt: tail.fetchedAt,
     routeStopPairs: combined.stop_times.length, tripStopMembershipComplete: false };
 }

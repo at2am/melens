@@ -38,16 +38,30 @@ const summarySchema = z.object({
 type AlertSummary = z.infer<typeof summarySchema>;
 type AlertSelector = AlertSummary['selectors'][number];
 
+/** A published route's drawn shape and the route source fact it came from. */
+export interface RouteShapeReference {
+  geometryGeojson: string;
+  record: SourceRecord;
+  feedVersion: string;
+}
+
 export interface StaticGtfsVersion {
   /** Both values must describe the same downloaded GTFS archive. */
   snapshot: GtfsStaticSnapshot;
   normalized: NormalizedGtfsResult;
   /** Runtime references require a publisher archive relationship for this mode. */
   publisherMode?: AlertMode;
+  /**
+   * Without feed_info no alert can name its schedule version. The runtime then loads only the newest
+   * published schedule and marks it as the one in service; alerts match it by being current.
+   */
+  matchRule?: 'latest_published_archive';
+  /** Route shapes from the same published schedule, by route_id. */
+  routeShapes?: ReadonlyMap<string, RouteShapeReference>;
 }
 
 export type GtfsMappingStatus =
-  | 'located' | 'route_only' | 'unmapped' | 'ambiguous'
+  | 'located' | 'route_only' | 'route_with_stops' | 'unmapped' | 'ambiguous'
   | 'version_unverified' | 'trip_instance_unverified' | 'invalid_alert';
 
 export interface GtfsAlertMapping {
@@ -56,6 +70,17 @@ export interface GtfsAlertMapping {
   staticFeedVersion: string | null;
   routeIds: readonly string[];
   stopIds: readonly string[];
+  /**
+   * The static facts that placed the alert. They belong to another source, and a batch may link
+   * only its own source's records, so they travel in the alert summary rather than as links.
+   */
+  staticEvidence: readonly StaticEvidence[];
+}
+
+export interface StaticEvidence {
+  role: 'gtfs_static_route_id' | 'gtfs_static_stop_location';
+  source_record_id: string;
+  version_id: string;
 }
 
 export interface JoinedGtfsAlerts {
@@ -72,6 +97,24 @@ interface PreparedStatic {
   tripStops: Set<string>;
   records: Map<string, SourceRecord>;
   stopGeography: Map<string, GeoRecord>;
+  /** Routes serving a stop, a station counting the routes of its platforms. */
+  servedRoutes: Map<string, Set<string>>;
+}
+
+function servedRoutes(stops: NormalizedGtfsResult['stops']): Map<string, Set<string>> {
+  const served = new Map<string, Set<string>>();
+  const add = (stopId: string, routeIds: readonly string[]) => {
+    let set = served.get(stopId);
+    if (!set) { set = new Set(); served.set(stopId, set); }
+    for (const routeId of routeIds) set.add(routeId);
+  };
+  for (const stop of stops) {
+    add(stop.stop_id, stop.route_ids);
+    // Alerts name stations (location_type 1), while stop_times name their platforms.
+    const parent = stop.parent_station?.trim();
+    if (parent) add(parent, stop.route_ids);
+  }
+  return served;
 }
 
 function prepare(version: StaticGtfsVersion): PreparedStatic {
@@ -84,11 +127,15 @@ function prepare(version: StaticGtfsVersion): PreparedStatic {
     [record.source_record_id, record]));
   const stopGeography = new Map(version.normalized.geoRecords.map(record =>
     [record.geo_record_id, record]));
-  return { version, routes, stops, trips, tripStops, records, stopGeography };
+  return { version, routes, stops, trips, tripStops, records, stopGeography,
+    servedRoutes: servedRoutes(version.normalized.stops) };
 }
 
+/** Basic and extended GTFS route types: Transport Victoria publishes metro trains as 400 (urban railway). */
 function modeMatches(mode: AlertMode, routeType: number): boolean {
-  return mode === 'yarra_tram' ? routeType === 0 : routeType === 1 || routeType === 2;
+  return mode === 'yarra_tram' ? routeType === 0 || (routeType >= 900 && routeType <= 906)
+    : routeType === 1 || routeType === 2 || (routeType >= 100 && routeType <= 117)
+      || (routeType >= 400 && routeType <= 404);
 }
 
 function publisherFeedVersion(staticFeed: PreparedStatic): string | null {
@@ -108,6 +155,10 @@ function publisherFeedVersion(staticFeed: PreparedStatic): string | null {
 function versionMatches(alert: AlertSummary, staticFeed: PreparedStatic): boolean {
   if (staticFeed.version.publisherMode !== undefined
     && staticFeed.version.publisherMode !== alert.mode) return false;
+  if (staticFeed.version.matchRule === 'latest_published_archive') {
+    return alert.feed_timestamp !== null && Number.isFinite(Date.parse(alert.feed_timestamp))
+      && staticFeed.version.normalized.feedVersion.startsWith('archive-sha256:');
+  }
   if (alert.feed_version === null || alert.feed_timestamp === null
     || alert.feed_version !== publisherFeedVersion(staticFeed)) return false;
   const timestamp = Date.parse(alert.feed_timestamp);
@@ -159,9 +210,12 @@ function resolveSelector(
     const route = staticFeed.routes.get(routeId);
     if (!route || !modeMatches(mode, route.route_type)) return false;
     if (selector.routeType !== null && route.route_type !== selector.routeType) return false;
-    if (selector.agencyId !== null && route.agency_id !== selector.agencyId) return false;
-    if (stop && !stop.route_ids.includes(routeId)) return false;
-    if (selector.directionId !== null) {
+    // Published runtime references keep no agency; each mode feed has one agency, so an unknown one is no conflict.
+    if (selector.agencyId !== null && route.agency_id != null && route.agency_id !== selector.agencyId) return false;
+    if (stop && !staticFeed.servedRoutes.get(stop.stop_id)?.has(routeId)) return false;
+    // Published runtime references carry no trips, so a direction cannot be checked there. It narrows
+    // services within the route but not where they run: the route's shape or the stop is the same.
+    if (selector.directionId !== null && (trip || snapshot.trips.length > 0)) {
       if (trip) return trip.direction_id === selector.directionId;
       if (stop && !staticFeed.version.normalized.tripStopMembershipComplete) return false;
       return snapshot.trips.some(candidate => candidate.route_id === routeId
@@ -198,8 +252,8 @@ function parseSummary(row: GeoRecord): AlertSummary | null {
 }
 
 /**
- * Enrich only an exact stop match in the same static feed version and mode.
- * A route, agency, or mode selector alone has no defensible point geometry.
+ * Place an exact stop match at its stop, and a match on named routes along those routes' shapes,
+ * both from the matched static schedule. An agency or mode selector alone stays unlocated.
  * Call this before publishing the realtime batch, with an admitted static feed.
  */
 export function joinGtfsAlertLocations(input: {
@@ -237,11 +291,12 @@ export function joinGtfsAlertLocations(input: {
             status = 'trip_instance_unverified';
           }
           else if (matched.length === 0) status = 'unmapped';
-          else if (matched.length !== resolved.length || stopIds.length > 1
-            || (stopIds.length === 1 && matched.some(item => item.stopId === null))) {
-            // A stop selector alongside a route or agency selector describes
-            // more than one possible location for the whole alert.
-            status = 'ambiguous';
+          else if (matched.length !== resolved.length) status = 'ambiguous';
+          else if (stopIds.length > 1 || (stopIds.length === 1 && matched.some(item => item.stopId === null))) {
+            // Several stops, or a stop beside a route selector, have no single point. When every
+            // selector names its route (works between stations on a line), the routes carry the
+            // alert; otherwise a stop may lie on a route the alert never named.
+            status = matched.every(item => item.exactRouteIds.length > 0) ? 'route_with_stops' : 'ambiguous';
           }
           else if (stopIds.length === 0) status = 'route_only';
           else {
@@ -275,9 +330,28 @@ export function joinGtfsAlertLocations(input: {
           location_role: 'event_site', location_confidence: 'official_join' };
       }
     }
+    // A route alert is drawn along every named route when each has a shape in the same schedule.
+    const shapes = (status === 'route_only' || status === 'route_with_stops') && staticFeed !== null && alertSelfLink
+      ? routeIds.map(routeId => staticFeed!.version.routeShapes?.get(routeId)) : [];
+    if (shapes.length > 0 && shapes.every(shape => shape !== undefined
+      && shape.feedVersion === staticFeed!.version.normalized.feedVersion)) {
+      const found = shapes as RouteShapeReference[];
+      const geometry = JSON.stringify({ type: 'MultiLineString', coordinates: found.flatMap(shape =>
+        (JSON.parse(shape.geometryGeojson) as { coordinates: unknown[] }).coordinates) });
+      const versionId = sourceVersionId(original.source_updated_at, {
+        alertSourceVersionId: alertSelfLink!.source_version_id,
+        staticFeedVersion: staticFeed!.version.normalized.feedVersion,
+        staticRouteVersionIds: found.map(shape => shape.record.version_id),
+        geometry,
+      });
+      record = { ...original, version_id: versionId, geometry_geojson: geometry,
+        centroid_lat: null, centroid_lon: null,
+        location_role: 'event_site', location_confidence: 'official_join' };
+    }
     geoRecords.push(record);
     geoRecordSources.push(...originalLinks.map(link => ({ ...link, version_id: record.version_id })));
 
+    const staticEvidence: StaticEvidence[] = [];
     if (staticFeed !== null) {
       for (const [kind, ids] of [
         ['route', routeIds], ['stop', stopIds],
@@ -285,19 +359,14 @@ export function joinGtfsAlertLocations(input: {
         for (const id of ids) {
           const referenced = staticRecord(staticFeed, kind, id);
           if (!referenced) continue;
-          geoRecordSources.push({ batch_id: record.batch_id, source_id: record.source_id,
-            schema_version: record.schema_version, fetched_at: record.fetched_at,
-            geo_record_id: record.geo_record_id, version_id: record.version_id,
-            source_record_id: referenced.source_record_id,
-            source_version_id: referenced.version_id,
-            evidence_role: kind === 'route' ? 'gtfs_static_route_id' : 'gtfs_static_stop_location',
-            original_url: referenced.original_url });
+          staticEvidence.push({ role: kind === 'route' ? 'gtfs_static_route_id' : 'gtfs_static_stop_location',
+            source_record_id: referenced.source_record_id, version_id: referenced.version_id });
         }
       }
     }
     mappings.push({ geoRecordId: record.geo_record_id, status,
       staticFeedVersion: staticFeed?.version.normalized.feedVersion ?? null,
-      routeIds, stopIds });
+      routeIds, stopIds, staticEvidence });
   }
   const unique = new Map<string, GeoRecordSource>();
   for (const link of geoRecordSources) {

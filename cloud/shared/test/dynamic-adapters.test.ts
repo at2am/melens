@@ -172,6 +172,26 @@ test('transit route-only alerts stay unlocated and selector IDs are not invented
   assert.equal(batch.unresolvedCount, null);
 });
 
+test('a transit alert as the connector writes it: numeric GTFS effect, drawn along its routes', () => {
+  const routes = JSON.stringify({ type: 'MultiLineString',
+    coordinates: [[[144.96, -37.81], [144.97, -37.82]], [[144.97, -37.82], [144.98, -37.83]]] });
+  const item = adaptDisruptionRow(geo({ source_id: transitSource.sourceId, topic: 'transport',
+    geometry_geojson: routes, location_confidence: 'official_join',
+    summary: JSON.stringify({ mode: 'metro_train', feed_timestamp: '2026-10-01T00:00:00Z', feed_version: null,
+      alert_id: 'M-17', cause: 9, effect: 1, description: 'Buses replace trains',
+      selectors: [{ agencyId: '1', routeId: 'aus:vic:vic-02-CGB:', stopId: 'vic:rail:NME', directionId: 0 }],
+      gtfs_mapping_status: 'route_with_stops', static_evidence: [] }) }), { source: transitSource });
+  assert.equal(item.geometry?.type, 'MultiLineString');
+  assert.equal(item.details.extentKind, 'route');
+  assert.equal(item.details.impact, 'No service');
+  assert.equal(item.details.summary, 'Buses replace trains');
+  // An effect number outside the enum is no text rather than a guess.
+  const unknown = adaptDisruptionRow(geo({ source_id: transitSource.sourceId, topic: 'transport',
+    geometry_geojson: routes, location_confidence: 'official_join',
+    summary: JSON.stringify({ effect: 99, selectors: [] }) }), { source: transitSource });
+  assert.equal(unknown.details.impact, null);
+});
+
 test('an officially joined transit stop preserves its point and stop extent', () => {
   const item = adaptDisruptionRow(geo({ source_id: transitSource.sourceId, topic: 'transport',
     geometry_geojson: point, location_confidence: 'official_join' }), { source: transitSource });
