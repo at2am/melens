@@ -67,6 +67,24 @@ export class TurnRegistry {
     }
   }
 
+  /**
+   * The sources of a card an earlier turn showed, which the server verified then: a `refine` turn may cite
+   * them again without searching. Google Maps places keep their Maps link for the attribution.
+   */
+  rememberCard(card: Card): void {
+    for (const item of card.items) {
+      if ('feature_id' in item.source) this.featureIds.add(item.source.feature_id);
+      else this.urls.add(item.source.url);
+    }
+    const places = (card.attribution?.google_maps ?? []) as readonly { place_id?: unknown; maps_uri?: unknown }[];
+    for (const place of Array.isArray(places) ? places : []) {
+      if (typeof place.place_id !== 'string' || typeof place.maps_uri !== 'string') continue;
+      const title = card.items.find((item) => item.place_id === place.place_id)?.title ?? 'Place';
+      this.places.set(place.place_id, { title, place_id: place.place_id, maps_uri: place.maps_uri });
+      this.urls.add(place.maps_uri);
+    }
+  }
+
   nextQuestionId(): string { this.questions += 1; return `q_${this.turn.turnId}_${this.questions}`; }
   nextStepId(): string { this.steps += 1; return `s_${this.turn.turnId}_${this.steps}`; }
   nextCardId(): string { return `c_${this.turn.turnId}_${this.cards.length + 1}`; }

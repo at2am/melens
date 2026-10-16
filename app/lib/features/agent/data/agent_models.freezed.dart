@@ -32,6 +32,10 @@ TurnInput _$TurnInputFromJson(
           return AnswerTurnInput.fromJson(
             json
           );
+                case 'refine':
+          return RefineTurnInput.fromJson(
+            json
+          );
         
           default:
             throw CheckedFromJsonException(
@@ -90,14 +94,15 @@ extension TurnInputPatterns on TurnInput {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( TextTurnInput value)?  text,TResult Function( AreaTurnInput value)?  area,TResult Function( AnalyseTurnInput value)?  analyse,TResult Function( AnswerTurnInput value)?  answer,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( TextTurnInput value)?  text,TResult Function( AreaTurnInput value)?  area,TResult Function( AnalyseTurnInput value)?  analyse,TResult Function( AnswerTurnInput value)?  answer,TResult Function( RefineTurnInput value)?  refine,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case TextTurnInput() when text != null:
 return text(_that);case AreaTurnInput() when area != null:
 return area(_that);case AnalyseTurnInput() when analyse != null:
 return analyse(_that);case AnswerTurnInput() when answer != null:
-return answer(_that);case _:
+return answer(_that);case RefineTurnInput() when refine != null:
+return refine(_that);case _:
   return orElse();
 
 }
@@ -115,14 +120,15 @@ return answer(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( TextTurnInput value)  text,required TResult Function( AreaTurnInput value)  area,required TResult Function( AnalyseTurnInput value)  analyse,required TResult Function( AnswerTurnInput value)  answer,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( TextTurnInput value)  text,required TResult Function( AreaTurnInput value)  area,required TResult Function( AnalyseTurnInput value)  analyse,required TResult Function( AnswerTurnInput value)  answer,required TResult Function( RefineTurnInput value)  refine,}){
 final _that = this;
 switch (_that) {
 case TextTurnInput():
 return text(_that);case AreaTurnInput():
 return area(_that);case AnalyseTurnInput():
 return analyse(_that);case AnswerTurnInput():
-return answer(_that);}
+return answer(_that);case RefineTurnInput():
+return refine(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -136,14 +142,15 @@ return answer(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( TextTurnInput value)?  text,TResult? Function( AreaTurnInput value)?  area,TResult? Function( AnalyseTurnInput value)?  analyse,TResult? Function( AnswerTurnInput value)?  answer,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( TextTurnInput value)?  text,TResult? Function( AreaTurnInput value)?  area,TResult? Function( AnalyseTurnInput value)?  analyse,TResult? Function( AnswerTurnInput value)?  answer,TResult? Function( RefineTurnInput value)?  refine,}){
 final _that = this;
 switch (_that) {
 case TextTurnInput() when text != null:
 return text(_that);case AreaTurnInput() when area != null:
 return area(_that);case AnalyseTurnInput() when analyse != null:
 return analyse(_that);case AnswerTurnInput() when answer != null:
-return answer(_that);case _:
+return answer(_that);case RefineTurnInput() when refine != null:
+return refine(_that);case _:
   return null;
 
 }
@@ -160,13 +167,14 @@ return answer(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function(@JsonKey(required: true)  String text)?  text,TResult Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)?  area,TResult Function(@JsonKey(required: true)  String featureId)?  analyse,TResult Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)?  answer,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function(@JsonKey(required: true)  String text)?  text,TResult Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)?  area,TResult Function(@JsonKey(required: true)  String featureId)?  analyse,TResult Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)?  answer,TResult Function(@JsonKey(required: true)  String cardId, @JsonKey(required: true)  String text)?  refine,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case TextTurnInput() when text != null:
 return text(_that.text);case AreaTurnInput() when area != null:
 return area(_that.lat,_that.lng);case AnalyseTurnInput() when analyse != null:
 return analyse(_that.featureId);case AnswerTurnInput() when answer != null:
-return answer(_that.questionId,_that.value);case _:
+return answer(_that.questionId,_that.value);case RefineTurnInput() when refine != null:
+return refine(_that.cardId,_that.text);case _:
   return orElse();
 
 }
@@ -184,13 +192,14 @@ return answer(_that.questionId,_that.value);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function(@JsonKey(required: true)  String text)  text,required TResult Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)  area,required TResult Function(@JsonKey(required: true)  String featureId)  analyse,required TResult Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)  answer,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function(@JsonKey(required: true)  String text)  text,required TResult Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)  area,required TResult Function(@JsonKey(required: true)  String featureId)  analyse,required TResult Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)  answer,required TResult Function(@JsonKey(required: true)  String cardId, @JsonKey(required: true)  String text)  refine,}) {final _that = this;
 switch (_that) {
 case TextTurnInput():
 return text(_that.text);case AreaTurnInput():
 return area(_that.lat,_that.lng);case AnalyseTurnInput():
 return analyse(_that.featureId);case AnswerTurnInput():
-return answer(_that.questionId,_that.value);}
+return answer(_that.questionId,_that.value);case RefineTurnInput():
+return refine(_that.cardId,_that.text);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -204,13 +213,14 @@ return answer(_that.questionId,_that.value);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function(@JsonKey(required: true)  String text)?  text,TResult? Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)?  area,TResult? Function(@JsonKey(required: true)  String featureId)?  analyse,TResult? Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)?  answer,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function(@JsonKey(required: true)  String text)?  text,TResult? Function(@JsonKey(required: true)  double lat, @JsonKey(required: true)  double lng)?  area,TResult? Function(@JsonKey(required: true)  String featureId)?  analyse,TResult? Function(@JsonKey(required: true)  String questionId, @JsonKey(required: true)  String value)?  answer,TResult? Function(@JsonKey(required: true)  String cardId, @JsonKey(required: true)  String text)?  refine,}) {final _that = this;
 switch (_that) {
 case TextTurnInput() when text != null:
 return text(_that.text);case AreaTurnInput() when area != null:
 return area(_that.lat,_that.lng);case AnalyseTurnInput() when analyse != null:
 return analyse(_that.featureId);case AnswerTurnInput() when answer != null:
-return answer(_that.questionId,_that.value);case _:
+return answer(_that.questionId,_that.value);case RefineTurnInput() when refine != null:
+return refine(_that.cardId,_that.text);case _:
   return null;
 
 }
@@ -515,6 +525,83 @@ class _$AnswerTurnInputCopyWithImpl<$Res>
   return _then(AnswerTurnInput(
 questionId: null == questionId ? _self.questionId : questionId // ignore: cast_nullable_to_non_nullable
 as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class RefineTurnInput implements TurnInput {
+  const RefineTurnInput({@JsonKey(required: true) required this.cardId, @JsonKey(required: true) required this.text,  String? $type}): $type = $type ?? 'refine';
+  factory RefineTurnInput.fromJson(Map<String, dynamic> json) => _$RefineTurnInputFromJson(json);
+
+@JsonKey(required: true) final  String cardId;
+@JsonKey(required: true) final  String text;
+
+@JsonKey(name: 'kind')
+final String $type;
+
+
+/// Create a copy of TurnInput
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$RefineTurnInputCopyWith<RefineTurnInput> get copyWith => _$RefineTurnInputCopyWithImpl<RefineTurnInput>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$RefineTurnInputToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is RefineTurnInput&&(identical(other.cardId, cardId) || other.cardId == cardId)&&(identical(other.text, text) || other.text == text));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode {
+    return Object.hash(runtimeType,cardId,text);
+}
+
+@override
+String toString() {
+    return 'TurnInput.refine(cardId: $cardId, text: $text)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $RefineTurnInputCopyWith<$Res> implements $TurnInputCopyWith<$Res> {
+  factory $RefineTurnInputCopyWith(RefineTurnInput value, $Res Function(RefineTurnInput) _then) = _$RefineTurnInputCopyWithImpl;
+@useResult
+$Res call({
+@JsonKey(required: true) String cardId,@JsonKey(required: true) String text
+});
+
+
+
+
+}
+/// @nodoc
+class _$RefineTurnInputCopyWithImpl<$Res>
+    implements $RefineTurnInputCopyWith<$Res> {
+  _$RefineTurnInputCopyWithImpl(this._self, this._then);
+
+  final RefineTurnInput _self;
+  final $Res Function(RefineTurnInput) _then;
+
+/// Create a copy of TurnInput
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? cardId = null,Object? text = null,}) {
+  return _then(RefineTurnInput(
+cardId: null == cardId ? _self.cardId : cardId // ignore: cast_nullable_to_non_nullable
+as String,text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

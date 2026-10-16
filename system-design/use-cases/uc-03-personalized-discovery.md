@@ -28,12 +28,16 @@ Shows the agent calling several tools to build a plan around the user's time, in
 2. `map_agent`, following the UC-03 playbook, finds candidates: events from the events layer for story 1, free places and activities for story 2, and Maps grounding only for stops the layers do not have, such as a café or a park.
 3. For a walk, it builds a route with the Maps grounding route capability (up to 13 waypoints) and calls `draw_route`, so the app draws it on the map.
 4. The plan arrives as a `plan` card, with times, stops and a source for each item.
+5. **Change plan.** Under a finished plan card the user taps Change plan, then types what to change or taps a suggestion (shorter, cheaper, an hour later, indoors). The message is a `refine` turn for that card ([agent-protocol.md](../agent-protocol.md#request)): the agent gets the whole plan, keeps the stops the user did not ask to change, searches only for new ones, redraws the route when the stops changed and shows the whole revised plan as a new `plan` card. The user can change it again, as often as they like.
+6. **Save plan.** Save plan keeps a copy of the card, with its route, on the Home tab (UC-14) under Saved plans: a one-off plan, not a feed that refreshes. It outlives the chat session. A saved plan opens on its own page, where each stop opens on the map, Show the route on the map draws the route again and Remove plan deletes it. Plans whose timed stops are all over are marked Past and listed last. At most 30 per user ([agent-protocol.md](../agent-protocol.md#saved-plans)).
 
 ## Example queries
 
 - "What can I do after 7 PM tonight? I enjoy arts and culture and need somewhere accessible on foot or by public transport."
 - "I'd like some free activities now."
 - "Plan a free, 45-minute walk near me, with a few interesting stops along the way."
+- After a walk plan, Change plan: "Swap the second stop for a café." Expect the other stops kept, one new searched stop and a new route.
+- After an evening plan, Change plan: "Start an hour later." Expect the same kind of stops with later times, no unverified sources.
 
 ## Acceptance criteria (Draft)
 
@@ -42,6 +46,8 @@ Shows the agent calling several tools to build a plan around the user's time, in
 - [ ] A walk plan has free stops only, takes about 45 minutes, uses at most 13 waypoints and is drawn on the map.
 - [ ] Every stop or event cites a MapFeature id or a web link.
 - [ ] If the events layer has too few Melbourne events, the agent falls back to Search grounding and links the pages it used.
+- [x] Change plan sends a `refine` turn for that card; the revised plan keeps the unchanged stops and cites their sources without a new search.
+- [x] Save plan keeps the card and its route per uid; it shows on the Home tab until removed and outlives the chat session.
 
 ## Notes
 

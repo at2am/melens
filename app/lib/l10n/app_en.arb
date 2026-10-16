@@ -1688,9 +1688,9 @@
   "@mapAgentHighlightsClear": {
     "description": "Button that clears the agent's highlights."
   },
-  "tabFeed": "Feed",
+  "tabFeed": "Home",
   "@tabFeed": {
-    "description": "Label of the bottom tab that opens the feed."
+    "description": "Label of the bottom tab that opens the home page: saved plans and the user's feeds."
   },
   "tabDiscover": "Discover",
   "@tabDiscover": {
@@ -1700,9 +1700,9 @@
   "@tabSettings": {
     "description": "Label of the bottom tab that opens settings, and the settings title."
   },
-  "notFoundBackToFeed": "Back to the feed",
+  "notFoundBackToFeed": "Back to Home",
   "@notFoundBackToFeed": {
-    "description": "Button on the not-found screen that opens the feed."
+    "description": "Button on the not-found screen that opens the Home tab."
   },
   "sampleBadge": "Sample",
   "@sampleBadge": {
@@ -2932,5 +2932,133 @@
         "type": "String"
       }
     }
+  },
+  "chatInputHintRefine": "What should change?",
+  "@chatInputHintRefine": {
+    "description": "Placeholder of the chat input box while the next message changes a plan."
+  },
+  "chatRefiningPlan": "Changing “{title}”",
+  "@chatRefiningPlan": {
+    "description": "Line above the chat input while the next message changes a plan. {title} is the plan's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRefinedPlan": "Change to “{title}”",
+  "@chatRefinedPlan": {
+    "description": "Small label above a user message that asked to change a plan. {title} is the plan's title.",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "chatRefinedPlanUnknown": "Change to a plan",
+  "@chatRefinedPlanUnknown": {
+    "description": "Small label above a user message that asked to change a plan the conversation no longer shows."
+  },
+  "planRefine": "Change plan",
+  "@planRefine": {
+    "description": "Button under a plan card in the chat: the next message asks the agent to change this plan."
+  },
+  "planRefineCancel": "Stop changing",
+  "@planRefineCancel": {
+    "description": "Button that leaves plan-change mode, so the next message is an ordinary one."
+  },
+  "planRefineShorter": "Make it shorter",
+  "@planRefineShorter": {
+    "description": "Suggested change to a plan, sent to the agent as written."
+  },
+  "planRefineCheaper": "Make it cheaper",
+  "@planRefineCheaper": {
+    "description": "Suggested change to a plan, sent to the agent as written."
+  },
+  "planRefineLater": "Start an hour later",
+  "@planRefineLater": {
+    "description": "Suggested change to a plan, sent to the agent as written."
+  },
+  "planRefineIndoors": "Keep it indoors",
+  "@planRefineIndoors": {
+    "description": "Suggested change to a plan, sent to the agent as written."
+  },
+  "planSave": "Save plan",
+  "@planSave": {
+    "description": "Button under a plan card in the chat that keeps the plan on the Home tab."
+  },
+  "planSaved": "Saved",
+  "@planSaved": {
+    "description": "Disabled button under a plan card that is already saved."
+  },
+  "planSaveFailed": "The plan could not be saved. Try again.",
+  "@planSaveFailed": {
+    "description": "Error under a plan card when saving it failed."
+  },
+  "planSaveLimit": "You have 30 saved plans. Remove one on the Home tab first.",
+  "@planSaveLimit": {
+    "description": "Error under a plan card when the user already has the most saved plans."
+  },
+  "plansSectionTitle": "Saved plans",
+  "@plansSectionTitle": {
+    "description": "Heading of the saved plans on the Home tab."
+  },
+  "plansLoadFailed": "Saved plans could not load.",
+  "@plansLoadFailed": {
+    "description": "Shown when the saved plans failed to load."
+  },
+  "planStops": "{count, plural, =1{1 stop} other{{count} stops}}",
+  "@planStops": {
+    "description": "How many stops a saved plan has.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planPast": "Past",
+  "@planPast": {
+    "description": "Label on a saved plan whose stops are all over."
+  },
+  "planScreenTitle": "Saved plan",
+  "@planScreenTitle": {
+    "description": "Title of the page that shows one saved plan."
+  },
+  "planShowRoute": "Show the route on the map",
+  "@planShowRoute": {
+    "description": "Button on a saved plan that draws its route on the map."
+  },
+  "planSavedOn": "Saved {date}",
+  "@planSavedOn": {
+    "description": "When a plan was saved. {date} is a Melbourne date and time.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "planMissing": "This plan is no longer saved.",
+  "@planMissing": {
+    "description": "Shown when a saved plan page opens for a plan that was removed."
+  },
+  "planRemove": "Remove plan",
+  "@planRemove": {
+    "description": "Button and tooltip that removes a saved plan."
+  },
+  "planRemoveTitle": "Remove this plan?",
+  "@planRemoveTitle": {
+    "description": "Title of the dialog that confirms removing a saved plan."
+  },
+  "planRemoveBody": "It disappears from Home. The chat it came from stays.",
+  "@planRemoveBody": {
+    "description": "Body of the dialog that confirms removing a saved plan."
+  },
+  "planRemoveCancel": "Keep",
+  "@planRemoveCancel": {
+    "description": "Button that closes the remove dialog without removing the plan."
+  },
+  "planRemoveFailed": "The plan could not be removed. Try again.",
+  "@planRemoveFailed": {
+    "description": "Shown when removing a saved plan failed."
   }
 }

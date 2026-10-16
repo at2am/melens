@@ -43,6 +43,8 @@ export interface SessionStore {
   delete(uid: string, sessionId: string): Promise<boolean>;
   /** Turns in `seq` order; `limit` keeps the most recent ones. */
   listTurns(uid: string, sessionId: string, limit?: number): Promise<StoredTurn[]>;
+  /** One stored turn, or null when it or its session is gone. */
+  getTurn(uid: string, sessionId: string, turnId: string): Promise<StoredTurn | null>;
   /**
    * One turn at a time per session: a held lease answers `busy`, an expired one is taken over. `takeOverFrom`
    * also takes the lease from that turn, for a new message that asked it to stop and waited long enough.
@@ -135,6 +137,10 @@ export class InMemorySessionStore implements SessionStore {
   async listTurns(uid: string, sessionId: string, limit?: number): Promise<StoredTurn[]> {
     const turns = this.user(uid).get(sessionId)?.turns ?? [];
     return limit === undefined ? [...turns] : turns.slice(Math.max(0, turns.length - limit));
+  }
+
+  async getTurn(uid: string, sessionId: string, turnId: string): Promise<StoredTurn | null> {
+    return this.user(uid).get(sessionId)?.turns.find((turn) => turn.id === turnId) ?? null;
   }
 
   async acquireTurn(uid: string, sessionId: string, turnId: string, now: Date, takeOverFrom?: string): Promise<LeaseResult> {

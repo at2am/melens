@@ -74,7 +74,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   void _submit() {
     final text = _input.text.trim();
-    if (text.isEmpty && _photos.isEmpty) return;
+    final refining = ref.read(chatControllerProvider).refining;
+    // A change to a plan needs words; photos alone cannot say what to change.
+    if (text.isEmpty && (_photos.isEmpty || refining != null)) return;
     final photos = List.of(_photos);
     _input.clear();
     setState(() {
@@ -84,9 +86,33 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     unawaited(
       ref
           .read(chatControllerProvider.notifier)
-          .send(TurnInput.text(text: text), photos: photos),
+          .send(
+            refining == null
+                ? TurnInput.text(text: text)
+                : TurnInput.refine(cardId: refining.id, text: text),
+            photos: photos,
+          ),
     );
     _inputFocus.requestFocus();
+  }
+
+  /// A suggested change to the plan being refined, sent as it is.
+  void _sendRefinement(AgentCard plan, String text) {
+    unawaited(
+      ref
+          .read(chatControllerProvider.notifier)
+          .send(TurnInput.refine(cardId: plan.id, text: text)),
+    );
+  }
+
+  /// The title of a plan card the conversation shows, by id.
+  static String? _planTitle(ChatState chat, String cardId) {
+    for (final turn in chat.turns) {
+      for (final card in turn.cards) {
+        if (card.id == cardId) return card.title;
+      }
+    }
+    return null;
   }
 
   /// The camera is offered on phones; a browser's file chooser offers it
@@ -173,6 +199,14 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     final colors = theme.colorScheme;
     final chat = ref.watch(chatControllerProvider);
     final controller = ref.read(chatControllerProvider.notifier);
+    // Change plan puts the cursor in the box, ready for what to change.
+    ref.listen(chatControllerProvider.select((state) => state.refining), (
+      previous,
+      next,
+    ) {
+      if (next != null && next.id != previous?.id) _inputFocus.requestFocus();
+    });
+    final refining = chat.refining;
     final selection = ref.watch(selectionControllerProvider);
     _scrollToEnd(chat);
     final selectedItem = selection.item;
@@ -276,6 +310,13 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                             : null,
                         onCardItemTap: widget.onCardItemTap,
                         onOpenSource: widget.onOpenSource,
+                        refinedPlanTitle: switch (turn.input) {
+                          RefineTurnInput(:final cardId) => _planTitle(
+                            chat,
+                            cardId,
+                          ),
+                          _ => null,
+                        },
                       );
                     },
                   ),
@@ -338,6 +379,56 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                             )
                           : null,
                     ),
+                ],
+              ),
+            ),
+          if (refining != null)
+            Padding(
+              key: const ValueKey('chat-refining'),
+              padding: const EdgeInsets.fromLTRB(12, 8, 4, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.tune, size: 16, color: colors.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          strings.chatRefiningPlan(refining.title),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge,
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('chat-refining-cancel'),
+                        tooltip: strings.planRefineCancel,
+                        visualDensity: VisualDensity.compact,
+                        onPressed: controller.cancelRefine,
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ],
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      for (final (index, suggestion) in [
+                        strings.planRefineShorter,
+                        strings.planRefineCheaper,
+                        strings.planRefineLater,
+                        strings.planRefineIndoors,
+                      ].indexed)
+                        ActionChip(
+                          key: ValueKey('chat-refine-suggestion-$index'),
+                          label: Text(suggestion),
+                          onPressed: chat.canSend
+                              ? () => _sendRefinement(refining, suggestion)
+                              : null,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -423,7 +514,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _submit(),
                       decoration: InputDecoration(
-                        hintText: chat.isRunning
+                        hintText: refining != null
+                            ? strings.chatInputHintRefine
+                            : chat.isRunning
                             ? strings.chatInputHintRunning
                             : strings.chatInputHint,
                         border: const OutlineInputBorder(),

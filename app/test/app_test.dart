@@ -23,7 +23,7 @@ void main() {
 
     expect(find.text('Page not found'), findsOneWidget);
 
-    await tester.tap(find.text('Back to the feed'));
+    await tester.tap(find.text('Back to Home'));
     await tester.pumpAndSettle();
     expect(find.text('Melbourne'), findsOneWidget);
   });

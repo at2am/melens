@@ -8,13 +8,16 @@ import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../events/state/event_view_providers.dart';
+import '../../plans/state/plans_providers.dart';
+import '../../plans/ui/saved_plans_section.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/feed_models.dart';
 import '../state/feed_providers.dart';
 import 'feed_labels.dart';
 
-/// The home tab: what is happening in the user's feeds. A chip per feed
-/// narrows the list to one; the feed refreshes by pulling down.
+/// The home tab: the plans the user saved from the chat, then what is
+/// happening in the user's feeds. A chip per feed narrows the list to one
+/// (and hides the plans); the feed refreshes by pulling down.
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
@@ -25,6 +28,7 @@ class FeedScreen extends ConsumerWidget {
       ref.invalidate(feedSubscriptionsProvider);
     }
     ref
+      ..invalidate(savedPlansProvider)
       ..invalidate(feedCommunityEventsProvider)
       ..invalidate(mapFeedItemsProvider)
       ..invalidate(feedProvider);
@@ -152,6 +156,8 @@ class FeedScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (selected == null)
+              const SliverToBoxAdapter(child: SavedPlansSection()),
             ..._body(context, ref, feeds, enabled, selected),
             const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],

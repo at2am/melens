@@ -240,6 +240,7 @@ final class ChatState {
     this.sessionsLoading = false,
     this.isRestoring = false,
     this.pendingQuestion,
+    this.refining,
     this.error,
   });
 
@@ -258,6 +259,9 @@ final class ChatState {
 
   /// The question the agent is waiting on; tapping an option answers it.
   final AgentQuestion? pendingQuestion;
+
+  /// The plan card the next message asks to change; the input box says so.
+  final AgentCard? refining;
 
   /// A failed session operation (list, create, open, delete).
   final ChatError? error;
@@ -279,6 +283,8 @@ final class ChatState {
     bool? isRestoring,
     AgentQuestion? pendingQuestion,
     bool clearPendingQuestion = false,
+    AgentCard? refining,
+    bool clearRefining = false,
     ChatError? error,
     bool clearError = false,
   }) => ChatState(
@@ -292,6 +298,7 @@ final class ChatState {
     pendingQuestion: clearPendingQuestion
         ? null
         : pendingQuestion ?? this.pendingQuestion,
+    refining: clearRefining ? null : refining ?? this.refining,
     error: clearError ? null : error ?? this.error,
   );
 }

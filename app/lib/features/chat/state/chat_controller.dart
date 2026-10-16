@@ -58,9 +58,13 @@ class ChatController extends _$ChatController {
     if (!state.canSend) return;
     final normalised = switch (input) {
       TextTurnInput(:final text) => TurnInput.text(text: text.trim()),
+      RefineTurnInput(:final cardId, :final text) => TurnInput.refine(
+        cardId: cardId,
+        text: text.trim(),
+      ),
       _ => input,
     };
-    final sent = normalised is TextTurnInput
+    final sent = normalised is TextTurnInput || normalised is RefineTurnInput
         ? photos
               .where((photo) => photo.bytes != null)
               .take(maxPhotosPerTurn)
@@ -70,6 +74,8 @@ class ChatController extends _$ChatController {
         when text.isEmpty && sent.isEmpty) {
       return;
     }
+    // A change to a plan needs words; photos alone cannot say what to change.
+    if (normalised case RefineTurnInput(:final text) when text.isEmpty) return;
     if (state.isRunning) {
       _generation++;
       _abortRun();
@@ -107,10 +113,14 @@ class ChatController extends _$ChatController {
         ),
       ],
       clearPendingQuestion: true,
+      clearRefining: true,
       clearError: true,
     );
     final context = ref.read(requestContextBuilderProvider)(
-      openCardId: _openCardId(),
+      openCardId: switch (normalised) {
+        RefineTurnInput(:final cardId) => cardId,
+        _ => _openCardId(),
+      },
     );
     try {
       final events = _client.runTurn(
@@ -160,6 +170,16 @@ class ChatController extends _$ChatController {
       }
     }
   }
+
+  /// The next message asks the agent to change [card], a plan of this
+  /// session, instead of starting a new request.
+  void startRefine(AgentCard card) {
+    if (card.type != CardType.plan) return;
+    state = state.copyWith(refining: card);
+  }
+
+  /// The next message is an ordinary one again.
+  void cancelRefine() => state = state.copyWith(clearRefining: true);
 
   /// Answers the pending question with one of its options.
   Future<void> answer(AgentQuestion question, String option) =>
@@ -231,6 +251,7 @@ class ChatController extends _$ChatController {
       if (!ref.mounted || generation != _generation) return;
       state = state.copyWith(
         isRestoring: false,
+        clearRefining: true,
         sessionId: detail.session.id,
         sessionTitle: detail.session.title,
         turns: [
@@ -259,6 +280,7 @@ class ChatController extends _$ChatController {
         sessionTitle: session.title,
         turns: const [],
         clearPendingQuestion: true,
+        clearRefining: true,
       );
       await _refreshSessions(quiet: true);
     } on AgentClientException catch (error) {
@@ -290,6 +312,7 @@ class ChatController extends _$ChatController {
       clearSession: sessionId == state.sessionId,
       turns: sessionId == state.sessionId ? const [] : null,
       clearPendingQuestion: sessionId == state.sessionId,
+      clearRefining: sessionId == state.sessionId,
       sessions: state.sessions
           .where((session) => session.id != sessionId)
           .toList(growable: false),

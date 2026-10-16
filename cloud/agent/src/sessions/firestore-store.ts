@@ -70,6 +70,13 @@ export function createFirestoreSessionStore(options: { readonly projectId: strin
       const all = await query.get();
       return all.docs.map((doc) => { const { expiresAtTs: _ttl, ...turn } = doc.data(); return storedTurnSchema.parse(turn); });
     },
+    async getTurn(uid, sessionId, turnId) {
+      const { db } = await load();
+      const data = (await sessions(db, uid).doc(sessionId).collection('turns').doc(turnId).get()).data();
+      if (data === undefined) return null;
+      const { expiresAtTs: _ttl, ...turn } = data;
+      return storedTurnSchema.parse(turn);
+    },
     async acquireTurn(uid, sessionId, turnId, now, takeOverFrom): Promise<LeaseResult> {
       const { db } = await load();
       const ref = sessions(db, uid).doc(sessionId);

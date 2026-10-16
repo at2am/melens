@@ -56,8 +56,11 @@ Flutter                                  Cloud Run: agent service (ADK, TypeScri
 | `area` | The user selects a point on the map | `lat`, `lng` |
 | `analyse` | The user taps Analyse on a "?" marker | `featureId` |
 | `answer` | The user taps an option under a question | `questionId`, `value` |
+| `refine` | The user tapped Change plan under a plan card and sends what to change | `cardId` (a `plan` card of this session), `text` (1 to 2,000 characters) |
 
-A `text` input may carry photos the user attached, in `attachments` next to `input`; its `text` may then be empty. Each is `{ "kind": "image", "mimeType": "image/jpeg", "data": "<standard base64>" }`: at most 4 per turn, each at most 1,000,000 bytes, of type `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. The server checks that the bytes start like the declared type and answers `400` otherwise. The app downsizes photos before sending (long edge 1,600 px, JPEG quality 80 where the platform re-encodes) and re-encodes anything still too large, or of another type, as a smaller PNG. Gemini reads the photos with the message; a photo Gemini cannot decode ends the turn with an `error` that says so and is not `retryable`.
+A `refine` turn is the UC-03 plan refinement. The service reads the card from the session's stored turn, never from the request: an unknown card answers `404 notFound` and a card that is not a plan `400 invalidRequest` (`messageKey` `agent.error.invalidRequest.not_a_plan`), both before the turn starts. The model gets the whole card, not only the item titles the history carries, and the card's sources count as returned in this turn, so the revised `plan` card may cite the kept stops without searching again. The app sends the card's id as `context.openCardId` too.
+
+A `text` or `refine` input may carry photos the user attached, in `attachments` next to `input`; a `text` input's `text` may then be empty. Each is `{ "kind": "image", "mimeType": "image/jpeg", "data": "<standard base64>" }`: at most 4 per turn, each at most 1,000,000 bytes, of type `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. The server checks that the bytes start like the declared type and answers `400` otherwise. The app downsizes photos before sending (long edge 1,600 px, JPEG quality 80 where the platform re-encodes) and re-encodes anything still too large, or of another type, as a smaller PNG. Gemini reads the photos with the message; a photo Gemini cannot decode ends the turn with an `error` that says so and is not `retryable`.
 
 `context` is sent on every turn. The app is the source of truth for what is on screen; the server does not guess. `userLocation` is present only when the user granted location access.
 
@@ -206,7 +209,7 @@ Rules:
 
 ## Feed subscriptions
 
-The feeds a user built on the Feed tab (UC-14) are stored per uid by the same service on `/v1/feeds`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; no other service and no client reads them ([uc-14](use-cases/uc-14-personal-feed.md)).
+The feeds a user built on the Home tab (UC-14) are stored per uid by the same service on `/v1/feeds`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; no other service and no client reads them ([uc-14](use-cases/uc-14-personal-feed.md)).
 
 | Method and path | Purpose |
 | --- | --- |
@@ -237,6 +240,40 @@ Rules:
 | Document | Fields |
 | --- | --- |
 | `userFeeds/{uid}` | `feeds` (the list above, in order) and `updatedAt` (UTC instant of the last save). A stored list that no longer parses reads as null, as if never saved |
+
+## Saved plans
+
+A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` and shown on the Home tab until the user removes it. It is a one-off: a copy of the card, not a subscription, and nothing refreshes it.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /v1/plans` | The caller's saved plans, newest first: `{ "plans": […] }` |
+| `POST /v1/plans` | Save the plan card named by the body `{ "sessionId": …, "cardId": … }`; `201` with `{ "plan": … }`. Saving a card already saved returns that plan |
+| `DELETE /v1/plans/{planId}` | Remove one; `204`, or `404 notFound` |
+
+A saved plan:
+
+```json
+{
+  "id": "c_t_Xk2…_1",
+  "sessionId": "s_9fQ…",
+  "turnId": "t_Xk2…",
+  "savedAt": "2026-10-16T08:12:00.000Z",
+  "card": { "id": "c_t_Xk2…_1", "type": "plan", "title": "A quiet evening walk", "items": […] },
+  "route": { "polyline": "…", "mode": "walk", "distance_m": 3400, "duration_min": 46, "waypoints": […] }
+}
+```
+
+Rules:
+
+1. **Copied, not sent.** The service copies the card from the caller's own stored turn, so its sources stay the ones it verified. A card id that is unknown, of another session or of another uid answers `404 notFound`; a card that is not a plan `400 invalidRequest` (`.not_a_plan`). The plan's `id` is the card's id.
+2. **Route.** `route` is the arguments of the turn's last `draw_route` action, when it drew one; the app draws it again on request. Absent otherwise.
+3. **Lifetime.** A saved plan outlives its 30-day session and has no TTL; the user removes it.
+4. **Limits.** At most 30 saved plans per uid (`409 conflict`, `.plan_limit`). Saves and removals count against a per-uid limit of 120 per hour (`429 rateLimited`); saving a card already saved does not count, and reads are not limited.
+
+| Document | Fields |
+| --- | --- |
+| `userPlans/{uid}/plans/{planId}` | The saved plan above. A document that no longer parses is left out of the list |
 
 ## Authentication
 

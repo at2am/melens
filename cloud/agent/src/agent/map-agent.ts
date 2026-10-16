@@ -52,6 +52,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
     async run(turn: TurnContext): Promise<StoredTurn> {
       const registry = new TurnRegistry({ turnId: turn.turnId, uid: turn.uid, request: turn.request, sink: turn.sink,
         signal: turn.signal, clock, ...(options.log === undefined ? {} : { log: options.log }) });
+      if (turn.refineCard !== undefined) registry.rememberCard(turn.refineCard);
       const tools = toolSpecs(options.tools).map((spec) => buildTool(spec, registry));
       let streamedText = false;
       let answer = '';
@@ -125,7 +126,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
 
         try {
           const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
-            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images), runConfig, abortSignal: turn.signal });
+            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.refineCard), runConfig, abortSignal: turn.signal });
           for await (const event of events) {
             if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
             if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
