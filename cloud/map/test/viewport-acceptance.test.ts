@@ -5,6 +5,7 @@ import test from 'node:test';
 import { loadMapConfig } from '@melens/shared/config';
 import type { MapItem, ViewportResponse } from '@melens/shared/contracts/map-contract';
 import { createMapService } from '../src/map-service.js';
+import { VERIFIED_RECORD_TTL_MS } from '../src/services/public-records.js';
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
 import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapHttpServer } from '../src/server.js';
@@ -47,6 +48,7 @@ function pedestrianRight(item: Extract<MapItem, { kind: 'pedestrian' }>): string
 /** Direct SQL responses; publication-cache behavior is tested in current-cache-rights.test.ts. */
 function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: boolean; partial?: boolean;
   independentPedestrianRights?: boolean; productionAggregation?: boolean } = {}) {
+  let elapsed = 0;
   const sources = [metadata('acceptance.planning', 'planning'), metadata('acceptance.traffic', 'transport'),
     metadata('acceptance.pedestrian', 'pedestrian'), metadata('acceptance.boundary', 'boundary')];
   const rows = options.rows ?? [planning('acceptance:first'), planning('acceptance:second')];
@@ -108,10 +110,11 @@ function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: bool
       aggregateLayer: (layer) => ({ items: layer.items, groups: new Map() }),
     }),
     ...(options.independentPedestrianRights === true ? { checkPublicRecords } : {}),
-    clock: () => new Date(timestamp), resolveArea: () => 'contains', publicSources: sources.map((row) => ({
+    clock: () => new Date(Date.parse(timestamp) + elapsed), resolveArea: () => 'contains', publicSources: sources.map((row) => ({
       sourceId: String(row.source_id), url: 'https://example.org/public-source', attribution: 'Synthetic public source', versionRef: null,
     })) });
-  return { service, sources, rows, unlocated, boundaries, queries, rights, rightsChecks };
+  return { service, sources, rows, unlocated, boundaries, queries, rights, rightsChecks,
+    advance(milliseconds: number) { elapsed += milliseconds; } };
 }
 
 test('viewport HTTP preserves available, failed, uncovered and absent-producer states independently', async () => {
@@ -211,6 +214,9 @@ test('record removal with unchanged public-source watermark invalidates both det
   assert.equal((await f.service.getItem(item.id, { requestId: 'public-detail', snapshotId: first.snapshotId })).item.id, item.id);
   f.rows.splice(0, 1);
   const unavailable = (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable';
+  // A proof stands for one minute within the same publication, then the record's rights are read again.
+  assert.equal((await f.service.getItem(item.id, { requestId: 'cached-detail', snapshotId: first.snapshotId })).item.id, item.id);
+  f.advance(VERIFIED_RECORD_TTL_MS + 1);
   await assert.rejects(f.service.getItem(item.id, { requestId: 'removed-detail', snapshotId: first.snapshotId }), unavailable);
   await assert.rejects(f.service.queryViewport({ ...request, pageSize: 1, snapshotId: first.snapshotId,
     cursor: first.layers[0]!.nextCursor }), unavailable);

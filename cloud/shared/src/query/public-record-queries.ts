@@ -5,9 +5,9 @@ import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
   BOUNDARY_COLUMNS, BOUNDARY_ORDER, GEO_COLUMNS, GEO_ORDER, PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS,
   PEDESTRIAN_ORDER,
-  bind, geoRightsView, isGeoQuery, queryDefaults, recordProjection, recordStatusFilter, resultLimit, viewPath,
+  bind, geoRightsView, geoView, isGeoQuery, queryDefaults, recordProjection, recordStatusFilter, resultLimit, viewPath,
 } from './sql.js';
-import type { ViewQueryId } from './view-queries.js';
+import type { CurrentGeoRead, ViewQueryId } from './view-queries.js';
 
 export const publicRecordKeysSchema = z.array(z.strictObject({
   id, versionId: id, sourceId: id, sensorId: id.optional(), observedAt: z.string().max(32).optional(),
@@ -18,6 +18,12 @@ export type PublicRecordKeys = z.infer<typeof publicRecordKeysSchema>;
 export function preparePublicRecordQuery(options: {
   readonly queryId: ViewQueryId; readonly request: ViewportQuery; readonly config: MapConfig;
   readonly pageSize: number; readonly recordKeys: PublicRecordKeys;
+  /**
+   * Current geo rights read the live view by default. `served` reads the refreshed copy, which the
+   * caller may choose only after checking that the copy reflects every source's latest published
+   * batch: the copy is the live view's rows as of that batch, with source rights applied at read time.
+   */
+  readonly currentGeoRead?: CurrentGeoRead;
 }): PreparedViewQuery {
   const { queryId, request, config, pageSize } = options;
   const keys = publicRecordKeysSchema.parse(options.recordKeys);
@@ -63,7 +69,7 @@ export function preparePublicRecordQuery(options: {
   if (!isGeoQuery(queryId)) throw new RangeError('Public record verifier unavailable');
   return { ...defaults, ...bindings,
     query: `${recordProjection(GEO_COLUMNS)}
-      FROM ${viewPath(config, geoRightsView(request.mode))} g
+      FROM ${viewPath(config, options.currentGeoRead === 'served' ? geoView(request.mode) : geoRightsView(request.mode))} g
       ${joinRecordKeys('g.geo_record_id', 'g.version_id', 'g.source_id')}
       WHERE ${recordStatusFilter(request.mode)}
       ${GEO_ORDER}` };
