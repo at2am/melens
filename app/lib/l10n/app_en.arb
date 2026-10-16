@@ -1804,6 +1804,15 @@
   "@eventInviteCopied": {
     "description": "Snackbar after copying."
   },
+  "mapLayerNoSource": "{layer} · no data yet",
+  "@mapLayerNoSource": {
+    "description": "Chip label of a map layer the catalog lists with no published source, shown off and disabled.",
+    "placeholders": {
+      "layer": {
+        "type": "String"
+      }
+    }
+  },
   "mapCommunityLayer": "Community events",
   "@mapCommunityLayer": {
     "description": "Map layer chip for user events."

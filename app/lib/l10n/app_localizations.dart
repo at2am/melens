@@ -2325,6 +2325,12 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get eventInviteCopied;
 
+  /// Chip label of a map layer the catalog lists with no published source, shown off and disabled.
+  ///
+  /// In en, this message translates to:
+  /// **'{layer} · no data yet'**
+  String mapLayerNoSource(String layer);
+
   /// Map layer chip for user events.
   ///
   /// In en, this message translates to:

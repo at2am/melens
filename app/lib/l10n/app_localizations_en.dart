@@ -1317,6 +1317,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eventInviteCopied => 'Copied';
 
   @override
+  String mapLayerNoSource(String layer) {
+    return '$layer · no data yet';
+  }
+
+  @override
   String get mapCommunityLayer => 'Community events';
 
   @override

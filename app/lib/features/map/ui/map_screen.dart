@@ -1157,12 +1157,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final strings = AppLocalizations.of(context);
     final controller = ref.read(layerControllerProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
+    // A layer the catalog lists with no published source can show nothing:
+    // its chip says so and stays off, rather than look on over an empty map.
+    final catalog = ref.watch(mapLayerCatalogProvider).value;
+    final unsourced = {
+      for (final descriptor in catalog?.layers ?? const <LayerDescriptor>[])
+        if (descriptor.sourceIds.isEmpty) descriptor.id,
+    };
     Widget chip({
       required Key key,
       required String label,
       required MapMarkerStyle style,
       required bool on,
-      required ValueChanged<bool> onChanged,
+      required ValueChanged<bool>? onChanged,
     }) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
@@ -1191,13 +1198,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         children: [
           for (final layer in layers.availableLayers)
-            chip(
-              key: ValueKey('map-chip-${layer.name}'),
-              label: layerTitle(strings, layer),
-              style: layerStyle(layer),
-              on: layers.isLayerEnabled(layer),
-              onChanged: (on) => controller.setLayerEnabled(layer, on),
-            ),
+            if (unsourced.contains(layer))
+              chip(
+                key: ValueKey('map-chip-${layer.name}'),
+                label: strings.mapLayerNoSource(layerTitle(strings, layer)),
+                style: layerStyle(layer),
+                on: false,
+                onChanged: null,
+              )
+            else
+              chip(
+                key: ValueKey('map-chip-${layer.name}'),
+                label: layerTitle(strings, layer),
+                style: layerStyle(layer),
+                on: layers.isLayerEnabled(layer),
+                onChanged: (on) => controller.setLayerEnabled(layer, on),
+              ),
           chip(
             key: const ValueKey('map-chip-community'),
             label: strings.mapCommunityLayer,
