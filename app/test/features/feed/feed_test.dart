@@ -220,6 +220,60 @@ void main() {
     expect(layers, hasLength(2));
   });
 
+  testWidgets('events read what starts within the feed range, other layers '
+      'what is on now', (tester) async {
+    final repository = T017Repository(autoComplete: true);
+    final container = appContainer(
+      mapRepository: repository,
+      sampleData: false,
+      feeds: FakeFeedsClient([
+        feedOf(
+          'week',
+          topics: {FeedTopic.events, FeedTopic.disruptions},
+          horizon: CommunityHorizon.week,
+        ),
+      ]),
+    );
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    final windows = {
+      for (final query in feedQueries(repository))
+        query.layers.single: query.window,
+    };
+    final events = windows[MapLayerId.event]!;
+    final disruptions = windows[MapLayerId.disruption]!;
+    expect(events.from, disruptions.from);
+    expect(disruptions.to.difference(disruptions.from).inMinutes, 15);
+    expect(events.to, disruptions.to.add(const Duration(days: 7)));
+  });
+
+  testWidgets('a repeated item shows once, at its next showing', (
+    tester,
+  ) async {
+    final container = appContainer(
+      events: FakeUserEventsClient([
+        for (final (id, day) in [
+          ('ue_sun', 20),
+          ('ue_fri', 18),
+          ('ue_sat', 19),
+        ])
+          fakeEvent(
+            id,
+            title: 'Morning yoga',
+            startAt: DateTime.utc(2026, 10, day, 1),
+          ),
+      ]),
+      feeds: FakeFeedsClient([feedOf('cbd')]),
+    );
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    final items = container.read(feedProvider).requireValue.items;
+    final yoga = items.where((item) => item.title == 'Morning yoga');
+    expect(yoga.map((item) => item.id), ['ue_fri']);
+  });
+
   testWidgets('a paused feed is not loaded', (tester) async {
     final repository = T017Repository(autoComplete: true);
     final events = FakeUserEventsClient(harnessEvents());

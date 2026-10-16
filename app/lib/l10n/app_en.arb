@@ -2592,9 +2592,9 @@
   "@feedEditorUnlocatedHint": {
     "description": "Subtitle of the unlocated switch."
   },
-  "feedEditorHorizon": "Community events ahead",
+  "feedEditorHorizon": "Events ahead",
   "@feedEditorHorizon": {
-    "description": "Heading of the community events time range."
+    "description": "Heading of the time range of the events and community events topics."
   },
   "feedHorizonToday": "24 hours",
   "@feedHorizonToday": {

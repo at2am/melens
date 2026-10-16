@@ -324,7 +324,8 @@ class _FeedEditorScreenState extends ConsumerState<FeedEditorScreen> {
             onChanged: (value) => setState(() => _includeUnlocated = value),
           ),
         ],
-        if (_topics.contains(FeedTopic.community)) ...[
+        if (_topics.contains(FeedTopic.community) ||
+            _topics.contains(FeedTopic.events)) ...[
           const SizedBox(height: 16),
           _Heading(strings.feedEditorHorizon),
           SegmentedButton<CommunityHorizon>(

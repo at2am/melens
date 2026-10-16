@@ -3357,10 +3357,10 @@ abstract class AppLocalizations {
   /// **'Adds reports that cover the whole city, such as a disruption to a whole tram line. These are not limited to the area.'**
   String get feedEditorUnlocatedHint;
 
-  /// Heading of the community events time range.
+  /// Heading of the time range of the events and community events topics.
   ///
   /// In en, this message translates to:
-  /// **'Community events ahead'**
+  /// **'Events ahead'**
   String get feedEditorHorizon;
 
   /// Community events range option.

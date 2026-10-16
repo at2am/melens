@@ -171,21 +171,26 @@ final class FeedLayerQuery {
     required this.layer,
     required this.scope,
     this.includeUnlocated = false,
+    this.ahead,
   });
 
   final MapLayerId layer;
   final FeedScope scope;
   final bool includeUnlocated;
 
+  /// For events, how far ahead the read reaches beyond what is on now.
+  final CommunityHorizon? ahead;
+
   @override
   bool operator ==(Object other) =>
       other is FeedLayerQuery &&
       other.layer == layer &&
       other.scope == scope &&
-      other.includeUnlocated == includeUnlocated;
+      other.includeUnlocated == includeUnlocated &&
+      other.ahead == ahead;
 
   @override
-  int get hashCode => Object.hash(layer, scope, includeUnlocated);
+  int get hashCode => Object.hash(layer, scope, includeUnlocated, ahead);
 }
 
 /// The community events of one scope and horizon.
@@ -234,7 +239,16 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
   // A changed subscription disposes this instance before its queries start.
   await Future<void>.delayed(const Duration(milliseconds: 250));
   cancellation.throwIfCancelled();
-  final window = currentViewportWindow(clock);
+  // Events read what is on now and what starts within the feed's range;
+  // other layers read what is on now.
+  final current = currentViewportWindow(clock);
+  final ahead = query.ahead;
+  final window = ahead == null
+      ? current
+      : TimeWindow(
+          from: current.from,
+          to: current.to.add(Duration(days: ahead.days)),
+        );
   final requestId =
       'feed-${query.layer.name}-${clock.now().millisecondsSinceEpoch}';
   Future<List<FeedItem>> locatedItems() async {
@@ -255,10 +269,14 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
       for (final layer in response.layers)
         if (layer.layerId == query.layer) ...layer.items,
     ];
-    final areas = [
+    // News areas, and events that share one venue point, arrive as
+    // aggregates even at zoom 18; the feed lists their members.
+    final groups = [
       for (final item in items)
         if (item case AggregateMapItem(:final details)
-            when details.representation == AggregateRepresentation.areaMentions)
+            when details.representation ==
+                    AggregateRepresentation.areaMentions ||
+                query.layer == MapLayerId.event)
           item,
     ];
     return [
@@ -276,11 +294,11 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
             ),
             topic,
           ),
-      if (areas.isNotEmpty)
-        ...await _areaStories(
+      if (groups.isNotEmpty)
+        ...await _groupMembers(
           repository,
           response.snapshotId,
-          areas,
+          groups,
           topic,
           requestId,
           cancellation,
@@ -305,15 +323,15 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
   return [for (final items in results) ...items];
 }
 
-/// How many named areas a feed reads the stories of.
-const _feedNewsAreas = 8;
+/// How many aggregates a feed reads the members of.
+const _feedGroups = 8;
 
 /// News reaches the map only as the areas its articles name (UC-06): no
 /// article has a place of its own, so the viewport holds no story to list.
-/// The feed reads the latest stories of the [_feedNewsAreas] areas that the
-/// most stories name, one request each. An area that fails is left out; the
-/// source fails only when every area does.
-Future<List<FeedItem>> _areaStories(
+/// Events at one venue point are grouped the same way. The feed reads the
+/// members of the [_feedGroups] largest aggregates, one request each. One
+/// that fails is left out; the source fails only when every one does.
+Future<List<FeedItem>> _groupMembers(
   MapRepository repository,
   String snapshotId,
   List<AggregateMapItem> areas,
@@ -327,7 +345,7 @@ Future<List<FeedItem>> _areaStories(
           (b.details.metric.value ?? 0).compareTo(a.details.metric.value ?? 0),
     );
   final pages = await Future.wait([
-    for (final (index, area) in busiest.take(_feedNewsAreas).indexed)
+    for (final (index, area) in busiest.take(_feedGroups).indexed)
       repository
           .getAggregateMembers(
             area.id,
@@ -486,6 +504,9 @@ Future<FeedResult> feed(Ref ref) async {
                   includeUnlocated:
                       feed.includeUnlocated &&
                       unlocatedFeedTopics.contains(topic),
+                  ahead: topic == FeedTopic.events
+                      ? feed.communityHorizon
+                      : null,
                 ),
               ),
             );
@@ -529,8 +550,18 @@ Future<FeedResult> feed(Ref ref) async {
     if (left == null || right == null) return 0;
     return rank(a) == 0 ? left.compareTo(right) : right.compareTo(left);
   });
+  // A show on every day of the range, or one road work recorded per
+  // segment, reads as one item: the first in the order (the next showing).
+  final repeats = <String>{};
+  final shown = [
+    for (final item in sorted)
+      if (repeats.add(
+        jsonEncode([item.topic.name, item.title, item.place, item.summary]),
+      ))
+        item,
+  ];
   return FeedResult(
-    items: sorted,
+    items: shown,
     failedSources: failed,
     loadingSources: loading,
   );

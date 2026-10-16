@@ -1912,7 +1912,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Adds reports that cover the whole city, such as a disruption to a whole tram line. These are not limited to the area.';
 
   @override
-  String get feedEditorHorizon => 'Community events ahead';
+  String get feedEditorHorizon => 'Events ahead';
 
   @override
   String get feedHorizonToday => '24 hours';
