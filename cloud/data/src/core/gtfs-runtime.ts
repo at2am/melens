@@ -59,6 +59,15 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
   try {
     const [queried] = await bigquery.query({
       query: `/* published-gtfs-static-references */
+      -- Only the newest batch is read, so its fact rows sit in the partitions from just before it
+      -- started. A scripting variable is a constant, so BigQuery prunes the older partitions on it.
+      DECLARE fetched_floor TIMESTAMP DEFAULT (
+        SELECT TIMESTAMP_SUB(started_at, INTERVAL 1 DAY) FROM (
+          SELECT batch_id, state, started_at, published_at FROM ${path('sync_batches')}
+          WHERE source_id = @sourceId
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC) = 1
+        ) WHERE state = 'published' AND published_at IS NOT NULL
+        ORDER BY published_at DESC, batch_id DESC LIMIT 1);
       WITH source_states AS (
         SELECT source_id, license_status, access_status FROM ${path('data_sources')}
         WHERE source_id = @sourceId
@@ -78,6 +87,7 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
         JOIN ${path('source_records')} r ON r.batch_id = g.batch_id AND r.source_id = g.source_id
           AND r.source_record_id = g.geo_record_id AND r.version_id = g.version_id
         WHERE g.source_id = @sourceId AND STARTS_WITH(g.geo_record_id, CONCAT(@sourceId, ':stop:'))
+          AND g.fetched_at >= fetched_floor AND r.fetched_at >= fetched_floor
           AND g.public_query_allowed AND g.rights_status IN ('verified_open', 'restricted')
           AND r.rights_status IN ('verified_open', 'restricted')
         QUALIFY ROW_NUMBER() OVER (PARTITION BY g.batch_id, g.geo_record_id, g.version_id
@@ -89,6 +99,7 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
         JOIN ${path('source_records')} r ON r.batch_id = l.batch_id AND r.source_id = @sourceId
           AND r.source_record_id = l.source_record_id AND r.version_id = l.source_version_id
         WHERE l.source_id = @sourceId AND l.evidence_role = 'serving_route'
+          AND l.fetched_at >= fetched_floor AND r.fetched_at >= fetched_floor
           AND r.rights_status IN ('verified_open', 'restricted')
         QUALIFY ROW_NUMBER() OVER (PARTITION BY l.batch_id, l.geo_record_id, l.version_id,
           r.source_record_id, r.version_id ORDER BY r.fetched_at DESC) = 1
@@ -101,6 +112,7 @@ export async function loadPublishedStaticGtfsVersions(config: DataConfig,
         JOIN ${path('source_records')} r ON r.batch_id = g.batch_id AND r.source_id = g.source_id
           AND r.source_record_id = g.geo_record_id AND r.version_id = g.version_id
         WHERE g.source_id = @sourceId AND STARTS_WITH(g.geo_record_id, CONCAT(@sourceId, ':route:'))
+          AND g.fetched_at >= fetched_floor AND r.fetched_at >= fetched_floor
           AND g.geometry_geojson IS NOT NULL
           AND g.public_query_allowed AND g.rights_status IN ('verified_open', 'restricted')
           AND r.rights_status IN ('verified_open', 'restricted')

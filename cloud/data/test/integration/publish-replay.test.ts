@@ -1032,3 +1032,34 @@ test('large census-style batches keep logical IDs and escaped parameters within 
   assert.deepEqual(covered, new Set(rows.map(row => row.source_record_id)));
   assert.equal(bigquery.visible('source_records').length, rows.length);
 });
+
+test('transport snapshot validation reads only the partitions of its own fetch range', async () => {
+  const { publisher, bigquery } = setup();
+  const transport: DataSource = { ...source, source_id: 'victoria.transport.road_unplanned', topic: 'road_disruption' };
+  const fact = { ...record, source_id: transport.source_id, source_record_id: `${transport.source_id}:incident:1` };
+  const seen: { query: string; params: Record<string, string | undefined> }[] = [];
+  const query = bigquery.query.bind(bigquery);
+  bigquery.query = async input => {
+    if (input.query.includes('/* validate:')) seen.push(input);
+    return query(input);
+  };
+  await publisher.publish({ ...window, source: transport, result: { ...result, sourceId: transport.source_id,
+    sourceRecords: [fact] } });
+  assert.ok(seen.length > 0);
+  for (const call of seen) {
+    assert.ok(call.query.includes('fetched_at BETWEEN TIMESTAMP(@fetchedFrom) AND TIMESTAMP(@fetchedTo)'));
+    assert.equal(call.params.fetchedFrom, new Date(checkedAt).toISOString());
+    assert.equal(call.params.fetchedTo, new Date(checkedAt).toISOString());
+  }
+  // Other sources keep reading their whole published history.
+  seen.length = 0;
+  const other = setup();
+  const otherQuery = other.bigquery.query.bind(other.bigquery);
+  other.bigquery.query = async input => {
+    if (input.query.includes('/* validate:')) seen.push(input);
+    return otherQuery(input);
+  };
+  await other.publisher.publish(window);
+  assert.ok(seen.length > 0);
+  assert.ok(seen.every(call => !call.query.includes('@fetchedFrom') && call.params.fetchedFrom === undefined));
+});
