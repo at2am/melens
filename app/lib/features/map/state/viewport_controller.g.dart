@@ -9,20 +9,26 @@ part of 'viewport_controller.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Whether the map searches again by itself after the user pans or zooms.
-/// Off by default: a moved map offers "Search this area" instead. Kept for
-/// the application session, like the theme choice.
+/// On by default since the map service answers from memory in milliseconds
+/// (system-design/map-serving-stateless.md); turned off, a moved map offers
+/// "Search this area" instead. Kept for the application session, like the
+/// theme choice.
 
 @ProviderFor(MapAutoSearch)
 final mapAutoSearchProvider = MapAutoSearchProvider._();
 
 /// Whether the map searches again by itself after the user pans or zooms.
-/// Off by default: a moved map offers "Search this area" instead. Kept for
-/// the application session, like the theme choice.
+/// On by default since the map service answers from memory in milliseconds
+/// (system-design/map-serving-stateless.md); turned off, a moved map offers
+/// "Search this area" instead. Kept for the application session, like the
+/// theme choice.
 final class MapAutoSearchProvider
     extends $NotifierProvider<MapAutoSearch, bool> {
   /// Whether the map searches again by itself after the user pans or zooms.
-  /// Off by default: a moved map offers "Search this area" instead. Kept for
-  /// the application session, like the theme choice.
+  /// On by default since the map service answers from memory in milliseconds
+  /// (system-design/map-serving-stateless.md); turned off, a moved map offers
+  /// "Search this area" instead. Kept for the application session, like the
+  /// theme choice.
   MapAutoSearchProvider._()
     : super(
         from: null,
@@ -50,11 +56,13 @@ final class MapAutoSearchProvider
   }
 }
 
-String _$mapAutoSearchHash() => r'7a37808140440966b6dbdbf3f1d5d7d30db0fe5d';
+String _$mapAutoSearchHash() => r'169faafbbd2c361e9c88157341498fa893df72b1';
 
 /// Whether the map searches again by itself after the user pans or zooms.
-/// Off by default: a moved map offers "Search this area" instead. Kept for
-/// the application session, like the theme choice.
+/// On by default since the map service answers from memory in milliseconds
+/// (system-design/map-serving-stateless.md); turned off, a moved map offers
+/// "Search this area" instead. Kept for the application session, like the
+/// theme choice.
 
 abstract class _$MapAutoSearch extends $Notifier<bool> {
   bool build();

@@ -42,7 +42,7 @@ final class SelectionControllerProvider
 }
 
 String _$selectionControllerHash() =>
-    r'f1d3ac1bb4adf717682da3d07128dd2083d6c864';
+    r'1d19edf48c8db5bb78145f537a25e707dd39546a';
 
 abstract class _$SelectionController extends $Notifier<MapSelectionState> {
   MapSelectionState build();

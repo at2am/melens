@@ -64,6 +64,8 @@ Measured after phase 1 on 2026-10-16, in process against the live views on one l
 
 Ship the app change and the map service together, app first. The new app works against the old service (it only stops rejecting a newer detail version). The new service works against the old app, except that tapping a record whose version changed since the map loaded (a parking sensor after its next two-minute publication) shows a detail error until the app ships. Old snapshot ids read as `snapshotExpired`, which the app already answers by reissuing its request.
 
+Once the service answered from memory, the app turned "Search as the map moves" back on by default (2026-10-16, project owner). It had been off since 2026-10-15, with a "Search this area" button, because every move cost seconds of BigQuery time. The setting still turns it off.
+
 ## Open questions
 
 - A member list longer than one page (more than 1,000 members) can mix versions across pages after a reload; `aggregate_details.dart` rejects a changed version between its pages. Phase 3 relaxes it.
