@@ -370,7 +370,7 @@
       "snapshot_revision": null,
       "backfill_strategy": "manual_serial_contiguous_windows",
       "request_cap_per_day": 160,
-      "maximum_bytes_billed": 500000000,
+      "maximum_bytes_billed": 2000000000,
       "secret_names": [],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 1,
@@ -435,7 +435,7 @@
       "snapshot_revision": null,
       "backfill_strategy": "manual_serial_contiguous_windows",
       "request_cap_per_day": 288,
-      "maximum_bytes_billed": 1000000000,
+      "maximum_bytes_billed": 2000000000,
       "secret_names": [
         "transport_victoria_key_id"
       ],
@@ -598,6 +598,7 @@
     }
   ],
   "notes": [
+    "gdelt.news and victoria.transport.gtfs_realtime have a 2 GB ceiling since 2026-10-17: every run had failed budgetExceeded since about 13:55 UTC on 2026-10-16 (GDELT's publish validation needed 1.10 GB against 0.5 GB; the GTFS-R static join 1.007 GB against about 0.99 GB), because the 2026-10-16 fetched_at partitions hold about 1.1 GB of parking and transport rows. Lower them again once those partitions age out of the reads.",
     "All sources remain disabled until manifest admission and cloud verification are complete.",
     "Time-window backfills are manual, ordered oldest to newest; the scheduler does not replay missed windows automatically.",
     "melbourne.pedestrian.minute already rereads the previous hour inside its connector; do not add a second hour of schedule overlap.",
