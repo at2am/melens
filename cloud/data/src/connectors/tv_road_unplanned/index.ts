@@ -198,7 +198,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
         time_missing_reason: parentTimeMissing,
         valid_from: createdAt, valid_to: null,
         source_updated_at: updatedAt, source_version_ordinal: null,
-        record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
+        record_status: 'active', assertion_kind: 'report', rights_status: 'verified_open' });
     }
 
     const childId = impactKey === null ? parentId : sourceRecordId({ sourceId: SOURCE_ID,
@@ -216,7 +216,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
         valid_from: createdAt,
         valid_to: null,
         source_updated_at: updatedAt, source_version_ordinal: null,
-        record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
+        record_status: 'active', assertion_kind: 'report', rights_status: 'verified_open' });
     }
     const geometry = geometryFor(feature);
     const point = geometry?.type === 'Point' ? geometry.coordinates : null;
@@ -243,7 +243,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
       valid_from: createdAt, valid_to: null,
       source_updated_at: updatedAt, source_version_ordinal: null,
       freshness_state: 'unknown', record_status: recordStatus,
-      rights_status: 'review_required', public_query_allowed: false });
+      rights_status: 'verified_open', public_query_allowed: true });
     const linked = [{ source_record_id: parentId, source_version_id: parentVersion,
       evidence_role: 'parent_incident' },
     ...(impactKey === null ? [] : [{ source_record_id: childId,
@@ -267,7 +267,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
     first_accessible_at: fetchedAt,
     time_missing_reason: 'Complete fetched snapshot; fetch time is not an incident source timestamp',
     valid_from: null, valid_to: null, source_updated_at: null, source_version_ordinal: null,
-    record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
+    record_status: 'active', assertion_kind: 'report', rights_status: 'verified_open' });
   for (const row of geoRecords) {
     geoRecordSources.push({ batch_id: input.runId, source_id: SOURCE_ID, schema_version: 1,
       fetched_at: fetchedAt, geo_record_id: row.geo_record_id, version_id: row.version_id,

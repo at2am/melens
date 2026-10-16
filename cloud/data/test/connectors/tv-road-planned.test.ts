@@ -45,7 +45,7 @@ test('planned works retain schedule, affected segment, source status and geometr
   assert.equal(normalized.geoRecords[0]?.geometry_geojson?.includes('LineString'), true);
   assert.equal(normalized.geoRecords[1]?.geometry_geojson?.includes('Point'), true);
   assert.equal(normalized.geoRecords[2]?.record_status, 'active');
-  assert.equal(normalized.geoRecords[0]?.public_query_allowed, false);
+  assert.equal(normalized.geoRecords[0]?.public_query_allowed, true);
   normalized.sourceRecords.forEach(row => assert.deepEqual(parseSourceRecord(row), row));
   normalized.geoRecords.forEach(row => assert.equal(validateGeoRecordGeography(row).valid, true));
   const details = JSON.parse(normalized.geoRecords[0]?.summary ?? '{}');
@@ -348,12 +348,12 @@ test('mismatched sourceId fails with validation_failed', async () => {
   if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
 });
 
-test('source manifest enforces review_required, candidate, and KeyID secret requirement', async () => {
+test('source manifest is admitted as open data and requires the KeyID secret', async () => {
   const bytes = await readFile(new URL('../../src/connectors/tv_road_planned/source.json', import.meta.url), 'utf8');
   const manifest = JSON.parse(bytes);
   assert.equal(manifest.source_id, SOURCE_ID);
-  assert.equal(manifest.license_status, 'review_required');
-  assert.equal(manifest.access_status, 'candidate');
+  assert.equal(manifest.license_status, 'verified_open');
+  assert.equal(manifest.access_status, 'active');
   assert.deepEqual(manifest.admission_evidence.secret_names, ['transport_victoria_key_id']);
   assert.equal(manifest.topic, 'road_disruption');
   assert.equal(manifest.scope, 'victoria');

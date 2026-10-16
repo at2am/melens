@@ -34,7 +34,7 @@ test('road incident keeps parent and each impact, with resolved status and unver
   assert.equal(result.geoRecords[0]?.geometry_geojson?.includes('LineString'), true);
   assert.equal(result.geoRecordSources.filter(link => link.evidence_role === 'parent_incident').length, 2);
   assert.equal(result.geoRecordSources.filter(link => link.evidence_role === 'child_impact').length, 2);
-  assert.equal(result.geoRecords[0]?.public_query_allowed, false);
+  assert.equal(result.geoRecords[0]?.public_query_allowed, true);
 });
 
 test('one complete v3 page can be collected without logging KeyID', async () => {
@@ -126,7 +126,7 @@ test('parent incident deduplication, child impact links, parseSourceRecord and v
   // All source records must satisfy schema invariants
   for (const record of result.sourceRecords) {
     assert.deepEqual(parseSourceRecord(record), record);
-    assert.equal(record.rights_status, 'review_required');
+    assert.equal(record.rights_status, 'verified_open');
     assert.equal(record.assertion_kind, 'report');
   }
 
@@ -134,8 +134,8 @@ test('parent incident deduplication, child impact links, parseSourceRecord and v
   for (const geo of result.geoRecords) {
     const geoValidation = validateGeoRecordGeography(geo);
     assert.equal(geoValidation.valid, true, `GeoRecord geography must be valid: ${geoValidation.issues.join(', ')}`);
-    assert.equal(geo.rights_status, 'review_required');
-    assert.equal(geo.public_query_allowed, false);
+    assert.equal(geo.rights_status, 'verified_open');
+    assert.equal(geo.public_query_allowed, true);
   }
 
   // Each child impact geo record links to BOTH parent incident and child impact
@@ -362,15 +362,15 @@ test('temporal clearance progression across batches (Run 1 active -> Run 2 resol
   assert.notEqual(resultRun2.geoRecords[0]?.version_id, resultRun1.geoRecords[0]?.version_id, 'Version must update upon clearance');
 });
 
-test('source.json contract: cadence_seconds=60, check_interval_seconds=60, license_status=review_required, access_status=candidate', async () => {
+test('source.json contract: 10-minute cadence, admitted as open data', async () => {
   const raw = await readFile(new URL('../../src/connectors/tv_road_unplanned/source.json', import.meta.url), 'utf8');
   const manifest = JSON.parse(raw);
   assert.equal(manifest.source_id, 'victoria.transport.road_unplanned');
-  assert.equal(manifest.cadence_seconds, 60);
-  assert.equal(manifest.check_interval_seconds, 60);
+  assert.equal(manifest.cadence_seconds, 600);
+  assert.equal(manifest.check_interval_seconds, 600);
   assert.equal(manifest.requires_monitoring, true);
-  assert.equal(manifest.license_status, 'review_required');
-  assert.equal(manifest.access_status, 'candidate');
+  assert.equal(manifest.license_status, 'verified_open');
+  assert.equal(manifest.access_status, 'active');
   assert.deepEqual(manifest.admission_evidence.secret_names, ['transport_victoria_key_id']);
 });
 
