@@ -18,6 +18,7 @@ import 'package:melens/features/map/ui/map_surface.dart';
 
 import '../features/agent/fake_agent_client.dart';
 import '../features/events/fake_user_events_client.dart';
+import '../features/feed/fake_feeds_cache.dart';
 import '../features/feed/fake_feeds_client.dart';
 
 /// 18 Oct 2026, 11:00 Melbourne time, a Sunday.
@@ -60,6 +61,7 @@ ProviderContainer appContainer({
   FakeAgentClient? agent,
   FakeUserEventsClient? events,
   FakeFeedsClient? feeds,
+  FakeFeedsCache? feedsCache,
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
   MapRepository? mapRepository,
@@ -79,6 +81,7 @@ ProviderContainer appContainer({
       events ?? FakeUserEventsClient(harnessEvents()),
     ),
     feedsClientProvider.overrideWithValue(feeds ?? FakeFeedsClient()),
+    feedsCacheProvider.overrideWithValue(feedsCache ?? FakeFeedsCache()),
     melbourneClockProvider.overrideWithValue(
       MelbourneClock(now: () => harnessNow),
     ),

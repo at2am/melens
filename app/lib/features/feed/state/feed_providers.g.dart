@@ -54,8 +54,58 @@ final class FeedsClientProvider
 
 String _$feedsClientHash() => r'0b5c7f9c69502eefe8dd73324bdc5bd6217bacd1';
 
+/// Tests override this with an in-memory [FeedsCache].
+
+@ProviderFor(feedsCache)
+final feedsCacheProvider = FeedsCacheProvider._();
+
+/// Tests override this with an in-memory [FeedsCache].
+
+final class FeedsCacheProvider
+    extends $FunctionalProvider<FeedsCache, FeedsCache, FeedsCache>
+    with $Provider<FeedsCache> {
+  /// Tests override this with an in-memory [FeedsCache].
+  FeedsCacheProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'feedsCacheProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$feedsCacheHash();
+
+  @$internal
+  @override
+  $ProviderElement<FeedsCache> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  FeedsCache create(Ref ref) {
+    return feedsCache(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(FeedsCache value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<FeedsCache>(value),
+    );
+  }
+}
+
+String _$feedsCacheHash() => r'4d659cb9ffb8cc9ab8e5d4a219d4279fba0e54d5';
+
 /// The user's feeds, in their order, as the agent service stores them. A
 /// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// The feeds this device cached show at once, so their sources start loading
+/// while the service is asked again; its answer then replaces them. With
+/// nothing cached the feed waits for the service.
 ///
 /// A change shows at once and then saves the whole list. Saves run one after
 /// another, so an older list never lands after a newer one; a failed save
@@ -67,6 +117,10 @@ final feedSubscriptionsProvider = FeedSubscriptionsProvider._();
 /// The user's feeds, in their order, as the agent service stores them. A
 /// user who never saved one sees [defaultFeedSubscriptions].
 ///
+/// The feeds this device cached show at once, so their sources start loading
+/// while the service is asked again; its answer then replaces them. With
+/// nothing cached the feed waits for the service.
+///
 /// A change shows at once and then saves the whole list. Saves run one after
 /// another, so an older list never lands after a newer one; a failed save
 /// puts the list back and rethrows for the caller to report.
@@ -74,6 +128,10 @@ final class FeedSubscriptionsProvider
     extends $AsyncNotifierProvider<FeedSubscriptions, List<FeedSubscription>> {
   /// The user's feeds, in their order, as the agent service stores them. A
   /// user who never saved one sees [defaultFeedSubscriptions].
+  ///
+  /// The feeds this device cached show at once, so their sources start loading
+  /// while the service is asked again; its answer then replaces them. With
+  /// nothing cached the feed waits for the service.
   ///
   /// A change shows at once and then saves the whole list. Saves run one after
   /// another, so an older list never lands after a newer one; a failed save
@@ -97,10 +155,14 @@ final class FeedSubscriptionsProvider
   FeedSubscriptions create() => FeedSubscriptions();
 }
 
-String _$feedSubscriptionsHash() => r'03f0f972857590babd6f4811c0cad03227468aec';
+String _$feedSubscriptionsHash() => r'834f38b7d3cb790cecdb1a23d204ec3540ecf95a';
 
 /// The user's feeds, in their order, as the agent service stores them. A
 /// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// The feeds this device cached show at once, so their sources start loading
+/// while the service is asked again; its answer then replaces them. With
+/// nothing cached the feed waits for the service.
 ///
 /// A change shows at once and then saves the whole list. Saves run one after
 /// another, so an older list never lands after a newer one; a failed save

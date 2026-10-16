@@ -11,7 +11,7 @@ service=melens-dev-agent
 identity=melens-dev-agent@melens-510012.iam.gserviceaccount.com
 image=''
 dynamic_scan_bytes=100000000
-min_instances=0
+min_instances=1
 apply=false
 verify=false
 confirm_project=''
@@ -25,7 +25,7 @@ Usage: deploy.sh --image IMAGE@sha256:DIGEST --allowed-origin ORIGIN [options]
   --project melens-510012          Development project only
   --allowed-origin ORIGIN         Repeat for each reviewed exact origin
   --dynamic-scan-bytes BYTES       100000000 default; 400000000 or 1000000000 reviewed dev ceilings
-  --min-instances 0|1              0 default; 1 while judging, to avoid cold starts
+  --min-instances 0|1              1 default, so the feed and chat avoid cold starts; 0 to idle for free
   --verify                        Read-only identity and Firestore audit (bootstrap.sh --verify)
   --apply --confirm-project ID     Verify, deploy and read back; public agent service
 No project/dataset/bucket/secret IAM grants, API enabling or Firebase setup.

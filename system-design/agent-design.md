@@ -15,7 +15,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | HTTP layer | `node:http` directly, as in cloud/map: one SSE route plus health, hand-written CORS, body limits and error envelope shared with the map service. No web framework |
 | Models | Gemini only, through Vertex AI with the service identity. No Gemini API key, no other providers, no provider abstraction layer |
 | Data access | Fixed parameterized queries over the published `melens_query` views with a read-only identity and `maximumBytesBilled`, the same rules as the map service's query runner |
-| Sessions | Persisted per Firebase uid in Firestore as stored turns ([agent-protocol.md](agent-protocol.md#sessions)); each turn rebuilds the ADK session in memory from the last 20 stored turns, so no raw tool results are persisted. Instances hold no conversation state, so the service can scale out; min-instances=1 while judging |
+| Sessions | Persisted per Firebase uid in Firestore as stored turns ([agent-protocol.md](agent-protocol.md#sessions)); each turn rebuilds the ADK session in memory from the last 20 stored turns, so no raw tool results are persisted. Instances hold no conversation state, so the service can scale out; min-instances=1 keeps one warm |
 | Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
 | Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
