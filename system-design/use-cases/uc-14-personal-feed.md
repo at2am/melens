@@ -21,14 +21,14 @@ The home tab: what is happening in the feeds the user built. Added 2026-10-15 wi
 
 ## Behaviour
 
-1. The app has three bottom tabs: Feed (home), Discover (the map, UC-01 and UC-02) and Settings. A floating button on every tab opens the agent chat (UC-13).
+1. The app has three bottom tabs: Home (labelled Feed until 2026-10-16, when saved plans joined it), Discover (the map, UC-01 and UC-02) and Settings. A floating button on every tab opens the agent chat (UC-13).
 2. **A feed** is a name, one or more topics and one scope. A topic is community events (UC-09) or one map layer (events, disruptions, news, anomalies, planning). The scope is one of:
    - **Map area**: the user moves and zooms a map until a frame covers the area; the framed box is stored, cut to the service area.
    - **Named area**: one of the City of Melbourne small areas the app lists (CBD, Carlton, Docklands, East Melbourne, Kensington, North Melbourne, Parkville, Port Melbourne, South Yarra west, Southbank, West Melbourne) or the whole municipality. Each is an approximate box, not a statistical boundary.
    - **All of Melbourne**: the whole service area. The slowest; offered, never the default.
 3. Topics whose records may have no location (events, disruptions, planning) offer **Include reports without a place**: the feed also reads that layer's unlocated records by the area its sources cover, the same evidence the map's unlocated list uses. Those records are not limited to the feed's area. Off by default.
 4. Community events take a time range instead: the next 24 hours, 7 days or 14 days (default 14). Their route accepts boxes up to 10 km a side, so a wider scope is cut down around its centre, and All of Melbourne reads central Melbourne.
-5. The Feed tab has a **New feed** button that opens the editor. Chips under the title pick **All feeds** or one feed; a Manage chip opens Settings. An item two feeds share appears once. The list puts what is coming up first, soonest first, then what has happened, latest first. A map item opens on the map; a community event opens its page.
+5. The Home tab has a **New feed** button that opens the editor. Chips under the title pick **All feeds** or one feed; a Manage chip opens Settings. An item two feeds share appears once. The list puts what is coming up first, soonest first, then what has happened, latest first. A map item opens on the map; a community event opens its page.
 6. **Settings, Feeds** lists every feed with its topics and scope. A switch pauses or resumes a feed (a paused feed stays saved and is not loaded); a tap opens the editor, which also deletes. At most 20 feeds.
 7. **Loading.** Each topic of each enabled feed is one source and one request: one map layer inside the feed's box, or one community events query. Sources load in parallel and are cached by their parameters, so feeds asking for the same layer and scope share a request. A source that fails is named in the feed as "feed: topic" and never hides the others; a source still loading shows a progress bar over what has arrived.
 8. **Saved plans.** Plans the user saved from the chat (UC-03) head the tab under Saved plans when All feeds is picked, upcoming first and past ones last, each opening its own page. They are one-off copies, stored per uid through `/v1/plans`, not feeds: nothing refreshes them, and they show even when the user has no feeds.
@@ -36,10 +36,10 @@ The home tab: what is happening in the feeds the user built. Added 2026-10-15 wi
 
 ## Acceptance criteria (Draft)
 
-- [x] A user creates a feed from the Feed tab with topics and a map area, a named area or all of Melbourne.
+- [x] A user creates a feed from the Home tab with topics and a map area, a named area or all of Melbourne.
 - [x] Each topic of a feed is its own request, limited to the feed's area, and the feed shows each source as it arrives.
 - [x] A failing source is reported by feed and topic while the other sources still show.
-- [x] Feeds are listed in Settings, where they can be paused, edited and deleted; the Feed tab follows at once.
+- [x] Feeds are listed in Settings, where they can be paused, edited and deleted; the Home tab follows at once.
 - [x] Feeds survive an app restart (stored per uid by the agent service).
 - [x] Tapping a map item opens it on the Discover tab; tapping a community event opens its page.
 - [ ] Measured on live data: a one-area feed loads faster than the old city-wide request for the same layers.
@@ -54,7 +54,7 @@ The home tab: what is happening in the feeds the user built. Added 2026-10-15 wi
 - Items from the Melens map keep their feature id, so the agent and the feed cite the same records.
 - Map topics read what is on now (the current 15-minute window). Time-ahead windows for map events need the map contract to allow future windows; it is not decided.
 - The named areas and their boxes live in the app (`app/lib/features/feed/data/melbourne_areas.dart`); the service stores only the id. An id the app no longer knows reads nothing. Never rename an id.
-- Deployment order: the agent service image with `/v1/feeds` must be live before the app that reads it, or the Feed tab shows "The feed could not load".
+- Deployment order: the agent service image with `/v1/feeds` must be live before the app that reads it, or the Home tab shows "The feed could not load".
 
 ## Open questions
 

@@ -58,7 +58,7 @@ Breaking one of these can disqualify the entry.
 - Import `package:material_ui/material_ui.dart`, never `package:flutter/material.dart`.
 - After changing annotated code, run `fvm dart run build_runner build` and commit the generated files with the change.
 - `fvm flutter analyze` and `fvm flutter test` pass before every commit.
-- The Feed tab (UC-14) is built from feeds the user creates: topics inside one scope (a framed map area, a named City of Melbourne area or all of Melbourne), stored per uid through `/v1/feeds`. Each topic of each feed is its own parallel request inside that scope. Do not go back to one city-wide request with layer switches; the project owner rejected it as too slow. Read the Notes in `use-cases/uc-14-personal-feed.md` before changing the feed.
+- The Home tab (UC-14, labelled Feed until 2026-10-16; code and routes still say feed) shows saved plans (UC-03) and then is built from feeds the user creates: topics inside one scope (a framed map area, a named City of Melbourne area or all of Melbourne), stored per uid through `/v1/feeds`. Each topic of each feed is its own parallel request inside that scope. Do not go back to one city-wide request with layer switches; the project owner rejected it as too slow. Read the Notes in `use-cases/uc-14-personal-feed.md` before changing the feed.
 
 ## Working with use cases
 

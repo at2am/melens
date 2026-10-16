@@ -22,7 +22,7 @@ PlansClient plansClient(Ref ref) => HttpPlansClient(
 );
 
 /// The plans the user saved from the chat, newest first, as the agent
-/// service stores them. They show on the Feed tab until the user removes
+/// service stores them. They show on the Home tab until the user removes
 /// them.
 @Riverpod(keepAlive: true, retry: _manualRetry)
 class SavedPlans extends _$SavedPlans {

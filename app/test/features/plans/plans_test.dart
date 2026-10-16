@@ -227,7 +227,7 @@ void main() {
     await tester.tap(find.byKey(ValueKey('plan-save-${_plan.id}')));
     await tester.pumpAndSettle();
     expect(
-      find.text('You have 30 saved plans. Remove one on the Feed tab first.'),
+      find.text('You have 30 saved plans. Remove one on the Home tab first.'),
       findsOneWidget,
     );
   });
@@ -275,7 +275,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(mapActionsControllerProvider).route, isNotNull);
 
-    await tester.tap(find.text('Feed'));
+    await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(ValueKey('saved-plan-${past.id}')));
     await tester.pumpAndSettle();

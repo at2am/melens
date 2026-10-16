@@ -2151,10 +2151,10 @@ abstract class AppLocalizations {
   /// **'Clear highlights'**
   String get mapAgentHighlightsClear;
 
-  /// Label of the bottom tab that opens the feed.
+  /// Label of the bottom tab that opens the home page: saved plans and the user's feeds.
   ///
   /// In en, this message translates to:
-  /// **'Feed'**
+  /// **'Home'**
   String get tabFeed;
 
   /// Label of the bottom tab that opens the map.
@@ -2169,10 +2169,10 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get tabSettings;
 
-  /// Button on the not-found screen that opens the feed.
+  /// Button on the not-found screen that opens the Home tab.
   ///
   /// In en, this message translates to:
-  /// **'Back to the feed'**
+  /// **'Back to Home'**
   String get notFoundBackToFeed;
 
   /// Small label on demo content that is not real.
@@ -3879,7 +3879,7 @@ abstract class AppLocalizations {
   /// **'Keep it indoors'**
   String get planRefineIndoors;
 
-  /// Button under a plan card in the chat that keeps the plan on the Feed tab.
+  /// Button under a plan card in the chat that keeps the plan on the Home tab.
   ///
   /// In en, this message translates to:
   /// **'Save plan'**
@@ -3900,10 +3900,10 @@ abstract class AppLocalizations {
   /// Error under a plan card when the user already has the most saved plans.
   ///
   /// In en, this message translates to:
-  /// **'You have 30 saved plans. Remove one on the Feed tab first.'**
+  /// **'You have 30 saved plans. Remove one on the Home tab first.'**
   String get planSaveLimit;
 
-  /// Heading of the saved plans on the Feed tab.
+  /// Heading of the saved plans on the Home tab.
   ///
   /// In en, this message translates to:
   /// **'Saved plans'**
@@ -3966,7 +3966,7 @@ abstract class AppLocalizations {
   /// Body of the dialog that confirms removing a saved plan.
   ///
   /// In en, this message translates to:
-  /// **'It disappears from your Feed. The chat it came from stays.'**
+  /// **'It disappears from Home. The chat it came from stays.'**
   String get planRemoveBody;
 
   /// Button that closes the remove dialog without removing the plan.

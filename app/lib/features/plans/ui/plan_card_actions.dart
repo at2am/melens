@@ -12,7 +12,7 @@ import '../state/plans_providers.dart';
 enum _SaveFailure { limit, other }
 
 /// The buttons under a plan card in the chat: ask the agent to change the
-/// plan, or save it to the Feed tab. A saved plan says so.
+/// plan, or save it to the Home tab. A saved plan says so.
 class PlanCardActions extends ConsumerStatefulWidget {
   const PlanCardActions({required this.card, super.key});
 

@@ -1688,9 +1688,9 @@
   "@mapAgentHighlightsClear": {
     "description": "Button that clears the agent's highlights."
   },
-  "tabFeed": "Feed",
+  "tabFeed": "Home",
   "@tabFeed": {
-    "description": "Label of the bottom tab that opens the feed."
+    "description": "Label of the bottom tab that opens the home page: saved plans and the user's feeds."
   },
   "tabDiscover": "Discover",
   "@tabDiscover": {
@@ -1700,9 +1700,9 @@
   "@tabSettings": {
     "description": "Label of the bottom tab that opens settings, and the settings title."
   },
-  "notFoundBackToFeed": "Back to the feed",
+  "notFoundBackToFeed": "Back to Home",
   "@notFoundBackToFeed": {
-    "description": "Button on the not-found screen that opens the feed."
+    "description": "Button on the not-found screen that opens the Home tab."
   },
   "sampleBadge": "Sample",
   "@sampleBadge": {
@@ -2985,7 +2985,7 @@
   },
   "planSave": "Save plan",
   "@planSave": {
-    "description": "Button under a plan card in the chat that keeps the plan on the Feed tab."
+    "description": "Button under a plan card in the chat that keeps the plan on the Home tab."
   },
   "planSaved": "Saved",
   "@planSaved": {
@@ -2995,13 +2995,13 @@
   "@planSaveFailed": {
     "description": "Error under a plan card when saving it failed."
   },
-  "planSaveLimit": "You have 30 saved plans. Remove one on the Feed tab first.",
+  "planSaveLimit": "You have 30 saved plans. Remove one on the Home tab first.",
   "@planSaveLimit": {
     "description": "Error under a plan card when the user already has the most saved plans."
   },
   "plansSectionTitle": "Saved plans",
   "@plansSectionTitle": {
-    "description": "Heading of the saved plans on the Feed tab."
+    "description": "Heading of the saved plans on the Home tab."
   },
   "plansLoadFailed": "Saved plans could not load.",
   "@plansLoadFailed": {
@@ -3049,7 +3049,7 @@
   "@planRemoveTitle": {
     "description": "Title of the dialog that confirms removing a saved plan."
   },
-  "planRemoveBody": "It disappears from your Feed. The chat it came from stays.",
+  "planRemoveBody": "It disappears from Home. The chat it came from stays.",
   "@planRemoveBody": {
     "description": "Body of the dialog that confirms removing a saved plan."
   },

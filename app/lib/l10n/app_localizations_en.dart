@@ -1227,7 +1227,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapAgentHighlightsClear => 'Clear highlights';
 
   @override
-  String get tabFeed => 'Feed';
+  String get tabFeed => 'Home';
 
   @override
   String get tabDiscover => 'Discover';
@@ -1236,7 +1236,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabSettings => 'Settings';
 
   @override
-  String get notFoundBackToFeed => 'Back to the feed';
+  String get notFoundBackToFeed => 'Back to Home';
 
   @override
   String get sampleBadge => 'Sample';
@@ -2205,7 +2205,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get planSaveLimit =>
-      'You have 30 saved plans. Remove one on the Feed tab first.';
+      'You have 30 saved plans. Remove one on the Home tab first.';
 
   @override
   String get plansSectionTitle => 'Saved plans';
@@ -2249,7 +2249,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get planRemoveBody =>
-      'It disappears from your Feed. The chat it came from stays.';
+      'It disappears from Home. The chat it came from stays.';
 
   @override
   String get planRemoveCancel => 'Keep';
