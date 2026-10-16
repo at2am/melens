@@ -1051,7 +1051,7 @@ test('transport snapshot validation reads only the partitions of its own fetch r
     assert.equal(call.params.fetchedFrom, new Date(checkedAt).toISOString());
     assert.equal(call.params.fetchedTo, new Date(checkedAt).toISOString());
   }
-  // Other sources keep reading their whole published history.
+  // Other sources read their own batch within its fetch range, but their history in full.
   seen.length = 0;
   const other = setup();
   const otherQuery = other.bigquery.query.bind(other.bigquery);
@@ -1061,5 +1061,32 @@ test('transport snapshot validation reads only the partitions of its own fetch r
   };
   await other.publisher.publish(window);
   assert.ok(seen.length > 0);
-  assert.ok(seen.every(call => !call.query.includes('@fetchedFrom') && call.params.fetchedFrom === undefined));
+  const history = (sql: string) => sql.slice(sql.indexOf('eligible AS ('), sql.indexOf('SELECT (SELECT COUNT(DISTINCT row_key)'));
+  for (const call of seen.filter(call => call.query.includes('eligible AS ('))) {
+    assert.ok(/batch_rows AS \([\s\S]*?batch_id = @batchId AND t\.fetched_at BETWEEN/.test(call.query));
+    assert.ok(!history(call.query).includes('@fetchedFrom'), 'history reads stay unbounded');
+    assert.equal(call.params.fetchedFrom, new Date(checkedAt).toISOString());
+  }
+});
+
+test('a replay compares the published batch with the plan inside the batch span, without history checks', async () => {
+  const { publisher, bigquery } = setup();
+  const first = await publisher.publish(window);
+  const seen: { query: string; params: Record<string, string | undefined> }[] = [];
+  const query = bigquery.query.bind(bigquery);
+  bigquery.query = async input => {
+    if (input.query.includes('/* validate:')) seen.push(input);
+    return query(input);
+  };
+  const again = await publisher.publish(window);
+  assert.equal(again.batch_id, first.batch_id);
+  assert.ok(seen.length > 0);
+  for (const call of seen.filter(call => call.query.includes('eligible AS ('))) {
+    assert.ok(call.query.includes('0 AS invalid, 0 AS conflicts, 0 AS ambiguous'));
+    assert.ok(!call.query.includes('FROM eligible GROUP BY'), 'the history CTE is never referenced');
+    assert.equal(call.params.fetchedFrom, new Date(Date.parse(first.started_at) - 24 * 3_600_000).toISOString());
+  }
+  // A changed payload under the same revision is still refused on replay.
+  await assert.rejects(publisher.publish({ ...window, result: { ...result,
+    sourceRecords: [{ ...record, original_url: 'https://example.org/changed' }] } }), /validation failed/);
 });

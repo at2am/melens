@@ -121,6 +121,14 @@ interface PlannedTable {
   expectedDistinct: number;
 }
 
+/** A published batch's rows were fetched from at most a day before it started until its last state. */
+function batchSpan(batch: SyncBatch): { from: string; to: string } | null {
+  const started = Date.parse(batch.started_at);
+  const ended = Date.parse(batch.state_updated_at);
+  if (!Number.isFinite(started) || !Number.isFinite(ended)) return null;
+  return { from: new Date(started - 24 * 3_600_000).toISOString(), to: new Date(ended + 60_000).toISOString() };
+}
+
 /** The earliest and latest fetch time across a batch's rows; null for a batch without rows. */
 function fetchedRange(tables: readonly PlannedTable[]): { from: string; to: string } | null {
   let from = Infinity;
@@ -360,11 +368,22 @@ export class BigQueryPublisher {
     });
   }
 
-  private async validateLoadedRows(batchId: string, tables: readonly PlannedTable[], source: DataSource): Promise<void> {
+  /**
+   * A fresh load's rows carry the plan's fetch times. A replay (`replayOf`) compares the stored rows
+   * of that published batch with the plan, within the batch's own time span: from a day before it
+   * started, which covers a fetch before the batch row was written, to its last state.
+   */
+  private async validateLoadedRows(batchId: string, tables: readonly PlannedTable[], source: DataSource,
+    replayOf?: SyncBatch): Promise<void> {
     const path = (name: string) => `\`${this.config.projectId}.${this.config.ingestDataset}.${name}\``;
-    const fetched = SNAPSHOT_GEO_SOURCES.has(source.source_id) ? fetchedRange(tables) : null;
-    const fetchedParams: Record<string, string> = fetched === null ? {}
-      : { fetchedFrom: fetched.from, fetchedTo: fetched.to };
+    const range = replayOf === undefined ? fetchedRange(tables) : batchSpan(replayOf);
+    // History reads stay unbounded except for transport snapshots, whose batches reference only themselves.
+    const fetched = replayOf === undefined && range !== null && SNAPSHOT_GEO_SOURCES.has(source.source_id) ? range : null;
+    const fetchedParams: Record<string, string> = range === null ? {}
+      : { fetchedFrom: range.from, fetchedTo: range.to };
+    // The batch's own rows were all fetched within the plan's range, for every source.
+    const batchWindow = (alias: string) => range === null ? ''
+      : ` AND ${alias}.fetched_at BETWEEN TIMESTAMP(@fetchedFrom) AND TIMESTAMP(@fetchedTo)`;
     for (const table of tables) {
       // Warehouse types keep timestamp/numeric/array comparisons identical on both sides.
       const [metadata] = await this.bigquery.dataset(this.config.ingestDataset).table(table.name).getMetadata();
@@ -527,7 +546,7 @@ export class BigQueryPublisher {
         const rows = await this.query(`/* validate:${table.name} */
           SELECT COUNT(*) AS distinct_count, 0 AS unexpected, 0 AS invalid,
             0 AS conflicts, 0 AS ambiguous
-          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${fetchedWindow('t')}`, {
+          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${batchWindow('t')}`, {
           batchId, sourceId: source.source_id, expectedRows: '[]', ...fetchedParams,
         });
         const report = rows[0];
@@ -549,7 +568,7 @@ export class BigQueryPublisher {
           FROM UNNEST(JSON_QUERY_ARRAY(@expectedRows)) e
         ), batch_rows AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
-          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${fetchedWindow('t')}
+          FROM ${path(table.name)} t WHERE source_id = @sourceId AND batch_id = @batchId${batchWindow('t')}
         ), eligible AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
           FROM ${path(table.name)} t
@@ -562,10 +581,13 @@ export class BigQueryPublisher {
         SELECT (SELECT COUNT(DISTINCT row_key) FROM batch_rows) AS distinct_count,
           (SELECT COUNT(*) FROM expected e WHERE NOT EXISTS (
             SELECT 1 FROM batch_rows t WHERE e.row_key = t.row_key AND e.content = t.content)) AS unexpected,
-          (SELECT COUNT(*) FROM batch_rows t WHERE ${invalid.map(check => `(${check})`).join(' OR ')}) AS invalid,
+          ${replayOf !== undefined
+            // The published batch passed these checks; an unreferenced CTE is never read.
+            ? '0 AS invalid, 0 AS conflicts, 0 AS ambiguous'
+            : `(SELECT COUNT(*) FROM batch_rows t WHERE ${invalid.map(check => `(${check})`).join(' OR ')}) AS invalid,
           (SELECT COUNT(*) FROM (SELECT row_key FROM eligible GROUP BY row_key
             HAVING COUNT(DISTINCT content) > 1)) AS conflicts,
-          ${ordering} AS ambiguous`, {
+          ${ordering} AS ambiguous`}`, {
           batchId, sourceId: source.source_id, licenseStatus: source.license_status,
           allowedFields: JSON.stringify(source.admission_evidence.allowed_fields ?? []),
           expectedRows: JSON.stringify(expectedRows),
@@ -660,8 +682,10 @@ export class BigQueryPublisher {
         return complete;
       };
       if (previous?.state === 'published') {
-        // Recheck the incoming plan, including empty tables, before acknowledging a replay.
-        await this.validateLoadedRows(batchId, plan.tables, source);
+        // Most scheduled runs of an unchanged source land here. The published batch already passed
+        // the history checks, so a replay only proves that its stored rows equal this plan, reading
+        // the batch's own partitions instead of the source's whole history once per chunk.
+        await this.validateLoadedRows(batchId, plan.tables, source, previous);
         return finish(previous);
       }
       const base: SyncBatch = {
