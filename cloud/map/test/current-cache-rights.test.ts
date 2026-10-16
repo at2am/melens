@@ -8,6 +8,7 @@ import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/quer
 import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapService } from '../src/map-service.js';
 import { MapServiceError } from '../src/services/snapshot-store.js';
+import { VERIFIED_RECORD_TTL_MS } from '../src/services/public-records.js';
 
 const publishedAt = '2026-10-01T01:00:01.000Z';
 const window = { from: '2026-10-01T00:00:00.000Z', to: '2026-10-01T01:00:00.000Z' };
@@ -116,18 +117,27 @@ test('cached planning loads cannot authorize a withdrawn stored detail or aggreg
   const first = await f.service.queryViewport(f.request);
   const group = aggregate(first);
   aggregate(await f.service.queryViewport({ ...f.request, requestId: 'cached-planning-again' }));
-  assert.equal(f.queries.filter((query) => query.query.includes('v_geo_records_current_served')).length, 1);
+  assert.equal(f.queries.filter((query) => query.query.includes('v_geo_records_current_served')
+    && typeof query.params.publicRecordKeysJson !== 'string').length, 1);
+  // Rights proofs read the copy while it reflects the source's latest batch.
+  assert.ok(f.queries.filter((query) => typeof query.params.publicRecordKeysJson === 'string')
+    .every((query) => query.query.includes('v_geo_records_current_served')));
   const rightsReadsBeforeDetails = f.queries.filter((query) => typeof query.params.publicRecordKeysJson === 'string').length;
   const context = { requestId: 'planning-detail', snapshotId: first.snapshotId };
   assert.equal((await f.service.getItem('planning:result-1', context)).item.kind, 'planning');
 
   f.withdraw('planning:result-1');
+  // A proof stands for one minute within the same publication, then the record's rights are read again.
+  assert.equal((await f.service.getItem('planning:result-1', context)).item.kind, 'planning');
+  f.advance(VERIFIED_RECORD_TTL_MS + 1);
   await assert.rejects(f.service.getItem('planning:result-1', context), unavailable);
   await assert.rejects(f.service.getMembers(group.id, context), unavailable);
   assert.equal((await f.service.getItem('planning:result-2', context)).item.id, 'planning:result-2');
   assert.equal(f.publication.latest_published_batch_id, 'unchanged-batch');
-  assert.equal(f.queries.filter((query) => typeof query.params.publicRecordKeysJson === 'string').length - rightsReadsBeforeDetails, 4,
-    'Stored geo access must query current record rights even while the layer cache is valid');
+  // The first detail and the one inside the minute use the map view's proof; after it, the withdrawn
+  // detail, the members and the remaining detail each read current rights again.
+  assert.equal(f.queries.filter((query) => typeof query.params.publicRecordKeysJson === 'string').length - rightsReadsBeforeDetails, 3,
+    'Stored geo access must query current record rights once its proof has expired');
 });
 
 test('default source coverage stops authorizing a revoked source after its 30 second cache window', async () => {

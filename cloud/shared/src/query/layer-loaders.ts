@@ -1,8 +1,10 @@
-import type { LayerId, LayerResult, MapItem, UnlocatedQuery, ViewportQuery } from '../contracts/map-contract.js';
+import { compareMapItems, type LayerId, type LayerResult, type MapItem, type UnlocatedQuery, type ViewportQuery }
+  from '../contracts/map-contract.js';
 import { MapServiceError } from '../errors.js';
 import { MapAdapterError, type PublicSourceResolver } from './adapter-common.js';
 import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, UNLOCATED_LAYERS, adaptContext, adaptLayerRows }
   from './layer-adapters.js';
+import type { NewsAreaLoader } from './news-areas.js';
 import type { ViewQueryResult } from './query-runner.js';
 import { assessLayerCoverage, finalizeLayerResult, sourceBelongsToLayer, type CoverageAreaResolver,
   type SourceCoverageSnapshot } from './source-coverage.js';
@@ -35,6 +37,8 @@ export interface LayerLoaderDependencies {
   readonly externalVerifier: boolean;
   readonly resolveArea: CoverageAreaResolver | undefined;
   readonly loadAnomalyLayer: ViewportLayerLoader | undefined;
+  /** UC-06: current news drawn as the official areas the articles name. */
+  readonly loadNewsAreas?: NewsAreaLoader | undefined;
 }
 
 /** Admitted, published sources of one layer that also carry a reviewed public reference. */
@@ -70,11 +74,20 @@ export function createViewportLayerLoader(deps: LayerLoaderDependencies): Viewpo
       const result = await deps.runQuery({ queryId: layerId, request: { ...request, pageSize: execution.rowLimit },
         publicSourceIds: sourceIds, resultBudgetBytes: execution.resultBudgetBytes }, execution);
       const batch = adaptLayerRows(layerId, result.rows, adaptContext(request, resolveSource, deps.clock().toISOString()));
+      // News articles name places but never prove an event site, so they reach the map as the
+      // areas they name. Each area keeps its latest articles as members within the row limit.
+      const groups = layerId === 'news' && deps.loadNewsAreas !== undefined
+        ? await deps.loadNewsAreas(request, { coverage, layerCoverage: assessment.coverage, publicSourceIds: sourceIds,
+          resolveSource, rowLimit: execution.rowLimit - batch.items.length,
+          ...(execution.signal === undefined ? {} : { signal: execution.signal }) })
+        : [];
+      const items = [...batch.items, ...groups.map((group) => group.aggregate)].sort(compareMapItems);
       // Geometry eligibility can tighten in the adapter; the complete drawable count is
       // exact only after every bounded matching row was successfully converted.
-      return { result: finalizeLayerResult({ layerId, assessment, items: batch.items,
+      return { result: finalizeLayerResult({ layerId, assessment, items,
         completeness: result.kind, unresolvedCount: null,
-        totalMatching: result.kind === 'complete' ? batch.items.length : null }) };
+        totalMatching: result.kind === 'complete' ? items.length : null }),
+      ...(groups.length === 0 ? {} : { groups }) };
     } catch {
       if (execution.signal?.aborted) throw new MapServiceError('queryTimeout');
       return denied();

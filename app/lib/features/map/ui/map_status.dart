@@ -219,6 +219,7 @@ class MapItemProvenance extends ConsumerWidget {
     required this.mode,
     required this.dataMode,
     this.onOpenSource,
+    this.showSourceVersions = true,
     super.key,
   });
 
@@ -228,6 +229,10 @@ class MapItemProvenance extends ConsumerWidget {
   final MapQueryMode mode;
   final MapDataMode dataMode;
   final void Function(Uri)? onOpenSource;
+
+  /// False when the caller lists source version refs elsewhere, such as the
+  /// selected-record panel's technical section.
+  final bool showSourceVersions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -270,8 +275,9 @@ class MapItemProvenance extends ConsumerWidget {
         if (sources.isEmpty) Text(strings.mapSourceUnknown),
         for (final source in sources) ...[
           _PublicSource(source: source, onOpenSource: onOpenSource),
-          if (source.versionRef case final version?)
-            Text(strings.mapSourceVersion(version)),
+          if (showSourceVersions)
+            if (source.versionRef case final version?)
+              Text(strings.mapSourceVersion(version)),
         ],
       ],
     );

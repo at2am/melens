@@ -422,8 +422,13 @@ const gridDetailsSchema = z.object({
     context.addIssue({ code: 'custom', message: 'Anomaly ratio requires one baseline and the classified denominator' });
   }
 });
+/**
+ * `cluster` groups loaded points, `coverageGrid` summarises sensors per cell, and `areaMentions`
+ * (UC-06) is an official area drawn with the news articles that name it. A mention is not where
+ * the reported event happened, so the area is an association, never an event site.
+ */
 const aggregateDetailsSchema = z.object({
-  representation: z.enum(['cluster', 'coverageGrid']), memberIds: distinctIds, memberCursor: identifier.nullable(),
+  representation: z.enum(['cluster', 'coverageGrid', 'areaMentions']), memberIds: distinctIds, memberCursor: identifier.nullable(),
   resultRange: resultRangeSchema,
   metric: z.object({ id: identifier, label: nonemptyString, unit: nonemptyString, value: z.number().nullable(), definition: nonemptyString }),
   window: timeWindowSchema.nullable(), coverage: coverageSchema, bounds: bboxSchema, grid: gridDetailsSchema.nullable(),
@@ -486,6 +491,11 @@ export const mapItemSchema = z.discriminatedUnion('kind', [
       || (item.geometry.type !== 'Polygon' && item.geometry.type !== 'MultiPolygon'))) {
       context.addIssue({ code: 'custom', message: 'Drawable indicators require matched statistical area polygons' });
     }
+  }
+  if (item.kind === 'aggregate' && item.details.representation === 'areaMentions' && (item.layerId !== 'news'
+    || item.location.role !== 'areaAssociation' || item.geometry === null
+    || (item.geometry.type !== 'Polygon' && item.geometry.type !== 'MultiPolygon'))) {
+    context.addIssue({ code: 'custom', message: 'Area mentions are news area associations drawn as polygons' });
   }
   if (item.kind === 'news' && item.location.role === 'mention' && item.geometry !== null) {
     context.addIssue({ code: 'custom', message: 'A news mention cannot become an event geometry' });

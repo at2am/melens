@@ -18,6 +18,8 @@ void main() {
       MapLayerId.disruption,
     ]);
     expect(selection.filledAreaMetric, isNull);
+    // UC-06: the map has no topic switch, so news is an opt-in chip here.
+    expect(selection.availableLayers, contains(MapLayerId.news));
 
     controller.selectTopic(MapTopic.nearbyNews);
     selection = container.read(layerControllerProvider);
@@ -126,11 +128,11 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        () => controller.setLayerEnabled(MapLayerId.news, true),
+        () => controller.setLayerEnabled(MapLayerId.rent, true),
         throwsArgumentError,
       );
       expect(
-        () => controller.setLayerEnabled(MapLayerId.rent, true),
+        () => controller.setLayerEnabled(MapLayerId.census, true),
         throwsArgumentError,
       );
       expect(container.read(layerControllerProvider), same(before));

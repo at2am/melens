@@ -9,6 +9,7 @@ import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/map_models.dart';
 import '../data/map_repository.dart';
+import '../data/source_summaries.dart';
 import 'map_status.dart';
 import 'renderers/aggregate_renderer.dart';
 
@@ -26,6 +27,7 @@ class AggregateDetailsPanel extends ConsumerStatefulWidget {
     this.onRefreshSnapshot,
     this.pageSize = 25,
     this.maxDisplayedMembers = 100,
+    this.showSummary = true,
     super.key,
   }) : assert(pageSize > 0 && pageSize <= 50),
        assert(maxDisplayedMembers > 0 && maxDisplayedMembers <= 200);
@@ -41,6 +43,10 @@ class AggregateDetailsPanel extends ConsumerStatefulWidget {
   final VoidCallback? onRefreshSnapshot;
   final int pageSize;
   final int maxDisplayedMembers;
+
+  /// False when the enclosing panel already shows the group's title, metric,
+  /// time and sources, leaving only navigation and the member list here.
+  final bool showSummary;
 
   @override
   ConsumerState<AggregateDetailsPanel> createState() =>
@@ -221,47 +227,52 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
     }
 
     final metric = details.metric;
+    if (details.representation == AggregateRepresentation.areaMentions) {
+      return _areaMentions(context, strings, format);
+    }
     return Semantics(
       container: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            widget.aggregate.title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(
-            strings.mapAggregateLoadedRecords(
-              format.format(details.resultRange.returnedCount),
-            ),
-          ),
-          Text(strings.mapAggregateScopeExplanation),
-          if (aggregateHasUnknownTotal(widget.aggregate))
-            Text(strings.mapAggregateLoadedOnly),
-          if (details.resultRange.totalMatching case final total?)
-            Text(strings.mapAggregateGroupTotal(format.format(total)))
-          else
-            Text(strings.mapTotalUnknown),
-          Text(
-            metric.value == null
-                ? strings.mapAggregateMetricUnknown(metric.label, metric.unit)
-                : strings.mapAggregateMetric(
-                    metric.label,
-                    format.format(metric.value),
-                    metric.unit,
-                  ),
-          ),
-          Text(metric.definition),
-          if (details.window case final window?)
+          if (widget.showSummary) ...[
             Text(
-              strings.mapObservedWindow(
-                localTime(window.from),
-                localTime(window.to),
+              widget.aggregate.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            Text(
+              strings.mapAggregateLoadedRecords(
+                format.format(details.resultRange.returnedCount),
               ),
-            )
-          else
-            Text(strings.mapObservedWindowUnknown),
+            ),
+            Text(strings.mapAggregateScopeExplanation),
+            if (aggregateHasUnknownTotal(widget.aggregate))
+              Text(strings.mapAggregateLoadedOnly),
+            if (details.resultRange.totalMatching case final total?)
+              Text(strings.mapAggregateGroupTotal(format.format(total)))
+            else
+              Text(strings.mapTotalUnknown),
+            Text(
+              metric.value == null
+                  ? strings.mapAggregateMetricUnknown(metric.label, metric.unit)
+                  : strings.mapAggregateMetric(
+                      metric.label,
+                      format.format(metric.value),
+                      metric.unit,
+                    ),
+            ),
+            Text(metric.definition),
+            if (details.window case final window?)
+              Text(
+                strings.mapObservedWindow(
+                  localTime(window.from),
+                  localTime(window.to),
+                ),
+              )
+            else
+              Text(strings.mapObservedWindowUnknown),
+          ],
           if (_sameLocation(widget.aggregate.geometry))
             Text(strings.mapAggregateSameLocation),
           if (widget.onZoomToBounds != null)
@@ -270,14 +281,15 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
               icon: const Icon(Icons.zoom_in),
               label: Text(strings.mapAggregateZoom),
             ),
-          MapItemProvenance(
-            time: widget.aggregate.time,
-            sources: widget.aggregate.sources,
-            assertionKind: widget.aggregate.assertionKind,
-            mode: widget.mode,
-            dataMode: widget.dataMode,
-            onOpenSource: widget.onOpenSource,
-          ),
+          if (widget.showSummary)
+            MapItemProvenance(
+              time: widget.aggregate.time,
+              sources: widget.aggregate.sources,
+              assertionKind: widget.aggregate.assertionKind,
+              mode: widget.mode,
+              dataMode: widget.dataMode,
+              onOpenSource: widget.onOpenSource,
+            ),
           const SizedBox(height: 16),
           Text(
             strings.mapAggregateMembersTitle,
@@ -321,7 +333,7 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
           for (final member in _members.values)
             ListTile(
               key: ValueKey('aggregate-member:${member.id}'),
-              title: Text(member.title),
+              title: Text(_memberTitle(member)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -355,6 +367,108 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
   }
 }
 
+extension on _AggregateDetailsPanelState {
+  /// UC-06: an area's latest articles, each with its own original link.
+  Widget _areaMentions(
+    BuildContext context,
+    AppLocalizations strings,
+    NumberFormat format,
+  ) {
+    final details = widget.aggregate.details;
+    final total = details.resultRange.totalMatching;
+    return Semantics(
+      container: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        // The record header above already shows the title and the count's
+        // definition; this section adds the articles themselves.
+        children: [
+          Text(strings.mapNewsAreaExplanation),
+          const SizedBox(height: 16),
+          Text(
+            strings.mapNewsAreaLatest,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (total != null && _members.isNotEmpty)
+            Text(
+              strings.mapNewsAreaShowing(
+                format.format(_members.length),
+                format.format(total),
+              ),
+            ),
+          if (_busy)
+            LinearProgressIndicator(
+              semanticsLabel: strings.mapAggregateMembersLoading,
+            ),
+          if (_failure != null) ...[
+            Text(
+              _snapshotExpired
+                  ? strings.mapAggregateSnapshotExpired
+                  : strings.mapStatusClientError,
+            ),
+            if (_snapshotExpired && widget.onRefreshSnapshot != null)
+              TextButton(
+                onPressed: widget.onRefreshSnapshot,
+                child: Text(strings.mapAggregateRefreshSnapshot),
+              )
+            else if (_failure!.retryable && !_busy)
+              TextButton(
+                onPressed: () => unawaited(_readMembers()),
+                child: Text(strings.mapAggregateMembersRetry),
+              ),
+          ],
+          if (_queried && _members.isEmpty && !_busy && _failure == null)
+            Text(strings.mapAggregateMembersEmpty),
+          for (final member in _members.values)
+            ListTile(
+              key: ValueKey('aggregate-member:${member.id}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(member.title),
+              // The outlet's site says more than the shared GDELT credit,
+              // which the provenance below still carries.
+              subtitle: Text(switch (Uri.tryParse(
+                member.sources.firstOrNull?.url ?? '',
+              )) {
+                Uri(:final host) when host.isNotEmpty => host.replaceFirst(
+                  RegExp(r'^www\.'),
+                  '',
+                ),
+                _ =>
+                  member.sources.isEmpty
+                      ? strings.mapSourceUnknown
+                      : strings.mapSourceAttribution(
+                          member.sources.first.attribution,
+                        ),
+              }),
+              trailing: switch (member.sources.firstOrNull?.url) {
+                final url? when widget.onOpenSource != null => IconButton(
+                  key: ValueKey('aggregate-member-open:${member.id}'),
+                  tooltip: strings.mapNewsAreaOpenArticle,
+                  icon: const Icon(Icons.open_in_new),
+                  onPressed: () => widget.onOpenSource!(Uri.parse(url)),
+                ),
+                _ => null,
+              },
+              onTap: widget.onItemSelected == null
+                  ? null
+                  : () => widget.onItemSelected!(member),
+            ),
+          if (widget.showSummary)
+            MapItemProvenance(
+              time: widget.aggregate.time,
+              sources: widget.aggregate.sources,
+              assertionKind: widget.aggregate.assertionKind,
+              mode: widget.mode,
+              dataMode: widget.dataMode,
+              onOpenSource: widget.onOpenSource,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 bool _sameLocation(GeoJsonGeometry? geometry) {
   if (geometry is! GeoJsonMultiPoint || geometry.coordinates.length < 2) {
     return false;
@@ -363,4 +477,15 @@ bool _sameLocation(GeoJsonGeometry? geometry) {
   return geometry.coordinates.every(
     (point) => point[0] == first[0] && point[1] == first[1],
   );
+}
+
+/// Development projects are titled "address (STATUS)"; the list reads
+/// better with the address alone, as in the selected-record panel.
+String _memberTitle(MapItem member) {
+  if (member case PlanningMapItem(:final details)) {
+    if (DevelopmentProjectSummary.tryParse(details.summary) case final p?) {
+      return DevelopmentProjectSummary.cleanTitle(member.title, p);
+    }
+  }
+  return member.title;
 }

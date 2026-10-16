@@ -31,6 +31,9 @@ const layerTopicPresets = [
       MapLayerId.planning,
       // UC-15, opt-in: shows live bay sensors for the area being viewed.
       MapLayerId.parking,
+      // UC-06, opt-in: the areas recent news names. The map has no topic
+      // switch since 2026-10-15, so the layer needs its own chip here.
+      MapLayerId.news,
       MapLayerId.boundary,
     ],
     defaultLayers: {

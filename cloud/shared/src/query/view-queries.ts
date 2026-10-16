@@ -4,8 +4,8 @@ import type { MapConfig } from '../config.js';
 import type { ViewportQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
-  ANOMALY_COLUMNS, BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, GEO_ORDER, NO_BINDINGS,
-  PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoTimeFilter,
+  ANOMALY_COLUMNS, BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, NO_BINDINGS,
+  PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoOrder, geoTimeFilter,
   geoRightsView, geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection, recordStatusFilter,
   resultLimit, spatialFilter, timeWindow, topicFilter, usesTimeWindow, viewPath, type ViewName,
 } from './sql.js';
@@ -46,7 +46,7 @@ export function prepareViewQuery(options: {
         FROM ${path(options.currentGeoRead === 'authoritative' ? geoRightsView(mode) : geoView(mode))} g
         WHERE ${topic.sql} AND ${spatialFilter('g.geometry')} ${admitted('g.source_id')}
           AND ${recordStatusFilter(mode)} ${windowed ? `AND ${geoTimeFilter(queryId, mode)}` : ''}
-        ${GEO_ORDER}`,
+        ${geoOrder(queryId)}`,
       ...bind(base, topic, windowed ? timeWindow(request.window) : NO_BINDINGS),
     };
   }

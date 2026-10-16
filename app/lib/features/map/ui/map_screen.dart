@@ -29,7 +29,6 @@ import '../state/map_providers.dart';
 import '../state/selection_controller.dart';
 import '../state/viewport_controller.dart';
 import 'aggregate_details.dart';
-import 'anomaly_details.dart';
 import 'layer_panel.dart';
 import 'map_details.dart';
 import 'map_layer_style.dart';
@@ -843,8 +842,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ref.read(selectionControllerProvider.notifier).retryDetails(),
         ),
         onOpenSource: _sourceOpener,
-        typedDetailsBuilder: (item) =>
-            item is AnomalyMapItem ? AnomalyDetailsSection(item: item) : null,
         additionalContent: aggregate == null || selection.context == null
             ? null
             : AggregateDetailsPanel(
@@ -860,6 +857,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 onItemSelected: _selectAggregateMember,
                 onOpenSource: _sourceOpener,
                 onRefreshSnapshot: () => unawaited(_refreshAggregateSnapshot()),
+                showSummary: false,
               ),
       );
     } else if (_cardItem case final cardItem?) {

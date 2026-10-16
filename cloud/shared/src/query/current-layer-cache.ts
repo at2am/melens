@@ -9,7 +9,7 @@ import { publicRecordKeysSchema } from './public-record-queries.js';
 import { boundedRows, type ViewQueryResult, type ViewQueryRunner } from './query-runner.js';
 import { sourceBelongsToLayer, type SourceCoverageReader, type SourceCoverageSnapshot } from './source-coverage.js';
 import {
-  ANOMALY_COLUMNS, GEO_COLUMNS, GEO_ORDER, PARKING_COLUMNS, PARKING_ORDER, bind, queryDefaults, recordProjection, recordStatusFilter,
+  ANOMALY_COLUMNS, CURRENT_NEWS_LOOKBACK_DAYS, GEO_COLUMNS, PARKING_COLUMNS, PARKING_ORDER, bind, geoOrder, queryDefaults, recordProjection, recordStatusFilter,
   resultLimit, topicFilter, usesTimeWindow, viewPath, type GeoQueryId,
 } from './sql.js';
 
@@ -59,6 +59,7 @@ const queryInput = z.object({
   recordKeys: publicRecordKeysSchema.optional(), approvedScope: z.unknown().optional(),
   publicSourceIds: z.array(identifierSchema).max(1_000).optional(),
   resultBudgetBytes: z.number().int().min(2).optional(),
+  rightsRead: z.enum(['served', 'authoritative']).optional(),
 }).strict();
 
 /** Microseconds since the epoch, so BigQuery's microsecond instants compare exactly. */
@@ -94,16 +95,19 @@ function cachedRow(layerId: LayerId, record: string): CachedRow {
   const id = text(row.geo_record_id), versionId = text(row.version_id);
   if (id === null || versionId === null) throw new TypeError('Geo row without an identity');
   const geojson = text(row.geometry_geojson);
+  // News uses sql.ts NEWS_REPORTED_AT: GDELT's processing time bounds an article without a clock.
   const start = layerId === 'news'
-    ? instantMicros(row.published_at ?? row.observed_at)
+    ? instantMicros(row.published_at ?? row.observed_at ?? row.source_updated_at)
     : instantMicros(row.valid_from ?? row.observed_at ?? row.published_at);
   return { record, sourceId, id, versionId, sensorId: null, geometry: geojson === null ? null : prepareGeometry(geojson),
     start, validTo: instantMicros(row.valid_to), latitude: null, longitude: null, batchId: null };
 }
 
+const NEWS_LOOKBACK_MICROS = CURRENT_NEWS_LOOKBACK_DAYS * 24 * 3_600 * 1_000_000;
+
 /** The current-mode time filter of sql.ts geoTimeFilter, on parsed instants. */
 function withinWindow(layerId: LayerId, row: CachedRow, from: number, to: number): boolean {
-  if (layerId === 'news') return row.start === null || (row.start >= from && row.start < to);
+  if (layerId === 'news') return row.start === null || (row.start >= to - NEWS_LOOKBACK_MICROS && row.start < to);
   return (row.start === null || row.start < to) && (row.validTo === null || row.validTo > from);
 }
 
@@ -123,7 +127,7 @@ export function prepareLayerLoad(layerId: LayerId, config: MapConfig, maxRows: n
     query: `${recordProjection(GEO_COLUMNS)}
       FROM ${viewPath(config, 'v_geo_records_current_served')} g
       WHERE ${topic.sql} AND ${recordStatusFilter('current')} ${DRAWABLE_ONLY.has(layerId) ? 'AND g.geometry IS NOT NULL' : ''}
-      ${GEO_ORDER}` };
+      ${geoOrder(layerId as GeoQueryId)}` };
 }
 
 export function prepareStateLoad(config: MapConfig, maxRows: number): PreparedViewQuery {

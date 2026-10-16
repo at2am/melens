@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -7,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../../data/map_models.dart';
+import '../map_layer_style.dart';
 import 'core_renderers.dart';
 
 typedef AggregateRenderBuilder = CoreRenderPlan Function(
@@ -40,7 +42,12 @@ CoreRenderPlan buildAggregateRenderPlan(
 }) {
   final strings = AppLocalizations.of(context);
   final colors = Theme.of(context).colorScheme;
-  var plan = const CoreRenderPlan.empty();
+  var plan = buildAreaMentionsRenderPlan(
+    items,
+    selectedItemId,
+    onSelected,
+    colors: colors,
+  );
   for (final item in items) {
     if (item.details.representation != AggregateRepresentation.cluster ||
         !isDrawableMapItem(item)) {
@@ -110,6 +117,57 @@ CoreRenderPlan buildAggregateRenderPlan(
         ),
       );
     }
+  }
+  return plan;
+}
+
+/// UC-06 news areas: each official area the current articles name, shaded by
+/// its article count relative to the busiest area in view. Smaller areas sit
+/// above the larger ones that contain them, so a suburb stays tappable inside
+/// its council area. Selecting an area lists its articles without moving the
+/// map, since the area is an association rather than a place to zoom to.
+CoreRenderPlan buildAreaMentionsRenderPlan(
+  List<AggregateMapItem> items,
+  String? selectedItemId,
+  ValueChanged<AggregateMapItem>? onSelected, {
+  required ColorScheme colors,
+}) {
+  final areas = [
+    for (final item in items)
+      if (item.details.representation == AggregateRepresentation.areaMentions &&
+          isDrawableMapItem(item))
+        item,
+  ];
+  if (areas.isEmpty) return const CoreRenderPlan.empty();
+  double count(AggregateMapItem item) =>
+      (item.details.metric.value ?? item.details.resultRange.returnedCount)
+          .toDouble();
+  double extent(AggregateMapItem item) {
+    final bounds = item.details.bounds;
+    return (bounds.east - bounds.west) * (bounds.north - bounds.south);
+  }
+
+  final busiest = areas.map(count).reduce(math.max);
+  final bySize = [...areas]..sort((a, b) => extent(b).compareTo(extent(a)));
+  final base = layerStyle(MapLayerId.news).color;
+  var plan = const CoreRenderPlan.empty();
+  for (final (rank, item) in bySize.indexed) {
+    final selected = item.id == selectedItemId;
+    final share = busiest <= 0
+        ? 0.0
+        : math.log(1 + count(item)) / math.log(1 + busiest);
+    plan = plan.merge(
+      buildGeometryRenderPlan(
+        id: '${item.id}:area',
+        geometry: item.geometry!,
+        title: item.title,
+        color: selected ? colors.secondary : base,
+        selected: selected,
+        fillAlpha: 0.05 + 0.25 * share,
+        zIndex: 1 + rank + (selected ? bySize.length : 0),
+        onTap: onSelected == null ? null : () => onSelected(item),
+      ),
+    );
   }
   return plan;
 }
