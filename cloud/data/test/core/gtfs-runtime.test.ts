@@ -94,7 +94,7 @@ test('runtime loads published static references and keeps official mode/version 
   const actual = await withPublishedGtfsLocations(original, config, bq);
   assert.equal(actual.geoRecords[0]?.geometry_geojson, null);
   assert.equal(JSON.parse(actual.geoRecords[0]?.summary ?? '{}').gtfs_mapping_status, 'version_unverified');
-  assert.equal(actual.geoRecordSources.some(link => link.evidence_role === 'gtfs_static_stop_location'), false);
+  assert.deepEqual(JSON.parse(actual.geoRecords[0]?.summary ?? '{}').static_evidence, []);
   assert.deepEqual(actual.sourceRecords, original.sourceRecords);
   const again = await withPublishedGtfsLocations(original, config, bq);
   assert.deepEqual(again.geoRecords, actual.geoRecords);
@@ -114,10 +114,13 @@ test('explicit published per-mode references preserve exact source versions in a
   assert.equal(JSON.parse(point.summary ?? '{}').gtfs_mapping_status, 'located');
   const expectedStop = rows.find(row => row.source.source_record_id.endsWith(':stop:19499'));
   assert.ok(expectedStop);
-  const stopEvidence = actual.geoRecordSources.find(link => link.evidence_role === 'gtfs_static_stop_location');
+  const stopEvidence = JSON.parse(point.summary ?? '{}').static_evidence
+    .find((item: { role: string }) => item.role === 'gtfs_static_stop_location');
   assert.equal(stopEvidence?.source_record_id, expectedStop.source.source_record_id);
-  assert.equal(stopEvidence?.source_version_id, expectedStop.source.version_id);
+  assert.equal(stopEvidence?.version_id, expectedStop.source.version_id);
   assert.equal(actual.geoRecordSources.every(link => link.version_id === point.version_id), true);
+  // A batch links only its own source's records; the static facts stay in the summary.
+  assert.equal(actual.geoRecordSources.every(link => link.source_record_id.startsWith(REALTIME_SOURCE_ID)), true);
 
   rows = await references('yarra_tram');
   const wrongMode = await withPublishedGtfsLocations(realtime(), config, bq);
@@ -154,8 +157,10 @@ test('the official archive schedule places stop alerts at the stop and route ale
   assert.equal(drawn.centroid_lat, null);
   assert.equal(drawn.location_role, 'event_site');
   assert.equal(drawn.location_confidence, 'official_join');
-  const routeEvidence = onRoute.geoRecordSources.find(link => link.evidence_role === 'gtfs_static_route_id');
+  const routeEvidence = JSON.parse(drawn.summary ?? '{}').static_evidence
+    .find((item: { role: string }) => item.role === 'gtfs_static_route_id');
   assert.equal(routeEvidence?.source_record_id, `${STATIC_SOURCE_ID}:route:2-FLI`);
+  assert.equal(onRoute.geoRecordSources.every(link => link.source_record_id.startsWith(REALTIME_SOURCE_ID)), true);
   assert.equal(onRoute.geoRecordSources.every(link => link.version_id === drawn.version_id), true);
 
   // A route with no shape in the schedule stays unlocated rather than guessed.

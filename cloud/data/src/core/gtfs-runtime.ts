@@ -284,7 +284,8 @@ export async function withPublishedGtfsLocations(result: ConnectorSuccess, confi
     if (!mapping) throw new Error('GTFS runtime did not classify an alert');
     const originalSummary: unknown = row.summary === null ? null : JSON.parse(row.summary);
     const summary = JSON.stringify({ ...z.record(z.string(), z.unknown()).parse(originalSummary),
-      gtfs_mapping_status: mapping.status, static_feed_version: mapping.staticFeedVersion });
+      gtfs_mapping_status: mapping.status, static_feed_version: mapping.staticFeedVersion,
+      static_evidence: mapping.staticEvidence });
     return { ...row, summary, version_id: sourceVersionId(row.source_updated_at,
       { joinedVersionId: row.version_id, summary }) };
   });

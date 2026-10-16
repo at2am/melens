@@ -70,6 +70,17 @@ export interface GtfsAlertMapping {
   staticFeedVersion: string | null;
   routeIds: readonly string[];
   stopIds: readonly string[];
+  /**
+   * The static facts that placed the alert. They belong to another source, and a batch may link
+   * only its own source's records, so they travel in the alert summary rather than as links.
+   */
+  staticEvidence: readonly StaticEvidence[];
+}
+
+export interface StaticEvidence {
+  role: 'gtfs_static_route_id' | 'gtfs_static_stop_location';
+  source_record_id: string;
+  version_id: string;
 }
 
 export interface JoinedGtfsAlerts {
@@ -340,6 +351,7 @@ export function joinGtfsAlertLocations(input: {
     geoRecords.push(record);
     geoRecordSources.push(...originalLinks.map(link => ({ ...link, version_id: record.version_id })));
 
+    const staticEvidence: StaticEvidence[] = [];
     if (staticFeed !== null) {
       for (const [kind, ids] of [
         ['route', routeIds], ['stop', stopIds],
@@ -347,19 +359,14 @@ export function joinGtfsAlertLocations(input: {
         for (const id of ids) {
           const referenced = staticRecord(staticFeed, kind, id);
           if (!referenced) continue;
-          geoRecordSources.push({ batch_id: record.batch_id, source_id: record.source_id,
-            schema_version: record.schema_version, fetched_at: record.fetched_at,
-            geo_record_id: record.geo_record_id, version_id: record.version_id,
-            source_record_id: referenced.source_record_id,
-            source_version_id: referenced.version_id,
-            evidence_role: kind === 'route' ? 'gtfs_static_route_id' : 'gtfs_static_stop_location',
-            original_url: referenced.original_url });
+          staticEvidence.push({ role: kind === 'route' ? 'gtfs_static_route_id' : 'gtfs_static_stop_location',
+            source_record_id: referenced.source_record_id, version_id: referenced.version_id });
         }
       }
     }
     mappings.push({ geoRecordId: record.geo_record_id, status,
       staticFeedVersion: staticFeed?.version.normalized.feedVersion ?? null,
-      routeIds, stopIds });
+      routeIds, stopIds, staticEvidence });
   }
   const unique = new Map<string, GeoRecordSource>();
   for (const link of geoRecordSources) {

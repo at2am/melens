@@ -68,10 +68,11 @@ test('an exact stop, route, trip and static feed version yields a sourced point'
   assert.equal(point.centroid_lat, -37.8183);
   assert.equal(point.centroid_lon, 144.9671);
   assert.equal(validateGeoRecordGeography(point).valid, true);
-  assert.equal(joined.geoRecordSources.some(link =>
-    link.evidence_role === 'gtfs_static_stop_location'
-      && link.source_record_id === `${STATIC_SOURCE_ID}:stop:19499`), true);
+  assert.equal(joined.mappings[0]?.staticEvidence.some(item =>
+    item.role === 'gtfs_static_stop_location'
+      && item.source_record_id === `${STATIC_SOURCE_ID}:stop:19499`), true);
   assert.equal(joined.geoRecordSources.every(link => link.version_id === point.version_id), true);
+  assert.equal(joined.geoRecordSources.every(link => link.source_record_id.startsWith(REALTIME_SOURCE_ID)), true);
 });
 
 test('version mismatch and unknown stop keep the alert without invented coordinates', async () => {
@@ -164,8 +165,8 @@ test('sparse official stop times cannot claim a trip-specific stop match', async
     alertSources: alerts.geoRecordSources, staticVersions: [sparse] });
   assert.equal(joined.mappings[0]?.status, 'unmapped');
   assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
-  assert.equal(joined.geoRecordSources.some(link =>
-    link.evidence_role === 'gtfs_static_stop_location'), false);
+  assert.equal(joined.mappings[0]?.staticEvidence.some(item =>
+    item.role === 'gtfs_static_stop_location'), false);
 });
 
 test('mixed route and stop selectors cannot locate the whole alert at one stop', async () => {
@@ -210,8 +211,8 @@ test('valid trip-instance constraints stay unresolved without static calendar an
     assert.equal(joined.mappings[0]?.status, 'trip_instance_unverified');
     assert.equal(joined.geoRecords[0]?.geometry_geojson, null);
     assert.equal(joined.geoRecords[0]?.location_confidence, 'unverified');
-    assert.equal(joined.geoRecordSources.some(link =>
-      link.evidence_role === 'gtfs_static_stop_location'), false);
+    assert.equal(joined.mappings[0]?.staticEvidence.some(item =>
+      item.role === 'gtfs_static_stop_location'), false);
     assert.deepEqual(joined.geoRecordSources, alerts.geoRecordSources);
   }
 });

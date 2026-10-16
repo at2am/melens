@@ -255,8 +255,8 @@ test('T069 offline UC-05: a static stop locates a matching alert, while absent e
   assert.equal(joined.mappings[0]?.status, 'located');
   assert.equal(joined.geoRecords[0]?.geometry_geojson, stop.geometry_geojson);
   assert.equal(joined.geoRecords[0]?.location_confidence, 'official_join');
-  assert.ok(joined.geoRecordSources.some(link => link.evidence_role === 'gtfs_static_stop_location'
-    && link.source_record_id === stop.geo_record_id));
+  assert.ok(joined.mappings[0]?.staticEvidence.some(item => item.role === 'gtfs_static_stop_location'
+    && item.source_record_id === stop.geo_record_id));
 
   const unknown = joinedFor({ ...feed, alerts: [{ ...feed.alerts[0]!,
     selectors: [{ ...feed.alerts[0]!.selectors[0]!, stopId: 'UNKNOWN-STOP' }] }] });

@@ -1442,10 +1442,10 @@ test('US4 Suite 3: GTFS Realtime alerts join static stops without fabricating co
 
   // Provenance contains static stop evidence
   assert.equal(
-    joinedExact.geoRecordSources.some(
-      (link) =>
-        link.evidence_role === 'gtfs_static_stop_location' &&
-        link.source_record_id === `${STATIC_SOURCE_ID}:stop:19499`,
+    joinedExact.mappings[0]?.staticEvidence.some(
+      (item) =>
+        item.role === 'gtfs_static_stop_location' &&
+        item.source_record_id === `${STATIC_SOURCE_ID}:stop:19499`,
     ),
     true,
   );
