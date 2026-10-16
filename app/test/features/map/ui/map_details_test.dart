@@ -186,6 +186,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('opening and closing details keeps the same map', (tester) async {
+    // A rebuilt platform map loses the camera move the same tap started,
+    // such as a cluster zooming to its members.
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.physicalSize = const Size(1100, 720);
+    final details = MapDetails(state: _state(t016Item()), onClose: () {});
+    await _show(tester, const MapDetailsLayout(map: _CountedMap()));
+    expect(_CountedMap.created, 1);
+
+    await _show(
+      tester,
+      MapDetailsLayout(map: const _CountedMap(), details: details),
+    );
+    expect(
+      find.byKey(const ValueKey('map-details-side-layout')),
+      findsOneWidget,
+    );
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('map-details-bottom-layout')),
+      findsOneWidget,
+    );
+    await _show(tester, const MapDetailsLayout(map: _CountedMap()));
+    expect(_CountedMap.created, 1);
+  });
+
   testWidgets('null counts are unknown and zero remains a measured zero', (
     tester,
   ) async {
@@ -591,4 +620,25 @@ void main() {
     await _expandTechnical(tester);
     expect(find.text('Sensor id: kerbside:10317'), findsOneWidget);
   });
+}
+
+/// Counts how often its state is created, standing in for the platform map.
+class _CountedMap extends StatefulWidget {
+  const _CountedMap();
+
+  static int created = 0;
+
+  @override
+  State<_CountedMap> createState() => _CountedMapState();
+}
+
+class _CountedMapState extends State<_CountedMap> {
+  @override
+  void initState() {
+    super.initState();
+    _CountedMap.created++;
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }

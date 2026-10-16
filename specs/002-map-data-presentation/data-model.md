@@ -60,7 +60,8 @@ Viewport snapshot context binds bbox/zoom/mode/window/filters/pageSize. Original
 
 ## Client transitions
 
-- Topic session: defaults → adjusted layers → preserved session; another topic restores its own session/default.
+- Topic session: defaults → adjusted layers → preserved session; another topic restores its own session/default. The topic and every topic's layers are remembered on the device and restored at the next launch (UC-01 notes).
+- Aggregate: tapping a count badge selects the group and fits the camera to its member bounds after the details open; opening details never recreates the map.
 - Request: idle → loading/refreshing → result/failure. Only the newest requestId replaces results. Retained data keeps original source timestamps and a refresh-failure notice.
 - Selection: stable id survives zoom; offscreen detail remains; filter exclusion/deletion explains and clears highlight.
 - Zoom: nominal first band; closer entry at threshold+0.2, return at threshold−0.2.

@@ -75,10 +75,31 @@ class BuildProvenanceTests(unittest.TestCase):
             build.build_variant("live")
         self.assertEqual(provenance.bundle_files(directory), original)
 
+    def font_paths(self, directory):
+        manifest = json.loads((directory / "assets" / "FontManifest.json").read_text())
+        return {family["family"]: directory / "assets" / family["fonts"][0]["asset"] for family in manifest}
+
+    def test_fonts_are_served_under_content_hashed_names(self):
+        build.build_variant("live")
+        directory = self.app / "build" / "web-e2e-live"
+        fonts = self.font_paths(directory)
+        icons = fonts["MaterialIcons"]
+        self.assertRegex(icons.name, r"^MaterialIcons-Regular\.[0-9a-f]{16}\.otf$")
+        self.assertEqual(icons.read_text(), "icons")
+        self.assertRegex(fonts["Roboto"].name, r"^Roboto\.[0-9a-f]{16}\.ttf$")
+        self.assertFalse((directory / "assets" / "fonts" / "MaterialIcons-Regular.otf").exists())
+
+        def new_icons(command, **options):
+            self.fake_flutter(command, **options)
+            (self.app / "build" / "web" / "assets" / "fonts" / "MaterialIcons-Regular.otf").write_text("more icons")
+        self.runner.side_effect = new_icons
+        build.build_variant("live")
+        self.assertNotEqual(self.font_paths(directory)["MaterialIcons"].name, icons.name)
+
     def test_serving_rejects_removed_fonts_and_tampered_assets(self):
         build.build_variant("sample")
         directory = self.app / "build" / "web-e2e-sample"
-        font = directory / "assets" / "fonts" / "MaterialIcons-Regular.otf"
+        font = self.font_paths(directory)["MaterialIcons"]
         font.write_text("tampered")
         with self.assertRaisesRegex(ValueError, "files differ"):
             provenance.validate_build(directory, "sample")

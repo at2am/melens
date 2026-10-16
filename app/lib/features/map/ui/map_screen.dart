@@ -156,6 +156,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listenManual(eventsPanelRequestsProvider, (previous, next) {
       if (next != null) _takeEventsPanelRequest(next);
     });
+    // Also catches the switch this device remembered, which can arrive
+    // after the first frame.
+    ref.listenManual(communityLayerEnabledProvider, (previous, next) {
+      _syncNearbyLoading(next);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // The agent or an event page may have asked for the map before it was
@@ -364,25 +369,37 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (groups.isNotEmpty) _selectItem(groups.first);
   }
 
+  /// Fits the camera to [bounds], such as a cluster's members. It runs after
+  /// the next frame: the tap that asks for it usually also opens the details
+  /// beside or below the map, and the fit must use the map's new size. The
+  /// padding keeps edge pins, which stand above their point, clear of the
+  /// layer chips and the round buttons.
   void _zoomToBounds(MapBounds bounds) {
     if (widget.onZoomToBounds != null) {
       widget.onZoomToBounds!(bounds);
-    } else if (_map != null) {
-      _searchNextRegion = true;
-      unawaited(
-        _map!
-            .animateCamera(
-              CameraUpdate.newLatLngBounds(
-                LatLngBounds(
-                  southwest: LatLng(bounds.south, bounds.west),
-                  northeast: LatLng(bounds.north, bounds.east),
-                ),
-                32,
-              ),
-            )
-            .catchError((Object _) {}),
-      );
+      return;
     }
+    if (_map == null) return;
+    _searchNextRegion = true;
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        final map = _map;
+        if (!mounted || map == null) return;
+        unawaited(
+          map
+              .animateCamera(
+                CameraUpdate.newLatLngBounds(
+                  LatLngBounds(
+                    southwest: LatLng(bounds.south, bounds.west),
+                    northeast: LatLng(bounds.north, bounds.east),
+                  ),
+                  96,
+                ),
+              )
+              .catchError((Object _) {}),
+        );
+      })
+      ..scheduleFrame();
   }
 
   /// Applies a `focus_map` action from the agent (agent-protocol.md,
@@ -975,10 +992,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// The community layer switch also decides whether the nearby events load
   /// while the panel is closed, so their pins stay on the map.
-  void _setCommunity(bool on) {
-    ref.read(communityLayerEnabledProvider.notifier).set(enabled: on);
-    _syncNearbyLoading(on);
-  }
+  void _setCommunity(bool on) =>
+      ref.read(communityLayerEnabledProvider.notifier).set(enabled: on);
 
   void _syncNearbyLoading(bool on) {
     if (on == _holdingNearby) return;
@@ -1202,8 +1217,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         heroTag: null,
         tooltip: tooltip,
         elevation: 2,
-        backgroundColor: active ? scheme.primary : scheme.surface,
-        foregroundColor: active ? scheme.onPrimary : scheme.onSurface,
+        // Tonal like the Feed's buttons: plain surface read as blank white
+        // discs on the light map.
+        backgroundColor: active ? scheme.primary : scheme.secondaryContainer,
+        foregroundColor: active
+            ? scheme.onPrimary
+            : scheme.onSecondaryContainer,
         onPressed: onPressed,
         child: icon,
       ),

@@ -10,19 +10,22 @@ part of 'event_view_providers.dart';
 // ignore_for_file: type=lint, type=warning
 /// Whether user events are drawn on the map. They are not a layer of the map
 /// contract (v1 registers nine layers), so the app keeps this switch itself
-/// and the map shows it beside the contract layers.
+/// and the map shows it beside the contract layers. Remembered on this
+/// device with the other layers.
 
 @ProviderFor(CommunityLayerEnabled)
 final communityLayerEnabledProvider = CommunityLayerEnabledProvider._();
 
 /// Whether user events are drawn on the map. They are not a layer of the map
 /// contract (v1 registers nine layers), so the app keeps this switch itself
-/// and the map shows it beside the contract layers.
+/// and the map shows it beside the contract layers. Remembered on this
+/// device with the other layers.
 final class CommunityLayerEnabledProvider
     extends $NotifierProvider<CommunityLayerEnabled, bool> {
   /// Whether user events are drawn on the map. They are not a layer of the map
   /// contract (v1 registers nine layers), so the app keeps this switch itself
-  /// and the map shows it beside the contract layers.
+  /// and the map shows it beside the contract layers. Remembered on this
+  /// device with the other layers.
   CommunityLayerEnabledProvider._()
     : super(
         from: null,
@@ -51,11 +54,12 @@ final class CommunityLayerEnabledProvider
 }
 
 String _$communityLayerEnabledHash() =>
-    r'f8861719597da9d02768d706ef13de51063988c4';
+    r'1784f8c12741df48f301b05acd7c9af3867bbab1';
 
 /// Whether user events are drawn on the map. They are not a layer of the map
 /// contract (v1 registers nine layers), so the app keeps this switch itself
-/// and the map shows it beside the contract layers.
+/// and the map shows it beside the contract layers. Remembered on this
+/// device with the other layers.
 
 abstract class _$CommunityLayerEnabled extends $Notifier<bool> {
   bool build();

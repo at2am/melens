@@ -47,6 +47,31 @@ def validate_assets(directory):
         raise ValueError("The Web font manifest must include Roboto and MaterialIcons.")
 
 
+def fingerprint_fonts(directory):
+    """Rename every Web font to a name that carries its content hash.
+
+    The engine fetches each font by its FontManifest.json path. Under a fixed
+    name a browser can keep an older tree-shaken icon font that lacks icons a
+    later release uses; Safari then drew those buttons blank. A new name for
+    new contents cannot be served stale.
+    """
+    assets = directory / "assets"
+    manifest_path = assets / "FontManifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    renamed = {}
+    for family in manifest:
+        for font in family["fonts"]:
+            asset = font["asset"]
+            if asset not in renamed:
+                source = assets / asset
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
+                target = source.with_name(f"{source.stem}.{digest}{source.suffix}")
+                source.rename(target)
+                renamed[asset] = target.relative_to(assets).as_posix()
+            font["asset"] = renamed[asset]
+    manifest_path.write_text(json.dumps(manifest, separators=(",", ":")))
+
+
 def source_stamp():
     digest = hashlib.sha256()
     paths = []

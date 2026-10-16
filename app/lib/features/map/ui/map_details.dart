@@ -25,29 +25,31 @@ class MapDetailsLayout extends StatelessWidget {
   final Widget map;
   final Widget? details;
 
+  /// One [Flex] whether or not details show, with the map always its first
+  /// child: opening or closing the details keeps the map's element, so the
+  /// platform map is not rebuilt and a camera move started by the same tap
+  /// (a cluster zooming to its members) is not lost.
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      if (details == null) return map;
-      if (constraints.maxWidth >= 720) {
-        return Row(
-          key: const ValueKey('map-details-side-layout'),
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: map),
-            SizedBox(width: 360, child: details),
-          ],
-        );
-      }
-      return Column(
-        key: const ValueKey('map-details-bottom-layout'),
+      final side = constraints.maxWidth >= 720;
+      return Flex(
+        direction: side ? Axis.horizontal : Axis.vertical,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(child: map),
-          SizedBox(
-            height: math.min(360, constraints.maxHeight * 0.48),
-            child: details,
-          ),
+          if (details case final details?)
+            side
+                ? SizedBox(
+                    key: const ValueKey('map-details-side-layout'),
+                    width: 360,
+                    child: details,
+                  )
+                : SizedBox(
+                    key: const ValueKey('map-details-bottom-layout'),
+                    height: math.min(360, constraints.maxHeight * 0.48),
+                    child: details,
+                  ),
         ],
       );
     },
