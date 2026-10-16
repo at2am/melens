@@ -219,6 +219,7 @@ fi
 deploy=("$gcloud_bin" run deploy "$service" "--project=$project" "--region=$region"
   "--image=$image" "--service-account=$identity" "--env-vars-file=$task_tmp_dir/env.json"
   --port=8080 --cpu=1 --memory=1Gi --concurrency=32 --timeout=30s
+  --startup-probe=httpGet.path=/healthz,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=1,timeoutSeconds=1,failureThreshold=60
   "--min=$min_instances" --max=4 "--min-instances=$min_instances" --max-instances=4 --cpu-boost --ingress=all
   --allow-unauthenticated --quiet)
 printf 'Reviewed Cloud Run command:'

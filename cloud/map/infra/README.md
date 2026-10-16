@@ -55,7 +55,8 @@ audit aborts on other query-identity project roles, ingestion dataset access,
 secret/bucket grants or an unreviewed query-dataset resource.
 
 Runtime bounds are at most four instances at both service and revision levels,
-concurrency 32, one CPU with startup boost, 1 GiB, a 30-second HTTP
+concurrency 32, one CPU with startup boost, 1 GiB, an HTTP startup probe on
+`/healthz` (503 until the cached layers have loaded, at most 25 seconds), a 30-second HTTP
 deadline, 10-second queries, 5-second dry runs, 1-second cancellation, 1,000 items
 and a 2 MiB response. One instance stays warm by default (`--min-instances 1`,
 since 2026-10-16), so the first map or feed read skips a cold start and finds the
