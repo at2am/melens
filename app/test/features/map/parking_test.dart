@@ -9,12 +9,14 @@ import 'package:melens/features/map/ui/renderers/core_renderers.dart';
 
 /// The frozen parking example, with optional detail overrides.
 Map<String, dynamic> _json({Map<String, Object?> details = const {}}) {
-  final items = jsonDecode(
-    File(
-      '../specs/002-map-data-presentation/contracts/examples/'
-      'item-variants.sample.json',
-    ).readAsStringSync(),
-  ) as List<dynamic>;
+  final items =
+      jsonDecode(
+            File(
+              '../specs/002-map-data-presentation/contracts/examples/'
+              'item-variants.sample.json',
+            ).readAsStringSync(),
+          )
+          as List<dynamic>;
   final json = Map<String, dynamic>.from(
     items.cast<Map<String, dynamic>>().singleWhere(
       (item) => item['kind'] == 'parking',
@@ -95,57 +97,63 @@ void main() {
     expect(() => MapItem.fromJson(json), throwsA(anything));
   });
 
-  test('each bay is a dot coloured by its own reading, and noData is never the vacant colour', () {
-    const colors = ColorScheme.light();
-    final vacant = _item();
-    final occupied = _item(
-      id: 'parking:kerbside:2',
-      details: {'state': 'occupied'},
-    );
-    final silent = _item(
-      id: 'parking:kerbside:3',
-      details: {
-        'state': 'noData',
-        'noDataReason': 'notReporting',
-        'reading': 'stale',
-      },
-    );
-    final plan = buildCoreRenderPlan(
-      items: [vacant, occupied, silent],
-      colors: colors,
-    );
-    expect(plan.markers, isEmpty, reason: 'Bays are dots, not pins');
-    Circle dot(String id) => plan.circles.singleWhere(
-      (circle) => circle.circleId.value == '$id:bay',
-    );
-    expect(
-      dot('parking:kerbside:1').fillColor,
-      parkingStateColor(ParkingState.vacant, colors),
-    );
-    expect(dot('parking:kerbside:2').fillColor, colors.error);
-    expect(dot('parking:kerbside:3').fillColor, colors.outline);
-    expect(
-      dot('parking:kerbside:3').fillColor,
-      isNot(parkingStateColor(ParkingState.vacant, colors)),
-    );
-    expect(dot('parking:kerbside:1').radius, parkingBayDotRadiusMeters);
-  });
+  test(
+    'each bay is a footprint coloured by its own reading, and noData is never the vacant colour',
+    () {
+      const colors = ColorScheme.light();
+      final vacant = _item();
+      final occupied = _item(
+        id: 'parking:kerbside:2',
+        details: {'state': 'occupied'},
+      );
+      final silent = _item(
+        id: 'parking:kerbside:3',
+        details: {
+          'state': 'noData',
+          'noDataReason': 'notReporting',
+          'reading': 'stale',
+        },
+      );
+      final plan = buildCoreRenderPlan(
+        items: [vacant, occupied, silent],
+        colors: colors,
+      );
+      expect(plan.markers, isEmpty, reason: 'Bays are footprints, not pins');
+      expect(plan.circles, isEmpty);
+      Polygon bay(String id) => plan.polygons.singleWhere(
+        (polygon) => polygon.polygonId.value == '$id:bay',
+      );
+      expect(
+        bay('parking:kerbside:1').fillColor,
+        parkingStateColor(ParkingState.vacant, colors),
+      );
+      expect(bay('parking:kerbside:2').fillColor, colors.error);
+      expect(bay('parking:kerbside:3').fillColor, colors.outline);
+      expect(
+        bay('parking:kerbside:3').fillColor,
+        isNot(parkingStateColor(ParkingState.vacant, colors)),
+      );
+      expect(bay('parking:kerbside:1').points, hasLength(4));
+    },
+  );
 
-  test('a selected bay is larger and outlined, and a tap selects it', () {
+  test('a selected bay keeps its size, is outlined, and a tap selects it', () {
     const colors = ColorScheme.light();
     MapItem? tapped;
     final item = _item();
+    final plain = buildCoreRenderPlan(items: [item], colors: colors);
     final plan = buildCoreRenderPlan(
       items: [item],
       colors: colors,
       selectedItemId: item.id,
       onSelected: (value) => tapped = value,
     );
-    final dot = plan.circles.single;
-    expect(dot.radius, greaterThan(parkingBayDotRadiusMeters));
-    expect(dot.strokeColor, colors.secondary);
-    expect(dot.consumeTapEvents, isTrue);
-    dot.onTap!();
+    final bay = plan.polygons.single;
+    expect(bay.points, plain.polygons.single.points);
+    expect(bay.strokeColor, colors.secondary);
+    expect(bay.zIndex, greaterThan(plain.polygons.single.zIndex));
+    expect(bay.consumeTapEvents, isTrue);
+    bay.onTap!();
     expect(tapped, item);
   });
 }
