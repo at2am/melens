@@ -17,7 +17,7 @@ import '../../shell/state/shell_providers.dart';
 import '../data/saved_plan.dart';
 import '../state/plans_providers.dart';
 
-/// One saved plan, opened from the Feed tab: the card as the agent made it,
+/// One saved plan, opened from the Home tab: the card as the agent made it,
 /// its route on the map, and a remove button. A stop opens on the map.
 class PlanScreen extends ConsumerWidget {
   const PlanScreen({required this.planId, super.key});

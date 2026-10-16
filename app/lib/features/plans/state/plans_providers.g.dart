@@ -55,19 +55,19 @@ final class PlansClientProvider
 String _$plansClientHash() => r'c0924a16a854e3cbd9c1b5f9244ede8a4b62afd2';
 
 /// The plans the user saved from the chat, newest first, as the agent
-/// service stores them. They show on the Feed tab until the user removes
+/// service stores them. They show on the Home tab until the user removes
 /// them.
 
 @ProviderFor(SavedPlans)
 final savedPlansProvider = SavedPlansProvider._();
 
 /// The plans the user saved from the chat, newest first, as the agent
-/// service stores them. They show on the Feed tab until the user removes
+/// service stores them. They show on the Home tab until the user removes
 /// them.
 final class SavedPlansProvider
     extends $AsyncNotifierProvider<SavedPlans, List<SavedPlan>> {
   /// The plans the user saved from the chat, newest first, as the agent
-  /// service stores them. They show on the Feed tab until the user removes
+  /// service stores them. They show on the Home tab until the user removes
   /// them.
   SavedPlansProvider._()
     : super(
@@ -91,7 +91,7 @@ final class SavedPlansProvider
 String _$savedPlansHash() => r'006c41764108daf5fcf5ab5f22a0d007118db9a8';
 
 /// The plans the user saved from the chat, newest first, as the agent
-/// service stores them. They show on the Feed tab until the user removes
+/// service stores them. They show on the Home tab until the user removes
 /// them.
 
 abstract class _$SavedPlans extends $AsyncNotifier<List<SavedPlan>> {

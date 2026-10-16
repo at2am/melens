@@ -209,7 +209,7 @@ Rules:
 
 ## Feed subscriptions
 
-The feeds a user built on the Feed tab (UC-14) are stored per uid by the same service on `/v1/feeds`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; no other service and no client reads them ([uc-14](use-cases/uc-14-personal-feed.md)).
+The feeds a user built on the Home tab (UC-14) are stored per uid by the same service on `/v1/feeds`, with the Firebase ID token like every other route. Firestore holds them, written only by this service; no other service and no client reads them ([uc-14](use-cases/uc-14-personal-feed.md)).
 
 | Method and path | Purpose |
 | --- | --- |
@@ -243,7 +243,7 @@ Rules:
 
 ## Saved plans
 
-A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` and shown on the Feed tab until the user removes it. It is a one-off: a copy of the card, not a subscription, and nothing refreshes it.
+A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` and shown on the Home tab until the user removes it. It is a one-off: a copy of the card, not a subscription, and nothing refreshes it.
 
 | Method and path | Purpose |
 | --- | --- |

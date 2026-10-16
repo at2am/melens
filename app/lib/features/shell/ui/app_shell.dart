@@ -127,8 +127,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             destinations: [
               NavigationDestination(
                 key: const ValueKey('tab-feed'),
-                icon: const Icon(Icons.dynamic_feed_outlined),
-                selectedIcon: const Icon(Icons.dynamic_feed),
+                icon: const Icon(Icons.home_outlined),
+                selectedIcon: const Icon(Icons.home),
                 label: strings.tabFeed,
               ),
               NavigationDestination(
