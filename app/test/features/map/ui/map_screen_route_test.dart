@@ -34,6 +34,7 @@ Future<(ProviderContainer, List<MapSurfaceConfiguration>)> showScreen(
         T017Repository(autoComplete: true),
       ),
       agentClientProvider.overrideWithValue(FakeAgentClient()),
+      deviceLocationSupportedProvider.overrideWithValue(true),
       deviceLocationReaderProvider.overrideWithValue(location),
       melbourneClockProvider.overrideWithValue(
         MelbourneClock(now: () => t017Instant),

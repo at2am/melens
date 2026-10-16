@@ -60,9 +60,11 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _Section(strings.settingsFeeds),
           const _FeedsSection(),
-          const SizedBox(height: 16),
-          _Section(strings.settingsLocation),
-          _LocationSwitch(),
+          if (ref.watch(deviceLocationSupportedProvider)) ...[
+            const SizedBox(height: 16),
+            _Section(strings.settingsLocation),
+            _LocationSwitch(),
+          ],
           const SizedBox(height: 16),
           _Section(strings.settingsMap),
           SwitchListTile(

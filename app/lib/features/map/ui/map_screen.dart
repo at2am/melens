@@ -521,6 +521,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _showUnlocated = false;
       _cardItem = null;
     });
+    // A record opened from elsewhere (the Home feed) is brought into view.
+    ref
+        .read(mapActionsControllerProvider.notifier)
+        .focusPoints(_positionsOf(record.item.geometry));
     unawaited(
       ref
           .read(selectionControllerProvider.notifier)
@@ -537,6 +541,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             if (mounted) _reconcileSelection();
           }),
     );
+  }
+
+  static List<AgentLatLng> _positionsOf(GeoJsonGeometry? geometry) {
+    AgentLatLng at(List<double> p) => AgentLatLng(lat: p[1], lng: p[0]);
+    return switch (geometry) {
+      null => const [],
+      GeoJsonPoint(:final coordinates) => [at(coordinates)],
+      GeoJsonMultiPoint(:final coordinates) ||
+      GeoJsonLineString(:final coordinates) => coordinates.map(at).toList(),
+      GeoJsonMultiLineString(:final coordinates) ||
+      GeoJsonPolygon(
+        :final coordinates,
+      ) => [for (final line in coordinates) ...line.map(at)],
+      GeoJsonMultiPolygon(:final coordinates) => [
+        for (final polygon in coordinates)
+          for (final ring in polygon) ...ring.map(at),
+      ],
+    };
   }
 
   /// Why My location did not work; nothing is shown otherwise.
@@ -1246,29 +1268,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           onPressed: () => _showResultsSheet(wide: wide),
           icon: const Icon(Icons.format_list_bulleted),
         ),
-        button(
-          key: const ValueKey('map-chip-my-location'),
-          tooltip: locating
-              ? strings.mapMyLocationLocating
-              : strings.mapMyLocation,
-          active: on,
-          onPressed: locating
-              ? null
-              : () {
-                  final controller = ref.read(userLocationProvider.notifier);
-                  if (on) {
-                    controller.disable();
-                  } else {
-                    unawaited(controller.enable());
-                  }
-                },
-          icon: locating
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(on ? Icons.my_location : Icons.location_searching),
-        ),
+        if (ref.watch(deviceLocationSupportedProvider))
+          button(
+            key: const ValueKey('map-chip-my-location'),
+            tooltip: locating
+                ? strings.mapMyLocationLocating
+                : strings.mapMyLocation,
+            active: on,
+            onPressed: locating
+                ? null
+                : () {
+                    final controller = ref.read(userLocationProvider.notifier);
+                    if (on) {
+                      controller.disable();
+                    } else {
+                      unawaited(controller.enable());
+                    }
+                  },
+            icon: locating
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(on ? Icons.my_location : Icons.location_searching),
+          ),
       ],
     );
   }

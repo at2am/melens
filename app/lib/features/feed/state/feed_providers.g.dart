@@ -372,7 +372,7 @@ final class MapFeedItemsProvider
   }
 }
 
-String _$mapFeedItemsHash() => r'f47455ac52c1df85c5a789d26531e27fc79572fa';
+String _$mapFeedItemsHash() => r'e0f92750ff54198b22af1b16756a55c0bcd9ef5a';
 
 /// What one layer holds now inside one scope. Each layer is its own request,
 /// so the layers load in parallel and a slow one delays only its own items.
@@ -552,4 +552,4 @@ final class FeedProvider
   }
 }
 
-String _$feedHash() => r'94213ed1c4b4f53e288fb8f67d60f59f488a07af';
+String _$feedHash() => r'307e77ef19cb1adc58d34ddbd4e53a3646341980';

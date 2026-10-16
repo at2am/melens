@@ -72,10 +72,13 @@ ProviderContainer appContainer({
   bool sampleData = true,
   MapRepository? mapRepository,
   DeviceLocationReader? deviceLocation,
+  bool locationSupported = true,
   List<Override> overrides = const [],
 }) => ProviderContainer.test(
   overrides: [
     ...overrides,
+    // The Web build's location controls, which the tests exercise.
+    deviceLocationSupportedProvider.overrideWithValue(locationSupported),
     if (deviceLocation != null)
       deviceLocationReaderProvider.overrideWithValue(deviceLocation),
     mapRepositoryProvider.overrideWithValue(

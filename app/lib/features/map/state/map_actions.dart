@@ -159,6 +159,23 @@ class MapActionsController extends _$MapActionsController {
     );
   }
 
+  /// Moves the camera to a record the app opened, such as a Home feed item:
+  /// one point is centred, a line or area is fitted.
+  void focusPoints(List<AgentLatLng> points) {
+    if (points.isEmpty) return;
+    final first = points.first;
+    if (points.every((p) => p.lat == first.lat && p.lng == first.lng)) {
+      focusPoint(first.lat, first.lng);
+      return;
+    }
+    state = state._with(
+      focus: MapFocusRequest(
+        sequence: ++_focusSequence,
+        bounds: _boundsOf(points),
+      ),
+    );
+  }
+
   /// Removes the drawn route, for the dismiss chip and a new conversation.
   void clearRoute() {
     if (state.route != null) state = state._with(clearRoute: true);

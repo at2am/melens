@@ -9,6 +9,7 @@ import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/layer_controller.dart';
+import 'package:melens/features/map/state/map_actions.dart';
 import 'package:melens/features/map/state/selection_controller.dart';
 import 'package:melens/features/map/state/viewport_controller.dart';
 
@@ -63,6 +64,10 @@ void main() {
       expect(selected.dataMode, MapDataMode.sample);
       expect(selected.detailError, isNull);
       expect(selected.isLoading, isFalse);
+      // The map is asked to bring the record into view.
+      final focus = container.read(mapActionsControllerProvider).focus;
+      expect(focus, isNotNull);
+      expect(focus!.point ?? focus.bounds, isNotNull);
       expect(
         container.read(layerControllerProvider).enabledLayers,
         contains(topic.layer),

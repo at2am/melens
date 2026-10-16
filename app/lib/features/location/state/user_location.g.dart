@@ -8,6 +8,59 @@ part of 'user_location.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Whether this build can ask the device where it is: only the Web build has
+/// a reader ([readDeviceLocation]); the phone builds have no location plugin
+/// or permission strings, so their location controls are hidden.
+
+@ProviderFor(deviceLocationSupported)
+final deviceLocationSupportedProvider = DeviceLocationSupportedProvider._();
+
+/// Whether this build can ask the device where it is: only the Web build has
+/// a reader ([readDeviceLocation]); the phone builds have no location plugin
+/// or permission strings, so their location controls are hidden.
+
+final class DeviceLocationSupportedProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether this build can ask the device where it is: only the Web build has
+  /// a reader ([readDeviceLocation]); the phone builds have no location plugin
+  /// or permission strings, so their location controls are hidden.
+  DeviceLocationSupportedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'deviceLocationSupportedProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deviceLocationSupportedHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return deviceLocationSupported(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$deviceLocationSupportedHash() =>
+    r'5d0748b33ab981a6cc2612d42974217c45300d55';
+
 /// Tests override this with a fake reader.
 
 @ProviderFor(deviceLocationReader)
