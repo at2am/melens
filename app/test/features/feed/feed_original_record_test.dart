@@ -131,7 +131,7 @@ void main() {
     );
   });
 
-  testWidgets('a detail response cannot replace the version on the Feed card', (
+  testWidgets('a newer detail version replaces the one on the Feed card', (
     tester,
   ) async {
     final repository = _FeedRecordRepository(FeedTopic.planning)
@@ -145,8 +145,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final selected = container.read(selectionControllerProvider);
-    expect(selected.item!.versionId, 'sample-v1');
-    expect(selected.detailError, isA<MapContractException>());
+    expect(selected.item!.versionId, 'unexpected-new-version');
+    expect(selected.detailError, isNull);
     expect(repository.reads.single.context.snapshotId, 'feed-snapshot');
   });
 

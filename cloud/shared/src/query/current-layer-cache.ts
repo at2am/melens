@@ -21,7 +21,6 @@ import {
  * about 1-4 s each. Here a layer is loaded once from its small current table and reused until
  * the source registry shows a newer publication of any of its sources. Requests are answered in
  * memory with the same filters, order and limits as the SQL in view-queries.ts.
- * Non-parking public-record checks always use the live SQL rights gate.
  */
 export const CACHED_LAYERS: ReadonlySet<LayerId> = new Set(['planning', 'disruption', 'event', 'news', 'parking', 'anomaly']);
 
@@ -37,6 +36,13 @@ const POINT_LAYERS: ReadonlySet<LayerId> = new Set(['parking', 'anomaly']);
 const MAX_ENTRY_AGE_MS = 2 * 60_000;
 /** A copy that lags the registry still answers its request, then is reloaded shortly after. */
 const LAGGING_ENTRY_AGE_MS = 5_000;
+/**
+ * While a layer reloads (a new publication, or an entry past its age), requests keep reading the previous rows,
+ * still filtered by the current registry's public sources, for up to this long since they loaded. No request
+ * waits on a reload once the layer has loaded (system-design/map-serving-stateless.md).
+ */
+export const STALE_ENTRY_MAX_AGE_MS = 5 * 60_000;
+const RELOAD_RETRY_MS = 10_000;
 
 interface CachedRow {
   readonly record: string;
@@ -51,7 +57,7 @@ interface CachedRow {
   readonly longitude: number | null;
   readonly batchId: string | null;
 }
-interface Entry { readonly key: string; readonly rows: readonly CachedRow[]; readonly expiresAt: number }
+interface Entry { readonly key: string; readonly rows: readonly CachedRow[]; readonly loadedAt: number; readonly expiresAt: number }
 
 const queryInput = z.object({
   queryId: z.string(), request: z.unknown(),
@@ -149,6 +155,7 @@ export function createCurrentLayerCache(options: {
   const entries = new Map<LayerId, Entry>();
   const loading = new Map<string, Promise<Entry | null>>();
   const tooLarge = new Map<string, number>();
+  const failedAt = new Map<string, number>();
   const maximumResultBudget = config.maxResponseBytes - config.responseEnvelopeReserveBytes;
 
   /** Every source the registry places in the layer, with its latest publication. */
@@ -181,7 +188,7 @@ export function createCurrentLayerCache(options: {
     if (!current && layerId !== 'parking') throw new MapQueryError('serviceUnavailable');
     if (result.kind !== 'complete') return null;
     const now = clock().getTime();
-    return { key, rows, expiresAt: now + (current ? MAX_ENTRY_AGE_MS : LAGGING_ENTRY_AGE_MS) };
+    return { key, rows, loadedAt: now, expiresAt: now + (current ? MAX_ENTRY_AGE_MS : LAGGING_ENTRY_AGE_MS) };
   }
 
   async function entryFor(layerId: LayerId, request: ViewportQuery,
@@ -197,6 +204,9 @@ export function createCurrentLayerCache(options: {
     if ((tooLarge.get(key) ?? 0) > now) return null;
     const existing = entries.get(layerId);
     if (existing !== undefined && existing.key === key && existing.expiresAt > now) return existing;
+    const serveStale = existing !== undefined && now - existing.loadedAt < STALE_ENTRY_MAX_AGE_MS;
+    // A failed reload is retried at most every few seconds while the previous rows still answer.
+    if (serveStale && (failedAt.get(key) ?? -Infinity) > now - RELOAD_RETRY_MS) return existing;
     let pending = loading.get(key);
     if (pending === undefined) {
       const published = new Map(marks.filter((mark): mark is readonly [string, string] => mark[1] !== null));
@@ -205,9 +215,17 @@ export function createCurrentLayerCache(options: {
       pending = load(layerId, key, published, {}).then((entry) => {
         if (entry === null) tooLarge.set(key, clock().getTime() + MAX_ENTRY_AGE_MS);
         else entries.set(layerId, entry);
+        failedAt.delete(key);
         return entry;
+      }, (error: unknown) => {
+        failedAt.set(key, clock().getTime());
+        throw error;
       }).finally(() => loading.delete(key));
       loading.set(key, pending);
+    }
+    if (serveStale) {
+      pending.catch(() => {}); // The reload reports nothing to this request; a later one retries it.
+      return existing;
     }
     return abortable(pending, execution.signal);
   }

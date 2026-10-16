@@ -10,8 +10,8 @@ import {
 import { MapQueryError } from '@melens/shared/query/query-runner';
 import type { SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
 import { createDetailService } from '../src/services/details.js';
-import { createSnapshotStore, MapServiceError } from '../src/services/snapshot-store.js';
-import { createViewportService } from '../src/services/viewport.js';
+import { createUnlocatedService } from '../src/services/unlocated.js';
+import { createViewportService, MapServiceError } from '../src/services/viewport.js';
 
 const request = parseViewportQuery({ requestId: 'test-anomaly', bbox: [144.95, -37.83, 145, -37.8],
   zoom: 16, mode: 'current', layers: ['anomaly'],
@@ -270,8 +270,8 @@ test('reader failures use canonical errors without exposing producer payloads or
   });
 });
 
-test('T014 snapshot service returns default unavailable anomaly without a rights bypass', async () => {
-  const service = createViewportService({ store: createSnapshotStore(),
+test('T014 viewport service returns default unavailable anomaly', async () => {
+  const service = createViewportService({
     readCoverage: async () => coverage(), loadLayer: createAnomalyLayerLoader() });
   const response = await service.query(request);
   assert.equal(response.dataMode, 'live');
@@ -279,22 +279,18 @@ test('T014 snapshot service returns default unavailable anomaly without a rights
   assert.equal(response.layers[0]!.items.length, 0);
 });
 
-test('T014 verified anomaly snapshots require an independent current record-rights checker', async () => {
-  const loadLayer = createAnomalyLayerLoader({ producer: { async read() { return batch(); } } });
-  const denied = createViewportService({ store: createSnapshotStore(),
-    readCoverage: async () => coverage(), loadLayer });
-  await assert.rejects(denied.query(request), (error: unknown) =>
-    error instanceof MapServiceError && error.code === 'notAvailable');
-  let recordPublic = true;
-  const shared = { store: createSnapshotStore(), readCoverage: async () => coverage(),
-    checkPublicRecords: async () => recordPublic };
-  const accepted = await createViewportService({ ...shared, loadLayer }).query(request);
+test('T014 verified anomaly results are served, and a detail read recomputes them from the token', async () => {
+  let results = [batch()];
+  const loadLayer = createAnomalyLayerLoader({ producer: { async read() { return results[0]!; } } });
+  const viewport = createViewportService({ readCoverage: async () => coverage(), loadLayer });
+  const accepted = await viewport.query(request);
   assert.equal(accepted.layers[0]!.items.length, 1);
-  const details = createDetailService(shared);
+  const details = createDetailService({ viewport, unlocated: createUnlocatedService({ readCoverage: async () => coverage(),
+    async loadLayer() { throw new Error('not used'); } }) });
   const context = { requestId: 'anomaly-detail', snapshotId: accepted.snapshotId };
   const detail = await details.item('anomaly-result-1', context);
   assert.equal(detail.item.kind, 'anomaly');
-  recordPublic = false;
+  results = [{ ...batch(), records: [], totalMatching: 0 }];
   await assert.rejects(details.item('anomaly-result-1', context), (error: unknown) =>
-    error instanceof MapServiceError && error.code === 'notAvailable');
+    error instanceof MapServiceError && error.code === 'notFound');
 });

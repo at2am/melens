@@ -34,9 +34,9 @@ The result is a development-process health signal. It does not establish BigQuer
 | --- | --- |
 | `GET /v1/map/layers` | Registered layers and public coverage/freshness |
 | `POST /v1/map/viewport` | Bounded viewport/time queries |
-| `GET /v1/map/items/{id}` | Snapshot-bound item details |
+| `GET /v1/map/items/{id}` | Item details, recomputed from the `snapshotId` read token |
 | `GET /v1/map/unlocated` | Bounded, explicitly unlocated lists |
-| `GET /v1/map/aggregates/{id}/members` | Snapshot-bound aggregate members |
+| `GET /v1/map/aggregates/{id}/members` | Aggregate members, recomputed from the `snapshotId` read token |
 
 Only an explicitly selected development sample repository may return sample data. A live query failure never switches to fixtures. Public field selection, source admission and retention remain required even when a source can be queried privately.
 
@@ -48,9 +48,8 @@ The contract, the query families, the query runner, the layer adapters, source c
 | --- | --- |
 | `src/server.ts` | HTTP transport: route matching, CORS preflight, bounded bodies, concurrency, timeouts, error envelopes |
 | `src/map-service.ts` | Composition root that wires the shared query modules and the services below together |
-| `src/services/public-records.ts` | Recheck that stored rows are still public before every snapshot read |
-| `src/services/viewport.ts`, `details.ts`, `unlocated.ts`, `page-budget.ts` | Snapshot-bound page services and the byte-budget page fitting they share |
-| `src/services/snapshot-store.ts` | Bounded in-memory snapshots and cursors |
+| `src/services/viewport.ts`, `details.ts`, `unlocated.ts`, `page-budget.ts` | Stateless page services and the byte-budget page fitting they share |
+| `src/services/read-token.ts` | `snapshotId` read tokens that carry the request context, and offset cursors bound to them |
 | `src/services/aggregation.ts`, `layer-catalog.ts` | Zoom-band grouping; layer registrations and the catalog |
 
 ## Query configuration
@@ -72,9 +71,19 @@ T007 implemented `src/config.ts` and the fixed query runner. The validated setti
 | `MAP_MAX_RESPONSE_BYTES` | At most `2097152` uncompressed bytes |
 | `MAP_RESPONSE_ENVELOPE_RESERVE_BYTES` | `65536` bytes |
 
-The runner allows fixed parameterized queries over approved views and implements dry runs, billed-byte ceilings, timeouts, cancellation, row lookahead and result-byte limits. Caller SQL, arbitrary table names, raw/staging datasets, provider URLs and client credentials stay outside it. Public-field adapters, coverage evidence, immutable snapshot storage, final envelope budgeting and HTTP integration are implemented. T025 applies default zoom grouping only after validating the global 1,000-original-row allocation; each aggregate retains exact original member ids and versions.
+The runner allows fixed parameterized queries over approved views and implements dry runs, billed-byte ceilings, timeouts, cancellation, row lookahead and result-byte limits. Caller SQL, arbitrary table names, raw/staging datasets, provider URLs and client credentials stay outside it. Public-field adapters, coverage evidence, stateless read tokens, final envelope budgeting and HTTP integration are implemented. T025 applies default zoom grouping only after validating the global 1,000-original-row allocation; each aggregate retains exact original member ids and versions.
 
-The 2026-10-01 real BigQuery dry runs validated all thirteen current/historical query combinations. Current planning/disruption/event/news each estimated 383847461 bytes, exceeding the default 100000000-byte dynamic ceiling. The guard correctly blocks those queries under the default. The reviewed development preview configured 400000000 bytes after a fresh exact planning dry run, and 1000000000 bytes from 2026-10-09 when that estimate reached 481467396 bytes; library defaults were not relaxed. The lasting fix is a smaller current view on the data side, tracked in [issue #9](https://github.com/at2am/melens/issues/9) and summarised in [infra/README.md](infra/README.md). Since 2026-10-15 current geo reads use `v_geo_records_current_served`, a copy refreshed per publication (see `cloud/data/docs/operations.md`), and the service holds current planning, disruption, event, news, parking and anomaly layers in memory per publication (`@melens/shared/query/current-layer-cache`): ordinary layer loads reuse the current rows until the publication changes or the entry expires. Since 2026-10-16, current planning, disruption, event and news record-rights checks read the same copy whenever `v_geo_records_current_state` shows it reflects every checked source's latest published batch, and the live `v_geo_records_current` otherwise. The live view scanned 515 MB and took about 4 s per check, which was most of every request's time. The copy and its state are read together, and the copy's answer counts only if the state agrees. A successful current geo check then stands for 60 seconds for the same record version and source batch, so a map view's details and members reuse it. A new publication ends it at once, and source admission is still rechecked on every access. Anomaly checks use an independent live producer and are not cached. `node map/scripts/profile-requests.mjs <layers> <bbox> <zoom>` (after `npm run build --workspace map`) times each BigQuery job of a live request. A Geo copy that does not match the source publication is unavailable. Source coverage retains its existing 30-second cache, with no stale grace window by default. The layers of one request load together. Parking behavior remains on its existing path. See [joint validation](../../specs/002-map-data-presentation/validation.md) for estimates and acceptance limits.
+The 2026-10-01 real BigQuery dry runs validated all thirteen current/historical query combinations. Current planning/disruption/event/news each estimated 383847461 bytes, exceeding the default 100000000-byte dynamic ceiling. The reviewed development preview configured 400000000 bytes, and 1000000000 bytes from 2026-10-09; library defaults were not relaxed. Since 2026-10-15 current geo reads use `v_geo_records_current_served`, a copy refreshed per publication (see `cloud/data/docs/operations.md`).
+
+**Stateless serving (since 2026-10-16, [design](../../system-design/map-serving-stateless.md)).** The service stores nothing per request, so it can run on several instances:
+
+- Current planning, disruption, event, news, parking and anomaly layers are held in memory per publication (`@melens/shared/query/current-layer-cache`). Every request filters them by bbox and time in memory. While a layer reloads, requests keep reading the previous rows for up to five minutes, still filtered by the current registry's public sources, so no request waits on a reload. Instances load every cached layer at start.
+- The source registry is cached for 30 seconds; an expired read is still served for 90 seconds while one background read replaces it.
+- There is no public-rights recheck: the published views already filter by source licence, access and record rights, and a withdrawn record leaves the map within one layer reload (about two minutes).
+- A `snapshotId` is a read token that carries the request's normalized context. Details, aggregate members and continuations recompute what they need from it; cursors are offsets bound to the token. Aggregate ids are grid-cell ids (`aggregate.<layer>.<band>.<x>.<y>.<key>`), so a cell keeps its id across reloads.
+- Pedestrian, boundary, unlocated lists and historical mode still run a live BigQuery query per request.
+
+Measured on 2026-10-16 against the live views (in process, one laptop core): warm viewport reads p50 5.5 ms, p99 37 ms; detail p50 4.2 ms; members p50 3.2 ms; no BigQuery job across 550 warm reads; a burst of 128 simultaneous viewports finished in 0.66 s; resident memory about 460 MB. The previous design measured p50 1.3 s, p90 9.8 s in production. `node map/scripts/profile-requests.mjs <layers> <bbox> <zoom>` (after `npm run build --workspace map`) times each BigQuery job of a live request. The layers of one request load together. See [joint validation](../../specs/002-map-data-presentation/validation.md) for estimates and acceptance limits.
 
 ## Read-only identity requirements
 

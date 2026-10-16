@@ -3,13 +3,12 @@ import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 
 import { loadMapConfig } from '@melens/shared/config';
-import type { MapItem, ViewportResponse } from '@melens/shared/contracts/map-contract';
+import type { ViewportResponse } from '@melens/shared/contracts/map-contract';
 import { createMapService } from '../src/map-service.js';
-import { VERIFIED_RECORD_TTL_MS } from '../src/services/public-records.js';
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
 import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapHttpServer } from '../src/server.js';
-import { MapServiceError } from '../src/services/snapshot-store.js';
+import { MapServiceError } from '../src/services/viewport.js';
 
 const timestamp = '2026-10-01T01:00:00.000001Z';
 const request = { requestId: 'acceptance-viewport', bbox: [144.95, -37.83, 144.99, -37.8],
@@ -41,13 +40,9 @@ function observation(sensorId: string, count: number | null): ViewRow {
     source_last_success_at: timestamp, location_source_id: null, location_valid_from: null,
     location_valid_to: null, geometry_geojson: null, location_status: 'unlocated', source_freshness_state: 'current' };
 }
-function pedestrianRight(item: Extract<MapItem, { kind: 'pedestrian' }>): string {
-  return JSON.stringify([item.sources[0]!.sourceId, item.details.sensorId, item.time.observedAt]);
-}
-
-/** Direct SQL responses; publication-cache behavior is tested in current-cache-rights.test.ts. */
+/** Direct SQL responses; publication-cache behavior is tested in stateless-reads.test.ts. */
 function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: boolean; partial?: boolean;
-  independentPedestrianRights?: boolean; productionAggregation?: boolean } = {}) {
+  productionAggregation?: boolean } = {}) {
   let elapsed = 0;
   const sources = [metadata('acceptance.planning', 'planning'), metadata('acceptance.traffic', 'transport'),
     metadata('acceptance.pedestrian', 'pedestrian'), metadata('acceptance.boundary', 'boundary')];
@@ -59,14 +54,6 @@ function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: bool
     fetched_at: timestamp, geometry_geojson: JSON.stringify({ type: 'Polygon', coordinates: [
       [[144.96, -37.82], [144.98, -37.82], [144.98, -37.80], [144.96, -37.82]],
     ] }) }];
-  // This permission ledger is independent of the readable view rows and batch watermark.
-  const rights = new Set(['unknown', 'zero'].map((sensorId) =>
-    JSON.stringify(['acceptance.pedestrian', sensorId, '2026-10-01T00:59:00.000001Z'])));
-  const rightsChecks: (readonly MapItem[])[] = [];
-  const checkPublicRecords = async (items: readonly MapItem[]) => {
-    rightsChecks.push([...items]);
-    return items.every((item) => item.kind === 'pedestrian' && rights.has(pedestrianRight(item)));
-  };
   const queries: PreparedViewQuery[] = [];
   const adapter: BigQueryViewAdapter = {
     async dryRun() { return { bytesProcessed: 1n }; },
@@ -109,11 +96,10 @@ function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: bool
     ...(options.productionAggregation === true ? {} : {
       aggregateLayer: (layer) => ({ items: layer.items, groups: new Map() }),
     }),
-    ...(options.independentPedestrianRights === true ? { checkPublicRecords } : {}),
     clock: () => new Date(Date.parse(timestamp) + elapsed), resolveArea: () => 'contains', publicSources: sources.map((row) => ({
       sourceId: String(row.source_id), url: 'https://example.org/public-source', attribution: 'Synthetic public source', versionRef: null,
     })) });
-  return { service, sources, rows, unlocated, boundaries, queries, rights, rightsChecks,
+  return { service, sources, rows, unlocated, boundaries, queries,
     advance(milliseconds: number) { elapsed += milliseconds; } };
 }
 
@@ -166,15 +152,13 @@ test('bounded partial drawable results never invent a full-query total', async (
 });
 
 test('unlocated list retains missing and measured-zero counts without assigning coordinates or clocks', async () => {
-  const f = publishedFixture({ independentPedestrianRights: true });
+  const f = publishedFixture();
   const { bbox: _bbox, zoom: _zoom, ...context } = request;
   const body = await f.service.queryUnlocated({ ...context, layers: ['pedestrian'],
     scope: { sourceJurisdiction: 'acceptance-jurisdiction' } });
   assert.equal(body.dataMode, 'live');
   assert.equal(body.totalMatching, 2);
   assert.equal(body.completeness, 'complete');
-  assert.equal(f.rightsChecks.length, 1);
-  assert.deepEqual(f.rightsChecks[0]!.map((item) => item.id).sort(), body.items.map((item) => item.id).sort());
   const counts = body.items.map((item) => {
     assert.equal(item.kind, 'pedestrian');
     if (item.kind !== 'pedestrian') throw new Error('Expected a typed pedestrian item.');
@@ -206,35 +190,19 @@ test('current and historical contexts retain eligible lifecycle and source-time 
   assert.ok(!historical.layers[0]!.items.some((item) => item.id === 'acceptance:withdrawn'));
 });
 
-test('record removal with unchanged public-source watermark invalidates both detail and continuation', async () => {
+test('a record the published view no longer returns leaves the next detail read and continuation', async () => {
   const f = publishedFixture();
   const first = await f.service.queryViewport({ ...request, pageSize: 1 });
   const item = first.layers[0]!.items[0]!;
   assert.ok(first.layers[0]!.nextCursor);
   assert.equal((await f.service.getItem(item.id, { requestId: 'public-detail', snapshotId: first.snapshotId })).item.id, item.id);
   f.rows.splice(0, 1);
-  const unavailable = (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable';
-  // A proof stands for one minute within the same publication, then the record's rights are read again.
-  assert.equal((await f.service.getItem(item.id, { requestId: 'cached-detail', snapshotId: first.snapshotId })).item.id, item.id);
-  f.advance(VERIFIED_RECORD_TTL_MS + 1);
-  await assert.rejects(f.service.getItem(item.id, { requestId: 'removed-detail', snapshotId: first.snapshotId }), unavailable);
-  await assert.rejects(f.service.queryViewport({ ...request, pageSize: 1, snapshotId: first.snapshotId,
-    cursor: first.layers[0]!.nextCursor }), unavailable);
+  await assert.rejects(f.service.getItem(item.id, { requestId: 'removed-detail', snapshotId: first.snapshotId }),
+    (error: unknown) => error instanceof MapServiceError && error.code === 'notFound');
+  const next = await f.service.queryViewport({ ...request, pageSize: 1, snapshotId: first.snapshotId,
+    cursor: first.layers[0]!.nextCursor });
+  assert.ok(!next.layers[0]!.items.some((entry) => entry.id === item.id));
   assert.equal(f.sources[0]!.latest_published_batch_id, 'acceptance-batch');
-});
-
-test('same-publication content changes cannot be served from an immutable unlocated snapshot', async () => {
-  const f = publishedFixture({ independentPedestrianRights: true });
-  const { bbox: _bbox, zoom: _zoom, ...context } = request;
-  const query = { ...context, pageSize: 1, layers: ['pedestrian'],
-    scope: { sourceJurisdiction: 'acceptance-jurisdiction' } };
-  const first = await f.service.queryUnlocated(query);
-  assert.ok(first.nextCursor);
-  assert.equal(f.rightsChecks.length, 1);
-  f.unlocated[0]!.total_count = 99;
-  await assert.rejects(f.service.queryUnlocated({ ...query, snapshotId: first.snapshotId, cursor: first.nextCursor }),
-    (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable');
-  assert.equal(f.rightsChecks.length, 2);
 });
 
 test('older boundary and pedestrian views fail closed when latest-record permission evidence is absent', async () => {
@@ -254,29 +222,7 @@ test('older boundary and pedestrian views fail closed when latest-record permiss
   await assert.rejects(f.service.queryUnlocated({ ...context, layers: ['pedestrian'],
     scope: { sourceJurisdiction: 'acceptance-jurisdiction' } }),
   (error: unknown) => error instanceof MapServiceError && error.code === 'serviceUnavailable');
-  assert.equal(f.rightsChecks.length, 0);
   assert.ok(f.queries.some((query) => query.query.includes('v_boundaries')));
-});
-
-test('independent pedestrian rights revocation blocks detail and paging while public view rows remain unchanged', async () => {
-  const f = publishedFixture({ independentPedestrianRights: true });
-  const { bbox: _bbox, zoom: _zoom, ...context } = request;
-  const query = { ...context, pageSize: 1, layers: ['pedestrian'],
-    scope: { sourceJurisdiction: 'acceptance-jurisdiction' } };
-  const first = await f.service.queryUnlocated(query);
-  const item = first.items[0]!;
-  assert.equal(item.kind, 'pedestrian');
-  if (item.kind !== 'pedestrian') throw new Error('Expected a typed pedestrian item.');
-  assert.equal(f.rightsChecks.length, 1);
-  assert.ok(first.nextCursor);
-  const originalRows = JSON.stringify(f.unlocated);
-  f.rights.delete(pedestrianRight(item));
-  const unavailable = (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable';
-  await assert.rejects(f.service.getItem(item.id, { requestId: 'revoked-pedestrian', snapshotId: first.snapshotId }), unavailable);
-  await assert.rejects(f.service.queryUnlocated({ ...query, snapshotId: first.snapshotId, cursor: first.nextCursor }), unavailable);
-  assert.equal(f.rightsChecks.length, 3);
-  assert.equal(JSON.stringify(f.unlocated), originalRows);
-  assert.equal(f.sources[2]!.latest_published_batch_id, 'acceptance-batch');
 });
 
 test('permission-checked boundary and pedestrian views work without a supplemental verifier', async () => {
@@ -289,10 +235,9 @@ test('permission-checked boundary and pedestrian views work without a supplement
   const pedestrians = await f.service.queryUnlocated({ ...context, layers: ['pedestrian'],
     scope: { sourceJurisdiction: 'acceptance-jurisdiction' } });
   assert.equal(pedestrians.items.length, 2);
-  assert.equal(f.rightsChecks.length, 0);
 });
 
-test('default pedestrian snapshots recheck record withdrawal with an unchanged source publication watermark', async () => {
+test('a withdrawn pedestrian record leaves the next detail read and unlocated page', async () => {
   const f = publishedFixture();
   const { bbox: _bbox, zoom: _zoom, ...context } = request;
   const query = { ...context, pageSize: 1, layers: ['pedestrian'],
@@ -302,8 +247,9 @@ test('default pedestrian snapshots recheck record withdrawal with an unchanged s
   assert.ok(first.nextCursor);
   const stillPublic = f.unlocated.filter((row) => row.sensor_id !== (item.kind === 'pedestrian' ? item.details.sensorId : null));
   f.unlocated.splice(0, f.unlocated.length, ...stillPublic);
-  const unavailable = (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable';
-  await assert.rejects(f.service.getItem(item.id, { requestId: 'withdrawn-pedestrian', snapshotId: first.snapshotId }), unavailable);
-  await assert.rejects(f.service.queryUnlocated({ ...query, snapshotId: first.snapshotId, cursor: first.nextCursor }), unavailable);
+  await assert.rejects(f.service.getItem(item.id, { requestId: 'withdrawn-pedestrian', snapshotId: first.snapshotId }),
+    (error: unknown) => error instanceof MapServiceError && error.code === 'notFound');
+  const next = await f.service.queryUnlocated({ ...query, snapshotId: first.snapshotId, cursor: first.nextCursor });
+  assert.ok(!next.items.some((entry) => entry.id === item.id));
   assert.equal(f.sources.find((source) => source.source_id === 'acceptance.pedestrian')?.latest_published_batch_id, 'acceptance-batch');
 });
