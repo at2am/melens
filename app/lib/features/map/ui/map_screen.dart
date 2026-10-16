@@ -642,7 +642,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ActionChip(
               key: ValueKey('map-highlight-$id'),
               avatar: const Icon(Icons.place_outlined, size: 16),
-              label: Text(byId[id]?.title ?? id),
+              label: Text(byId[id]?.title ?? actions.highlightTitles[id] ?? id),
               onPressed: byId[id] == null ? null : () => _selectItem(byId[id]!),
             ),
           for (final id in actions.missingIds)

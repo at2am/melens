@@ -82,6 +82,8 @@ test('get_feature, focus_map and highlight_features resolve a feature the user c
   assert.deepEqual(focus, { ok: true });
   const highlighted = await runTool(fresh.spec('highlight_features'), fresh.turn, { ids: ['anomaly:41-h18', 'anomaly:gone'] });
   assert.deepEqual(highlighted, { ok: true, missing: ['anomaly:gone'] });
+  assert.deepEqual(fresh.turn.uiActions.at(-1)?.args, { ids: ['anomaly:41-h18'], clear_previous: true, missing: ['anomaly:gone'],
+    titles: { 'anomaly:41-h18': 'Flinders La-Swanston St (West)' } });
   const numbers = await runTool(spec('get_anomaly'), turn, { feature_id: 'anomaly:41-h18' }) as { observed: number; baseline: number; change_pct: number; direction: string };
   assert.deepEqual([numbers.observed, numbers.baseline, numbers.change_pct, numbers.direction], [4210, 1830, 130, 'higher']);
   const notOne = await runTool(spec('get_anomaly'), registry(deps).turn, { feature_id: 'event:never' }) as { error: { code: string } };

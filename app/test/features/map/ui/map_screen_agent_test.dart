@@ -114,6 +114,7 @@ void main() {
           'ids': ['event:unknown'],
           'clear_previous': true,
           'missing': ['event:gone'],
+          'titles': {'event:unknown': 'Late show at the Forum'},
         },
       ),
     );
@@ -123,6 +124,9 @@ void main() {
       find.byKey(const ValueKey('map-highlight-event:unknown')),
       findsOneWidget,
     );
+    // An id the map has not loaded is labelled with the agent's title.
+    expect(find.text('Late show at the Forum'), findsOneWidget);
+    expect(find.text('event:unknown'), findsNothing);
     expect(
       find.byKey(const ValueKey('map-highlight-missing-event:gone')),
       findsOneWidget,
