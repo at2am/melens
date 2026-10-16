@@ -131,17 +131,30 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      # The deploy audits parse bq JSON. On a fresh runner bq has no ~/.bigqueryrc and prints its
-      # interactive first-run text instead, so create it and prove bq returns JSON before deploying.
+      # The deploy audits parse bq JSON. With the Workload Identity (external_account) credentials
+      # bq returned no output at all (v0.1.1), so the scripts get bq through BQ_BIN with a plain
+      # access token, then this step proves bq returns JSON before anything is deployed.
       - name: Initialise bq
         run: |
           printf 'project_id = %s\n' "$PROJECT_ID" > "$HOME/.bigqueryrc"
-          out=$(bq --project_id="$PROJECT_ID" show --format=json "$PROJECT_ID:melens_query" < /dev/null 2>&1) || true
-          if python3 -c 'import json, sys; json.loads(sys.argv[1])' "$out" 2>/dev/null; then
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/bq-token" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          token=$(gcloud auth print-access-token)
+          exec bq --headless --oauth_access_token="$token" "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/bq-token"
+          echo "BQ_BIN=$RUNNER_TEMP/bin/bq-token" >> "$GITHUB_ENV"
+          bq version
+          status=0
+          "$RUNNER_TEMP/bin/bq-token" --project_id="$PROJECT_ID" show --format=json "$PROJECT_ID:melens_query" \
+            < /dev/null > "$RUNNER_TEMP/bq.out" 2> "$RUNNER_TEMP/bq.err" || status=$?
+          if python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$RUNNER_TEMP/bq.out" 2>/dev/null; then
             echo "bq ready"
           else
             # Not JSON, so a CLI message rather than dataset metadata.
-            echo "bq did not return JSON: ${out:0:600}" >&2
+            echo "bq exit $status; stdout: $(head -c 400 "$RUNNER_TEMP/bq.out"); stderr: $(head -c 800 "$RUNNER_TEMP/bq.err")" >&2
             exit 1
           fi
 
