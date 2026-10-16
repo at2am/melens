@@ -130,7 +130,8 @@ function fixtureReader(responses: readonly unknown[]) {
   return { reader, calls };
 }
 const latest = (input = '1', output = input) => [{ batch_id: 'published-snapshot',
-  source_revision: 'snapshot-revision', input_count: input, output_count: output }];
+  source_revision: 'snapshot-revision', input_count: input, output_count: output,
+  started_at: '2026-10-16T16:25:00.000000Z' }];
 const recovered = (rows: readonly ParkingRuntimeHistoryEntry[], proof = '1', members = String(rows.length)) =>
   [{ proof_count: proof, member_count: members, history: rows }];
 
@@ -159,7 +160,9 @@ test('a fresh process reads only the constant latest snapshot and its exact publ
   assert.doesNotMatch(state.query, /v_parking_sensor_current|geo_records|parking_observations|data_sources/);
   assert.doesNotMatch(state.query, /CURRENT_TIMESTAMP|INTERVAL 24 HOUR/);
   assert.deepEqual(state.params, { sourceId: SOURCE_ID, batchId: 'published-snapshot',
-    sourceRevision: 'snapshot-revision' });
+    sourceRevision: 'snapshot-revision', startedAt: '2026-10-16T16:25:00.000000Z' });
+  // The latest snapshot's members are read from its own partitions only.
+  assert.match(state.query, /fetched_at >= TIMESTAMP_SUB\(TIMESTAMP\(@startedAt\), INTERVAL 1 DAY\)/);
   assert.ok(calls.every(call => call.maximumBytesBilled === '100000000'
     && call.location === 'australia-southeast2'));
   await assert.rejects(withPublishedParkingState(await collect([row]), { ...config, maxBytesBilled: null }, reader),

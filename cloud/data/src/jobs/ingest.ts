@@ -146,7 +146,9 @@ export async function ingest(args: readonly string[],
     currentSensors = (await replaceParkingSensorCurrent(config, bigquery,
       buildParkingSensorCurrentRows(normalizedResult, batch.batch_id))).rows;
     try {
-      await pruneSupersededParkingMemberships(config, bigquery, batch.batch_id);
+      // The prune reads two days of memberships (about 0.4 GB); once an hour keeps the table small
+      // without paying that on every five-minute run.
+      if (new Date().getUTCMinutes() < 5) await pruneSupersededParkingMemberships(config, bigquery, batch.batch_id);
     } catch (error) {
       // The snapshot is already published; the retention job removes what is left.
       process.stderr.write(`${JSON.stringify({ source_id: source.source_id, action: 'membership_prune_failed',

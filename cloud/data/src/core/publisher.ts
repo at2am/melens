@@ -121,6 +121,16 @@ interface PlannedTable {
   expectedDistinct: number;
 }
 
+/**
+ * Sources whose batch facts reference only rows of the same batch, so validation can read the batch's
+ * fetch range instead of the source's history. Transport snapshots carry every row each read. A parking
+ * run writes only changed sensors' facts, all in the batch; its memberships also point at older business
+ * batches, but the run's published-state recovery (parking-runtime.ts) proves those exact references
+ * just before publishing, so only references to this batch are checked here.
+ */
+const PARKING_SENSOR_SOURCE = 'melbourne.parking.sensors';
+const WINDOWED_HISTORY_SOURCES: ReadonlySet<string> = new Set([...SNAPSHOT_GEO_SOURCES, PARKING_SENSOR_SOURCE]);
+
 /** A published batch's rows were fetched from at most a day before it started until its last state. */
 function batchSpan(batch: SyncBatch): { from: string; to: string } | null {
   const started = Date.parse(batch.started_at);
@@ -377,8 +387,8 @@ export class BigQueryPublisher {
     replayOf?: SyncBatch): Promise<void> {
     const path = (name: string) => `\`${this.config.projectId}.${this.config.ingestDataset}.${name}\``;
     const range = replayOf === undefined ? fetchedRange(tables) : batchSpan(replayOf);
-    // History reads stay unbounded except for transport snapshots, whose batches reference only themselves.
-    const fetched = replayOf === undefined && range !== null && SNAPSHOT_GEO_SOURCES.has(source.source_id) ? range : null;
+    // History reads stay unbounded except for sources whose batch facts reference only the batch itself.
+    const fetched = replayOf === undefined && range !== null && WINDOWED_HISTORY_SOURCES.has(source.source_id) ? range : null;
     const fetchedParams: Record<string, string> = range === null ? {}
       : { fetchedFrom: range.from, fetchedTo: range.to };
     // The batch's own rows were all fetched within the plan's range, for every source.
@@ -471,24 +481,27 @@ export class BigQueryPublisher {
       if (table.name === 'geo_records') invalid.push(`NOT EXISTS (
         SELECT 1 FROM ${path('geo_record_sources')} r WHERE r.source_id = @sourceId AND r.geo_record_id = t.geo_record_id
           AND r.source_id = t.source_id AND r.version_id = t.version_id AND ${visible('r')}${fetchedWindow('r')})`);
+      // With a windowed history only this batch's business references are checked; the run's published-
+      // state recovery proved every older one (see WINDOWED_HISTORY_SOURCES).
+      const ownBusiness = fetched === null ? '' : 't.business_batch_id = @batchId AND ';
       if (table.name === 'parking_sensor_memberships') invalid.push(
         "t.source_id != 'melbourne.parking.sensors'",
         `NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
           WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.batch_id
             AND r.source_record_id = t.snapshot_source_record_id
-            AND r.version_id = t.snapshot_version_id AND ${visible('r')})`,
-        `NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
+            AND r.version_id = t.snapshot_version_id AND ${visible('r')}${fetchedWindow('r')})`,
+        `${ownBusiness}NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
           WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.business_batch_id
             AND r.source_record_id = t.business_source_record_id
-            AND r.version_id = t.business_version_id AND ${visible('r')})`,
-        `(NOT EXISTS (SELECT 1 FROM ${path('parking_observations')} o
+            AND r.version_id = t.business_version_id AND ${visible('r')}${fetchedWindow('r')})`,
+        `${ownBusiness}(NOT EXISTS (SELECT 1 FROM ${path('parking_observations')} o
           WHERE o.source_id = @sourceId AND o.source_id = t.source_id AND o.batch_id = t.business_batch_id
             AND o.source_record_id = t.business_source_record_id AND o.sensor_id = t.sensor_id
-            AND o.version_id = t.business_version_id AND ${visible('o')})
+            AND o.version_id = t.business_version_id AND ${visible('o')}${fetchedWindow('o')})
           AND NOT EXISTS (SELECT 1 FROM ${path('source_records')} r
             WHERE r.source_id = @sourceId AND r.source_id = t.source_id AND r.batch_id = t.business_batch_id
               AND r.source_record_id = t.business_source_record_id AND r.version_id = t.business_version_id
-              AND r.observed_at IS NULL AND ${visible('r')}))`,
+              AND r.observed_at IS NULL AND ${visible('r')}${fetchedWindow('r')}))`,
       );
       const ordering = table.name === 'pedestrian_observations' ? `(SELECT COUNT(*) FROM (
         SELECT sensor_id, observed_at, COUNT(*) AS versions,
