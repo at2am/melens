@@ -469,7 +469,7 @@
     {
       "source_id": "victoria.transport.road_planned",
       "priority": "B",
-      "enabled": false,
+      "enabled": true,
       "mode": "time",
       "cadence_seconds": 1800,
       "check_interval_seconds": 1800,
@@ -485,14 +485,14 @@
       ],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 30,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-victoria-b555cb5eff@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "victoria.transport.road_unplanned",
       "priority": "P0",
-      "enabled": false,
+      "enabled": true,
       "mode": "time",
       "cadence_seconds": 600,
       "check_interval_seconds": 600,
@@ -508,9 +508,9 @@
       ],
       "task_timeout_seconds": 600,
       "max_requests_per_execution": 10,
-      "service_account_email": null,
+      "service_account_email": "melens-dev-victoria-0dbdc1d92d@melens-510012.iam.gserviceaccount.com",
       "memory_mib": 1024,
-      "dedicated_identity_permissions_verified": false
+      "dedicated_identity_permissions_verified": true
     },
     {
       "source_id": "victoria.vicmap.planning",

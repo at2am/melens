@@ -16,7 +16,7 @@ export const MAX_PAGES = 1000;
 // The linked OpenAPI still says 10/minute while the landing page says 20/minute.
 export const PAGE_DELAY_MS = 6100;
 const MAX_SOURCE_CLOCK_SKEW_MS = 300_000;
-const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v2';
+const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v3';
 const localClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
@@ -184,7 +184,10 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
       throw new Error('Planned road update timestamp is more than five minutes after fetch time');
     }
     const start = parseVictorianTimestamp(p.duration?.start);
-    const end = parseVictorianTimestamp(p.duration?.end);
+    const sourceEnd = parseVictorianTimestamp(p.duration?.end);
+    // Some recurring plans give one instant as both start and end; their real impact times are in
+    // the recurrence schedule, so the overall end is unknown rather than an empty interval.
+    const end = start !== null && sourceEnd === start ? null : sourceEnd;
     const localTimeUnresolved = [p.lastUpdated, p.duration?.start, p.duration?.end]
       .some(hasUnresolvedLocalTime);
     if (start !== null && end !== null && end < start) {

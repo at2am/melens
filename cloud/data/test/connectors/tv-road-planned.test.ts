@@ -118,6 +118,19 @@ test('classifyPlannedStatus correctly maps future, pending, active, cancelled, r
   assert.throws(() => classifyPlannedStatus('UnknownStatus', null, '2026-09-28T00:00:00Z'), /Undocumented planned disruption status/);
 });
 
+test('a plan whose overall start and end are one instant keeps its start and an unknown end', async () => {
+  const page = await fixture();
+  const first = page.data.features[0]!;
+  const instant = { ...first, properties: { ...first.properties,
+    duration: { ...first.properties.duration, start: '2026-10-18T00:00:00Z', end: '2026-10-18T00:00:00Z' } } };
+  const normalized = normalizePlannedRoadSnapshot([instant], input, fetchedAt);
+  assert.equal(normalized.geoRecords[0]?.valid_from, '2026-10-18T00:00:00.000Z');
+  assert.equal(normalized.geoRecords[0]?.valid_to, null);
+  assert.equal(normalized.sourceRecords[0]?.valid_to, null);
+  const details = JSON.parse(normalized.geoRecords[0]?.summary ?? '{}');
+  assert.equal(details.duration.end, '2026-10-18T00:00:00Z');
+});
+
 test('cancelled disruption retains schedule, geometry and segment facts with cancelled status', async () => {
   const page = await fixture();
   const cancelledFeature = {
