@@ -144,7 +144,8 @@ export function createMapHttpServer(options: {
     if (!['https:', 'http:'].includes(parsed.protocol) || parsed.origin !== origin) throw new TypeError('CORS requires exact origins');
     return origin;
   }));
-  const maxConcurrent = options.maxConcurrentRequests ?? 8;
+  // Requests are answered from memory in milliseconds, so one vCPU serves many at once (map-serving-stateless.md).
+  const maxConcurrent = options.maxConcurrentRequests ?? 32;
   const timeoutMs = options.requestTimeoutMs ?? 30_000;
   if (!Number.isSafeInteger(maxConcurrent) || maxConcurrent < 1 || maxConcurrent > 128
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new TypeError('Invalid HTTP bounds');
@@ -245,8 +246,9 @@ export async function startMapServer(env: Readonly<Record<string, string | undef
   process.once('SIGINT', close);
   process.once('SIGTERM', close);
   server.listen(port, '0.0.0.0', () => {
-    // Startup has CPU; the first news copy loads while the instance waits for its first request.
+    // Startup has CPU; the cached layers and the first news copy load before the first request.
     service.warmNewsAreas();
+    service.warmLayers();
     const address = server.address();
     if (address !== null && typeof address !== 'string') {
       process.stdout.write(`${JSON.stringify({ severity: 'INFO', event: 'mapServerListening', port: address.port })}\n`);

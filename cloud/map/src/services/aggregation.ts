@@ -58,7 +58,7 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
   const seenIds = new Set<string>();
   const excludedIds: string[] = [];
   const passthrough: MapItem[] = [];
-  const buckets = new Map<string, PointItem[]>();
+  const buckets = new Map<string, { key: string; cell: [number, number]; members: PointItem[] }>();
   for (const candidate of [...layer.items].sort(compareMapItems)) {
     if (candidate.layerId !== layer.layerId) throw new TypeError('Aggregation item does not belong to its layer');
     if (seenIds.has(candidate.id)) throw new TypeError('A snapshot layer must contain one version per stable item id');
@@ -74,21 +74,23 @@ export function aggregateLayer(layer: LayerResult, options: AggregationOptions):
       continue;
     }
     const pointItem = item as PointItem;
-    const bucketId = JSON.stringify([semanticKey(item), spatialCell(pointItem.geometry.coordinates, band)]);
-    const members = buckets.get(bucketId);
-    if (members === undefined) buckets.set(bucketId, [pointItem]);
-    else members.push(pointItem);
+    const key = semanticKey(item);
+    const cell = spatialCell(pointItem.geometry.coordinates, band);
+    const bucketId = JSON.stringify([key, cell]);
+    const bucket = buckets.get(bucketId);
+    if (bucket === undefined) buckets.set(bucketId, { key, cell, members: [pointItem] });
+    else bucket.members.push(pointItem);
   }
 
   const groups = new Map<string, AggregateGroup>();
   const items = [...passthrough];
-  for (const members of buckets.values()) {
+  for (const { key, cell, members } of buckets.values()) {
     if (members.length === 1) {
       const item = members[0];
       if (item !== undefined) items.push(item);
       continue;
     }
-    const aggregate = createAggregate(members, layer, bounds);
+    const aggregate = createAggregate(members, layer, bounds, `${band}.${cell[0]}.${cell[1]}.${digest(key).slice(0, 32)}`);
     items.push(aggregate);
     groups.set(aggregate.id, Object.freeze({ aggregate, members: Object.freeze([...members]) }));
   }
@@ -200,12 +202,17 @@ function groupMetric(members: readonly MapItem[]): AggregateItem['details']['met
     definition: `Matching ${unit} represented by actual loaded members with compatible source, lifecycle and effective-time semantics; this is not a claim about unique people, measured speed or complete source coverage.` };
 }
 
-function createAggregate(members: readonly PointItem[], layer: LayerResult, viewportBounds: Bbox): AggregateItem {
+/**
+ * [cellKey] is the zoom band, the fixed global grid cell and the semantic key, so an aggregate keeps its id while
+ * its members change between reloads, and a member read recomputes the same cell (map-serving-stateless.md).
+ * The versionId still changes with the members.
+ */
+function createAggregate(members: readonly PointItem[], layer: LayerResult, viewportBounds: Bbox, cellKey: string): AggregateItem {
   const first = members[0];
   if (first === undefined) throw new TypeError('An aggregate needs members');
   const memberIds = members.map((item) => item.id);
   const metric = groupMetric(members);
-  const id = `aggregate.${first.layerId}.${digest(memberIds)}`;
+  const id = `aggregate.${first.layerId}.${cellKey}`;
   const sources = [...new Map(members.flatMap((item) => item.sources).map((source) => [JSON.stringify(source), source])).values()]
     .sort((left, right) => compareStrings(JSON.stringify(left), JSON.stringify(right)));
   const time = { ...first.time };

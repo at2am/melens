@@ -676,213 +676,7 @@
           "band": "overview",
           "items": [
             {
-              "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T00:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T00:00:00Z",
-                "validTo": "2026-10-01T01:00:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
-                },
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
-                },
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T00:00:00Z",
-                  "to": "2026-10-01T01:00:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T01:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T01:00:00Z",
-                "validTo": "2026-10-01T01:01:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                },
-                {
-                  "sourceId": "sample.minute",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
-                },
-                {
-                  "sourceId": "sample.minute",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with minute observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T01:00:00Z",
-                  "to": "2026-10-01T01:01:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
+              "id": "aggregate.pedestrian.overview.3697.2513.307932511fad52c72504c124aec7dd55",
               "versionId": "aggregate-v1.6690bb6b3ebbad4a5c2b6971f9dd4fb8acd6539e638d63b3588b1359299e2d09",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -994,12 +788,218 @@
                 ],
                 "grid": null
               }
+            },
+            {
+              "id": "aggregate.pedestrian.overview.3697.2513.33633833291c2993a101bb56a9d36186",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T01:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T01:00:00Z",
+                "validTo": "2026-10-01T01:01:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                },
+                {
+                  "sourceId": "sample.minute",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
+                },
+                {
+                  "sourceId": "sample.minute",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
+                  "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with minute observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T01:00:00Z",
+                  "to": "2026-10-01T01:01:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
+            },
+            {
+              "id": "aggregate.pedestrian.overview.3697.2513.5be6a03c61f456dd94349b9220f8a5ab",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T00:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T00:00:00Z",
+                "validTo": "2026-10-01T01:00:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
+                },
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
+                },
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
+                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T00:00:00Z",
+                  "to": "2026-10-01T01:00:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
             }
           ],
           "excludedIds": [],
           "groups": [
             {
-              "aggregateId": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
+              "aggregateId": "aggregate.pedestrian.overview.3697.2513.307932511fad52c72504c124aec7dd55",
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
@@ -1016,7 +1016,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
+              "aggregateId": "aggregate.pedestrian.overview.3697.2513.5be6a03c61f456dd94349b9220f8a5ab",
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
@@ -1029,7 +1029,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "aggregateId": "aggregate.pedestrian.overview.3697.2513.33633833291c2993a101bb56a9d36186",
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
@@ -1278,213 +1278,7 @@
           "band": "district",
           "items": [
             {
-              "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T00:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T00:00:00Z",
-                "validTo": "2026-10-01T01:00:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
-                },
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
-                },
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T00:00:00Z",
-                  "to": "2026-10-01T01:00:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T01:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T01:00:00Z",
-                "validTo": "2026-10-01T01:01:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                },
-                {
-                  "sourceId": "sample.minute",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
-                },
-                {
-                  "sourceId": "sample.minute",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with minute observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T01:00:00Z",
-                  "to": "2026-10-01T01:01:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
+              "id": "aggregate.pedestrian.district.14789.10053.307932511fad52c72504c124aec7dd55",
               "versionId": "aggregate-v1.6690bb6b3ebbad4a5c2b6971f9dd4fb8acd6539e638d63b3588b1359299e2d09",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -1596,12 +1390,218 @@
                 ],
                 "grid": null
               }
+            },
+            {
+              "id": "aggregate.pedestrian.district.14789.10053.33633833291c2993a101bb56a9d36186",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T01:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T01:00:00Z",
+                "validTo": "2026-10-01T01:01:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                },
+                {
+                  "sourceId": "sample.minute",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
+                },
+                {
+                  "sourceId": "sample.minute",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
+                  "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with minute observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T01:00:00Z",
+                  "to": "2026-10-01T01:01:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
+            },
+            {
+              "id": "aggregate.pedestrian.district.14789.10053.5be6a03c61f456dd94349b9220f8a5ab",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T00:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T00:00:00Z",
+                "validTo": "2026-10-01T01:00:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
+                },
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
+                },
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
+                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T00:00:00Z",
+                  "to": "2026-10-01T01:00:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
             }
           ],
           "excludedIds": [],
           "groups": [
             {
-              "aggregateId": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
+              "aggregateId": "aggregate.pedestrian.district.14789.10053.307932511fad52c72504c124aec7dd55",
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
@@ -1618,7 +1618,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
+              "aggregateId": "aggregate.pedestrian.district.14789.10053.5be6a03c61f456dd94349b9220f8a5ab",
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
@@ -1631,7 +1631,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "aggregateId": "aggregate.pedestrian.district.14789.10053.33633833291c2993a101bb56a9d36186",
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
@@ -1880,110 +1880,7 @@
           "band": "neighbourhood",
           "items": [
             {
-              "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T00:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T00:00:00Z",
-                "validTo": "2026-10-01T01:00:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
-                },
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
-                },
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T00:00:00Z",
-                  "to": "2026-10-01T01:00:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
+              "id": "aggregate.pedestrian.neighbourhood.118316.80429.307932511fad52c72504c124aec7dd55",
               "versionId": "aggregate-v1.c84a92a3d5767cd4a0d12aa17d3ab2c8fa8a4d3b021d709894deb4894c8730b9",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -2086,7 +1983,7 @@
               }
             },
             {
-              "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "id": "aggregate.pedestrian.neighbourhood.118316.80429.33633833291c2993a101bb56a9d36186",
               "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -2189,6 +2086,109 @@
               }
             },
             {
+              "id": "aggregate.pedestrian.neighbourhood.118316.80429.5be6a03c61f456dd94349b9220f8a5ab",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T00:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T00:00:00Z",
+                "validTo": "2026-10-01T01:00:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
+                },
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
+                },
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
+                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T00:00:00Z",
+                  "to": "2026-10-01T01:00:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
+            },
+            {
               "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
               "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77",
               "layerId": "pedestrian",
@@ -2251,7 +2251,7 @@
           "excludedIds": [],
           "groups": [
             {
-              "aggregateId": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
+              "aggregateId": "aggregate.pedestrian.neighbourhood.118316.80429.307932511fad52c72504c124aec7dd55",
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
@@ -2264,7 +2264,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
+              "aggregateId": "aggregate.pedestrian.neighbourhood.118316.80429.5be6a03c61f456dd94349b9220f8a5ab",
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
@@ -2277,7 +2277,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "aggregateId": "aggregate.pedestrian.neighbourhood.118316.80429.33633833291c2993a101bb56a9d36186",
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
@@ -2526,110 +2526,7 @@
           "band": "closeUp",
           "items": [
             {
-              "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
-              "layerId": "pedestrian",
-              "title": "Effective sensors",
-              "geometry": {
-                "type": "MultiPoint",
-                "coordinates": [
-                  [
-                    144.967,
-                    -37.818
-                  ],
-                  [
-                    144.967,
-                    -37.818
-                  ]
-                ]
-              },
-              "location": {
-                "precision": "point",
-                "role": "unknown",
-                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
-              },
-              "assertionKind": "observation",
-              "lifecycle": "active",
-              "time": {
-                "observedAt": "2026-10-01T00:00:00Z",
-                "reportedAt": null,
-                "validFrom": "2026-10-01T00:00:00Z",
-                "validTo": "2026-10-01T01:00:00Z",
-                "periodLabel": null,
-                "fetchedAt": "2026-10-01T01:02:00Z",
-                "sourceTimeText": null,
-                "sourceTimezone": null
-              },
-              "sources": [
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
-                },
-                {
-                  "sourceId": "sample.hourly",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
-                },
-                {
-                  "sourceId": "sample.locations",
-                  "url": null,
-                  "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": "sample-native-location-v1"
-                }
-              ],
-              "kind": "aggregate",
-              "details": {
-                "representation": "cluster",
-                "memberIds": [
-                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
-                ],
-                "memberCursor": null,
-                "resultRange": {
-                  "scope": "viewport",
-                  "returnedCount": 2,
-                  "totalMatching": null
-                },
-                "metric": {
-                  "id": "sensorCount",
-                  "label": "Effective sensors",
-                  "unit": "sensors",
-                  "value": 2,
-                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
-                },
-                "window": {
-                  "from": "2026-10-01T00:00:00Z",
-                  "to": "2026-10-01T01:00:00Z"
-                },
-                "coverage": {
-                  "state": "verified",
-                  "areaRefs": [
-                    "sample.melbourne"
-                  ],
-                  "window": {
-                    "from": "2026-10-01T00:00:00Z",
-                    "to": "2026-10-01T01:01:00Z"
-                  },
-                  "evidenceSourceIds": [
-                    "sample.hourly",
-                    "sample.locations",
-                    "sample.minute"
-                  ]
-                },
-                "bounds": [
-                  144.96699999999998,
-                  -37.818000000000005,
-                  144.967,
-                  -37.818
-                ],
-                "grid": null
-              }
-            },
-            {
-              "id": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
+              "id": "aggregate.pedestrian.closeUp.946534.643438.307932511fad52c72504c124aec7dd55",
               "versionId": "aggregate-v1.c84a92a3d5767cd4a0d12aa17d3ab2c8fa8a4d3b021d709894deb4894c8730b9",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -2732,7 +2629,7 @@
               }
             },
             {
-              "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "id": "aggregate.pedestrian.closeUp.946534.643438.33633833291c2993a101bb56a9d36186",
               "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
@@ -2835,6 +2732,109 @@
               }
             },
             {
+              "id": "aggregate.pedestrian.closeUp.946534.643438.5be6a03c61f456dd94349b9220f8a5ab",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
+              "layerId": "pedestrian",
+              "title": "Effective sensors",
+              "geometry": {
+                "type": "MultiPoint",
+                "coordinates": [
+                  [
+                    144.967,
+                    -37.818
+                  ],
+                  [
+                    144.967,
+                    -37.818
+                  ]
+                ]
+              },
+              "location": {
+                "precision": "point",
+                "role": "unknown",
+                "evidence": "Aggregate contains actual member points. A navigation symbol may use the first point; bounds describe loaded member navigation, not a new affected area."
+              },
+              "assertionKind": "observation",
+              "lifecycle": "active",
+              "time": {
+                "observedAt": "2026-10-01T00:00:00Z",
+                "reportedAt": null,
+                "validFrom": "2026-10-01T00:00:00Z",
+                "validTo": "2026-10-01T01:00:00Z",
+                "periodLabel": null,
+                "fetchedAt": "2026-10-01T01:02:00Z",
+                "sourceTimeText": null,
+                "sourceTimezone": null
+              },
+              "sources": [
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
+                },
+                {
+                  "sourceId": "sample.hourly",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance observations",
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
+                },
+                {
+                  "sourceId": "sample.locations",
+                  "url": null,
+                  "attribution": "Synthetic T026 acceptance locations",
+                  "versionRef": "sample-native-location-v1"
+                }
+              ],
+              "kind": "aggregate",
+              "details": {
+                "representation": "cluster",
+                "memberIds": [
+                  "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
+                  "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142"
+                ],
+                "memberCursor": null,
+                "resultRange": {
+                  "scope": "viewport",
+                  "returnedCount": 2,
+                  "totalMatching": null
+                },
+                "metric": {
+                  "id": "sensorCount",
+                  "label": "Effective sensors",
+                  "unit": "sensors",
+                  "value": 2,
+                  "definition": "Distinct source-scoped effective sensors with hour observations in this loaded group and the same window. Underlying sensor counts measure passages, may count repeated persons, and are not summed here."
+                },
+                "window": {
+                  "from": "2026-10-01T00:00:00Z",
+                  "to": "2026-10-01T01:00:00Z"
+                },
+                "coverage": {
+                  "state": "verified",
+                  "areaRefs": [
+                    "sample.melbourne"
+                  ],
+                  "window": {
+                    "from": "2026-10-01T00:00:00Z",
+                    "to": "2026-10-01T01:01:00Z"
+                  },
+                  "evidenceSourceIds": [
+                    "sample.hourly",
+                    "sample.locations",
+                    "sample.minute"
+                  ]
+                },
+                "bounds": [
+                  144.96699999999998,
+                  -37.818000000000005,
+                  144.967,
+                  -37.818
+                ],
+                "grid": null
+              }
+            },
+            {
               "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
               "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77",
               "layerId": "pedestrian",
@@ -2897,7 +2897,7 @@
           "excludedIds": [],
           "groups": [
             {
-              "aggregateId": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
+              "aggregateId": "aggregate.pedestrian.closeUp.946534.643438.307932511fad52c72504c124aec7dd55",
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
@@ -2910,7 +2910,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
+              "aggregateId": "aggregate.pedestrian.closeUp.946534.643438.5be6a03c61f456dd94349b9220f8a5ab",
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
@@ -2923,7 +2923,7 @@
               ]
             },
             {
-              "aggregateId": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
+              "aggregateId": "aggregate.pedestrian.closeUp.946534.643438.33633833291c2993a101bb56a9d36186",
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",

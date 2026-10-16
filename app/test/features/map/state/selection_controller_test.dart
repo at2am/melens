@@ -244,18 +244,16 @@ void main() {
   });
 
   test(
-    'a response from a different version cannot silently replace details',
+    'a newer version of the selected record replaces the shown details',
     () async {
       final item = t016Item();
       final loading = select(item);
-      repository.details.single.result.complete(
-        t016Details(item.copyWith(versionId: 'wrong-version'), context),
-      );
+      final newer = item.copyWith(versionId: 'newer-version');
+      repository.details.single.result.complete(t016Details(newer, context));
       await loading;
       final state = container.read(selectionControllerProvider);
-      expect(state.item, same(item));
-      expect(state.detailError, isA<MapContractException>());
-      expect(state.canRetry, isFalse);
+      expect(state.item!.versionId, 'newer-version');
+      expect(state.detailError, isNull);
     },
   );
 

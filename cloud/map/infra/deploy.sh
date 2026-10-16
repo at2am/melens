@@ -218,8 +218,8 @@ fi
 
 deploy=("$gcloud_bin" run deploy "$service" "--project=$project" "--region=$region"
   "--image=$image" "--service-account=$identity" "--env-vars-file=$task_tmp_dir/env.json"
-  --port=8080 --cpu=1 --memory=512Mi --concurrency=8 --timeout=30s
-  "--min=$min_instances" --max=1 "--min-instances=$min_instances" --max-instances=1 --no-cpu-boost --ingress=all
+  --port=8080 --cpu=1 --memory=1Gi --concurrency=32 --timeout=30s
+  "--min=$min_instances" --max=4 "--min-instances=$min_instances" --max-instances=4 --cpu-boost --ingress=all
   --allow-unauthenticated --quiet)
 printf 'Reviewed Cloud Run command:'
 printf ' %q' "${deploy[@]}"

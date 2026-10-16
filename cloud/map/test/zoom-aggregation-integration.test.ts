@@ -9,8 +9,8 @@ import { adaptPlanningRows } from '@melens/shared/query/planning';
 import { adaptEventRows } from '@melens/shared/query/events';
 import { parseSourceCoverage } from '@melens/shared/query/source-coverage';
 import { aggregateLayer } from '../src/services/aggregation.js';
-import { createSnapshotStore, MapServiceError } from '../src/services/snapshot-store.js';
-import { createViewportService } from '../src/services/viewport.js';
+import { readContext } from '../src/services/read-token.js';
+import { createViewportService, MapServiceError } from '../src/services/viewport.js';
 
 const TIME = '2026-10-01T01:00:00Z';
 const BOUNDS = [144.9, -37.9, 145.1, -37.7];
@@ -45,12 +45,8 @@ function fixture(options: { planning?: number; events?: number; summary?: string
     async dryRun() { return { bytesProcessed: 1n }; },
     async startQuery(query) {
       queries.push(query);
-      const keys = query.params.publicRecordKeysJson === undefined ? null
-        : JSON.parse(String(query.params.publicRecordKeysJson)) as { id: string; versionId: string; sourceId: string }[];
       const selected = query.query.includes('v_source_coverage') ? metadata
-        : keys === null ? rows.filter((row) => row.topic === query.params.topic)
-          : rows.filter((row) => keys.some((key) => key.id === row.geo_record_id
-            && key.versionId === row.version_id && key.sourceId === row.source_id && row.record_status !== 'withdrawn'));
+        : rows.filter((row) => row.topic === query.params.topic && row.record_status !== 'withdrawn');
       return { async readPage({ maxRows }) {
         const limit = Math.min(Number(query.params.resultLimit), maxRows);
         return { rows: selected.slice(0, limit).map((row) => ({ record: JSON.stringify(row) })),
@@ -59,11 +55,10 @@ function fixture(options: { planning?: number; events?: number; summary?: string
     },
   };
   const clock = () => new Date(TIME);
-  const store = createSnapshotStore({ clock });
   const service = createMapService({ config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }), adapter, clock,
-    snapshotStore: store, publicSources: metadata.map((row) => ({ sourceId: row.source_id,
+    publicSources: metadata.map((row) => ({ sourceId: row.source_id,
       url: `https://example.org/${row.topic}`, attribution: `Public ${row.topic} records`, versionRef: null })) });
-  return { service, rows, queries, store };
+  return { service, rows, queries };
 }
 
 function onlyAggregate(response: ViewportResponse): Extract<MapItem, { kind: 'aggregate' }> {
@@ -124,8 +119,9 @@ test('shared 1,000 original-row budget stays partial after groups shrink the pre
     assert.equal(page.nextCursor, null);
     assert.equal(page.scope.kind, 'aggregateMembers');
   }
-  const initialQueries = f.queries.filter((query) => query.params.publicRecordKeysJson === undefined && !query.query.includes('v_source_coverage'));
-  assert.deepEqual(initialQueries.map((query) => query.params.resultLimit), [501, 501]);
+  // Each member read recomputes only its own layer, with the 500-row allowance of the two-layer request.
+  const layerQueries = f.queries.filter((query) => !query.query.includes('v_source_coverage'));
+  assert.deepEqual(layerQueries.map((query) => query.params.resultLimit), [501, 501, 501, 501]);
 });
 
 test('UTF-8 uncompressed 2 MiB budget preserves loaded member scope and an unknown full total', async () => {
@@ -150,10 +146,9 @@ test('an injected loader cannot hide excess original rows behind bounded group s
   const f = fixture({ planning: 501, events: 501 });
   const coverage = parseSourceCoverage({ kind: 'complete', totalMatching: 2, resultBytes: 0,
     rows: [registry('planning', 501), registry('event', 501)] });
-  const store = createSnapshotStore();
   const resolveSource = (id: string) => ({ sourceId: id, url: 'https://example.org/public',
     attribution: 'Public test records', versionRef: null });
-  const viewport = createViewportService({ store, readCoverage: async () => coverage, aggregateLayer,
+  const viewport = createViewportService({ readCoverage: async () => coverage, aggregateLayer,
     async loadLayer(request, layerId) {
       const rows = f.rows.filter((row) => row.topic === layerId);
       const items = layerId === 'planning' ? adaptPlanningRows(rows, { resolveSource, mode: 'historical' }).items
@@ -164,18 +159,17 @@ test('an injected loader cannot hide excess original rows behind bounded group s
     } });
   await assert.rejects(viewport.query({ ...QUERY, layers: ['planning', 'event'] }),
     (error: unknown) => error instanceof MapServiceError && error.code === 'budgetExceeded');
-  assert.equal(store.stats().snapshots, 0);
 });
 
-test('continuations bind the canonical presentation zoom and stored groups recheck original record rights', async () => {
+test('continuations bind the canonical presentation zoom and a withdrawn member leaves its group', async () => {
   const f = fixture({ planning: 6, separateWindows: true });
   const request = { ...QUERY, zoom: 12, pageSize: 1 };
   const first = await f.service.queryViewport(request);
   const cursor = first.layers[0]?.nextCursor;
   assert.ok(cursor);
-  const storedRequest = f.store.read(first.snapshotId).request;
-  assert.ok('zoom' in storedRequest);
-  assert.equal(storedRequest.zoom, 12);
+  const context = readContext(first.snapshotId, 'decoded');
+  assert.ok(context.family === 'viewport');
+  assert.equal(context.request.zoom, 12);
   const continuation = { ...request, snapshotId: first.snapshotId, cursor };
   const second = await f.service.queryViewport(continuation);
   assert.notEqual(first.layers[0]?.items[0]?.id, second.layers[0]?.items[0]?.id);
@@ -186,6 +180,7 @@ test('continuations bind the canonical presentation zoom and stored groups reche
   const member = f.rows.find((row) => group.details.memberIds.includes(row.geo_record_id));
   assert.ok(member);
   member.record_status = 'withdrawn';
+  // The pair is now a single record, so its cell has no group: the client reissues its viewport.
   await assert.rejects(f.service.getMembers(group.id, { requestId: 'members', snapshotId: first.snapshotId }),
-    (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable');
+    (error: unknown) => error instanceof MapServiceError && error.code === 'snapshotExpired');
 });

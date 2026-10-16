@@ -54,15 +54,17 @@ project/data/secret IAM permissions. The service uses
 audit aborts on other query-identity project roles, ingestion dataset access,
 secret/bucket grants or an unreviewed query-dataset resource.
 
-Runtime bounds are one instance at both service and revision levels, concurrency
-8, one CPU, 512 MiB, a 30-second HTTP
+Runtime bounds are at most four instances at both service and revision levels,
+concurrency 32, one CPU with startup boost, 1 GiB, a 30-second HTTP
 deadline, 10-second queries, 5-second dry runs, 1-second cancellation, 1,000 items
 and a 2 MiB response. One instance stays warm by default (`--min-instances 1`,
 since 2026-10-16), so the first map or feed read skips a cold start and finds the
-current-layer cache filled; `--min-instances 0` restores scale-to-zero. The in-memory snapshot store
-requires one instance; restarts/revisions can expire existing snapshots. This is
-a development deployment, not a durable pagination store or a global monetary
-cap. Public invocation makes these approved reads reachable; CORS allows only
+current-layer cache filled; `--min-instances 0` restores scale-to-zero. The service
+is stateless since 2026-10-16 ([design](../../../system-design/map-serving-stateless.md)):
+each instance holds its own copy of the current layers (about 460 MB resident) and
+loads them at start, and any instance can answer a read token another issued. More
+instances add a few BigQuery jobs per two minutes each, not per request. This is
+a development deployment, not a global monetary cap. Public invocation makes these approved reads reachable; CORS allows only
 the explicitly listed app origins and does not authenticate nonbrowser callers.
 
 Two dynamic ceilings are reviewed. 400,000,000 bytes accommodated the

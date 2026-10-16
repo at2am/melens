@@ -6,7 +6,6 @@ import type { PublicSourceReference } from '@melens/shared/query/adapter-common'
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
 import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapService } from '../src/map-service.js';
-import { VERIFIED_RECORD_TTL_MS } from '../src/services/public-records.js';
 
 const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' });
 const source: PublicSourceReference = { sourceId: 'gdelt.news', url: 'https://www.gdeltproject.org/',
@@ -80,7 +79,7 @@ test('Ticketmaster viewport and detail preserve the original event link and revi
   assert.equal(detail.item.sources[0]?.attribution, reference.attribution);
 });
 
-test('map service serves scoped news and rechecks it without an external verifier or replacing the article link', async () => {
+test('map service serves scoped news without replacing the article link, and a detail read finds it again', async () => {
   const queries: PreparedViewQuery[] = [];
   let publicRecord = true;
   let now = Date.parse('2026-10-01T02:00:00Z');
@@ -94,8 +93,7 @@ test('map service serves scoped news and rechecks it without an external verifie
     async startQuery(query) {
       queries.push(query);
       const rows = query.query.includes('v_source_coverage') ? [coverage]
-        : query.query.includes('@publicRecordKeysJson') ? publicRecord ? [newsRow()] : []
-          : query.query.includes('g.geometry IS NULL') ? [newsRow()] : [];
+        : query.query.includes('g.geometry IS NULL') && publicRecord ? [newsRow()] : [];
       return { async readPage() { return { rows: rows.map((row) => ({ record: JSON.stringify(row) })),
         complete: true, hasMore: false }; }, async cancel() {} };
     } };
@@ -107,15 +105,14 @@ test('map service serves scoped news and rechecks it without an external verifie
   assert.equal(page.items.length, 1);
   assert.equal(page.items[0]?.sources[0]?.url, articleUrl);
   assert.equal(page.items[0]?.geometry, null);
-  assert.ok(queries.some((query) => query.query.includes('@publicRecordKeysJson')));
+  assert.ok(!queries.some((query) => query.query.includes('@publicRecordKeysJson')));
   const item = await service.getItem('news:article1', { requestId: 'details', snapshotId: page.snapshotId });
   assert.equal(item.item.id, 'news:article1');
+  // The published view no longer returns the article: the next read does not find it.
   publicRecord = false;
-  // The proof stands for one minute within the same publication.
-  assert.equal((await service.getItem('news:article1', { requestId: 'cached', snapshotId: page.snapshotId })).item.id, 'news:article1');
-  now += VERIFIED_RECORD_TTL_MS + 1;
+  now += 1;
   await assert.rejects(service.getItem('news:article1', { requestId: 'withdrawn', snapshotId: page.snapshotId }),
-    (error: unknown) => error instanceof Error && 'code' in error && error.code === 'notAvailable');
+    (error: unknown) => error instanceof Error && 'code' in error && error.code === 'notFound');
 });
 
 function areaFixture(options: { prewarmNewsAreas?: boolean } = {}) {

@@ -229,9 +229,10 @@ class SelectionController extends _$SelectionController {
     );
   }
 
-  /// Fetches the selected record. A record selected from the map must come
-  /// back in the version that was selected; one selected by id has no
-  /// version to compare.
+  /// Fetches the selected record. The map service recomputes details from
+  /// the current published data (system-design/map-serving-stateless.md), so
+  /// a record that changed since the map loaded comes back in its newer
+  /// version, which replaces the shown one.
   Future<void> _loadDetails() async {
     final id = state.selectedItemId;
     final original = state.item;
@@ -250,7 +251,7 @@ class SelectionController extends _$SelectionController {
       if (response.requestId != context.requestId ||
           response.snapshotId != context.snapshotId ||
           response.item.id != id ||
-          (original != null && response.item.versionId != original.versionId) ||
+          (original != null && response.item.layerId != original.layerId) ||
           response.mode != state.mode ||
           response.dataMode != state.dataMode) {
         throw const MapContractException(MapContractFailure.requestMismatch);
