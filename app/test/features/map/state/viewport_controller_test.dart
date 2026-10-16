@@ -374,7 +374,7 @@ void main() {
     },
   );
 
-  group('with auto-search off (the default)', () {
+  group('with auto-search turned off', () {
     late ProviderContainer manual;
     late ViewportController viewport;
     const moved = MapBounds(
@@ -402,6 +402,7 @@ void main() {
         ],
       );
       addTearDown(manual.dispose);
+      manual.read(mapAutoSearchProvider.notifier).set(enabled: false);
       viewport = manual.read(viewportControllerProvider.notifier)
         ..setLayers([MapLayerId.pedestrian], debounce: false)
         ..setRegion(t017Region, 14, debounce: false);

@@ -66,7 +66,7 @@ void main() {
     expect(find.byType(SwitchListTile), findsNWidgets(2));
   });
 
-  testWidgets('the map waits for Search this area unless auto-search is on', (
+  testWidgets('the map searches as it moves unless auto-search is turned off', (
     tester,
   ) async {
     final container = appContainer();
@@ -74,16 +74,16 @@ void main() {
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    expect(container.read(mapAutoSearchProvider), isFalse);
+    expect(container.read(mapAutoSearchProvider), isTrue);
     expect(
-      find.text('Off. After moving the map, tap Search this area.'),
+      find.text('On. The map searches again after every pan or zoom.'),
       findsOneWidget,
     );
     await tester.tap(key('settings-map-auto-search'));
     await tester.pumpAndSettle();
-    expect(container.read(mapAutoSearchProvider), isTrue);
+    expect(container.read(mapAutoSearchProvider), isFalse);
     expect(
-      find.text('On. The map searches again after every pan or zoom.'),
+      find.text('Off. After moving the map, tap Search this area.'),
       findsOneWidget,
     );
   });

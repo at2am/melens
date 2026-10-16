@@ -55,12 +55,14 @@ TimeWindow currentViewportWindow(
 }
 
 /// Whether the map searches again by itself after the user pans or zooms.
-/// Off by default: a moved map offers "Search this area" instead. Kept for
-/// the application session, like the theme choice.
+/// On by default since the map service answers from memory in milliseconds
+/// (system-design/map-serving-stateless.md); turned off, a moved map offers
+/// "Search this area" instead. Kept for the application session, like the
+/// theme choice.
 @Riverpod(keepAlive: true)
 class MapAutoSearch extends _$MapAutoSearch {
   @override
-  bool build() => false;
+  bool build() => true;
 
   void set({required bool enabled}) => state = enabled;
 }
