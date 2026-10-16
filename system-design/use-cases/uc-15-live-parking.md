@@ -23,7 +23,7 @@ The map shows, for the area the user searches or looks at, which on-street bays 
 
 1. The user searches for a place or pans the map there, and turns on the Parking sensors layer, or asks the assistant ("is there parking near Melbourne Central?").
 2. The map service reads only the sensors inside that viewport from `melens_query.v_parking_sensor_current`. The assistant searches with `search_features` and `layers: ["parking"]` over a small radius, then shows the result on the map.
-3. Close up (zoom 17 and above) each sensor is its bay, drawn to scale and centred on the sensor: green for vacant, red for occupied, grey for no data. Further out, sensors cluster, and the cluster counts the vacant ones. Tapping a bay opens its details: the reading, when the sensor last reported and when the status last changed, the parking zone, and two fixed notes: a vacant sensor does not mean parking there is allowed now, and works can block a bay that still reads vacant.
+3. Close up (zoom 17 and above) each sensor is its bay, drawn to scale and centred on the sensor: green for vacant, red for occupied, grey for no data. Further out, sensors cluster, and the cluster counts the vacant ones. Tapping a bay opens its details: the reading, when the sensor last reported and when the status last changed, the parking zone when the source gives one, and two fixed notes: a vacant sensor does not mean parking there is allowed now, and works can block a bay that still reads vacant.
 
 ## Example queries
 

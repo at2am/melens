@@ -9,6 +9,7 @@ import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../data/map_models.dart';
 import '../data/map_repository.dart';
+import '../data/source_summaries.dart';
 import 'map_status.dart';
 import 'renderers/aggregate_renderer.dart';
 
@@ -26,6 +27,7 @@ class AggregateDetailsPanel extends ConsumerStatefulWidget {
     this.onRefreshSnapshot,
     this.pageSize = 25,
     this.maxDisplayedMembers = 100,
+    this.showSummary = true,
     super.key,
   }) : assert(pageSize > 0 && pageSize <= 50),
        assert(maxDisplayedMembers > 0 && maxDisplayedMembers <= 200);
@@ -41,6 +43,10 @@ class AggregateDetailsPanel extends ConsumerStatefulWidget {
   final VoidCallback? onRefreshSnapshot;
   final int pageSize;
   final int maxDisplayedMembers;
+
+  /// False when the enclosing panel already shows the group's title, metric,
+  /// time and sources, leaving only navigation and the member list here.
+  final bool showSummary;
 
   @override
   ConsumerState<AggregateDetailsPanel> createState() =>
@@ -230,41 +236,43 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            widget.aggregate.title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(
-            strings.mapAggregateLoadedRecords(
-              format.format(details.resultRange.returnedCount),
-            ),
-          ),
-          Text(strings.mapAggregateScopeExplanation),
-          if (aggregateHasUnknownTotal(widget.aggregate))
-            Text(strings.mapAggregateLoadedOnly),
-          if (details.resultRange.totalMatching case final total?)
-            Text(strings.mapAggregateGroupTotal(format.format(total)))
-          else
-            Text(strings.mapTotalUnknown),
-          Text(
-            metric.value == null
-                ? strings.mapAggregateMetricUnknown(metric.label, metric.unit)
-                : strings.mapAggregateMetric(
-                    metric.label,
-                    format.format(metric.value),
-                    metric.unit,
-                  ),
-          ),
-          Text(metric.definition),
-          if (details.window case final window?)
+          if (widget.showSummary) ...[
             Text(
-              strings.mapObservedWindow(
-                localTime(window.from),
-                localTime(window.to),
+              widget.aggregate.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            Text(
+              strings.mapAggregateLoadedRecords(
+                format.format(details.resultRange.returnedCount),
               ),
-            )
-          else
-            Text(strings.mapObservedWindowUnknown),
+            ),
+            Text(strings.mapAggregateScopeExplanation),
+            if (aggregateHasUnknownTotal(widget.aggregate))
+              Text(strings.mapAggregateLoadedOnly),
+            if (details.resultRange.totalMatching case final total?)
+              Text(strings.mapAggregateGroupTotal(format.format(total)))
+            else
+              Text(strings.mapTotalUnknown),
+            Text(
+              metric.value == null
+                  ? strings.mapAggregateMetricUnknown(metric.label, metric.unit)
+                  : strings.mapAggregateMetric(
+                      metric.label,
+                      format.format(metric.value),
+                      metric.unit,
+                    ),
+            ),
+            Text(metric.definition),
+            if (details.window case final window?)
+              Text(
+                strings.mapObservedWindow(
+                  localTime(window.from),
+                  localTime(window.to),
+                ),
+              )
+            else
+              Text(strings.mapObservedWindowUnknown),
+          ],
           if (_sameLocation(widget.aggregate.geometry))
             Text(strings.mapAggregateSameLocation),
           if (widget.onZoomToBounds != null)
@@ -273,14 +281,15 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
               icon: const Icon(Icons.zoom_in),
               label: Text(strings.mapAggregateZoom),
             ),
-          MapItemProvenance(
-            time: widget.aggregate.time,
-            sources: widget.aggregate.sources,
-            assertionKind: widget.aggregate.assertionKind,
-            mode: widget.mode,
-            dataMode: widget.dataMode,
-            onOpenSource: widget.onOpenSource,
-          ),
+          if (widget.showSummary)
+            MapItemProvenance(
+              time: widget.aggregate.time,
+              sources: widget.aggregate.sources,
+              assertionKind: widget.aggregate.assertionKind,
+              mode: widget.mode,
+              dataMode: widget.dataMode,
+              onOpenSource: widget.onOpenSource,
+            ),
           const SizedBox(height: 16),
           Text(
             strings.mapAggregateMembersTitle,
@@ -324,7 +333,7 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
           for (final member in _members.values)
             ListTile(
               key: ValueKey('aggregate-member:${member.id}'),
-              title: Text(member.title),
+              title: Text(_memberTitle(member)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -445,14 +454,15 @@ extension on _AggregateDetailsPanelState {
                   ? null
                   : () => widget.onItemSelected!(member),
             ),
-          MapItemProvenance(
-            time: widget.aggregate.time,
-            sources: widget.aggregate.sources,
-            assertionKind: widget.aggregate.assertionKind,
-            mode: widget.mode,
-            dataMode: widget.dataMode,
-            onOpenSource: widget.onOpenSource,
-          ),
+          if (widget.showSummary)
+            MapItemProvenance(
+              time: widget.aggregate.time,
+              sources: widget.aggregate.sources,
+              assertionKind: widget.aggregate.assertionKind,
+              mode: widget.mode,
+              dataMode: widget.dataMode,
+              onOpenSource: widget.onOpenSource,
+            ),
         ],
       ),
     );
@@ -467,4 +477,15 @@ bool _sameLocation(GeoJsonGeometry? geometry) {
   return geometry.coordinates.every(
     (point) => point[0] == first[0] && point[1] == first[1],
   );
+}
+
+/// Development projects are titled "address (STATUS)"; the list reads
+/// better with the address alone, as in the selected-record panel.
+String _memberTitle(MapItem member) {
+  if (member case PlanningMapItem(:final details)) {
+    if (DevelopmentProjectSummary.tryParse(details.summary) case final p?) {
+      return DevelopmentProjectSummary.cleanTitle(member.title, p);
+    }
+  }
+  return member.title;
 }

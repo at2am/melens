@@ -1917,4 +1917,187 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFeedPaused => 'Paused';
+
+  @override
+  String get mapDetailTechnical => 'Technical details';
+
+  @override
+  String get mapDetailLocation => 'Location';
+
+  @override
+  String get mapDetailWhereSensor => 'Sensor position';
+
+  @override
+  String get mapDetailWhereSite => 'Site given by the source';
+
+  @override
+  String get mapDetailWhereExtent => 'Affected road, route or area';
+
+  @override
+  String get mapDetailWhereStatisticalArea => 'Statistical area';
+
+  @override
+  String get mapDetailWhereAreaAssociation =>
+      'Linked area, not an exact location';
+
+  @override
+  String get mapDetailWhereMention =>
+      'Place mentioned in the report, not where it happened';
+
+  @override
+  String get mapDetailWhereUnknown => 'Location basis unknown';
+
+  @override
+  String get mapDetailWhereUnlocated => 'No map location';
+
+  @override
+  String get mapChipActive => 'Active';
+
+  @override
+  String get mapChipPlanned => 'Planned';
+
+  @override
+  String get mapChipCancelled => 'Cancelled';
+
+  @override
+  String get mapChipResolved => 'Resolved';
+
+  @override
+  String get mapChipStatusUnknown => 'Status unknown';
+
+  @override
+  String get mapDevelopmentMooted => 'Proposed';
+
+  @override
+  String get mapDevelopmentApproved => 'Approved';
+
+  @override
+  String get mapDevelopmentUnderConstruction => 'Under construction';
+
+  @override
+  String get mapDevelopmentCompleted => 'Completed';
+
+  @override
+  String get mapDetailFloors => 'Floors above ground';
+
+  @override
+  String get mapDetailDwellings => 'Dwellings';
+
+  @override
+  String get mapDetailApplication => 'Planning application';
+
+  @override
+  String get mapDetailProjectRef => 'Project reference';
+
+  @override
+  String get mapDetailCouncil => 'Council';
+
+  @override
+  String get mapDetailTopics => 'Topics';
+
+  @override
+  String get mapDetailArea => 'Area';
+
+  @override
+  String get mapDetailCouncilWide => 'Whole council area';
+
+  @override
+  String get mapConsultationLabel => 'Community consultation';
+
+  @override
+  String get mapConsultationOpen => 'Open for feedback';
+
+  @override
+  String get mapConsultationActive => 'In progress';
+
+  @override
+  String get mapConsultationClosed => 'Closed';
+
+  @override
+  String get mapTicketsOnSale => 'Tickets on sale';
+
+  @override
+  String get mapTicketsOffSale => 'Tickets not on sale';
+
+  @override
+  String get mapTicketsCancelled => 'Cancelled';
+
+  @override
+  String get mapTicketsPostponed => 'Postponed';
+
+  @override
+  String get mapTicketsRescheduled => 'Rescheduled';
+
+  @override
+  String get mapDetailTime => 'Time';
+
+  @override
+  String get mapPeopleCountedHour => 'people counted in this hour';
+
+  @override
+  String get mapPeopleCountedMinute => 'people counted in this minute';
+
+  @override
+  String get mapAnomalyUnusual => 'Unusual';
+
+  @override
+  String get mapAnomalyNormal => 'Within the usual range';
+
+  @override
+  String get mapAnomalyNotChecked => 'Not classified';
+
+  @override
+  String get mapAnomalyInLine => 'In line with usual';
+
+  @override
+  String get mapAnomalyObservedCaption => 'observed';
+
+  @override
+  String get mapDetailUsual => 'Usual level';
+
+  @override
+  String get mapAnomalyIneligibleNote =>
+      'This sensor was not eligible for anomaly checks in this window.';
+
+  @override
+  String get mapAnomalyEligibilityUnknownNote =>
+      'Whether this sensor was eligible for anomaly checks is not known.';
+
+  @override
+  String get mapBoundaryGccsa => 'Greater capital city area';
+
+  @override
+  String get mapBoundaryLga => 'Local government area';
+
+  @override
+  String get mapBoundarySa2 => 'Statistical Area Level 2';
+
+  @override
+  String get mapBoundaryState => 'State';
+
+  @override
+  String get mapBoundaryClueBlock => 'City of Melbourne CLUE block';
+
+  @override
+  String get mapBoundaryMunicipal => 'Municipal boundary';
+
+  @override
+  String mapAnomalyBelow(String percent) {
+    return '$percent below usual';
+  }
+
+  @override
+  String mapAnomalyAbove(String percent) {
+    return '$percent above usual';
+  }
+
+  @override
+  String mapAnomalyBaselineSameHour(String days) {
+    return 'Average for the same hour over the previous $days days';
+  }
+
+  @override
+  String mapDetailRange(String from, String to) {
+    return '$from to $to';
+  }
 }

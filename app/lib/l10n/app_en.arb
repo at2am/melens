@@ -2592,5 +2592,256 @@
   "settingsFeedPaused": "Paused",
   "@settingsFeedPaused": {
     "description": "Prefix of a paused feed's subtitle in Settings."
+  },
+  "mapDetailTechnical": "Technical details",
+  "@mapDetailTechnical": {
+    "description": "Collapsed section holding record ids, versions and location evidence."
+  },
+  "mapDetailLocation": "Location",
+  "@mapDetailLocation": {
+    "description": "Fact label for the plain-language location basis."
+  },
+  "mapDetailWhereSensor": "Sensor position",
+  "@mapDetailWhereSensor": {
+    "description": "Location basis: the point is the sensor itself."
+  },
+  "mapDetailWhereSite": "Site given by the source",
+  "@mapDetailWhereSite": {
+    "description": "Location basis: the source supplies the site location."
+  },
+  "mapDetailWhereExtent": "Affected road, route or area",
+  "@mapDetailWhereExtent": {
+    "description": "Location basis: the drawn shape is the affected extent."
+  },
+  "mapDetailWhereStatisticalArea": "Statistical area",
+  "@mapDetailWhereStatisticalArea": {
+    "description": "Location basis: a statistical reporting area."
+  },
+  "mapDetailWhereAreaAssociation": "Linked area, not an exact location",
+  "@mapDetailWhereAreaAssociation": {
+    "description": "Location basis: the record is only associated with this area."
+  },
+  "mapDetailWhereMention": "Place mentioned in the report, not where it happened",
+  "@mapDetailWhereMention": {
+    "description": "Location basis: a place named in a report."
+  },
+  "mapDetailWhereUnknown": "Location basis unknown",
+  "@mapDetailWhereUnknown": {
+    "description": "Location basis is not known."
+  },
+  "mapDetailWhereUnlocated": "No map location",
+  "@mapDetailWhereUnlocated": {
+    "description": "The record has no location on the map."
+  },
+  "mapChipActive": "Active",
+  "@mapChipActive": {
+    "description": "Short status chip."
+  },
+  "mapChipPlanned": "Planned",
+  "@mapChipPlanned": {
+    "description": "Short status chip."
+  },
+  "mapChipCancelled": "Cancelled",
+  "@mapChipCancelled": {
+    "description": "Short status chip."
+  },
+  "mapChipResolved": "Resolved",
+  "@mapChipResolved": {
+    "description": "Short status chip."
+  },
+  "mapChipStatusUnknown": "Status unknown",
+  "@mapChipStatusUnknown": {
+    "description": "Short status chip."
+  },
+  "mapDevelopmentMooted": "Proposed",
+  "@mapDevelopmentMooted": {
+    "description": "Development Activity Monitor status mooted."
+  },
+  "mapDevelopmentApproved": "Approved",
+  "@mapDevelopmentApproved": {
+    "description": "Development Activity Monitor status approved."
+  },
+  "mapDevelopmentUnderConstruction": "Under construction",
+  "@mapDevelopmentUnderConstruction": {
+    "description": "Development Activity Monitor status under_construction."
+  },
+  "mapDevelopmentCompleted": "Completed",
+  "@mapDevelopmentCompleted": {
+    "description": "Development Activity Monitor status completed."
+  },
+  "mapDetailFloors": "Floors above ground",
+  "@mapDetailFloors": {
+    "description": "Development project floor count."
+  },
+  "mapDetailDwellings": "Dwellings",
+  "@mapDetailDwellings": {
+    "description": "Development project residential dwelling count."
+  },
+  "mapDetailApplication": "Planning application",
+  "@mapDetailApplication": {
+    "description": "Town planning application number."
+  },
+  "mapDetailProjectRef": "Project reference",
+  "@mapDetailProjectRef": {
+    "description": "Development Activity Monitor project key."
+  },
+  "mapDetailCouncil": "Council",
+  "@mapDetailCouncil": {
+    "description": "Council running a community consultation."
+  },
+  "mapDetailTopics": "Topics",
+  "@mapDetailTopics": {
+    "description": "Categories a council lists for a consultation."
+  },
+  "mapDetailArea": "Area",
+  "@mapDetailArea": {
+    "description": "Suburbs or area a consultation covers."
+  },
+  "mapDetailCouncilWide": "Whole council area",
+  "@mapDetailCouncilWide": {
+    "description": "A consultation that covers the whole council."
+  },
+  "mapConsultationLabel": "Community consultation",
+  "@mapConsultationLabel": {
+    "description": "Subtitle for a council consultation project."
+  },
+  "mapConsultationOpen": "Open for feedback",
+  "@mapConsultationOpen": {
+    "description": "Consultation status Open."
+  },
+  "mapConsultationActive": "In progress",
+  "@mapConsultationActive": {
+    "description": "Consultation status Active."
+  },
+  "mapConsultationClosed": "Closed",
+  "@mapConsultationClosed": {
+    "description": "Consultation status Closed."
+  },
+  "mapTicketsOnSale": "Tickets on sale",
+  "@mapTicketsOnSale": {
+    "description": "Ticketmaster status onsale."
+  },
+  "mapTicketsOffSale": "Tickets not on sale",
+  "@mapTicketsOffSale": {
+    "description": "Ticketmaster status offsale."
+  },
+  "mapTicketsCancelled": "Cancelled",
+  "@mapTicketsCancelled": {
+    "description": "Ticketmaster status cancelled."
+  },
+  "mapTicketsPostponed": "Postponed",
+  "@mapTicketsPostponed": {
+    "description": "Ticketmaster status postponed."
+  },
+  "mapTicketsRescheduled": "Rescheduled",
+  "@mapTicketsRescheduled": {
+    "description": "Ticketmaster status rescheduled."
+  },
+  "mapDetailTime": "Time",
+  "@mapDetailTime": {
+    "description": "Fact label for an observation window."
+  },
+  "mapPeopleCountedHour": "people counted in this hour",
+  "@mapPeopleCountedHour": {
+    "description": "Caption under an hourly pedestrian count."
+  },
+  "mapPeopleCountedMinute": "people counted in this minute",
+  "@mapPeopleCountedMinute": {
+    "description": "Caption under a per-minute pedestrian count."
+  },
+  "mapAnomalyUnusual": "Unusual",
+  "@mapAnomalyUnusual": {
+    "description": "Chip for an anomalous result."
+  },
+  "mapAnomalyNormal": "Within the usual range",
+  "@mapAnomalyNormal": {
+    "description": "Chip for a not-anomalous result."
+  },
+  "mapAnomalyNotChecked": "Not classified",
+  "@mapAnomalyNotChecked": {
+    "description": "Chip for an unclassified result."
+  },
+  "mapAnomalyInLine": "In line with usual",
+  "@mapAnomalyInLine": {
+    "description": "Headline when the observation equals the baseline."
+  },
+  "mapAnomalyObservedCaption": "observed",
+  "@mapAnomalyObservedCaption": {
+    "description": "Caption under the observed anomaly value."
+  },
+  "mapDetailUsual": "Usual level",
+  "@mapDetailUsual": {
+    "description": "Anomaly baseline value label."
+  },
+  "mapAnomalyIneligibleNote": "This sensor was not eligible for anomaly checks in this window.",
+  "@mapAnomalyIneligibleNote": {
+    "description": "Anomaly eligibility ineligible."
+  },
+  "mapAnomalyEligibilityUnknownNote": "Whether this sensor was eligible for anomaly checks is not known.",
+  "@mapAnomalyEligibilityUnknownNote": {
+    "description": "Anomaly eligibility unknown."
+  },
+  "mapBoundaryGccsa": "Greater capital city area",
+  "@mapBoundaryGccsa": {
+    "description": "ASGS GCCSA level."
+  },
+  "mapBoundaryLga": "Local government area",
+  "@mapBoundaryLga": {
+    "description": "ASGS LGA level."
+  },
+  "mapBoundarySa2": "Statistical Area Level 2",
+  "@mapBoundarySa2": {
+    "description": "ASGS SA2 level."
+  },
+  "mapBoundaryState": "State",
+  "@mapBoundaryState": {
+    "description": "ASGS STE level."
+  },
+  "mapBoundaryClueBlock": "City of Melbourne CLUE block",
+  "@mapBoundaryClueBlock": {
+    "description": "CLUE block level."
+  },
+  "mapBoundaryMunicipal": "Municipal boundary",
+  "@mapBoundaryMunicipal": {
+    "description": "Municipal boundary level."
+  },
+  "mapAnomalyBelow": "{percent} below usual",
+  "@mapAnomalyBelow": {
+    "description": "Headline: observation is lower than the baseline by a percentage.",
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAnomalyAbove": "{percent} above usual",
+  "@mapAnomalyAbove": {
+    "description": "Headline: observation is higher than the baseline by a percentage.",
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "mapAnomalyBaselineSameHour": "Average for the same hour over the previous {days} days",
+  "@mapAnomalyBaselineSameHour": {
+    "description": "Plain-language anomaly baseline definition.",
+    "placeholders": {
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "mapDetailRange": "{from} to {to}",
+  "@mapDetailRange": {
+    "description": "A time range; the end is excluded.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
   }
 }

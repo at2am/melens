@@ -8,6 +8,7 @@ import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/state/selection_controller.dart';
+import 'package:melens/features/map/ui/map_detail_parts.dart';
 import 'package:melens/features/map/ui/map_details.dart';
 import 'package:melens/l10n/app_localizations.dart';
 
@@ -33,6 +34,19 @@ Future<void> _show(WidgetTester tester, Widget child) async {
     ),
   );
   await tester.pump();
+}
+
+Finder _factRow(String label, String value) => find.byWidgetPredicate(
+  (widget) =>
+      widget is MapDetailFactRow &&
+      widget.label == label &&
+      widget.value == value,
+);
+
+Future<void> _expandTechnical(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Technical details'));
+  await tester.tap(find.text('Technical details'));
+  await tester.pumpAndSettle();
 }
 
 MapSelectionState _state(
@@ -180,12 +194,13 @@ void main() {
     final unknown = MapItem.fromJson(json);
     await _show(tester, MapDetails(state: _state(unknown), onClose: () {}));
     expect(find.text('Passage count unknown'), findsOneWidget);
-    expect(find.text('Direction A passages: Unknown'), findsOneWidget);
-    expect(find.text('Sensor passages: 0'), findsNothing);
+    expect(_factRow('Direction A passages', 'Unknown'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
     (json['details'] as Map<String, dynamic>)['totalCount'] = 0;
     final zero = MapItem.fromJson(json);
     await _show(tester, MapDetails(state: _state(zero), onClose: () {}));
-    expect(find.text('Sensor passages: 0'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('Passage count unknown'), findsNothing);
     expect(find.text('Sample data — illustrative only'), findsOneWidget);
     expect(find.textContaining('1 Oct 2026, 10:59 AEST'), findsWidgets);
   });
@@ -369,10 +384,16 @@ void main() {
         tester,
         MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
       );
-      expect(find.text('Impact: Use the adjacent stop'), findsOneWidget);
-      expect(find.text('Affected services: Route 19'), findsOneWidget);
+      expect(find.text('Stop temporarily closed'), findsOneWidget);
+      expect(_factRow('Impact', 'Use the adjacent stop'), findsOneWidget);
+      expect(_factRow('Affected services', 'Route 19'), findsOneWidget);
       expect(find.text('Affected extent: stop'), findsOneWidget);
-      expect(find.text('Status: resolved'), findsWidgets);
+      expect(find.text('Resolved'), findsOneWidget);
+      expect(
+        _factRow('Location', 'Affected road, route or area'),
+        findsOneWidget,
+      );
+      await _expandTechnical(tester);
       expect(find.text('Location role: affected extent'), findsOneWidget);
     },
   );
@@ -402,11 +423,12 @@ void main() {
       tester,
       MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
     );
-    expect(find.text('Venue: Fixture venue'), findsOneWidget);
-    expect(find.text('Starts: Unknown'), findsOneWidget);
-    expect(find.text('Ends: Unknown'), findsOneWidget);
-    expect(find.text('Plan'), findsOneWidget);
-    expect(find.text('Status: planned'), findsWidgets);
+    expect(_factRow('Venue', 'Fixture venue'), findsOneWidget);
+    expect(_factRow('Starts', 'Unknown'), findsOneWidget);
+    expect(find.text('Ends'), findsNothing);
+    expect(_factRow('Category', 'Music'), findsOneWidget);
+    expect(find.text('Published event'), findsOneWidget);
+    expect(find.text('Planned'), findsOneWidget);
   });
 
   testWidgets(
@@ -424,8 +446,11 @@ void main() {
         tester,
         MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
       );
-      expect(find.text('Project status: Proposed'), findsOneWidget);
+      expect(find.text('Published development record'), findsOneWidget);
+      expect(_factRow('Project status', 'Proposed'), findsOneWidget);
+      await _expandTechnical(tester);
       expect(find.text('Permit id: Unknown'), findsOneWidget);
+      json['id'] = 'boundary.fixture';
       json['kind'] = 'boundary';
       json['layerId'] = 'boundary';
       json['geometry'] = {
@@ -454,10 +479,116 @@ void main() {
         tester,
         MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
       );
-      expect(find.text('Boundary vintage: 2021'), findsOneWidget);
-      expect(find.text('Boundary level: SA2'), findsOneWidget);
+      expect(_factRow('Boundary vintage', '2021'), findsOneWidget);
+      expect(
+        _factRow('Boundary level', 'Statistical Area Level 2'),
+        findsOneWidget,
+      );
+      await _expandTechnical(tester);
+      expect(find.text('Boundary id: SA2.fixture'), findsOneWidget);
       expect(find.text('Location precision: area'), findsOneWidget);
       expect(find.text('Location role: statistical area'), findsOneWidget);
     },
   );
+
+  testWidgets('a development project reads as address, status and size', (
+    tester,
+  ) async {
+    final json = t016Item().toJson();
+    json['kind'] = 'planning';
+    json['layerId'] = 'planning';
+    json['title'] = '475-485 Flinders Lane, Melbourne, 3000 (APPROVED)';
+    json['location'] = {
+      'precision': 'point',
+      'role': 'eventSite',
+      'evidence': 'Source coordinates',
+    };
+    json['details'] = {
+      'summary':
+          'Development project X0003803 at 475-485 Flinders Lane, '
+          'Melbourne, 3000. Status: approved (source: APPROVED). '
+          'Dwellings: 0, Floors: 24. Application: TP-2018-263/B.',
+      'projectStatus': null,
+      'permitId': null,
+    };
+    await _show(
+      tester,
+      MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
+    );
+    expect(find.text('Development projects'), findsOneWidget);
+    expect(find.text('475-485 Flinders Lane, Melbourne, 3000'), findsOneWidget);
+    expect(find.text('Approved'), findsOneWidget);
+    expect(_factRow('Floors above ground', '24'), findsOneWidget);
+    expect(_factRow('Dwellings', '0'), findsOneWidget);
+    expect(_factRow('Planning application', 'TP-2018-263/B'), findsOneWidget);
+    expect(_factRow('Location', 'Site given by the source'), findsOneWidget);
+    expect(find.textContaining('Development project X0003803'), findsNothing);
+    await _expandTechnical(tester);
+    expect(find.text('Project reference: X0003803'), findsOneWidget);
+  });
+
+  testWidgets('a Ticketmaster event shows venue, start and sale status', (
+    tester,
+  ) async {
+    final json = t016Item().toJson();
+    json['kind'] = 'event';
+    json['layerId'] = 'event';
+    json['lifecycle'] = 'planned';
+    json['assertionKind'] = 'plan';
+    json['title'] = 'Lexus Melbourne Cup Day - The Dress Circle';
+    json['details'] = {
+      'summary':
+          'Event information provided by Ticketmaster; Ticketmaster status: '
+          'onsale; local start: 2026-11-03 09:30:00 Australia/Melbourne; '
+          'venue: Flemington Racecourse',
+      'venueName': null,
+      'category': null,
+      'startAt': '2026-11-02T22:30:00Z',
+      'endAt': null,
+      'status': 'planned',
+    };
+    await _show(
+      tester,
+      MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
+    );
+    expect(find.text('Tickets on sale'), findsOneWidget);
+    expect(_factRow('Venue', 'Flemington Racecourse'), findsOneWidget);
+    expect(_factRow('Starts', 'Tue 3 Nov 2026, 09:30 AEDT'), findsOneWidget);
+    expect(find.textContaining('Ticketmaster status'), findsNothing);
+  });
+
+  testWidgets('a parking sensor leads with its state and keeps caveats', (
+    tester,
+  ) async {
+    final json = t016Item().toJson();
+    json['kind'] = 'parking';
+    json['layerId'] = 'parking';
+    json['title'] = 'Parking sensor 10317';
+    json['details'] = {
+      'sensorId': 'kerbside:10317',
+      'state': 'noData',
+      'noDataReason': 'notReporting',
+      'reading': 'stale',
+      'lastReportedAt': '2025-09-19T06:45:39Z',
+      'statusChangedAt': '2024-03-26T11:45:29Z',
+      'zoneNumber': null,
+      'legalParking': 'unknown',
+      'mayBeObstructed': true,
+    };
+    await _show(
+      tester,
+      MapDetails(state: _state(MapItem.fromJson(json)), onClose: () {}),
+    );
+    expect(find.text('No current reading'), findsOneWidget);
+    expect(find.textContaining('stopped reporting'), findsOneWidget);
+    expect(
+      _factRow('Sensor last reported', '19 Sept 2025, 16:45 AEST'),
+      findsOneWidget,
+    );
+    expect(find.text('Parking zone'), findsNothing);
+    expect(find.textContaining('does not mean you may park'), findsOneWidget);
+    expect(_factRow('Location', 'Sensor position'), findsOneWidget);
+    await _expandTechnical(tester);
+    expect(find.text('Sensor id: kerbside:10317'), findsOneWidget);
+  });
 }
