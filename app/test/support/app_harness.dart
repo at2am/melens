@@ -13,6 +13,7 @@ import 'package:melens/features/location/data/device_location.dart';
 import 'package:melens/features/location/state/user_location.dart';
 import 'package:melens/features/map/data/map_repository.dart';
 import 'package:melens/features/map/data/sample_map_repository.dart';
+import 'package:melens/features/map/state/layer_controller.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/ui/map_surface.dart';
 
@@ -20,6 +21,7 @@ import '../features/agent/fake_agent_client.dart';
 import '../features/events/fake_user_events_client.dart';
 import '../features/feed/fake_feeds_cache.dart';
 import '../features/feed/fake_feeds_client.dart';
+import '../features/map/fake_layer_memory.dart';
 
 /// 18 Oct 2026, 11:00 Melbourne time, a Sunday.
 final harnessNow = DateTime.utc(2026, 10, 18);
@@ -62,6 +64,7 @@ ProviderContainer appContainer({
   FakeUserEventsClient? events,
   FakeFeedsClient? feeds,
   FakeFeedsCache? feedsCache,
+  FakeLayerMemory? layerMemory,
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
   MapRepository? mapRepository,
@@ -82,6 +85,7 @@ ProviderContainer appContainer({
     ),
     feedsClientProvider.overrideWithValue(feeds ?? FakeFeedsClient()),
     feedsCacheProvider.overrideWithValue(feedsCache ?? FakeFeedsCache()),
+    layerMemoryProvider.overrideWithValue(layerMemory ?? FakeLayerMemory()),
     melbourneClockProvider.overrideWithValue(
       MelbourneClock(now: () => harnessNow),
     ),

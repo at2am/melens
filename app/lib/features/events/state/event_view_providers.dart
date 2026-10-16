@@ -1,19 +1,39 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../map/data/map_models.dart';
+import '../../map/state/layer_controller.dart';
 import 'user_events_providers.dart';
 
 part 'event_view_providers.g.dart';
 
 /// Whether user events are drawn on the map. They are not a layer of the map
 /// contract (v1 registers nine layers), so the app keeps this switch itself
-/// and the map shows it beside the contract layers.
+/// and the map shows it beside the contract layers. Remembered on this
+/// device with the other layers.
 @Riverpod(keepAlive: true)
 class CommunityLayerEnabled extends _$CommunityLayerEnabled {
-  @override
-  bool build() => true;
+  /// Set by the first change, so a late remembered value never replaces it.
+  bool _changed = false;
 
-  void set({required bool enabled}) => state = enabled;
+  @override
+  bool build() {
+    unawaited(_restore());
+    return true;
+  }
+
+  Future<void> _restore() async {
+    final saved = await ref.read(layerMemoryProvider).readCommunity();
+    if (saved == null || _changed || !ref.mounted) return;
+    state = saved;
+  }
+
+  void set({required bool enabled}) {
+    _changed = true;
+    state = enabled;
+    unawaited(ref.read(layerMemoryProvider).writeCommunity(enabled: enabled));
+  }
 }
 
 /// A request from another tab for the events panel on the map: open one

@@ -38,6 +38,7 @@ Every dataset reaches the user as a layer, and every other feature hangs off a l
 - First delivery draws pedestrian count circles with area proportional to same-window sensor passages. Missing observations remain unknown, and a measured zero remains zero. Later H3 coverage/anomaly views and the count-driven 3D pilot have separate delivery gates; neither blocks P0.
 - V1 registers pedestrian, anomaly, disruption, event, planning, boundary, news, rent and census. Registration does not imply published coverage or source admission. P0 display, source publication and full P0 product acceptance are separate gates in [the map plan](../../specs/002-map-data-presentation/plan.md).
 - The first topic views are City activity, Nearby news and Area comparison. Session toggles are preserved within each topic; only one area metric is filled at once. Persistent named views remain outside the first delivery.
+- Since 2026-10-16 the app and the Web app remember on the device the topic, each topic's enabled layers and the Community events switch (UC-09), and open the map on them at the next launch. A layer this build no longer offers is dropped. A change made before the remembered layers load wins. This is device-local, not per account.
 
 ## Open questions
 

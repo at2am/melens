@@ -4,6 +4,8 @@ import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/state/layer_controller.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 
+import '../fake_layer_memory.dart';
+
 void main() {
   test('each topic opens with its own typed default combination', () {
     final container = ProviderContainer.test();
@@ -210,5 +212,102 @@ void main() {
       container.read(layerControllerProvider).filledAreaMetric,
       MapLayerId.census,
     );
+  });
+
+  group('remembered layers', () {
+    ProviderContainer containerWith(FakeLayerMemory memory) =>
+        ProviderContainer.test(
+          overrides: [layerMemoryProvider.overrideWithValue(memory)],
+        );
+
+    test('the map opens on the layers this device last had on', () async {
+      final memory = FakeLayerMemory(
+        layers: (
+          topic: MapTopic.cityActivity,
+          layers: {
+            MapTopic.cityActivity: {MapLayerId.event, MapLayerId.parking},
+          },
+        ),
+      );
+      final container = containerWith(memory);
+      container.read(layerControllerProvider);
+      await container.pump();
+
+      final selection = container.read(layerControllerProvider);
+      expect(selection.enabledLayerIds, [MapLayerId.event, MapLayerId.parking]);
+      // Topics the memory does not mention keep their defaults.
+      expect(selection.layersForTopic(MapTopic.nearbyNews), {MapLayerId.news});
+      expect(memory.layerWrites, isEmpty);
+    });
+
+    test('every change is remembered, topic included', () async {
+      final memory = FakeLayerMemory();
+      final container = containerWith(memory);
+      final controller = container.read(layerControllerProvider.notifier);
+      await container.pump();
+
+      controller.setLayerEnabled(MapLayerId.anomaly, false);
+      controller.selectTopic(MapTopic.nearbyNews);
+      expect(memory.layerWrites, hasLength(2));
+      expect(memory.layers!.topic, MapTopic.nearbyNews);
+      expect(memory.layers!.layers[MapTopic.cityActivity], {
+        MapLayerId.pedestrian,
+        MapLayerId.disruption,
+      });
+
+      final relaunched = containerWith(memory);
+      relaunched.read(layerControllerProvider);
+      await relaunched.pump();
+      final selection = relaunched.read(layerControllerProvider);
+      expect(selection.topic, MapTopic.nearbyNews);
+      expect(selection.layersForTopic(MapTopic.cityActivity), {
+        MapLayerId.pedestrian,
+        MapLayerId.disruption,
+      });
+    });
+
+    test('a late memory never replaces a change already made', () async {
+      final memory = FakeLayerMemory(
+        layers: (
+          topic: MapTopic.cityActivity,
+          layers: {
+            MapTopic.cityActivity: {MapLayerId.boundary},
+          },
+        ),
+      );
+      final container = containerWith(memory);
+      container
+          .read(layerControllerProvider.notifier)
+          .setLayerEnabled(MapLayerId.event, true);
+      await container.pump();
+
+      expect(container.read(layerControllerProvider).enabledLayers, {
+        MapLayerId.pedestrian,
+        MapLayerId.anomaly,
+        MapLayerId.disruption,
+        MapLayerId.event,
+      });
+    });
+
+    test('remembered layers are trimmed to what each topic offers', () {
+      final selection = LayerSelectionState.restored((
+        topic: MapTopic.areaComparison,
+        layers: {
+          MapTopic.nearbyNews: {MapLayerId.news, MapLayerId.parking},
+          MapTopic.areaComparison: {MapLayerId.rent, MapLayerId.census},
+          MapTopic.context: {MapLayerId.boundary},
+        },
+      ));
+      expect(selection.topic, MapTopic.areaComparison);
+      expect(selection.enabledLayers, {MapLayerId.rent});
+      expect(selection.layersForTopic(MapTopic.nearbyNews), {MapLayerId.news});
+      expect(
+        LayerSelectionState.restored((
+          topic: MapTopic.context,
+          layers: const {},
+        )).topic,
+        MapTopic.cityActivity,
+      );
+    });
   });
 }

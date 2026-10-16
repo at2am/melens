@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../data/layer_memory.dart';
 import '../data/map_models.dart';
 
 part 'layer_controller.g.dart';
@@ -87,8 +90,29 @@ final class LayerSelectionState {
     },
   );
 
+  /// [saved] trimmed to what each topic offers, so a build that drops or
+  /// moves a layer still opens cleanly. Topics [saved] does not mention keep
+  /// their defaults.
+  factory LayerSelectionState.restored(RememberedLayers saved) {
+    final initial = LayerSelectionState.initial();
+    final sessions = {...initial._sessions};
+    for (final MapEntry(key: topic, value: layers) in saved.layers.entries) {
+      if (topic == MapTopic.context) continue;
+      final kept = layers.where(layerPresetFor(topic).layers.contains).toSet();
+      // Rent and census share the filled areas; only one can be on.
+      if (kept.contains(MapLayerId.rent)) kept.remove(MapLayerId.census);
+      sessions[topic] = kept;
+    }
+    return LayerSelectionState._(
+      topic: saved.topic == MapTopic.context ? initial.topic : saved.topic,
+      sessions: sessions,
+    );
+  }
+
   final MapTopic topic;
   final Map<MapTopic, Set<MapLayerId>> _sessions;
+
+  RememberedLayers get remembered => (topic: topic, layers: _sessions);
 
   List<MapLayerId> get availableLayers => layerPresetFor(topic).layers;
 
@@ -112,17 +136,42 @@ final class LayerSelectionState {
   bool isLayerEnabled(MapLayerId layer) => enabledLayers.contains(layer);
 }
 
-/// Keep topic adjustments for the application session, including panel closure.
+/// Saves the layers on this device (UC-01).
+/// Tests override this with an in-memory [LayerMemory].
+@Riverpod(keepAlive: true)
+LayerMemory layerMemory(Ref ref) => PreferencesLayerMemory();
+
+/// Keep topic adjustments across panel closure and, through [LayerMemory],
+/// across launches: the map opens on the layers the user last had on.
 /// This controller never reads data or activates a source.
 @Riverpod(keepAlive: true)
 class LayerController extends _$LayerController {
+  /// Set by the first change, so a remembered selection that arrives late
+  /// never replaces what the user or the agent has already chosen.
+  bool _changed = false;
+
   @override
-  LayerSelectionState build() => LayerSelectionState.initial();
+  LayerSelectionState build() {
+    unawaited(_restore());
+    return LayerSelectionState.initial();
+  }
+
+  Future<void> _restore() async {
+    final saved = await ref.read(layerMemoryProvider).readLayers();
+    if (saved == null || _changed || !ref.mounted) return;
+    state = LayerSelectionState.restored(saved);
+  }
+
+  void _commit(LayerSelectionState next) {
+    _changed = true;
+    state = next;
+    unawaited(ref.read(layerMemoryProvider).writeLayers(next.remembered));
+  }
 
   void selectTopic(MapTopic topic) {
     layerPresetFor(topic);
     if (topic == state.topic) return;
-    state = LayerSelectionState._(topic: topic, sessions: state._sessions);
+    _commit(LayerSelectionState._(topic: topic, sessions: state._sessions));
   }
 
   void toggleLayer(MapLayerId layer) =>
@@ -142,9 +191,11 @@ class LayerController extends _$LayerController {
     } else {
       next.remove(layer);
     }
-    state = LayerSelectionState._(
-      topic: state.topic,
-      sessions: {...state._sessions, state.topic: next},
+    _commit(
+      LayerSelectionState._(
+        topic: state.topic,
+        sessions: {...state._sessions, state.topic: next},
+      ),
     );
   }
 }

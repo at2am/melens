@@ -85,7 +85,7 @@ class FeedScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    IconButton.outlined(
+                    IconButton.filledTonal(
                       key: const ValueKey('feed-host-event'),
                       tooltip: strings.feedHostEvent,
                       onPressed: () {
