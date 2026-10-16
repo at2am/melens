@@ -251,23 +251,40 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
       cancellation: cancellation,
     );
     cancellation.throwIfCancelled();
-    return [
+    final items = [
       for (final layer in response.layers)
-        if (layer.layerId == query.layer)
-          for (final item in layer.items)
-            if (item is! AggregateMapItem)
-              _fromMapItem(
-                MapItemResponse(
-                  schemaVersion: response.schemaVersion,
-                  requestId: response.requestId,
-                  snapshotId: response.snapshotId,
-                  generatedAt: response.generatedAt,
-                  mode: response.mode,
-                  dataMode: response.dataMode,
-                  item: item,
-                ),
-                topic,
-              ),
+        if (layer.layerId == query.layer) ...layer.items,
+    ];
+    final areas = [
+      for (final item in items)
+        if (item case AggregateMapItem(:final details)
+            when details.representation == AggregateRepresentation.areaMentions)
+          item,
+    ];
+    return [
+      for (final item in items)
+        if (item is! AggregateMapItem)
+          _fromMapItem(
+            MapItemResponse(
+              schemaVersion: response.schemaVersion,
+              requestId: response.requestId,
+              snapshotId: response.snapshotId,
+              generatedAt: response.generatedAt,
+              mode: response.mode,
+              dataMode: response.dataMode,
+              item: item,
+            ),
+            topic,
+          ),
+      if (areas.isNotEmpty)
+        ...await _areaStories(
+          repository,
+          response.snapshotId,
+          areas,
+          topic,
+          requestId,
+          cancellation,
+        ),
     ];
   }
 
@@ -286,6 +303,67 @@ Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
   ]);
   cancellation.throwIfCancelled();
   return [for (final items in results) ...items];
+}
+
+/// How many named areas a feed reads the stories of.
+const _feedNewsAreas = 8;
+
+/// News reaches the map only as the areas its articles name (UC-06): no
+/// article has a place of its own, so the viewport holds no story to list.
+/// The feed reads the latest stories of the [_feedNewsAreas] areas that the
+/// most stories name, one request each. An area that fails is left out; the
+/// source fails only when every area does.
+Future<List<FeedItem>> _areaStories(
+  MapRepository repository,
+  String snapshotId,
+  List<AggregateMapItem> areas,
+  FeedTopic topic,
+  String requestId,
+  MapRequestCancellation cancellation,
+) async {
+  final busiest = [...areas]
+    ..sort(
+      (a, b) =>
+          (b.details.metric.value ?? 0).compareTo(a.details.metric.value ?? 0),
+    );
+  final pages = await Future.wait([
+    for (final (index, area) in busiest.take(_feedNewsAreas).indexed)
+      repository
+          .getAggregateMembers(
+            area.id,
+            AggregateMembersQuery(
+              requestId: '$requestId-area-$index',
+              snapshotId: snapshotId,
+            ),
+            cancellation: cancellation,
+          )
+          .then<Object>(
+            (page) => page,
+            onError: (Object error, StackTrace stack) => (error, stack),
+          ),
+  ]);
+  cancellation.throwIfCancelled();
+  final read = pages.whereType<MapItemPage>().toList();
+  if (read.isEmpty) {
+    final (error, stack) = pages.first as (Object, StackTrace);
+    Error.throwWithStackTrace(error, stack);
+  }
+  return [
+    for (final page in read)
+      for (final item in page.items)
+        _fromMapItem(
+          MapItemResponse(
+            schemaVersion: page.schemaVersion,
+            requestId: page.requestId,
+            snapshotId: page.snapshotId,
+            generatedAt: page.generatedAt,
+            mode: page.mode,
+            dataMode: page.dataMode,
+            item: item,
+          ),
+          topic,
+        ),
+  ];
 }
 
 /// The layer's records with no location retain their own list snapshot.

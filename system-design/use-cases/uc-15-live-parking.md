@@ -22,7 +22,7 @@ The map shows, for the area the user searches or looks at, which on-street bays 
 ## Behaviour
 
 1. The user searches for a place or pans the map there, and turns on the Parking sensors layer, or asks the assistant ("is there parking near Melbourne Central?").
-2. The map service reads only the sensors inside that viewport from `melens_query.v_parking_sensor_current`. The assistant searches with `search_features` and `layers: ["parking"]` over a small radius, then shows the result on the map.
+2. The map reads parking only from camera zoom 16 in (`parkingMinZoom` in `app/lib/features/map/state/viewport_controller.dart`); further out the layer stays on but is left out of the request, and the map says "Zoom in to see parking." The map service reads only the sensors inside that viewport from `melens_query.v_parking_sensor_current`. The assistant searches with `search_features` and `layers: ["parking"]` over a small radius, then shows the result on the map.
 3. Close up (zoom 17 and above) each sensor is its bay, drawn to scale and centred on the sensor: green for vacant, red for occupied, grey for no data. Further out, sensors cluster, and the cluster counts the vacant ones. Tapping a bay opens its details: the reading, when the sensor last reported and when the status last changed, the parking zone when the source gives one, and two fixed notes: a vacant sensor does not mean parking there is allowed now, and works can block a bay that still reads vacant.
 
 ## Example queries
@@ -38,11 +38,14 @@ The map shows, for the area the user searches or looks at, which on-street bays 
 - [x] Readings are not shown on public holidays (the sensors do not operate) or when the holiday calendar is unknown.
 - [x] Every parking item has `legalParking: unknown`, and the details and the assistant say that a vacant sensor is not permission to park.
 - [x] Close up each bay is drawn on its own; further out sensors cluster with a vacant count.
+- [x] Zoomed out wider than zoom 16 the map sends no parking request and asks the user to zoom in.
 - [ ] The live map in the deployed app shows parking around a searched place (needs the data job image and map/agent deployments from this change).
 
 ## Notes
 
 **Design rules. Do not revert these without the project owner's agreement.**
+
+- **No parking read for a wide view.** Asked for by the project owner on 2026-10-16 (zoom 16 is a first value, not yet tuned on devices): the map leaves parking out of the viewport request below zoom 16. Measured on live data on 2026-10-16, a parking read returned 370 to 470 KB at every zoom, even a metro-wide view that was one cluster, and the map service loads the layers of one request one after another, so a wide parking read held up every other layer and could miss the 30 s request deadline.
 
 - **Collect the whole city, read by area.** The ingest job keeps collecting every sensor every 2 minutes and stores it in the Melens structure in BigQuery; the app and the agent read only the area they need through the published views. They never call the City of Melbourne API directly, and Flutter never reads BigQuery.
 - **The map reads only the latest snapshot.** `melens_ingest.parking_sensor_current` holds one row per sensor and is replaced in one transaction after each published batch (`cloud/data/src/core/parking-sensor-current.ts`). `v_parking_sensor_current` reads only that table. An earlier version read the append-only history (`parking_sensor_memberships`, `source_records`, `geo_records`) and scanned 165 MB per read, so its cost grew with every retained snapshot. `cloud/data/test/integration/parking-sensor-current-view.test.ts` fails if the view reads a history table again.

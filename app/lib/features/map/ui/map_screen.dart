@@ -1455,7 +1455,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         Text(strings.mapScreenWaitingArea)
       else if (!_usesVisibleRegion)
         Text(strings.mapScreenServiceArea),
-      if (state.blockedLayers.isNotEmpty) Text(strings.mapScreenFilterRequired),
+      if (state.filterBlockedLayers.isNotEmpty)
+        Text(strings.mapScreenFilterRequired),
+      if (state.parkingNeedsZoom)
+        Text(
+          strings.mapParkingZoomIn,
+          key: const ValueKey('map-parking-zoom-in'),
+        ),
       if (_regionReadFailed) ...[
         Text(strings.mapScreenRegionError),
         TextButton(

@@ -7,6 +7,7 @@ import 'package:melens/features/feed/data/melbourne_areas.dart';
 import 'package:melens/features/feed/state/feed_providers.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
+import 'package:melens/features/map/data/sample_map_repository.dart';
 
 import '../../support/app_harness.dart';
 import '../map/t017_test_support.dart';
@@ -201,6 +202,63 @@ void main() {
     expect(container.read(feedProvider).requireValue.loadingSources, isEmpty);
   });
 
+  testWidgets('news lists the latest stories of the busiest named areas', (
+    tester,
+  ) async {
+    // Nine named areas; the feed reads the eight with the most stories, and
+    // one of those fails without failing the source.
+    final repository = _NewsRepository(
+      storyCounts: [3, 40, 1, 12, 7, 9, 2, 5, 4],
+      failingArea: 'area.4',
+    );
+    final container = appContainer(
+      mapRepository: repository,
+      feeds: FakeFeedsClient([
+        _feed(topics: {FeedTopic.news}, scope: const CityFeedScope()),
+      ]),
+    );
+    container.listen(feedProvider, (previous, next) {});
+    await _flush(tester);
+    await tester.pump(const Duration(milliseconds: 250));
+    await _flush(tester);
+    await _flush(tester);
+
+    expect(repository.viewportLayers.single, [MapLayerId.news]);
+    expect(repository.memberReads, hasLength(8));
+    expect(repository.memberReads.first, 'area.1');
+    expect(repository.memberReads, isNot(contains('area.2')));
+    final feed = container.read(feedProvider).requireValue;
+    expect(feed.failedSources, isEmpty);
+    expect(feed.loadingSources, isEmpty);
+    // A story two areas name shows once.
+    expect(feed.items.map((item) => item.id).toSet(), {
+      'story.shared',
+      for (final area in repository.memberReads)
+        if (area != 'area.4') 'story.$area',
+    });
+    expect(feed.items.every((item) => item.topic == FeedTopic.news), isTrue);
+    expect(feed.items.first.mapRecord!.snapshotId, 'members-snapshot');
+  });
+
+  testWidgets('news fails only when no named area can be read', (tester) async {
+    final repository = _NewsRepository(storyCounts: [2], failingArea: 'area.0');
+    final container = appContainer(
+      mapRepository: repository,
+      feeds: FakeFeedsClient([
+        _feed(topics: {FeedTopic.news}, scope: const CityFeedScope()),
+      ]),
+    );
+    container.listen(feedProvider, (previous, next) {});
+    await _flush(tester);
+    await tester.pump(const Duration(milliseconds: 250));
+    await _flush(tester);
+    await _flush(tester);
+
+    expect(container.read(feedProvider).requireValue.failedSources, {
+      (feedId: 'test-feed', topic: FeedTopic.news),
+    });
+  });
+
   for (final mode in MapDataMode.values) {
     testWidgets(
       'map items retain the ${mode.name} source mode and snapshot after feed attribution',
@@ -251,6 +309,128 @@ ViewportResponse _eventResponse(ViewportQuery query, MapDataMode mode) {
   layer['items'] = [event];
   return ViewportResponse.fromJson(json);
 }
+
+/// The map service's news layer: only the areas articles name, as
+/// aggregates whose members are the stories.
+final class _NewsRepository implements MapRepository {
+  _NewsRepository({required this.storyCounts, this.failingArea});
+
+  /// Stories naming `area.<index>`.
+  final List<int> storyCounts;
+  final String? failingArea;
+  final viewportLayers = <List<MapLayerId>>[];
+  final memberReads = <String>[];
+  final _samples = const SampleMapRepository();
+
+  @override
+  Future<MapLayerCatalog> getLayers({MapRequestCancellation? cancellation}) =>
+      _samples.getLayers(cancellation: cancellation);
+
+  @override
+  Future<ViewportResponse> queryViewport(
+    ViewportQuery query, {
+    MapRequestCancellation? cancellation,
+  }) async {
+    viewportLayers.add(query.layers);
+    final json = t017Response(query).toJson();
+    final layer =
+        (json['layers'] as List<dynamic>).single as Map<String, dynamic>;
+    layer['state'] = 'available';
+    layer['items'] = [
+      for (final (index, count) in storyCounts.indexed)
+        _areaJson('area.$index', count.toDouble()),
+    ];
+    return ViewportResponse.fromJson(json);
+  }
+
+  @override
+  Future<MapItemPage> getAggregateMembers(
+    String id,
+    AggregateMembersQuery query, {
+    MapRequestCancellation? cancellation,
+  }) async {
+    memberReads.add(id);
+    if (id == failingArea) throw const MapNetworkException();
+    final json = t017Fixture('members');
+    json['requestId'] = query.requestId;
+    json['snapshotId'] = 'members-snapshot';
+    json['items'] = [_storyJson('story.$id'), _storyJson('story.shared')];
+    json['totalMatching'] = 2;
+    json['scope'] = {
+      ...json['scope'] as Map<String, dynamic>,
+      'aggregateId': id,
+      'window': null,
+      'unit': 'stories',
+    };
+    return MapItemPage.fromJson(json);
+  }
+
+  @override
+  Future<MapItemResponse> getItem(
+    String id,
+    MapReadContext context, {
+    MapRequestCancellation? cancellation,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<MapItemPage> getUnlocated(
+    UnlocatedQuery query, {
+    MapRequestCancellation? cancellation,
+  }) => throw UnimplementedError();
+}
+
+Map<String, dynamic> _itemVariant(String id) =>
+    (jsonDecode(
+      File(
+        '../specs/002-map-data-presentation/contracts/examples/item-variants.sample.json',
+      ).readAsStringSync(),
+    ) as List<dynamic>).cast<Map<String, dynamic>>().singleWhere(
+      (item) => item['id'] == id,
+    );
+
+Map<String, dynamic> _areaJson(String id, double stories) {
+  final json = _itemVariant('sample.aggregate');
+  final details = json['details'] as Map<String, dynamic>;
+  return {
+    ...json,
+    'id': id,
+    'layerId': 'news',
+    'title': '$id: news',
+    'geometry': {
+      'type': 'Polygon',
+      'coordinates': [
+        [
+          [144.96, -37.82],
+          [144.97, -37.82],
+          [144.97, -37.81],
+          [144.96, -37.82],
+        ],
+      ],
+    },
+    'location': {
+      'precision': 'area',
+      'role': 'areaAssociation',
+      'evidence': 'Official boundary of an area these articles name.',
+    },
+    'details': {
+      ...details,
+      'representation': 'areaMentions',
+      'memberIds': ['story.$id'],
+      'window': null,
+      'metric': {
+        ...details['metric'] as Map<String, dynamic>,
+        'unit': 'stories',
+        'value': stories,
+      },
+    },
+  };
+}
+
+Map<String, dynamic> _storyJson(String id) => {
+  ..._itemVariant('sample.news'),
+  'id': id,
+  'title': id,
+};
 
 Future<void> _flush(WidgetTester tester) async {
   await tester.pump(Duration.zero);
