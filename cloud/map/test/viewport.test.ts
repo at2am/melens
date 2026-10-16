@@ -300,3 +300,17 @@ test('runner row bound across a single viewport never turns omitted lookahead in
   assert.equal(result.layers[0]!.completeness, 'partial'); assert.equal(result.layers[0]!.totalMatching, null);
   assert.equal(result.layers[0]!.nextCursor, null);
 });
+
+test('the health probe reports warming until the instance is ready, so Cloud Run holds traffic off it', async () => {
+  let ready = false;
+  const server = createMapHttpServer({ service: fixture().service, allowedOrigins: [], isReady: () => ready });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/healthz`;
+  try {
+    const warming = await fetch(url);
+    assert.equal(warming.status, 503); assert.equal((await warming.json() as { status: string }).status, 'warming');
+    ready = true;
+    const live = await fetch(url);
+    assert.equal(live.status, 200); assert.equal((await live.json() as { status: string }).status, 'ok');
+  } finally { await new Promise<void>((resolve) => server.close(() => resolve())); server.closeAllConnections(); }
+});

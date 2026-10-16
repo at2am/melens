@@ -138,6 +138,8 @@ function writeError(response: ServerResponse, code: MapServiceErrorCode, request
 export function createMapHttpServer(options: {
   readonly service: MapService; readonly allowedOrigins: readonly string[];
   readonly maxConcurrentRequests?: number; readonly requestTimeoutMs?: number;
+  /** `/healthz` answers 503 until this is true, so Cloud Run's startup probe holds traffic off a cold instance. */
+  readonly isReady?: () => boolean;
 }) {
   const origins = new Set(options.allowedOrigins.map((origin) => {
     const parsed = new URL(origin);
@@ -177,8 +179,9 @@ export function createMapHttpServer(options: {
       if (route === null) throw new MapServiceError('notFound');
       if (route.kind === 'health') {
         if (request.method !== 'GET' || url.search !== '') throw new MapServiceError('invalidRequest');
-        response.writeHead(200);
-        response.end(JSON.stringify({ service: 'melens-map', status: 'ok' }));
+        const ready = options.isReady?.() ?? true;
+        response.writeHead(ready ? 200 : 503);
+        response.end(JSON.stringify({ service: 'melens-map', status: ready ? 'ok' : 'warming' }));
         return;
       }
       if (request.method === 'OPTIONS') { preflight(request, response, route, origin); return; }
@@ -231,13 +234,18 @@ async function loadPublicSources(path: string) {
   return sources;
 }
 
+/** The longest a new instance keeps its startup probe failing while it loads the cached layers. */
+const WARM_UP_LIMIT_MS = 25_000;
+
 /** Production entry point; imported test/service modules never start a listener. */
 export async function startMapServer(env: Readonly<Record<string, string | undefined>> = process.env) {
   const port = z.coerce.number().int().min(0).max(65_535).parse(env.PORT ?? '8080');
   const allowedOrigins = (env.MAP_ALLOWED_ORIGINS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
   const publicSources = env.MAP_PUBLIC_SOURCES_FILE === undefined ? [] : await loadPublicSources(env.MAP_PUBLIC_SOURCES_FILE);
   const service = createMapService({ config: loadMapConfig(env), publicSources, prewarmNewsAreas: true });
-  const server = createMapHttpServer({ service, allowedOrigins });
+  // Ready once the cached layers have loaded, or after WARM_UP_LIMIT_MS so a slow load never keeps it out of service.
+  let ready = false;
+  const server = createMapHttpServer({ service, allowedOrigins, isReady: () => ready });
   server.on('error', () => {
     process.stderr.write(`${JSON.stringify({ severity: 'ERROR', event: 'mapServerFailed' })}\n`);
     process.exitCode = 1;
@@ -247,8 +255,13 @@ export async function startMapServer(env: Readonly<Record<string, string | undef
   process.once('SIGTERM', close);
   server.listen(port, '0.0.0.0', () => {
     // Startup has CPU; the cached layers and the first news copy load before the first request.
+    const started = Date.now();
     service.warmNewsAreas();
-    service.warmLayers();
+    void Promise.race([service.warmLayers(),
+      new Promise<void>((resolve) => { setTimeout(resolve, WARM_UP_LIMIT_MS).unref(); })]).then(() => {
+      ready = true;
+      process.stdout.write(`${JSON.stringify({ severity: 'INFO', event: 'mapServerReady', warmUpMs: Date.now() - started })}\n`);
+    });
     const address = server.address();
     if (address !== null && typeof address !== 'string') {
       process.stdout.write(`${JSON.stringify({ severity: 'INFO', event: 'mapServerListening', port: address.port })}\n`);

@@ -112,8 +112,8 @@ export function createMapService(options: {
         coverage: { state: 'unknown', areaRefs: [], window: null, evidenceSourceIds: [] } } : layer) }, { production: true });
   }
 
-  /** Loads every cached layer once, so a new instance answers its first requests from memory. */
-  const warmLayers = () => {
+  /** Loads every cached layer once, so a new instance answers its first requests from memory. Never rejects. */
+  const warmLayers = (): Promise<void> => {
     const end = new Date(clock().getTime());
     end.setUTCSeconds(0, 0);
     const iso = (date: Date) => date.toISOString().replace('.000Z', 'Z');
@@ -121,8 +121,8 @@ export function createMapService(options: {
     try {
       request = parseViewportQuery({ requestId: 'layer-warm', bbox: SERVICE_BBOX, zoom: 10, layers: [...CACHED_LAYERS],
         mode: 'current', window: { from: iso(new Date(end.getTime() - 15 * 60_000)), to: iso(end) } });
-    } catch { return; }
-    viewport.loadLayers(request, request.layers).catch(() => {});
+    } catch { return Promise.resolve(); }
+    return viewport.loadLayers(request, request.layers).then(() => {}, () => {});
   };
 
   const warmed = <A extends unknown[], R>(read: (...args: A) => R) => (...args: A): R => { warmNewsAreas(); return read(...args); };
