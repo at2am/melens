@@ -2,7 +2,7 @@
 id: UC-05
 title: Tram and traffic disruption
 priority: P0
-status: planned
+status: in-progress
 proposed_by: unassigned
 trigger: browse
 agents: []
@@ -29,16 +29,18 @@ Translated from the original Chinese in the Notion table:
 
 ## Acceptance criteria (Draft)
 
-- [ ] Road disruptions appear as red line segments on the affected roads.
+- [x] Road disruptions appear as red line segments on the affected roads (live in dev since 2026-10-16).
 - [ ] Tram and train disruptions appear on the affected routes or stops.
 - [ ] Tapping a disruption shows what happened, what is affected and the time window if known, with a source.
-- [ ] Polling stays within 24 calls per 60 seconds per transport mode.
+- [x] Polling stays within 24 calls per 60 seconds per transport mode (the shared key's limit is 20; schedules peak near 16).
 - [ ] Disruptions are available to `map_agent` and `analyse_anomaly` through `nearby_context`.
 
 ## Notes
 
 - Service Alerts cover trams and trains only; buses are not covered.
-- Needs the Transport Victoria key. Until it arrives, build against recorded sample responses.
+- The Transport Victoria key is in Secret Manager (`transport_victoria_key_id`, version 1) and works.
+- 2026-10-16: planned and unplanned road disruptions are admitted (CC BY 4.0), scheduled and registered with the map. Unplanned roads run every 10 minutes, not every minute, because each road publication rebuilds the source's rows in `geo_records_current` (about 0.5 GB billed). Planned roads run at :07 and :37, about 10,400 events statewide on 21 pages.
+- Tram and train alerts are not enabled. The official GTFS archive has no `feed_info`, so `gtfs-alerts.ts` cannot match an alert to a static feed version and leaves every alert unlocated; route alerts also need line shapes.
 
 ## Open questions
 
