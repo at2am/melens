@@ -8,6 +8,8 @@ import { InMemoryUserEventStore } from '../src/events/store.js';
 import { FEED_LIMITS, type FeedSubscription } from '../src/feeds/schemas.js';
 import { FeedService } from '../src/feeds/service.js';
 import { InMemoryFeedStore } from '../src/feeds/store.js';
+import { PlanService } from '../src/plans/service.js';
+import { InMemoryPlanStore } from '../src/plans/store.js';
 import { AgentServiceError, zeroUsage } from '../src/protocol/schemas.js';
 import { createRateLimiter } from '../src/rate-limit.js';
 import { createAgentHttpServer, type TurnRunner } from '../src/server.js';
@@ -32,7 +34,9 @@ async function start(options: { writesPerHour?: number } = {}) {
   const events = new UserEventService({ store: new InMemoryUserEventStore(), writeLimiter: createRateLimiter(100) });
   const store = new InMemoryFeedStore();
   const feeds = new FeedService({ store, writeLimiter: createRateLimiter(options.writesPerHour ?? 100), clock: () => NOW });
-  const server = createAgentHttpServer({ store: new InMemorySessionStore(), runner, events, feeds,
+  const sessions = new InMemorySessionStore();
+  const plans = new PlanService({ store: new InMemoryPlanStore(), sessions, writeLimiter: createRateLimiter(100) });
+  const server = createAgentHttpServer({ store: sessions, runner, events, feeds, plans,
     verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }), rateLimiter: createRateLimiter(100), allowedOrigins: [ORIGIN], turnTimeoutMs: 5_000 });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

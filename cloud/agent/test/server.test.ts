@@ -7,6 +7,8 @@ import { UserEventService } from '../src/events/service.js';
 import { InMemoryUserEventStore } from '../src/events/store.js';
 import { FeedService } from '../src/feeds/service.js';
 import { InMemoryFeedStore } from '../src/feeds/store.js';
+import { PlanService } from '../src/plans/service.js';
+import { InMemoryPlanStore } from '../src/plans/store.js';
 import { attachmentRefOf } from '../src/protocol/attachments.js';
 import { type AgentEvent, type StoredTurn, zeroUsage } from '../src/protocol/schemas.js';
 import { createRateLimiter } from '../src/rate-limit.js';
@@ -37,7 +39,8 @@ async function start(runner: TurnRunner, options: { turnsPerHour?: number; turnT
   const store = new InMemorySessionStore();
   const events = new UserEventService({ store: new InMemoryUserEventStore(), writeLimiter: createRateLimiter(100) });
   const feeds = new FeedService({ store: new InMemoryFeedStore(), writeLimiter: createRateLimiter(100) });
-  const server = createAgentHttpServer({ store, runner, events, feeds, verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }),
+  const plans = new PlanService({ store: new InMemoryPlanStore(), sessions: store, writeLimiter: createRateLimiter(100) });
+  const server = createAgentHttpServer({ store, runner, events, feeds, plans, verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }),
     rateLimiter: createRateLimiter(options.turnsPerHour ?? 100), allowedOrigins: [ORIGIN], turnTimeoutMs: options.turnTimeoutMs ?? 5_000,
     supersedeWaitMs: options.supersedeWaitMs ?? 2_000 });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

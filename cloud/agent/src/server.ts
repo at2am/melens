@@ -4,8 +4,10 @@ import type { IdTokenVerifier } from './auth/verifier.js';
 import type { UserEventService } from './events/service.js';
 import type { FeedService } from './feeds/service.js';
 import { decodeImages, type TurnImage } from './protocol/attachments.js';
+import type { PlanService } from './plans/service.js';
+import { turnIdOfCard } from './plans/schemas.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
-  type AgentErrorCode, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
+  type AgentErrorCode, type Card, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
 import { openSseStream, type EventSink } from './protocol/sse.js';
 import type { RateLimiter } from './rate-limit.js';
 import { SESSION_LIMITS, newId, summaryOf, type SessionRecord, type SessionStore } from './sessions/store.js';
@@ -28,6 +30,8 @@ export interface TurnContext {
   readonly history: readonly StoredTurn[];
   /** The photos of the last `SESSION_LIMITS.promptImageTurns` history turns, by attachment id. */
   readonly historyImages: ReadonlyMap<string, TurnImage>;
+  /** For a `refine` input, the plan card being changed, as stored. */
+  readonly refineCard?: Card;
   readonly sink: EventSink;
   readonly signal: AbortSignal;
   readonly startedAt: Date;
@@ -52,7 +56,9 @@ type Route =
   | { readonly kind: 'eventJoin'; readonly method: 'POST' | 'DELETE'; readonly eventId: string }
   | { readonly kind: 'eventMembers'; readonly eventId: string }
   | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string }
-  | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' };
+  | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' }
+  | { readonly kind: 'plans'; readonly method: 'GET' | 'POST' }
+  | { readonly kind: 'plan'; readonly planId: string };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -81,6 +87,9 @@ function matchRoute(method: string, pathname: string): Route | null {
   if (pathname === '/healthz' && method === 'GET') return { kind: 'health' };
   if (pathname.startsWith('/v1/events')) return matchEventRoute(method, pathname);
   if (pathname === '/v1/feeds' && (method === 'GET' || method === 'PUT')) return { kind: 'feeds', method };
+  if (pathname === '/v1/plans' && (method === 'GET' || method === 'POST')) return { kind: 'plans', method };
+  const plan = /^\/v1\/plans\/([^/]+)$/.exec(pathname);
+  if (plan !== null && ID.test(plan[1]!) && method === 'DELETE') return { kind: 'plan', planId: plan[1]! };
   if (pathname === '/v1/sessions' && (method === 'GET' || method === 'POST')) return { kind: 'sessions', method };
   const session = /^\/v1\/sessions\/([^/]+)$/.exec(pathname);
   if (session !== null && ID.test(session[1]!) && (method === 'GET' || method === 'DELETE')) {
@@ -157,6 +166,8 @@ export interface AgentServerOptions {
   readonly events: UserEventService;
   /** Feed subscriptions (UC-14), with their own write limit. */
   readonly feeds: FeedService;
+  /** Saved plans (UC-03), with their own write limit. */
+  readonly plans: PlanService;
   /** Exact origins the Web app is served from; the agent additionally allows the Authorization header. */
   readonly allowedOrigins: readonly string[];
   readonly turnTimeoutMs: number;
@@ -230,12 +241,23 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     return new Map(images.filter((image) => image !== null).map((image) => [image.id, image]));
   }
 
+  /** The plan card a `refine` turn changes, read from the session's stored turn, never from the request. */
+  async function storedPlanCard(uid: string, sessionId: string, cardId: string): Promise<Card> {
+    const turnId = turnIdOfCard(cardId);
+    const turn = turnId === null ? null : await options.store.getTurn(uid, sessionId, turnId);
+    const card = turn?.cards.find((candidate) => candidate.id === cardId);
+    if (card === undefined) throw new AgentServiceError('notFound');
+    if (card.type !== 'plan') throw new AgentServiceError('invalidRequest', 'not_a_plan');
+    return card;
+  }
+
   async function runTurn(uid: string, sessionId: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = await readJsonBody(request);
     const parsed = turnRequestSchema.safeParse(body);
     if (!parsed.success) throw new AgentServiceError('invalidRequest');
     const images = decodeImages(parsed.data.attachments ?? [], ATTACHMENT_LIMITS.bytes);
     if (!options.rateLimiter.allow(uid, clock())) throw new AgentServiceError('rateLimited');
+    const refineCard = parsed.data.input.kind === 'refine' ? await storedPlanCard(uid, sessionId, parsed.data.input.cardId) : undefined;
 
     // The client leaving, the stop button, a newer message or the Cloud Run deadline cancels the run, so it
     // stops spending tokens. The client may already leave while this request waits for an interrupted turn.
@@ -280,7 +302,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     const sink = openSseStream(response, turnId);
     try {
       const turn = await options.runner.run({ uid, session, turnId, seq: session.turnCount + 1, request: parsed.data, images,
-        history, historyImages, sink, signal: controller.signal, startedAt });
+        history, historyImages, sink, signal: controller.signal, startedAt, ...(refineCard === undefined ? {} : { refineCard }) });
       await options.store.completeTurn(uid, sessionId, turn, clock(), images);
     } catch (error) {
       if (!sink.sent.some((event) => event.event === 'done' || event.event === 'error')) {
@@ -392,6 +414,15 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           else writeJson(response, 200, { feeds: await options.feeds.list(uid) });
           return;
         }
+        case 'plans': {
+          if (route.method === 'POST') writeJson(response, 201, { plan: await options.plans.save(uid, await readJsonBody(request)) });
+          else writeJson(response, 200, { plans: await options.plans.list(uid) });
+          return;
+        }
+        case 'plan':
+          await options.plans.remove(uid, route.planId);
+          writeNoContent(response);
+          return;
       }
     } catch (error) {
       const { code, reason } = errorOf(error);
