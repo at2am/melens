@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../data/map_models.dart';
 import '../map_layer_style.dart';
 import 'marker_icons.dart';
+import 'parking_bays.dart';
 
 /// Fixed ground area per sensor passage; never renormalized to the viewport.
 /// This is a display scale, not the sensor's catchment or a population density.
@@ -161,10 +162,7 @@ CoreRenderPlan buildGeometryRenderPlan({
   );
 }
 
-/// Ground radius of a parking bay dot; about one bay width, so neighbours stay apart.
-const double parkingBayDotRadiusMeters = 4;
-
-/// The colour of a parking sensor dot. A sensor with no current reading is
+/// The colour of a parking bay. A sensor with no current reading is
 /// neutral, never the vacant colour; the details panel always says why.
 Color parkingStateColor(ParkingState state, ColorScheme colors) =>
     switch (state) {
@@ -188,39 +186,42 @@ CoreRenderPlan buildCoreRenderPlan({
 }) {
   final pins = icons ?? MapMarkerIcons.fallback;
   var plan = const CoreRenderPlan.empty();
+  // Hundreds of bays fit a street view, so each sensor is its bay drawn to
+  // scale and coloured by its own reading rather than a pin. Bays are laid out
+  // together because each one's kerb direction comes from its neighbours.
+  final bays = [
+    for (final item in items)
+      if (item case ParkingMapItem(
+        geometry: GeoJsonPoint(:final coordinates),
+      ) when isDrawableMapItem(item))
+        (item: item, center: _position(coordinates)),
+  ];
+  final outlines = parkingBayOutlines([for (final bay in bays) bay.center]);
+  final bayPolygons = <Polygon>{};
+  for (final (index, (:item, center: _)) in bays.indexed) {
+    final selected = item.id == selectedItemId;
+    final fill = parkingStateColor(item.details.state, colors);
+    bayPolygons.add(
+      Polygon(
+        polygonId: PolygonId('${item.id}:bay'),
+        points: outlines[index],
+        fillColor: fill,
+        // No outline, so the line's gap between neighbouring bays stays
+        // clear; the selected bay keeps its size and gains one.
+        strokeColor: selected ? colors.secondary : fill,
+        strokeWidth: selected ? 3 : 0,
+        consumeTapEvents: onSelected != null,
+        onTap: onSelected == null ? null : () => onSelected(item),
+        zIndex: selected ? 2 : 1,
+      ),
+    );
+  }
   for (final item in items) {
     if (item is AggregateMapItem || !isDrawableMapItem(item)) continue;
+    if (item is ParkingMapItem && item.geometry is GeoJsonPoint) continue;
     final selected = item.id == selectedItemId;
     final color = selected ? colors.secondary : layerStyle(item.layerId).color;
     final onTap = onSelected == null ? null : () => onSelected(item);
-    // Hundreds of bays fit a street view, so each sensor is a small dot coloured
-    // by its own reading rather than a pin.
-    if (item case ParkingMapItem(
-      geometry: GeoJsonPoint(:final coordinates),
-      :final details,
-    )) {
-      final fill = parkingStateColor(details.state, colors);
-      plan = plan.merge(
-        CoreRenderPlan(
-          circles: {
-            Circle(
-              circleId: CircleId('${item.id}:bay'),
-              center: _position(coordinates),
-              radius: selected
-                  ? parkingBayDotRadiusMeters * 1.5
-                  : parkingBayDotRadiusMeters,
-              fillColor: fill,
-              strokeColor: selected ? colors.secondary : fill,
-              strokeWidth: selected ? 3 : 1,
-              consumeTapEvents: onTap != null,
-              onTap: onTap,
-              zIndex: selected ? 2 : 1,
-            ),
-          },
-        ),
-      );
-      continue;
-    }
     plan = plan.merge(
       buildGeometryRenderPlan(
         id: item.id,
@@ -258,5 +259,5 @@ CoreRenderPlan buildCoreRenderPlan({
       );
     }
   }
-  return plan;
+  return plan.merge(CoreRenderPlan(polygons: bayPolygons));
 }

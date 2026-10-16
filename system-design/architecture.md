@@ -63,7 +63,7 @@ Typed MapItem values contain stable id/version/layer, GeoJSON geometry or null, 
 
 V1 registers ten layers: pedestrian, anomaly, disruption, event, planning, boundary, news, rent, census and parking (live bay sensors, UC-15, added 2026-10-15). Registration does not imply available data. No unlocated fact gets a guessed point; no sparse sensors become claimed full-city population density.
 
-Each layer has one glyph and one colour, defined only in `app/lib/features/map/ui/map_layer_style.dart`: its point pins, its lines and areas, its layer chip and its legend entry all use them (anomaly is the "?" pin, disruption is red, community events are violet). Parking stays as small dots coloured by bay state, and aggregates stay as count badges. Colours are fixed rather than themed so a layer looks the same in light and dark mode; the selected object switches to the theme accent. Add a style there when adding a layer.
+Each layer has one glyph and one colour, defined only in `app/lib/features/map/ui/map_layer_style.dart`: its point pins, its lines and areas, its layer chip and its legend entry all use them (anomaly is the "?" pin, disruption is red, community events are violet). Parking is drawn as each sensor's bay to scale (see UC-15), coloured by bay state, and aggregates stay as count badges. Colours are fixed rather than themed so a layer looks the same in light and dark mode; the selected object switches to the theme accent. Add a style there when adding a layer.
 
 Agent tools and cards use the same identity: a `featureId` in [tools.md](tools.md) is a MapItem `id`, so the app can match cards and UI actions to items it loaded from the map service.
 
