@@ -9,6 +9,7 @@ service=melens-dev-map
 identity=melens-dev-query@melens-510012.iam.gserviceaccount.com
 image=''
 dynamic_scan_bytes=100000000
+min_instances=1
 apply=false
 verify=false
 confirm_project=''
@@ -23,6 +24,7 @@ Usage: deploy.sh --image IMAGE@sha256:DIGEST --allowed-origin ORIGIN [options]
   --project melens-510012          Development project only
   --allowed-origin ORIGIN         Repeat for each reviewed exact origin
   --dynamic-scan-bytes BYTES       100000000 default; 400000000 or 1000000000 reviewed dev ceilings
+  --min-instances 0|1              1 default, so the map and feed avoid cold starts and keep the layer cache warm; 0 to idle for free
   --verify                        Read-only cloud identity/publication audit
   --apply --confirm-project ID     Verify, deploy and read back; public map service
 No project/dataset/bucket/secret IAM grants, API enabling or Firebase setup.
@@ -31,13 +33,14 @@ EOF
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 while (($#)); do
   case "$1" in
-    --project|--image|--allowed-origin|--dynamic-scan-bytes|--confirm-project)
+    --project|--image|--allowed-origin|--dynamic-scan-bytes|--min-instances|--confirm-project)
       (($# >= 2)) || fail "Missing value for $1"
       case "$1" in
         --project) project=$2 ;;
         --image) image=$2 ;;
         --allowed-origin) origins+=("$2") ;;
         --dynamic-scan-bytes) dynamic_scan_bytes=$2 ;;
+        --min-instances) min_instances=$2 ;;
         --confirm-project) confirm_project=$2 ;;
       esac
       shift 2 ;;
@@ -52,6 +55,7 @@ done
 # as more topics share the view. Partitioning that view is the lasting fix; see infra/README.md.
 [[ $dynamic_scan_bytes == 100000000 || $dynamic_scan_bytes == 400000000 || $dynamic_scan_bytes == 1000000000 ]] \
   || fail 'Unreviewed dynamic scan ceiling'
+[[ $min_instances == 0 || $min_instances == 1 ]] || fail 'Minimum instances must be 0 or 1'
 [[ $image =~ ^australia-southeast2-docker\.pkg\.dev/melens-510012/melens-data/map@sha256:[a-f0-9]{64}$ ]] || fail 'An immutable development map image digest is required'
 ((${#origins[@]} > 0)) || fail 'At least one reviewed app origin is required'
 if $apply; then
@@ -212,7 +216,7 @@ fi
 deploy=("$gcloud_bin" run deploy "$service" "--project=$project" "--region=$region"
   "--image=$image" "--service-account=$identity" "--env-vars-file=$task_tmp_dir/env.json"
   --port=8080 --cpu=1 --memory=512Mi --concurrency=8 --timeout=30s
-  --min=0 --max=1 --min-instances=0 --max-instances=1 --no-cpu-boost --ingress=all
+  "--min=$min_instances" --max=1 "--min-instances=$min_instances" --max-instances=1 --no-cpu-boost --ingress=all
   --allow-unauthenticated --quiet)
 printf 'Reviewed Cloud Run command:'
 printf ' %q' "${deploy[@]}"

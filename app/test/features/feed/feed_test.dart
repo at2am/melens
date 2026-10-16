@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:melens/features/agent/data/agent_models.dart';
 import 'package:melens/features/feed/data/feed_models.dart';
@@ -16,6 +18,7 @@ import 'package:melens/features/map/state/viewport_controller.dart';
 import '../../support/app_harness.dart';
 import '../events/fake_user_events_client.dart';
 import '../map/t017_test_support.dart';
+import 'fake_feeds_cache.dart';
 import 'fake_feeds_client.dart';
 
 Finder key(String name) => find.byKey(ValueKey(name));
@@ -638,4 +641,79 @@ void main() {
       isFalse,
     );
   });
+
+  List<String> shownIds(ProviderContainer container) => [
+    for (final feed in container.read(feedSubscriptionsProvider).value!)
+      feed.id,
+  ];
+
+  test(
+    'the cached feeds show until the service answers with its own',
+    () async {
+      final feeds = FakeFeedsClient([feedOf('saved')])
+        ..loadGate = Completer<void>();
+      final cache = FakeFeedsCache([feedOf('cached')]);
+      final container = appContainer(feeds: feeds, feedsCache: cache);
+      addTearDown(container.dispose);
+
+      await container.read(feedSubscriptionsProvider.future);
+      expect(shownIds(container), ['cached']);
+      expect(feeds.loads, 1);
+
+      feeds.loadGate!.complete();
+      await pumpEventQueue();
+      expect(shownIds(container), ['saved']);
+      expect(cache.stored!.map((feed) => feed.id), ['saved']);
+    },
+  );
+
+  test('a change made while the service is asked is not undone', () async {
+    final feeds = FakeFeedsClient([feedOf('saved')])
+      ..loadGate = Completer<void>();
+    final cache = FakeFeedsCache([feedOf('cached')]);
+    final container = appContainer(feeds: feeds, feedsCache: cache);
+    addTearDown(container.dispose);
+
+    await container.read(feedSubscriptionsProvider.future);
+    await container
+        .read(feedSubscriptionsProvider.notifier)
+        .add(feedOf('added'));
+    feeds.loadGate!.complete();
+    await pumpEventQueue();
+    expect(shownIds(container), ['cached', 'added']);
+    expect(cache.stored!.map((feed) => feed.id), ['cached', 'added']);
+  });
+
+  test('a refresh that fails keeps the cached feeds', () async {
+    final feeds = FakeFeedsClient([feedOf('saved')])
+      ..failure = StateError('down');
+    final cache = FakeFeedsCache([feedOf('cached')]);
+    final container = appContainer(feeds: feeds, feedsCache: cache);
+    addTearDown(container.dispose);
+
+    await container.read(feedSubscriptionsProvider.future);
+    await pumpEventQueue();
+    expect(container.read(feedSubscriptionsProvider).hasError, isFalse);
+    expect(shownIds(container), ['cached']);
+    expect(cache.writes, isEmpty);
+  });
+
+  test(
+    'with nothing cached the service decides, and saves are cached',
+    () async {
+      final feeds = FakeFeedsClient([feedOf('saved')]);
+      final cache = FakeFeedsCache();
+      final container = appContainer(feeds: feeds, feedsCache: cache);
+      addTearDown(container.dispose);
+
+      await container.read(feedSubscriptionsProvider.future);
+      expect(shownIds(container), ['saved']);
+      expect(cache.stored!.map((feed) => feed.id), ['saved']);
+
+      await container
+          .read(feedSubscriptionsProvider.notifier)
+          .add(feedOf('added'));
+      expect(cache.stored!.map((feed) => feed.id), ['saved', 'added']);
+    },
+  );
 }

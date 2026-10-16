@@ -112,7 +112,7 @@ Rerun the same command with `--apply --confirm-project melens-510012` to deploy.
 | --- | --- | --- |
 | CPU and memory | 1 CPU, 1 GiB | A photo turn holds up to 4 MB of new photos and 12 MB of history photos |
 | Concurrency | 20 | Turns are long SSE streams that mostly wait on Gemini |
-| Instances | 0 to 2 | `--min-instances 1` while judging. Rate limits are in memory, so each instance counts on its own |
+| Instances | 1 to 2 | One stays warm by default (since 2026-10-16) so the feed and chat skip cold starts; `--min-instances 0` scales to zero. Rate limits are in memory, so each instance counts on its own |
 | Request timeout | 300 s | The 270 s turn timeout ends and stores a turn before Cloud Run cuts the stream. The 330 s turn lease outlives both, so a crashed turn still frees its session |
 
 Cloud Run allows unauthenticated invocation because a browser cannot obtain an IAM token,

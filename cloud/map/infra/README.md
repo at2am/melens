@@ -57,7 +57,9 @@ secret/bucket grants or an unreviewed query-dataset resource.
 Runtime bounds are one instance at both service and revision levels, concurrency
 8, one CPU, 512 MiB, a 30-second HTTP
 deadline, 10-second queries, 5-second dry runs, 1-second cancellation, 1,000 items
-and a 2 MiB response. Scale-to-zero is enabled. The in-memory snapshot store
+and a 2 MiB response. One instance stays warm by default (`--min-instances 1`,
+since 2026-10-16), so the first map or feed read skips a cold start and finds the
+current-layer cache filled; `--min-instances 0` restores scale-to-zero. The in-memory snapshot store
 requires one instance; restarts/revisions can expire existing snapshots. This is
 a development deployment, not a durable pagination store or a global monetary
 cap. Public invocation makes these approved reads reachable; CORS allows only

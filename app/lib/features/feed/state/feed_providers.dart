@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -15,6 +16,7 @@ import '../../map/data/map_repository.dart';
 import '../../map/state/map_providers.dart';
 import '../../map/state/viewport_controller.dart';
 import '../data/feed_models.dart';
+import '../data/feeds_cache.dart';
 import '../data/feeds_client.dart';
 
 part 'feed_providers.g.dart';
@@ -32,8 +34,16 @@ FeedsClient feedsClient(Ref ref) => HttpFeedsClient(
   tokenSource: ref.watch(agentTokenSourceProvider),
 );
 
+/// Tests override this with an in-memory [FeedsCache].
+@Riverpod(keepAlive: true)
+FeedsCache feedsCache(Ref ref) => PreferencesFeedsCache();
+
 /// The user's feeds, in their order, as the agent service stores them. A
 /// user who never saved one sees [defaultFeedSubscriptions].
+///
+/// The feeds this device cached show at once, so their sources start loading
+/// while the service is asked again; its answer then replaces them. With
+/// nothing cached the feed waits for the service.
 ///
 /// A change shows at once and then saves the whole list. Saves run one after
 /// another, so an older list never lands after a newer one; a failed save
@@ -43,8 +53,42 @@ class FeedSubscriptions extends _$FeedSubscriptions {
   Future<void> _saving = Future.value();
 
   @override
-  Future<List<FeedSubscription>> build() async =>
-      await ref.watch(feedsClientProvider).load() ?? defaultFeedSubscriptions;
+  Future<List<FeedSubscription>> build() async {
+    final client = ref.watch(feedsClientProvider);
+    final cache = ref.watch(feedsCacheProvider);
+    final cached = await cache.read();
+    if (cached == null) {
+      final feeds = await client.load() ?? defaultFeedSubscriptions;
+      await cache.write(feeds);
+      return feeds;
+    }
+    unawaited(_sync(client, cache, cached));
+    return cached;
+  }
+
+  /// Replaces the [cached] feeds with what the service stores, unless the
+  /// user changed them meanwhile: that change's save decides instead. A
+  /// failure keeps the cached feeds; pulling to refresh does not retry it.
+  Future<void> _sync(
+    FeedsClient client,
+    FeedsCache cache,
+    List<FeedSubscription> cached,
+  ) async {
+    final List<FeedSubscription> feeds;
+    try {
+      feeds = await client.load() ?? defaultFeedSubscriptions;
+    } on Object catch (error, stack) {
+      _log.warning('Refreshing the cached feeds failed', error, stack);
+      return;
+    }
+    if (!ref.mounted) return;
+    // The cached list shows first, so the service's answer cannot be
+    // overwritten by it.
+    await future;
+    if (!ref.mounted || !identical(state.value, cached)) return;
+    if (!_sameFeeds(feeds, cached)) state = AsyncData(feeds);
+    await cache.write(feeds);
+  }
 
   Future<void> add(FeedSubscription feed) =>
       _change((feeds) => [...feeds, feed]);
@@ -79,7 +123,10 @@ class FeedSubscriptions extends _$FeedSubscriptions {
     _saving = save.then<void>((_) {}, onError: (Object _) {});
     try {
       final stored = await save;
-      if (identical(state.value, next)) state = AsyncData(stored);
+      if (identical(state.value, next)) {
+        state = AsyncData(stored);
+        await ref.read(feedsCacheProvider).write(stored);
+      }
     } on Object catch (error, stack) {
       _log.warning('Saving the feeds failed', error, stack);
       if (identical(state.value, next)) state = AsyncData(previous);
@@ -87,6 +134,10 @@ class FeedSubscriptions extends _$FeedSubscriptions {
     }
   }
 }
+
+bool _sameFeeds(List<FeedSubscription> a, List<FeedSubscription> b) =>
+    jsonEncode([for (final feed in a) feed.toJson()]) ==
+    jsonEncode([for (final feed in b) feed.toJson()]);
 
 /// Reads the area picker's visible map region.
 typedef VisibleRegionReader = Future<MapBounds> Function();
