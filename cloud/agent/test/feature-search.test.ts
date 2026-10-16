@@ -51,14 +51,17 @@ function fixture(options: { failEventReads?: number; eventGate?: Promise<void>; 
     async startQuery(query) {
       queries.push(query);
       const coverage = query.query.includes('v_source_coverage');
+      // The served copy's publication state, read beside each layer load: it reflects the latest batch.
+      const state = query.query.includes('v_geo_records_current_state');
       return {
         async readPage() {
-          if (!coverage) {
+          if (!coverage && !state) {
             options.eventStarted?.();
             await options.eventGate;
             if (failures > 0) { failures -= 1; throw new Error('Temporary event read failure'); }
           }
-          return { rows: (coverage ? [metadata] : rows).map((row) => ({ record: JSON.stringify(row) })), complete: true, hasMore: false };
+          const result = coverage ? [metadata] : state ? [{ source_id: source.sourceId, batch_id: 'batch-1' }] : rows;
+          return { rows: result.map((row) => ({ record: JSON.stringify(row) })), complete: true, hasMore: false };
         },
         async cancel() { cancelled += 1; },
       };
@@ -85,7 +88,7 @@ test('30 unknown event IDs share one coverage query and one layer query within a
   assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
 });
 
-test('all returned features are remembered and a different turn reads again, even with the same turn ID', async () => {
+test('all returned features are remembered and a different turn is answered from the shared layer copy', async () => {
   const f = fixture();
   const deps = { features: f.reader, grounding: null };
   const first = registry();
@@ -93,8 +96,8 @@ test('all returned features are remembered and a different turn reads again, eve
   assert.equal(first.features.size, 30);
   assert.equal((await resolveFeature(deps, first, 'event:1'))?.id, 'event:1');
   assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
-  await resolveFeature(deps, registry({ uid: 'other-user' }), 'event:0');
-  assert.deepEqual(f.counts(), { coverage: 2, events: 2, dryRuns: 0, cancelled: 0 });
+  assert.equal((await resolveFeature(deps, registry({ uid: 'other-user' }), 'event:0'))?.id, 'event:0');
+  assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
 });
 
 test('an unavailable layer is retried within the turn instead of cached as an empty success', async () => {
@@ -103,7 +106,8 @@ test('an unavailable layer is retried within the turn instead of cached as an em
   const turn = registry();
   assert.equal(await resolveFeature(deps, turn, 'event:0'), undefined);
   assert.equal((await resolveFeature(deps, turn, 'event:0'))?.id, 'event:0');
-  assert.deepEqual(f.counts(), { coverage: 2, events: 2, dryRuns: 0, cancelled: 1 });
+  // The registry read is shared for 30 seconds; the failed layer load is not kept.
+  assert.deepEqual(f.counts(), { coverage: 1, events: 2, dryRuns: 0, cancelled: 1 });
 });
 
 test('same-turn keyword and limit changes filter the whole shared result independently', async () => {
@@ -125,22 +129,22 @@ test('same-turn keyword and limit changes filter the whole shared result indepen
   assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
 });
 
-test('tool time filters keep distinct microseconds and equivalent offset instants share the read', async () => {
+test('tool time filters are applied to the shared layer copy without another read', async () => {
   const f = fixture();
   const turn = registry();
   const search = toolSpecs({ features: f.reader, grounding: null }).find((spec) => spec.name === 'search_features');
   assert.ok(search);
   const args = { area: { bbox: CONTEXT.viewport }, layers: ['event'],
     time: { from: '2026-10-10T18:40:00.000001+11:00', to: '2026-10-11T07:40:00Z' } };
-  await runTool(search, turn, args);
-  await runTool(search, turn, { ...args, time: { ...args.time, from: '2026-10-10T07:40:00.000002Z' } });
-  await runTool(search, turn, { ...args, time: { ...args.time, from: '2026-10-10T07:40:00.000001Z' } });
-  assert.deepEqual(f.queries.filter((query) => query.params.topic === 'event').map((query) => query.params.from),
-    ['2026-10-10T07:40:00.000001Z', '2026-10-10T07:40:00.000002Z']);
-  assert.deepEqual(f.counts(), { coverage: 2, events: 2, dryRuns: 0, cancelled: 0 });
+  const total = (result: unknown) => (result as { total: number }).total;
+  assert.equal(total(await runTool(search, turn, args)), 30);
+  assert.equal(total(await runTool(search, turn, { ...args, time: { ...args.time, from: '2026-10-10T07:40:00.000002Z' } })), 30);
+  // Every event ends at 10:00 UTC, so a window from 10:00 keeps none of them.
+  assert.equal(total(await runTool(search, turn, { ...args, time: { ...args.time, from: '2026-10-10T10:00:00Z' } })), 0);
+  assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
 });
 
-test('pending reads are shared and a turn abort cancels their single underlying query', async () => {
+test('pending reads are shared, and a turn abort stops its waits while the shared load finishes for later turns', async () => {
   const gate = deferred();
   const started = deferred();
   const controller = new AbortController();
@@ -152,10 +156,12 @@ test('pending reads are shared and a turn abort cancels their single underlying 
   assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
   controller.abort(new Error('Turn cancelled'));
   await assert.rejects(pending);
-  assert.equal(f.counts().cancelled, 1);
+  assert.equal(f.counts().cancelled, 0, 'Other turns may be waiting on the same layer load');
   gate.release();
   turn.rememberFeatures([eventItem('event:known', 'Known', 144.96, -37.81, instant, '2026-10-10T10:00:00Z')]);
   await assert.rejects(resolveFeature(deps, turn, 'event:known'));
+  assert.equal((await resolveFeature(deps, registry(), 'event:3'))?.id, 'event:3');
+  assert.deepEqual(f.counts(), { coverage: 1, events: 1, dryRuns: 0, cancelled: 0 });
 });
 
 test('query keys include exact bounds, layers, mode, microsecond window and reader identity', async () => {
