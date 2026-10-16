@@ -127,7 +127,7 @@ test('only a plan card of the uid\'s own session can be saved, and only up to th
 
 test('a refine turn hands the runner the stored plan card; an unknown or non-plan card is refused before the turn runs', async () => {
   const seen: TurnContext[] = [];
-  const { newSession, turn, lastTurnId, close } = await start(cardRunner(seen, [
+  const { call, newSession, turn, lastTurnId, close } = await start(cardRunner(seen, [
     { cards: (id) => [planCard(id), planCard(id, 2, 'list')] },
     { cards: () => [] },
   ]));
@@ -140,6 +140,14 @@ test('a refine turn hands the runner the stored plan card; an unknown or non-pla
     assert.equal(refined.status, 200);
     assert.deepEqual(seen.at(-1)?.refineCard, planCard(turnId));
     assert.deepEqual(seen.at(-1)?.request.input, { kind: 'refine', cardId: `c_${turnId}_1`, text: 'Swap the jazz for a café' });
+
+    // A refine turn may carry photos, like a text turn.
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52]).toString('base64');
+    const withPhoto = await call(`/v1/sessions/${sessionId}/turns`, { method: 'POST', body: JSON.stringify({ context,
+      input: { kind: 'refine', cardId: `c_${turnId}_1`, text: 'Somewhere like this' }, attachments: [{ kind: 'image', mimeType: 'image/png', data: png }] }) });
+    assert.equal(withPhoto.status, 200);
+    await withPhoto.text();
+    assert.equal(seen.at(-1)?.images.length, 1);
 
     const runs = seen.length;
     assert.equal((await turn(sessionId, { kind: 'refine', cardId: `c_${turnId}_2`, text: 'Shorter' })).status, 400);

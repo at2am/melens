@@ -43,6 +43,7 @@ The app's entry point already states the intent, so routing is code, not a model
 | `area`: user selects a point on the map | `area_brief` workflow |
 | `analyse`: user taps Analyse on a "?" marker | `analyse_anomaly` workflow |
 | `text`: anything typed into the chat box, with any photos the user attached | `map_agent` loop |
+| `refine`: the user asks to change a plan card (UC-03), with the stored card in the prompt | `map_agent` loop |
 | Scheduled ingestion | Extraction pipeline |
 
 The chat agent can call both workflows as tools, so "why is it so busy here?" typed into the chat runs the same `analyse_anomaly` code as the button.

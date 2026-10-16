@@ -47,7 +47,7 @@ Without [fvm](https://fvm.app), install Flutter 3.47.5 stable and drop the `fvm`
 
 ## Navigation and design
 
-Three bottom tabs, one `StatefulShellRoute` in `lib/app/router.dart`: **Feed** (`/`), **Discover** (`/discover`, the map) and **Settings** (`/settings`). Event pages (`/events/new`, `/events/:id`) sit under the feed branch, inside the shell. The feed editor (`/feeds/new`, `/feeds/:id`) opens above the tabs, from the feed's add button or a feed row in Settings, and pops back to where it was opened. Each tab keeps its state while the user is elsewhere, so the map keeps its camera.
+Three bottom tabs, one `StatefulShellRoute` in `lib/app/router.dart`: **Feed** (`/`), **Discover** (`/discover`, the map) and **Settings** (`/settings`). Event pages (`/events/new`, `/events/:id`) sit under the feed branch, inside the shell. The feed editor (`/feeds/new`, `/feeds/:id`) opens above the tabs, from the feed's add button or a feed row in Settings, and pops back to where it was opened. A saved plan (`/plans/:id`) opens above the tabs the same way, from its tile under Saved plans at the top of the Feed tab. Each tab keeps its state while the user is elsewhere, so the map keeps its camera.
 
 The agent chat belongs to the shell (`features/shell/ui/app_shell.dart`), not to a tab: its floating button is on every tab and the conversation survives tab changes. A card item tapped in the chat, and an agent `focus_map` or `highlight_features`, bring the Discover tab forward (`cardItemRequestsProvider`, `mapActionsControllerProvider`).
 
@@ -78,7 +78,8 @@ lib/
   features/events/      user events (UC-09): the service client, the panel with its form, details and pin picker, invites
   features/agent/       the agent protocol: models and the SSE client
   features/location/    the user's position, only on request (My location)
-  features/chat/        the chat panel: controller, session list, turn views
+  features/chat/        the chat panel: controller, session list, turn views, the Change plan mode
+  features/plans/       saved plans (UC-03): the service client, the Change plan and Save plan buttons, the Feed tab section, the plan page
   features/cards/       the card registry, one widget per card type
   l10n/                 app_en.arb and the generated AppLocalizations
 test/                   mirrors lib/

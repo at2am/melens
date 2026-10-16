@@ -3730,6 +3730,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{from} to {to}'**
   String mapDetailRange(String from, String to);
+
+  /// Placeholder of the chat input box while the next message changes a plan.
+  ///
+  /// In en, this message translates to:
+  /// **'What should change?'**
+  String get chatInputHintRefine;
+
+  /// Line above the chat input while the next message changes a plan. {title} is the plan's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing “{title}”'**
+  String chatRefiningPlan(String title);
+
+  /// Small label above a user message that asked to change a plan. {title} is the plan's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to “{title}”'**
+  String chatRefinedPlan(String title);
+
+  /// Small label above a user message that asked to change a plan the conversation no longer shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Change to a plan'**
+  String get chatRefinedPlanUnknown;
+
+  /// Button under a plan card in the chat: the next message asks the agent to change this plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Change plan'**
+  String get planRefine;
+
+  /// Button that leaves plan-change mode, so the next message is an ordinary one.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop changing'**
+  String get planRefineCancel;
+
+  /// Suggested change to a plan, sent to the agent as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it shorter'**
+  String get planRefineShorter;
+
+  /// Suggested change to a plan, sent to the agent as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it cheaper'**
+  String get planRefineCheaper;
+
+  /// Suggested change to a plan, sent to the agent as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Start an hour later'**
+  String get planRefineLater;
+
+  /// Suggested change to a plan, sent to the agent as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it indoors'**
+  String get planRefineIndoors;
+
+  /// Button under a plan card in the chat that keeps the plan on the Feed tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Save plan'**
+  String get planSave;
+
+  /// Disabled button under a plan card that is already saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get planSaved;
+
+  /// Error under a plan card when saving it failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The plan could not be saved. Try again.'**
+  String get planSaveFailed;
+
+  /// Error under a plan card when the user already has the most saved plans.
+  ///
+  /// In en, this message translates to:
+  /// **'You have 30 saved plans. Remove one on the Feed tab first.'**
+  String get planSaveLimit;
+
+  /// Heading of the saved plans on the Feed tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved plans'**
+  String get plansSectionTitle;
+
+  /// Shown when the saved plans failed to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved plans could not load.'**
+  String get plansLoadFailed;
+
+  /// How many stops a saved plan has.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 stop} other{{count} stops}}'**
+  String planStops(int count);
+
+  /// Label on a saved plan whose stops are all over.
+  ///
+  /// In en, this message translates to:
+  /// **'Past'**
+  String get planPast;
+
+  /// Title of the page that shows one saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved plan'**
+  String get planScreenTitle;
+
+  /// Button on a saved plan that draws its route on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the route on the map'**
+  String get planShowRoute;
+
+  /// When a plan was saved. {date} is a Melbourne date and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {date}'**
+  String planSavedOn(String date);
+
+  /// Shown when a saved plan page opens for a plan that was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'This plan is no longer saved.'**
+  String get planMissing;
+
+  /// Button and tooltip that removes a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove plan'**
+  String get planRemove;
+
+  /// Title of the dialog that confirms removing a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this plan?'**
+  String get planRemoveTitle;
+
+  /// Body of the dialog that confirms removing a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'It disappears from your Feed. The chat it came from stays.'**
+  String get planRemoveBody;
+
+  /// Button that closes the remove dialog without removing the plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get planRemoveCancel;
+
+  /// Shown when removing a saved plan failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The plan could not be removed. Try again.'**
+  String get planRemoveFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -15,7 +15,8 @@ part of 'router.dart';
 /// position and the map keeps its camera while the user is elsewhere. Event
 /// links (`/events/:id`, the address an invite carries) open that event in the
 /// events panel on the Discover tab. The feed editor opens above the tabs,
-/// from the feed or from Settings, and returns to where it was opened.
+/// from the feed or from Settings, and returns to where it was opened. A
+/// saved plan (`/plans/:id`) opens above the tabs the same way.
 
 @ProviderFor(router)
 final routerProvider = RouterProvider._();
@@ -27,7 +28,8 @@ final routerProvider = RouterProvider._();
 /// position and the map keeps its camera while the user is elsewhere. Event
 /// links (`/events/:id`, the address an invite carries) open that event in the
 /// events panel on the Discover tab. The feed editor opens above the tabs,
-/// from the feed or from Settings, and returns to where it was opened.
+/// from the feed or from Settings, and returns to where it was opened. A
+/// saved plan (`/plans/:id`) opens above the tabs the same way.
 
 final class RouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
@@ -39,7 +41,8 @@ final class RouterProvider
   /// position and the map keeps its camera while the user is elsewhere. Event
   /// links (`/events/:id`, the address an invite carries) open that event in the
   /// events panel on the Discover tab. The feed editor opens above the tabs,
-  /// from the feed or from Settings, and returns to where it was opened.
+  /// from the feed or from Settings, and returns to where it was opened. A
+  /// saved plan (`/plans/:id`) opens above the tabs the same way.
   RouterProvider._()
     : super(
         from: null,
@@ -73,4 +76,4 @@ final class RouterProvider
   }
 }
 
-String _$routerHash() => r'f3374b932ef12db5b0c660655bcaecabfe317b60';
+String _$routerHash() => r'c38b2977945d2a2dc1cec25ffc58ba1c17699d25';
