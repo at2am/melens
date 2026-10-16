@@ -50,6 +50,7 @@ What is built instead (`cloud/shared/src/query/news-areas.ts`):
 - A story is one headline; syndicated copies count once. Tapping an area lists its latest 5 stories, each with its original article link.
 - "Current" news is the last 7 days up to the window end. The map's current window is 15 minutes, which suits sensors, not news. GDELT's processing time places an article in time and orders it, and is never shown as its publication time. Before this, rows without a time stayed in every current window (news from 6 weeks ago) and were dropped from every historical one.
 - Historical mode draws no areas: the copy holds current records only.
+- The map service loads the area copy of each new news publication in the background. Any request starts the load (Cloud Run gives CPU only while serving), and so does the server start. A news view then reads the copy from memory. Boundary outlines are kept across loads and read again only when an article names a new area, or after 6 hours.
 - `abs.asgs.boundaries` (CC BY 4.0) joined the map's public reference registry for the outlines.
 - The News chip is on the default map topic. The map lost its topic switch on 2026-10-15, which had left no way to turn news on.
 

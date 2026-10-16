@@ -55,17 +55,20 @@ const complete = (rows: readonly Record<string, unknown>[]): ViewQueryResult =>
 
 function harness(rows: Record<string, unknown>[], state: Record<string, unknown>[] = [{ source_id: 'gdelt.news', batch_id: 'n1' }]) {
   const queries: PreparedViewQuery[] = [];
+  const now = Date.parse('2026-10-16T00:00:00Z');
   const runner = { async runPrepared(query: PreparedViewQuery): Promise<ViewQueryResult> {
     queries.push(query);
     if (query.query.includes('v_boundaries')) return complete(boundaries);
     if (query.query.includes('v_geo_records_current_state')) return complete(state);
     return complete(rows);
   } };
-  const load = createNewsAreaLoader({ config, runner, clock: () => new Date('2026-10-16T00:00:00Z') });
+  const { load, warm } = createNewsAreaLoader({ config, runner, clock: () => new Date(now) });
   const read = (overrides: Partial<Parameters<typeof load>[1]> = {}, query = request) => load(query, {
     coverage, layerCoverage, publicSourceIds: ['gdelt.news'], resolveSource, rowLimit: 500, ...overrides });
-  return { read, queries };
+  return { read, warm, queries };
 }
+const published = (batch: string): SourceCoverageSnapshot =>
+  ({ completeness: 'complete', sources: [coverageSource('gdelt.news', 'news', batch)] });
 
 test('news area loads keep only the summary text, take mentions only and simplify the outlines they draw', () => {
   const rows = prepareNewsAreaRowsLoad(config, 100).query;
@@ -141,4 +144,32 @@ test('a copy behind the registry is not reloaded on every request', async () => 
   assert.deepEqual(await read(), []);
   assert.deepEqual(await read(), []);
   assert.equal(queries.length, 3);
+});
+
+test('warming loads the copy before the first news request, which then reads it at once', async () => {
+  const { read, warm, queries } = harness([article('news:a', '2026-10-15T23:00:00Z', ['ASGS_LGA:24600:2025'])]);
+  warm(coverage);
+  warm(coverage);
+  assert.equal(queries.length, 3, 'one load however often it is warmed');
+  assert.equal((await read()).length, 1);
+  assert.equal(queries.length, 3);
+});
+
+test('a new publication reloads the articles but keeps the outlines until an article names a new area', async () => {
+  const rows = [article('news:a', '2026-10-15T23:00:00Z', ['ASGS_LGA:24600:2025'])];
+  const state = [{ source_id: 'gdelt.news', batch_id: 'n1' }];
+  const { read, queries } = harness(rows, state);
+  await read();
+  const boundaryReads = () => queries.filter((query) => query.query.includes('v_boundaries')).length;
+  assert.equal(boundaryReads(), 1);
+
+  state[0]!.batch_id = 'n2';
+  rows.push(article('news:b', '2026-10-15T23:30:00Z', ['ASGS_LGA:24600:2025']));
+  assert.equal((await read({ coverage: published('n2') }))[0]?.aggregate.details.metric.value, 2);
+  assert.equal(boundaryReads(), 1, 'the same areas reuse their outlines');
+
+  state[0]!.batch_id = 'n3';
+  rows.push(article('news:c', '2026-10-15T23:40:00Z', ['ASGS_SA2:206071143:2026']));
+  assert.equal((await read({ coverage: published('n3') })).length, 2);
+  assert.equal(boundaryReads(), 2, 'a newly named area reads the outlines again');
 });

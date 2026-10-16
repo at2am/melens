@@ -31,10 +31,14 @@ export const NEWS_AREA_TOLERANCE_METERS = 100;
 export const NEWS_AREA_MEMBERS = 5;
 /**
  * A loaded copy is reused within one publication of the news sources, for at most this long. The
- * window is applied per request, so only a new publication changes the rows; the age bound only
- * refreshes the boundary shapes (a load scans about 200 MB of them).
+ * window is applied per request, so only a new publication changes the rows.
  */
 const MAX_ENTRY_AGE_MS = 15 * 60_000;
+/**
+ * Boundary outlines are kept across loads: reading them scans about 180 MB. They are read again
+ * only when an article names an area they did not cover, or after this long.
+ */
+const BOUNDARY_MAX_AGE_MS = 6 * 3_600_000;
 /** A copy that could not be used (incomplete, or behind the registry) is not retried before this. */
 const RETRY_AFTER_MS = 30_000;
 /**
@@ -62,6 +66,8 @@ interface Area {
 }
 interface Entry { readonly key: string; readonly rows: readonly AreaRow[]; readonly areas: ReadonlyMap<string, Area>;
   readonly expiresAt: number }
+/** The outlines of every area current articles named when they were read (including ones with no drawable shape). */
+interface Boundaries { readonly areas: ReadonlyMap<string, Area>; readonly covered: ReadonlySet<string>; readonly loadedAt: number }
 
 export function prepareNewsAreaRowsLoad(config: MapConfig, maxRows: number): PreparedViewQuery {
   const topic = topicFilter('news');
@@ -165,6 +171,13 @@ function areaAggregate(area: Area, members: readonly NewsItem[], total: number, 
   return parsed.kind === 'aggregate' ? parsed : null;
 }
 
+export interface NewsAreas {
+  /** The current news areas of one viewport request. */
+  readonly load: NewsAreaLoader;
+  /** Starts loading the copy of the latest publication, if it is not loaded or loading, without waiting. */
+  readonly warm: (coverage: SourceCoverageSnapshot) => void;
+}
+
 export type NewsAreaLoader = (request: ViewportQuery, options: {
   readonly coverage: SourceCoverageSnapshot; readonly layerCoverage: Coverage;
   readonly publicSourceIds: readonly string[]; readonly resolveSource: PublicSourceResolver;
@@ -172,45 +185,69 @@ export type NewsAreaLoader = (request: ViewportQuery, options: {
 }) => Promise<readonly LoadedMemberGroup[]>;
 
 /**
- * Current news areas, loaded once per publication of the news and boundary sources and answered in
- * memory. Historical requests get none: the copy holds current records only.
+ * Current news areas, loaded once per publication of the news sources and answered in memory.
+ * `warm` lets the service start that load before anyone asks, so a request rarely waits for it.
+ * Historical requests get none: the copy holds current records only.
  */
 export function createNewsAreaLoader(options: {
   readonly config: MapConfig; readonly runner: Pick<ViewQueryRunner, 'runPrepared'>; readonly clock?: () => Date;
   readonly maxRows?: number; readonly maxBytes?: number;
-}): NewsAreaLoader {
+}): NewsAreas {
   const config = validateMapConfig(options.config);
   const clock = options.clock ?? (() => new Date());
   const maxRows = options.maxRows ?? 20_000;
   const maxBytes = options.maxBytes ?? 24 * 1024 * 1024;
   let entry: Entry | null = null;
+  let boundaries: Boundaries | null = null;
   const loading = new Map<string, Promise<Entry | null>>();
   const retryAt = new Map<string, number>();
 
-  async function load(key: string, published: ReadonlyMap<string, string>): Promise<Entry | null> {
-    const [rows, boundaries, state] = await Promise.all([
-      options.runner.runPrepared(prepareNewsAreaRowsLoad(config, maxRows), { pageSize: maxRows, byteBudget: maxBytes }, {}),
-      options.runner.runPrepared(prepareNewsAreaBoundariesLoad(config, 2_000), { pageSize: 2_000, byteBudget: 8 * 1024 * 1024 }, {}),
-      options.runner.runPrepared(prepareStateLoad(config, 1_000), { pageSize: 1_000, byteBudget: 1024 * 1024 }, {}),
-    ]);
-    // A copy that is incomplete or behind the registry would list versions the rights check rejects.
-    if (rows.kind !== 'complete' || boundaries.kind !== 'complete' || state.kind !== 'complete') return null;
-    const reflected = new Map(state.rows.map((row) => [String(row.source_id), row.batch_id]));
-    if (![...published].every(([sourceId, batchId]) => reflected.get(sourceId) === batchId)) return null;
-    const areas = new Map(boundaries.rows.map(area).filter((value): value is Area => value !== null)
+  async function readBoundaries(): Promise<Boundaries | null> {
+    // The ids the query covers are the refs of every current article; they bound later reuse.
+    const read = await options.runner.runPrepared(prepareNewsAreaBoundariesLoad(config, 2_000),
+      { pageSize: 2_000, byteBudget: 8 * 1024 * 1024 }, {});
+    if (read.kind !== 'complete') return null;
+    const areas = new Map(read.rows.map(area).filter((value): value is Area => value !== null)
       .map((value) => [value.boundaryId, value]));
-    return { key, rows: rows.rows.map(areaRow), areas, expiresAt: clock().getTime() + MAX_ENTRY_AGE_MS };
+    return { areas, covered: new Set(), loadedAt: clock().getTime() };
   }
 
-  async function current(coverage: SourceCoverageSnapshot): Promise<Entry | null> {
+  async function load(key: string, published: ReadonlyMap<string, string>): Promise<Entry | null> {
+    const kept = boundaries !== null && clock().getTime() - boundaries.loadedAt < BOUNDARY_MAX_AGE_MS ? boundaries : null;
+    const [rows, state, fresh] = await Promise.all([
+      options.runner.runPrepared(prepareNewsAreaRowsLoad(config, maxRows), { pageSize: maxRows, byteBudget: maxBytes }, {}),
+      options.runner.runPrepared(prepareStateLoad(config, 1_000), { pageSize: 1_000, byteBudget: 1024 * 1024 }, {}),
+      kept === null ? readBoundaries() : Promise.resolve(null),
+    ]);
+    // A copy that is incomplete or behind the registry would list versions the rights check rejects.
+    if (rows.kind !== 'complete' || state.kind !== 'complete') return null;
+    const reflected = new Map(state.rows.map((row) => [String(row.source_id), row.batch_id]));
+    if (![...published].every(([sourceId, batchId]) => reflected.get(sourceId) === batchId)) return null;
+    const areaRows = rows.rows.map(areaRow);
+    const refs = new Set(areaRows.flatMap((row) => row.refs));
+    let outlines = fresh ?? kept;
+    // An area the kept outlines never covered was named after they were read.
+    if (outlines !== null && fresh === null && [...refs].some((ref) => !outlines!.covered.has(ref))) outlines = await readBoundaries();
+    if (outlines === null) return null;
+    boundaries = { ...outlines, covered: new Set([...outlines.covered, ...refs]) };
+    return { key, rows: areaRows, areas: boundaries.areas, expiresAt: clock().getTime() + MAX_ENTRY_AGE_MS };
+  }
+
+  function newsKey(coverage: SourceCoverageSnapshot) {
     const marks = coverage.sources.filter((source) => sourceBelongsToLayer(source, 'news'))
       .map((source) => [source.sourceId, source.publishedBatchId] as const)
       .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
-    const key = JSON.stringify(marks);
+    return { marks, key: JSON.stringify(marks) };
+  }
+
+  /** The copy for this publication if it is fresh, else the load that brings it (null while one may not start). */
+  function ensure(coverage: SourceCoverageSnapshot): { readonly ready: Entry | null; readonly pending: Promise<Entry | null> | null;
+    readonly stale: Entry | null } {
+    const { marks, key } = newsKey(coverage);
     const now = clock().getTime();
     const sameKey = entry !== null && entry.key === key ? entry : null;
-    if (sameKey !== null && sameKey.expiresAt > now) return sameKey;
-    if ((retryAt.get(key) ?? 0) > now) return sameKey;
+    if (sameKey !== null && sameKey.expiresAt > now) return { ready: sameKey, pending: null, stale: null };
+    if ((retryAt.get(key) ?? 0) > now) return { ready: sameKey, pending: null, stale: null };
     let pending = loading.get(key);
     if (pending === undefined) {
       const published = new Map(marks.filter((mark): mark is readonly [string, string] => mark[1] !== null));
@@ -222,13 +259,21 @@ export function createNewsAreaLoader(options: {
       }).finally(() => loading.delete(key));
       loading.set(key, pending);
     }
-    if (sameKey !== null) return sameKey;
+    return { ready: null, pending, stale: sameKey };
+  }
+
+  async function current(coverage: SourceCoverageSnapshot): Promise<Entry | null> {
+    const { ready, pending, stale } = ensure(coverage);
+    if (pending === null) return ready;
+    // A copy of the same publication that only aged is served while it is refreshed.
+    if (stale !== null) return stale;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const waited = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), LOAD_WAIT_MS); });
     return Promise.race([pending, waited]).finally(() => clearTimeout(timer));
   }
 
-  return async (request, context) => {
+  const warm = (coverage: SourceCoverageSnapshot) => { ensure(coverage); };
+  const loadAreas: NewsAreaLoader = async (request, context) => {
     if (request.mode !== 'current' || context.rowLimit < 1) return [];
     let loaded: Entry | null;
     try { loaded = await abortable(current(context.coverage), context.signal); } catch (error) {
@@ -274,6 +319,7 @@ export function createNewsAreaLoader(options: {
     }
     return groups;
   };
+  return { load: loadAreas, warm };
 }
 
 function abortable<T>(value: Promise<T>, signal: AbortSignal | undefined): Promise<T> {

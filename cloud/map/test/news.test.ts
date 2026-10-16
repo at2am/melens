@@ -118,7 +118,8 @@ test('map service serves scoped news and rechecks it without an external verifie
     (error: unknown) => error instanceof Error && 'code' in error && error.code === 'notAvailable');
 });
 
-test('current news reaches the map as the areas the articles name, with their articles as members', async () => {
+function areaFixture(options: { prewarmNewsAreas?: boolean } = {}) {
+  const queries: string[] = [];
   const boundarySource: PublicSourceReference = { sourceId: 'abs.asgs', url: 'https://www.abs.gov.au/',
     attribution: 'Australian Bureau of Statistics', versionRef: null };
   const registry = (sourceId: string, topic: string) => ({ source_id: sourceId, topic, scope: 'victoria',
@@ -134,6 +135,7 @@ test('current news reaches the map as the areas the articles name, with their ar
       [144.9, -37.8], [144.9, -37.9]]] }) };
   const adapter: BigQueryViewAdapter = { async dryRun() { return { bytesProcessed: 1n }; },
     async startQuery(query) {
+      queries.push(query.query);
       const rows = query.query.includes('v_source_coverage') ? [registry(source.sourceId, 'news'), registry('abs.asgs', 'boundary')]
         : query.query.includes('v_geo_records_current_state') ? [{ source_id: source.sourceId, batch_id: 'batch1' }]
           : query.query.includes('v_boundaries') ? [boundary]
@@ -142,7 +144,12 @@ test('current news reaches the map as the areas the articles name, with their ar
         complete: true, hasMore: false }; }, async cancel() {} };
     } };
   const service = createMapService({ config, adapter, currentLayerCache: false, publicSources: [source, boundarySource],
-    clock: () => new Date('2026-10-01T02:00:00Z') });
+    clock: () => new Date('2026-10-01T02:00:00Z'), ...options });
+  return { service, queries, area };
+}
+
+test('current news reaches the map as the areas the articles name, with their articles as members', async () => {
+  const { service, area } = areaFixture();
   const viewport = await service.queryViewport(request);
   const [item] = viewport.layers[0]?.items ?? [];
   assert.equal(item?.kind, 'aggregate');
@@ -157,4 +164,15 @@ test('current news reaches the map as the areas the articles name, with their ar
   assert.equal(members.totalMatching, 2);
   const detail = await service.getItem(item.id, { requestId: 'area-detail', snapshotId: viewport.snapshotId });
   assert.equal(detail.item.id, item.id);
+});
+
+test('with prewarming, any request loads the news area copy so a news view does not wait for it', async () => {
+  const { service, queries } = areaFixture({ prewarmNewsAreas: true });
+  await service.getCatalog();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const loads = queries.filter((query) => query.includes('ARRAY_LENGTH(g.area_refs)')).length;
+  assert.equal(loads, 1, 'the catalog request started the load');
+  const viewport = await service.queryViewport(request);
+  assert.equal(viewport.layers[0]?.items[0]?.kind, 'aggregate');
+  assert.equal(queries.filter((query) => query.includes('ARRAY_LENGTH(g.area_refs)')).length, loads);
 });
