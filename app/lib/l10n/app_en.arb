@@ -1573,6 +1573,91 @@
       }
     }
   },
+  "cardParkingVacant": "Vacant now",
+  "@cardParkingVacant": {
+    "description": "A parking card bay whose live sensor reads vacant."
+  },
+  "cardParkingOccupied": "Occupied",
+  "@cardParkingOccupied": {
+    "description": "A parking card bay whose live sensor reads occupied."
+  },
+  "cardParkingNoData": "No reading",
+  "@cardParkingNoData": {
+    "description": "A parking card bay whose sensor has no current reading."
+  },
+  "cardParkingBest": "Best match",
+  "@cardParkingBest": {
+    "description": "Badge on the parking bay the map moved to: the nearest vacant one."
+  },
+  "cardParkingDistanceTo": "{distance} to {destination}, about {minutes} min walk",
+  "@cardParkingDistanceTo": {
+    "description": "A bay's straight-line distance to the destination the user named.",
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "destination": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "cardParkingDistance": "{distance} to your destination, about {minutes} min walk",
+  "@cardParkingDistance": {
+    "description": "A bay's straight-line distance to the destination when it has no name.",
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "cardParkingFee": "Fee",
+  "@cardParkingFee": {
+    "description": "Label of the area's parking fee on a parking card bay."
+  },
+  "cardParkingTimeLimit": "Time limit",
+  "@cardParkingTimeLimit": {
+    "description": "Label of the area's usual time limit on a parking card bay."
+  },
+  "cardParkingHours": "Applies",
+  "@cardParkingHours": {
+    "description": "Label of the days and hours the area's fee and limit apply."
+  },
+  "cardParkingPayment": "Pay by",
+  "@cardParkingPayment": {
+    "description": "Label of how drivers pay in the area."
+  },
+  "cardParkingAreaRules": "Published rules for this area. The sign at the bay decides.",
+  "@cardParkingAreaRules": {
+    "description": "Note under a parking card bay's fee and limits, which describe the area, not this bay."
+  },
+  "cardParkingRulesUnknown": "Fee and time limit not published for this bay. Check the sign at the bay.",
+  "@cardParkingRulesUnknown": {
+    "description": "Shown on a parking card bay when no source gave the area's rules."
+  },
+  "cardParkingZone": "Zone {zone}",
+  "@cardParkingZone": {
+    "description": "The parking zone number a bay sensor reports.",
+    "placeholders": {
+      "zone": {
+        "type": "int"
+      }
+    }
+  },
+  "cardParkingReported": "Sensor reported {time}",
+  "@cardParkingReported": {
+    "description": "When a bay sensor last reported, Melbourne local time.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "cardSourceFeature": "Source: map feature {id}",
   "@cardSourceFeature": {
     "description": "A card item that cites a map feature. {id} is the feature id.",

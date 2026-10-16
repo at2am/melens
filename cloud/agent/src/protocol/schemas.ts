@@ -71,7 +71,34 @@ export const cardSourceSchema = z.union([
 ]);
 export type CardSource = z.infer<typeof cardSourceSchema>;
 
-export const cardItemSchema = z.strictObject({
+/**
+ * A recommended parking bay (UC-15), written only by `find_parking`, never by the model. The reading and the distance
+ * come from the sensor; fee, time limit, hours and payment are the area's published rules from one cited web source
+ * (`policy_scope: 'area'`), or null with `policy_scope: 'unknown'`. No admitted crosswalk links a sensor to its bay's
+ * sign, so these are never presented as the rule of that bay: the sign at the bay decides.
+ */
+export const cardParkingSchema = z.strictObject({
+  state: z.enum(['vacant', 'occupied', 'noData']),
+  /** The bay the map focused on: the nearest vacant one. */
+  recommended: z.boolean(),
+  /** Straight-line metres from the sensor to the destination. */
+  distance_m: count,
+  /** Walking minutes at 80 m a minute over that straight line. */
+  walk_min: z.number().int().positive(),
+  destination: z.string().min(1).max(80).nullable(),
+  reported_at: localTime.nullable(),
+  zone: count.nullable(),
+  fee: z.string().min(1).max(120).nullable(),
+  time_limit: z.string().min(1).max(80).nullable(),
+  hours: z.string().min(1).max(80).nullable(),
+  payment: z.string().min(1).max(80).nullable(),
+  policy_scope: z.enum(['area', 'unknown']),
+  policy_url: z.url({ protocol: /^https?$/ }).nullable(),
+});
+export type CardParking = z.infer<typeof cardParkingSchema>;
+
+/** What the model may write in a `show_card` item. */
+export const modelCardItemSchema = z.strictObject({
   title: z.string().min(1).max(80),
   summary: z.string().max(240).optional(),
   source: cardSourceSchema,
@@ -81,6 +108,7 @@ export const cardItemSchema = z.strictObject({
   cost: z.string().max(40).optional(),
   getting_there: z.string().max(80).optional(),
 });
+export const cardItemSchema = modelCardItemSchema.extend({ parking: cardParkingSchema.optional() });
 export type CardItem = z.infer<typeof cardItemSchema>;
 
 export const cardTypeSchema = z.enum(['area_brief', 'anomaly_analysis', 'plan', 'history', 'list']);

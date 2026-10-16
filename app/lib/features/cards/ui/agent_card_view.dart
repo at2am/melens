@@ -6,6 +6,8 @@ import '../../../core/network/public_source_opener.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
+import '../../map/data/map_models.dart';
+import '../../map/ui/renderers/core_renderers.dart';
 import 'card_registry.dart';
 
 /// A card item's time window in Melbourne local time, or an empty string
@@ -158,9 +160,13 @@ class _CardItemView extends StatelessWidget {
     final when = time == null
         ? null
         : formatCardTimeWindow(strings, clock, time);
+    final parking = item.parking;
+    final recommended = parking?.recommended ?? false;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(10),
-      side: BorderSide(color: colors.outlineVariant),
+      side: recommended
+          ? BorderSide(color: colors.primary, width: 1.5)
+          : BorderSide(color: colors.outlineVariant),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -188,20 +194,25 @@ class _CardItemView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.title, style: theme.textTheme.titleSmall),
-                      if (item.summary case final summary?)
-                        Text(summary, style: theme.textTheme.bodySmall),
+                      if (parking != null)
+                        ParkingCardItemBody(parking: parking, clock: clock)
+                      else ...[
+                        Text(item.title, style: theme.textTheme.titleSmall),
+                        if (item.summary case final summary?)
+                          Text(summary, style: theme.textTheme.bodySmall),
+                      ],
                       if (when != null)
                         Text(
                           strings.cardItemTime(when),
                           style: theme.textTheme.bodySmall,
                         ),
-                      if (item.cost case final cost?)
+                      if (item.cost case final cost? when parking == null)
                         Text(
                           strings.cardItemCost(cost),
                           style: theme.textTheme.bodySmall,
                         ),
-                      if (item.gettingThere case final gettingThere?)
+                      if (item.gettingThere case final gettingThere?
+                          when parking == null)
                         Text(
                           strings.cardItemGettingThere(gettingThere),
                           style: theme.textTheme.bodySmall,
@@ -246,6 +257,180 @@ class _CardItemView extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A parking card bay (UC-15): what the sensor reads, how far it is from the
+/// destination, and the area's fee, time limit, hours and payment, each on a
+/// labelled line so they can be compared at a glance. The rules are the
+/// area's, never this bay's (no crosswalk links a sensor to its sign), and the
+/// note under them always says so.
+class ParkingCardItemBody extends StatelessWidget {
+  const ParkingCardItemBody({
+    required this.parking,
+    required this.clock,
+    super.key,
+  });
+
+  final CardParking parking;
+  final MelbourneClock clock;
+
+  static ParkingState _mapState(CardParkingState state) => switch (state) {
+    CardParkingState.vacant => ParkingState.vacant,
+    CardParkingState.occupied => ParkingState.occupied,
+    CardParkingState.noData => ParkingState.noData,
+  };
+
+  static String _distance(int metres) => metres >= 1000
+      ? '${(metres / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} km'
+      : '$metres m';
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final stateColor = parkingStateColor(_mapState(parking.state), colors);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
+    final reported = switch (parking.reportedAt) {
+      final value? => switch (DateTime.tryParse(value)) {
+        final parsed? => DateFormat.Hm(
+          'en_AU',
+        ).format(clock.toMelbourne(parsed)),
+        null => null,
+      },
+      null => null,
+    };
+    final rules = [
+      (Icons.payments_outlined, strings.cardParkingFee, parking.fee),
+      (Icons.timer_outlined, strings.cardParkingTimeLimit, parking.timeLimit),
+      (Icons.schedule, strings.cardParkingHours, parking.hours),
+      (Icons.credit_card, strings.cardParkingPayment, parking.payment),
+    ].where((rule) => rule.$3 != null).toList();
+    final known =
+        parking.policyScope == CardParkingPolicyScope.area && rules.isNotEmpty;
+    return Column(
+      key: const ValueKey('parking-card-item'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _Badge(
+              label: switch (parking.state) {
+                CardParkingState.vacant => strings.cardParkingVacant,
+                CardParkingState.occupied => strings.cardParkingOccupied,
+                CardParkingState.noData => strings.cardParkingNoData,
+              },
+              color: stateColor,
+              icon: Icons.local_parking,
+            ),
+            if (parking.recommended)
+              _Badge(
+                key: const ValueKey('parking-card-best'),
+                label: strings.cardParkingBest,
+                color: colors.primary,
+                icon: Icons.star_outline,
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.directions_walk, size: 16, color: colors.primary),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(switch (parking.destination) {
+                final destination? => strings.cardParkingDistanceTo(
+                  _distance(parking.distanceMetres),
+                  destination,
+                  parking.walkMinutes,
+                ),
+                null => strings.cardParkingDistance(
+                  _distance(parking.distanceMetres),
+                  parking.walkMinutes,
+                ),
+              }, style: theme.textTheme.titleSmall),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        if (known) ...[
+          for (final (icon, label, value) in rules)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 14, color: colors.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 72,
+                    child: Text(label, style: theme.textTheme.labelMedium),
+                  ),
+                  Expanded(
+                    child: Text(value!, style: theme.textTheme.bodySmall),
+                  ),
+                ],
+              ),
+            ),
+          Text(strings.cardParkingAreaRules, style: muted),
+        ] else
+          Text(strings.cardParkingRulesUnknown, style: muted),
+        if (parking.zone != null || reported != null)
+          Text(
+            [
+              if (parking.zone case final zone?) strings.cardParkingZone(zone),
+              if (reported != null) strings.cardParkingReported(reported),
+            ].join(' · '),
+            style: muted,
+          ),
+      ],
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({
+    required this.label,
+    required this.color,
+    required this.icon,
+    super.key,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(color: color),
+            ),
+          ],
         ),
       ),
     );

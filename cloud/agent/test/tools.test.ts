@@ -52,7 +52,7 @@ test('a parking sensor reads Vacant, Occupied or No data, and never as legal par
 test('tool declarations are Gemini schemas with the right types, enums, bounds and required lists', () => {
   const specs = toolSpecs({ features: fakeReader([]), grounding: null });
   assert.deepEqual(specs.map((spec) => spec.name), ['search_features', 'get_feature', 'get_anomaly', 'nearby_context', 'show_layers', 'focus_map', 'draw_route',
-    'highlight_features', 'show_card', 'ask_user', 'area_brief', 'analyse_anomaly', 'maps_grounding', 'search_grounding']);
+    'highlight_features', 'show_card', 'ask_user', 'area_brief', 'analyse_anomaly', 'find_parking', 'maps_grounding', 'search_grounding']);
   const search = toGenaiSchema(specs[0]!.schema) as Record<string, unknown>;
   assert.equal(search.type, 'OBJECT');
   assert.deepEqual(search.required, ['area']);

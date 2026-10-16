@@ -309,6 +309,80 @@ final class LinkCardSource extends CardSource {
   int get hashCode => Object.hash(url, title);
 }
 
+/// What a sensor reads for a parking card item.
+enum CardParkingState {
+  vacant,
+  occupied,
+  @JsonValue('noData')
+  noData,
+}
+
+/// Where a parking item's fee and limits come from: the area's published
+/// rules from one cited web source, or nothing.
+enum CardParkingPolicyScope { area, unknown }
+
+/// A recommended parking bay (UC-15), written only by the agent's
+/// `find_parking` tool. Fee, time limit, hours and payment are the area's
+/// rules, never this bay's: no admitted crosswalk links a sensor to the sign
+/// at its bay, so the card always says the sign decides.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class CardParking {
+  const CardParking({
+    required this.state,
+    required this.recommended,
+    required this.distanceMetres,
+    required this.walkMinutes,
+    required this.policyScope,
+    this.destination,
+    this.reportedAt,
+    this.zone,
+    this.fee,
+    this.timeLimit,
+    this.hours,
+    this.payment,
+    this.policyUrl,
+  });
+
+  @JsonKey(required: true)
+  final CardParkingState state;
+
+  /// The bay the map moved to: the nearest vacant one.
+  @JsonKey(required: true)
+  final bool recommended;
+
+  /// Straight-line metres to the destination.
+  @JsonKey(name: 'distance_m', required: true)
+  final int distanceMetres;
+
+  @JsonKey(name: 'walk_min', required: true)
+  final int walkMinutes;
+
+  final String? destination;
+
+  @JsonKey(name: 'reported_at')
+  final String? reportedAt;
+
+  final int? zone;
+  final String? fee;
+
+  @JsonKey(name: 'time_limit')
+  final String? timeLimit;
+
+  final String? hours;
+  final String? payment;
+
+  @JsonKey(name: 'policy_scope', required: true)
+  final CardParkingPolicyScope policyScope;
+
+  @JsonKey(name: 'policy_url')
+  final String? policyUrl;
+
+  factory CardParking.fromJson(Map<String, dynamic> json) =>
+      _$CardParkingFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CardParkingToJson(this);
+}
+
 @JsonSerializable(checked: true, explicitToJson: true)
 final class CardItem {
   const CardItem({
@@ -320,6 +394,7 @@ final class CardItem {
     this.placeId,
     this.cost,
     this.gettingThere,
+    this.parking,
   });
 
   @JsonKey(required: true)
@@ -346,6 +421,10 @@ final class CardItem {
 
   @JsonKey(name: 'getting_there', includeIfNull: false)
   final String? gettingThere;
+
+  /// Set only on a parking card's bays.
+  @JsonKey(includeIfNull: false)
+  final CardParking? parking;
 
   factory CardItem.fromJson(Map<String, dynamic> json) =>
       _$CardItemFromJson(json);
