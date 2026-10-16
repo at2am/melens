@@ -1,0 +1,278 @@
+# Release the Cloud Run services (map, agent) and the Firebase Hosting Web app on a version tag.
+# The mobile apps are not released here. One-time setup and the release steps: .github/release/README.md.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to release
+        type: choice
+        options: [all, cloud, web]
+        default: all
+
+# One release at a time; a queued release waits instead of cancelling a running deployment.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: melens-510012
+  REGION: australia-southeast2
+  REGISTRY: australia-southeast2-docker.pkg.dev/melens-510012/melens-data
+  WIF_PROVIDER: projects/401001961508/locations/global/workloadIdentityPools/github/providers/melens
+  DEPLOYER: melens-github-release@melens-510012.iam.gserviceaccount.com
+  WEB_CONFIG_SECRET: melens-web-release-config
+  # The reviewed values the services run with today (cloud/map/infra/README.md, app/README.md).
+  ALLOWED_ORIGINS: http://localhost:8000 https://melens-510012.web.app
+  DYNAMIC_SCAN_BYTES: '1000000000'
+  MIN_INSTANCES: '1'
+  WEB_URL: https://melens-510012.web.app
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      cloud: ${{ steps.targets.outputs.cloud }}
+      web: ${{ steps.targets.outputs.web }}
+      version: ${{ steps.targets.outputs.version }}
+    steps:
+      - id: targets
+        env:
+          TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'all' }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          case "$TARGET" in
+            all) cloud=true; web=true ;;
+            cloud) cloud=true; web=false ;;
+            web) cloud=false; web=true ;;
+            *) echo "Unknown target: $TARGET" >&2; exit 1 ;;
+          esac
+          if [[ $REF_TYPE == tag ]]; then
+            version=$REF_NAME
+          else
+            version="${REF_NAME//\//-}-${GITHUB_SHA::7}"
+          fi
+          [[ $version =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,100}$ ]] || { echo "Invalid image tag: $version" >&2; exit 1; }
+          {
+            echo "cloud=$cloud"
+            echo "web=$web"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          echo "Release $version: cloud=$cloud web=$web" >> "$GITHUB_STEP_SUMMARY"
+
+  test-cloud:
+    needs: plan
+    if: needs.plan.outputs.cloud == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: cloud/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  test-web:
+    needs: plan
+    if: needs.plan.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - id: flutter-version
+        run: echo "version=$(jq -r .flutter .fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Release script tests
+        working-directory: app/e2e
+        run: python3 -m unittest -q test_provenance
+
+  deploy-cloud:
+    needs: [plan, test-cloud]
+    if: needs.plan.outputs.cloud == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      # Let both services finish; a half-cancelled pair is harder to reason about than one failure.
+      fail-fast: false
+      matrix:
+        service: [map, agent]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Build the image with Cloud Build
+        id: image
+        env:
+          SERVICE: ${{ matrix.service }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          tagged="$REGISTRY/$SERVICE:$VERSION"
+          gcloud builds submit cloud --project="$PROJECT_ID" \
+            --region="$REGION" --timeout=900s \
+            --gcs-source-staging-dir="gs://${PROJECT_ID}_cloudbuild/github-release/source" \
+            --gcs-log-dir="gs://${PROJECT_ID}_cloudbuild/github-release/logs" \
+            --config="cloud/$SERVICE/cloudbuild.yaml" \
+            --substitutions="_IMAGE=$tagged"
+          digest=$(gcloud artifacts docker images describe "$tagged" \
+            --project="$PROJECT_ID" --format='value(image_summary.digest)')
+          [[ $digest =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "No digest for $tagged" >&2; exit 1; }
+          echo "image=$REGISTRY/$SERVICE@$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          origin_args=()
+          for origin in $ALLOWED_ORIGINS; do origin_args+=(--allowed-origin "$origin"); done
+          "cloud/$SERVICE/infra/deploy.sh" --image "$IMAGE" "${origin_args[@]}" \
+            --dynamic-scan-bytes "$DYNAMIC_SCAN_BYTES" --min-instances "$MIN_INSTANCES" \
+            --apply --confirm-project "$PROJECT_ID"
+          revision=$(gcloud run services describe "melens-dev-$SERVICE" --project="$PROJECT_ID" \
+            --region="$REGION" --format='value(status.latestReadyRevisionName)')
+          {
+            echo "### $SERVICE"
+            echo "- image: \`$IMAGE\`"
+            echo "- revision: \`$revision\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-web:
+    needs: [plan, test-web, deploy-cloud]
+    # Runs after a successful cloud release, or alone when only the Web app is released.
+    if: >-
+      always() && needs.plan.outputs.web == 'true' && needs.test-web.result == 'success'
+      && (needs.deploy-cloud.result == 'success' || needs.deploy-cloud.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ env.WEB_URL }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: flutter-version
+        run: echo "version=$(jq -r .flutter app/.fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter-version.outputs.version }}
+          channel: stable
+          cache: true
+      # app/e2e/build_release.py calls `fvm flutter`; the action already installed the pinned SDK.
+      - name: Provide an fvm shim
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec "$@"\n' > "$RUNNER_TEMP/bin/fvm"
+          chmod +x "$RUNNER_TEMP/bin/fvm"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # The Web build binds to what Cloud Run serves now: the revisions just deployed, or the
+      # current ones on a Web-only release. hosting_release.py checks them again before and after upload.
+      - name: Read the live backends
+        id: backends
+        run: |
+          for service in map agent; do
+            gcloud run services describe "melens-dev-$service" --project="$PROJECT_ID" --region="$REGION" \
+              --format=json > "$RUNNER_TEMP/$service.json"
+          done
+          python3 - "$RUNNER_TEMP/map.json" "$RUNNER_TEMP/agent.json" >> "$GITHUB_OUTPUT" <<'PY'
+          import json, sys
+          for name, path in zip(("map", "agent"), sys.argv[1:]):
+              with open(path) as handle:
+                  service = json.load(handle)
+              print(f"{name}-url={service['status']['url']}")
+              print(f"{name}-revision={service['status']['latestReadyRevisionName']}")
+              print(f"{name}-image={service['spec']['template']['spec']['containers'][0]['image']}")
+          PY
+
+      - name: Write the release configuration
+        env:
+          MAP_URL: ${{ steps.backends.outputs.map-url }}
+          AGENT_URL: ${{ steps.backends.outputs.agent-url }}
+        run: |
+          gcloud secrets versions access latest --secret="$WEB_CONFIG_SECRET" --project="$PROJECT_ID" \
+            | python3 .github/release/web_config.py --map-base-url "$MAP_URL" --agent-base-url "$AGENT_URL" \
+                --output app/config/cloud-release.json
+
+      - name: Build the Web release
+        working-directory: app
+        env:
+          MAP_REVISION: ${{ steps.backends.outputs.map-revision }}
+          AGENT_REVISION: ${{ steps.backends.outputs.agent-revision }}
+          MAP_IMAGE: ${{ steps.backends.outputs.map-image }}
+          AGENT_IMAGE: ${{ steps.backends.outputs.agent-image }}
+        run: |
+          flutter pub get
+          python3 e2e/build_release.py --map-revision "$MAP_REVISION" --agent-revision "$AGENT_REVISION" \
+            --map-image-digest "$MAP_IMAGE" --agent-image-digest "$AGENT_IMAGE"
+
+      - name: Publish to Firebase Hosting
+        working-directory: app
+        run: python3 e2e/hosting_release.py --apply --confirm-project "$PROJECT_ID"
+
+      - name: Check the served release
+        run: |
+          commit=$(git rev-parse HEAD)
+          for _ in 1 2 3 4 5 6; do
+            served=$(curl -fsS "$WEB_URL/release-provenance.json?ts=$(date +%s)" | jq -r .sourceCommit || true)
+            if [[ $served == "$commit" ]]; then
+              echo "$WEB_URL serves $commit" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "$WEB_URL serves ${served:-nothing}, expected $commit" >&2
+          exit 1
+
+      - name: Keep the release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosting-release-evidence
+          path: |
+            /tmp/melens-hosting-release-*/*.json
+            app/build/web-cloud-release/release-provenance.json
+          if-no-files-found: ignore
+
+      - name: Remove the release configuration
+        if: always()
+        run: rm -f app/config/cloud-release.json
