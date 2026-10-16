@@ -317,4 +317,233 @@ void main() {
     );
     expect(_saved(untimed).isPastAt(DateTime.utc(2030)), isFalse);
   });
+
+  testWidgets('questions about a plan are answered together and go back as '
+      'one answers turn about that plan', (tester) async {
+    final client = FakeAgentClient();
+    await _showChat(tester, client, FakePlansClient());
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Plan something fun tonight',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    AgentQuestion question(int n, String text, List<String> options) =>
+        AgentQuestion(
+          id: 'q_t_1_$n',
+          text: text,
+          options: options,
+          allowFreeText: true,
+          planCardId: _plan.id,
+        );
+    client.lastTurn
+      ..emit(
+        const AgentEvent.card(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          card: _plan,
+        ),
+      )
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 1,
+          stepId: 's_2',
+          question: question(1, 'When will you leave?', ['Now', 'In an hour']),
+        ),
+      )
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 2,
+          stepId: 's_3',
+          question: question(2, 'How long do you have?', [
+            '1 hour',
+            'All evening',
+          ]),
+        ),
+      )
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 3,
+          stepId: 's_4',
+          question: question(3, 'How will you get there?', ['Walk', 'Drive']),
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_1',
+          seq: 4,
+          stop: StopReason.asked,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('A few questions to fit the plan to you. Answer any of them.'),
+      findsOneWidget,
+    );
+    expect(find.text('How will you get there?'), findsOneWidget);
+    final send = find.byKey(const ValueKey('chat-questions-send'));
+    await tester.ensureVisible(send);
+    expect(tester.widget<FilledButton>(send).onPressed, isNull);
+
+    await tester.tap(
+      find.byKey(const ValueKey('chat-question-q_t_1_1-In an hour')),
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-question-q_t_1_3-Walk')));
+    // A second pick for the same question replaces the first.
+    await tester.tap(find.byKey(const ValueKey('chat-question-q_t_1_3-Drive')));
+    await tester.pump();
+    await tester.tap(send);
+    await tester.pump();
+    await tester.pump();
+
+    final request = client.lastTurn.request;
+    expect(request.input.toJson(), {
+      'kind': 'answers',
+      'answers': [
+        {'questionId': 'q_t_1_1', 'value': 'In an hour'},
+        {'questionId': 'q_t_1_3', 'value': 'Drive'},
+      ],
+    });
+    expect(request.context.openCardId, _plan.id);
+    expect(find.text('Answers: In an hour, Drive'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-questions-send')), findsNothing);
+  });
+
+  const parkingAt640 = StopParking(
+    checkedAt: '2026-10-10T18:40:00+11:00',
+    radiusMetres: 400,
+    vacant: 3,
+    occupied: 5,
+    noData: 0,
+    bays: [
+      StopParkingBay(
+        featureId: 'parking:kerbside:a',
+        location: AgentLatLng(lat: -37.8097, lng: 144.9628),
+        distanceMetres: 60,
+        walkMinutes: 1,
+      ),
+    ],
+    fee: r'$7.10 an hour',
+    policyScope: CardParkingPolicyScope.area,
+    policyUrl: 'https://www.melbourne.vic.gov.au/parking-fees',
+  );
+  const driven = AgentCard(
+    id: 'c_t_5_1',
+    type: CardType.plan,
+    title: 'Gallery and jazz by car',
+    travelMode: TravelMode.drive,
+    items: [
+      CardItem(
+        title: 'Gallery late opening',
+        source: FeatureCardSource(featureId: 'event:1'),
+        location: AgentLatLng(lat: -37.8102, lng: 144.9628),
+        stopParking: parkingAt640,
+      ),
+      CardItem(
+        title: 'Dessert somewhere',
+        source: LinkCardSource(url: 'https://example.org/dessert'),
+      ),
+      CardItem(
+        title: 'Jazz on the lane',
+        source: FeatureCardSource(featureId: 'event:2'),
+        location: AgentLatLng(lat: -37.8110, lng: 144.9640),
+      ),
+    ],
+  );
+
+  testWidgets('a driven plan shows each stop\'s parking; a saved one reads '
+      'a stop\'s parking again on request', (tester) async {
+    final plans = FakePlansClient(stored: [_saved(driven)])
+      ..parking = const StopParking(
+        checkedAt: '2026-10-10T19:15:00+11:00',
+        radiusMetres: 800,
+        vacant: 1,
+        occupied: 9,
+        noData: 1,
+        bays: [
+          StopParkingBay(
+            featureId: 'parking:kerbside:b',
+            location: AgentLatLng(lat: -37.8091, lng: 144.9628),
+            distanceMetres: 120,
+            walkMinutes: 2,
+          ),
+        ],
+        fee: r'$7.10 an hour',
+        policyScope: CardParkingPolicyScope.area,
+      );
+    final container = appContainer(plans: plans);
+    await pumpApp(tester, container);
+    await tester.tap(find.byKey(ValueKey('saved-plan-${driven.id}')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('By car'), findsOneWidget);
+    expect(find.text('Parking near this stop'), findsOneWidget);
+    expect(
+      find.text('Nearest free bay 60 m away, about 1 min walk'),
+      findsOneWidget,
+    );
+    expect(find.text('3 free, 5 taken within 400 m'), findsOneWidget);
+    expect(find.text('Checked 6:40 pm'), findsOneWidget);
+    expect(find.text(r'Fee: $7.10 an hour'), findsOneWidget);
+    expect(
+      find.text(
+        'A free sensor shows no car on the bay, not that parking is allowed '
+        'now.',
+      ),
+      findsOneWidget,
+    );
+    // A stop with no place cannot read parking; a placed one without a
+    // reading yet can.
+    expect(find.byKey(const ValueKey('plan-stop-refresh-1')), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('plan-stop-refresh-2')),
+        matching: find.text('Find parking here'),
+      ),
+      findsOneWidget,
+    );
+
+    final refresh = find.descendant(
+      of: find.byKey(const ValueKey('plan-stop-refresh-0')),
+      matching: find.text('Refresh parking'),
+    );
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(plans.calls, contains('refresh:${driven.id}/0'));
+    expect(find.text('Checked 7:15 pm'), findsOneWidget);
+    expect(
+      find.text('Nearest free bay 120 m away, about 2 min walk'),
+      findsOneWidget,
+    );
+    expect(
+      container
+          .read(savedPlansProvider)
+          .value!
+          .single
+          .card
+          .items
+          .first
+          .stopParking
+          ?.checkedAt,
+      '2026-10-10T19:15:00+11:00',
+    );
+
+    plans.failure = const AgentNetworkException();
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('plan-stop-refresh-failed-0')),
+      findsOneWidget,
+    );
+    expect(find.text('Checked 7:15 pm'), findsOneWidget, reason: 'kept');
+  });
 }

@@ -5,9 +5,11 @@ import { melbourneDate, melbourneHourLabel, toMelbourneIso } from '../agent/time
 import { cached } from '../cache.js';
 import { centroid, compactFeature, type CompactFeature } from '../features/compact.js';
 import { turnSearchTime } from '../features/turn-search.js';
-import { latLngSchema, type Card, type CardItem, type LatLng } from '../protocol/schemas.js';
+import { latLngSchema, type Card, type CardItem, type LatLng, type StopParking } from '../protocol/schemas.js';
+import { collectingSink } from '../protocol/sse.js';
+import { newId } from '../sessions/store.js';
 import { grounded, searchArea, resolveFeature, distanceLabel, windowOf, HOUR, type Area, type ToolDependencies } from '../tools/catalog.js';
-import { defineTool, isToolError, toolError, type ToolSpec, type TurnRegistry } from '../tools/define.js';
+import { TurnRegistry, defineTool, isToolError, toolError, type ToolSpec } from '../tools/define.js';
 
 /** Workflow grounding may take longer than a chat tool call: nobody waits on it step by step, and the card is cached for everyone. */
 const WORKFLOW_GROUNDING_TIMEOUT_MS = 75_000;
@@ -287,8 +289,11 @@ async function areaParkingPolicy(deps: ToolDependencies, turn: TurnRegistry, pla
     const lines = answer.sources.slice(0, 5).map((source) => `${book.addUrl(source.url, source.title)} [web] ${source.title}`);
     if (book.size === 0) return null;
     const output = await generate(deps, turn, 'find_parking', [
+      // The search answer summarises the numbered sources; without the last sentence the model leaves "ref" null and the rules are dropped.
       `On-street parking rules near ${place}, Melbourne. Take each value only from the search answer and the numbered sources; `
-      + 'use null for anything they do not state. Cite the one W reference the rules come from in "ref".', ...lines, '',
+      + 'use null for anything they do not state. The search answer summarises the numbered sources: in "ref", give the W reference the '
+      + 'rules come from, the City of Melbourne\'s own page (melbourne.vic.gov.au) when it is listed, else the source that best matches. '
+      + 'Use null for "ref" only when no rule is stated at all.', ...lines, '',
       `Search answer: ${clip(answer.answer, 900)}`,
     ].join('\n'), parkingPolicyOutput).catch(() => null);
     const entry = output?.ref == null ? undefined : book.get(output.ref);
@@ -319,6 +324,36 @@ function parkingDestination(turn: TurnRegistry, given: LatLng | undefined): LatL
 
 function hhmm(instant: string): string { return toMelbourneIso(instant).slice(11, 16); }
 
+interface ParkingReading {
+  /** The radius the search stopped at. */
+  readonly radius: number;
+  /** Vacant bays, best first: the nearest, with a late reading ranked as if further away. At most `PARKING_PICKS`. */
+  readonly picks: readonly { readonly feature: CompactFeature; readonly item: ParkingItem }[];
+  readonly vacant: number;
+  readonly occupied: number;
+  readonly noData: number;
+}
+
+/** The live bay sensors around a point: a short walk first, a longer one when few read vacant. */
+async function readParking(deps: ToolDependencies, turn: TurnRegistry, destination: LatLng): Promise<ParkingReading> {
+  const window = windowOf(undefined, turn.now(), { back: 24 * HOUR, ahead: 24 * HOUR })!;
+  let radius: number = PARKING_RADII_M[0];
+  let sensors: { feature: CompactFeature; item: ParkingItem }[] = [];
+  for (radius of PARKING_RADII_M) {
+    const found = await searchArea(deps, turn, { center: destination, radius_m: radius }, ['parking'], window);
+    sensors = found.features.flatMap((feature) => {
+      const item = turn.features.get(feature.id);
+      return item?.kind === 'parking' && feature.distance_m !== null ? [{ feature, item }] : [];
+    });
+    if (sensors.filter(({ item }) => item.details.state === 'vacant').length >= PARKING_ENOUGH_VACANT) break;
+  }
+  const rank = ({ feature, item }: (typeof sensors)[number]) => feature.distance_m! + (item.details.reading === 'late' ? LATE_READING_PENALTY_M : 0);
+  const vacant = sensors.filter(({ item }) => item.details.state === 'vacant');
+  const occupied = sensors.filter(({ item }) => item.details.state === 'occupied').length;
+  return { radius, picks: vacant.sort((a, b) => rank(a) - rank(b)).slice(0, PARKING_PICKS), vacant: vacant.length, occupied,
+    noData: sensors.length - occupied - vacant.length };
+}
+
 export const findParkingTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> => defineTool({
   name: 'find_parking',
   description: 'Find free on-street parking near a destination. It searches the live bay sensors within a short walk (widening when few are free), '
@@ -341,21 +376,7 @@ export const findParkingTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> =
     const place = name ?? `latitude ${destination.lat.toFixed(4)}, longitude ${destination.lng.toFixed(4)}`;
     // The area's rules come from a slow web search; ask now so the map can move as soon as the sensors are read.
     const policyRequest = areaParkingPolicy(deps, turn, place);
-    const window = windowOf(undefined, turn.now(), { back: 24 * HOUR, ahead: 24 * HOUR })!;
-    let radius: number = PARKING_RADII_M[0];
-    let sensors: { feature: CompactFeature; item: ParkingItem }[] = [];
-    for (radius of PARKING_RADII_M) {
-      const found = await searchArea(deps, turn, { center: destination, radius_m: radius }, ['parking'], window);
-      sensors = found.features.flatMap((feature) => {
-        const item = turn.features.get(feature.id);
-        return item?.kind === 'parking' && feature.distance_m !== null ? [{ feature, item }] : [];
-      });
-      if (sensors.filter(({ item }) => item.details.state === 'vacant').length >= PARKING_ENOUGH_VACANT) break;
-    }
-    const rank = ({ feature, item }: (typeof sensors)[number]) => feature.distance_m! + (item.details.reading === 'late' ? LATE_READING_PENALTY_M : 0);
-    const picks = sensors.filter(({ item }) => item.details.state === 'vacant').sort((a, b) => rank(a) - rank(b)).slice(0, PARKING_PICKS);
-    const occupied = sensors.filter(({ item }) => item.details.state === 'occupied').length;
-    const noData = sensors.length - occupied - sensors.filter(({ item }) => item.details.state === 'vacant').length;
+    const { radius, picks, occupied, noData } = await readParking(deps, turn, destination);
     emitAction(turn, step, { action: 'show_layers', args: { layers: ['parking'], mode: 'add' } });
     if (picks.length === 0) {
       emitAction(turn, step, { action: 'focus_map', args: { target: { point: destination }, zoom: 17 } });
@@ -409,3 +430,87 @@ export const findParkingTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> =
       note: 'The card and the map already show these; add at most one sentence, and say that a vacant sensor is not permission to park.' };
   },
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Parking at the stops of a plan (UC-03 with UC-15)
+
+/** At most this many stops of a driven plan get parking; each reads the sensors around it. */
+export const PLAN_PARKING_STOPS = 6;
+const STOP_PARKING_BAYS = 3;
+
+type ParkingRules = Pick<StopParking, 'fee' | 'time_limit' | 'hours' | 'payment' | 'policy_scope' | 'policy_url'>;
+
+const NO_RULES: ParkingRules = { fee: null, time_limit: null, hours: null, payment: null, policy_scope: 'unknown', policy_url: null };
+
+function rulesOf(policy: AreaParkingPolicy | null): ParkingRules {
+  return policy === null ? NO_RULES : { fee: policy.fee, time_limit: policy.time_limit, hours: policy.hours, payment: policy.payment,
+    policy_scope: 'area', policy_url: policy.url };
+}
+
+function stopParkingOf(reading: ParkingReading, rules: ParkingRules, now: Date): StopParking {
+  return {
+    checked_at: toMelbourneIso(now), radius_m: reading.radius, vacant: reading.vacant, occupied: reading.occupied, no_data: reading.noData,
+    bays: reading.picks.slice(0, STOP_PARKING_BAYS).map(({ feature, item }) => ({ feature_id: item.id, location: { lat: feature.lat, lng: feature.lng },
+      distance_m: feature.distance_m!, walk_min: Math.max(1, Math.round(feature.distance_m! / WALK_METRES_PER_MINUTE)),
+      reported_at: item.details.lastReportedAt === null ? null : toMelbourneIso(item.details.lastReportedAt) })),
+    ...rules,
+  };
+}
+
+/** Stops about a kilometre apart or closer share the area's rules: they are published per area, and each lookup is a billed web search. */
+function rulesCell(point: LatLng): string { return `${point.lat.toFixed(2)},${point.lng.toFixed(2)}`; }
+
+const planStopSchema = z.strictObject({ index: z.number().int().min(0).max(12), point: latLngSchema, name: z.string().min(1).max(80) });
+
+/**
+ * The live parking at each located stop of a plan the user drives to. `show_card` runs it as its own step when a plan
+ * has `travel_mode` `drive`; the model never calls it.
+ */
+export const planParkingTool = (deps: ToolDependencies) => defineTool({
+  name: 'plan_parking',
+  description: 'Reads the parking sensors and the area rules around each stop of a driven plan.',
+  status: 'Checking parking at each stop',
+  readOnly: false,
+  schema: z.strictObject({ stops: z.array(planStopSchema).min(1).max(PLAN_PARKING_STOPS) }),
+  detail(args) { return args.stops.length === 1 ? `near ${args.stops[0]!.name}` : `${args.stops.length} stops`; },
+  async run(args, turn) {
+    const rules = new Map<string, Promise<AreaParkingPolicy | null>>();
+    const rulesFor = (stop: z.output<typeof planStopSchema>) => {
+      const key = rulesCell(stop.point);
+      let request = rules.get(key);
+      if (request === undefined) { request = areaParkingPolicy(deps, turn, stop.name).catch(() => null); rules.set(key, request); }
+      return request;
+    };
+    const stops = await Promise.all(args.stops.map(async (stop) => {
+      const [reading, policy] = await Promise.all([readParking(deps, turn, stop.point), rulesFor(stop)]);
+      return { index: stop.index, parking: stopParkingOf(reading, rulesOf(policy), turn.now()) };
+    }));
+    return { total: stops.length, stops };
+  },
+});
+
+/**
+ * Reads the parking around one stop of a saved plan again, outside any chat turn (agent-protocol.md, Saved plans): a
+ * request of its own, with a registry no turn shares. The sensors are read afresh. The area's rules are kept from the
+ * earlier reading when it had them, since they do not change by the minute; a stop without them looks them up.
+ */
+export async function refreshStopParking(deps: ToolDependencies, request: {
+  readonly uid: string; readonly point: LatLng; readonly name: string; readonly previous?: StopParking | undefined;
+  readonly signal: AbortSignal; readonly clock?: () => Date;
+}): Promise<StopParking> {
+  const clock = request.clock ?? (() => new Date());
+  const turnId = newId('r');
+  const { lat, lng } = request.point;
+  const span = 0.005;
+  const turn = new TurnRegistry({ turnId, uid: request.uid, sink: collectingSink(turnId), signal: request.signal, clock,
+    request: { input: { kind: 'text', text: 'Refresh the parking at a plan stop' },
+      context: { viewport: { north: lat + span, south: lat - span, east: lng + span, west: lng - span }, zoom: PARKING_FOCUS_ZOOM, layers: [],
+        localTime: toMelbourneIso(clock()) } } });
+  const previous = request.previous;
+  const kept: ParkingRules | null = previous?.policy_scope === 'area'
+    ? { fee: previous.fee, time_limit: previous.time_limit, hours: previous.hours, payment: previous.payment, policy_scope: 'area', policy_url: previous.policy_url }
+    : null;
+  const [reading, policy] = await Promise.all([readParking(deps, turn, request.point),
+    kept === null ? areaParkingPolicy(deps, turn, request.name).catch(() => null) : Promise.resolve(null)]);
+  return stopParkingOf(reading, kept ?? rulesOf(policy), clock());
+}

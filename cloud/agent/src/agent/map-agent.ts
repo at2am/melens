@@ -7,7 +7,7 @@ import type { TurnContext, TurnRunner } from '../server.js';
 import { TurnRegistry, buildTool, isToolError, runTool } from '../tools/define.js';
 import { analyseAnomalyTool, areaBriefTool } from '../workflows/workflows.js';
 import { toolSpecs, type ToolDependencies } from '../tools/catalog.js';
-import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, turnMessage } from './prompts.js';
+import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, questionsOf, turnMessage } from './prompts.js';
 import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
@@ -52,7 +52,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
     async run(turn: TurnContext): Promise<StoredTurn> {
       const registry = new TurnRegistry({ turnId: turn.turnId, uid: turn.uid, request: turn.request, sink: turn.sink,
         signal: turn.signal, clock, ...(options.log === undefined ? {} : { log: options.log }) });
-      if (turn.refineCard !== undefined) registry.rememberCard(turn.refineCard);
+      if (turn.planCard !== undefined) registry.rememberCard(turn.planCard);
       const tools = toolSpecs(options.tools).map((spec) => buildTool(spec, registry));
       let streamedText = false;
       let answer = '';
@@ -126,7 +126,8 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
 
         try {
           const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
-            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.refineCard), runConfig, abortSignal: turn.signal });
+            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.planCard, questionsOf(turn.history)),
+            runConfig, abortSignal: turn.signal });
           for await (const event of events) {
             if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
             if (event.author !== AGENT_NAME || event.content?.parts === undefined) continue;
@@ -162,7 +163,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
       turn.sink.emit({ event: 'done', stop, usage });
       return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input,
         attachments: turn.images.map(attachmentRefOf), text: answer,
-        cards: registry.cards, uiActions: registry.uiActions, question: registry.asked, stop, trace: registry.trace.slice(0, 200),
+        cards: registry.cards, uiActions: registry.uiActions, question: registry.asked, questions: registry.questions, stop, trace: registry.trace.slice(0, 200),
         usage: { ...usage, perCall: registry.usage.perCall.slice(0, 64) } };
     },
   };

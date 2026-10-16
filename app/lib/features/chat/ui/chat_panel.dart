@@ -305,6 +305,10 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                             ? (question, option) =>
                                   unawaited(controller.answer(question, option))
                             : null,
+                        onAnswers: chat.canSend
+                            ? (answers) =>
+                                  unawaited(controller.answerAll(answers))
+                            : null,
                         onRetry: chat.canSend && !chat.isRunning
                             ? () => unawaited(controller.retryLast())
                             : null,

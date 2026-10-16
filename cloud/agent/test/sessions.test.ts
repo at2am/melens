@@ -6,7 +6,7 @@ import { InMemorySessionStore, SESSION_LIMITS, type SessionRecord } from '../src
 
 function turn(seq: number, text = `turn ${seq}`): StoredTurn {
   return { id: `t_${seq}`, seq, createdAt: '2026-10-09T00:00:00.000Z', input: { kind: 'text', text }, attachments: [], text: 'ok',
-    cards: [], uiActions: [], question: null, stop: 'end', trace: [],
+    cards: [], uiActions: [], question: null, questions: [], stop: 'end', trace: [],
     usage: { calls: 1, input: 10, cachedInput: 0, output: 2, thoughts: 0, toolUseInput: 0, total: 12, complete: true, perCall: [] } };
 }
 

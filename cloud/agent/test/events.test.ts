@@ -206,7 +206,7 @@ async function start() {
   const runner: TurnRunner = { async run(turn) {
     turn.sink.emit({ event: 'done', stop: 'end', usage: { ...zeroUsage(), complete: true } });
     return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input, attachments: [], text: '', cards: [],
-      uiActions: [], question: null, stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
+      uiActions: [], question: null, questions: [], stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
   } };
   const { events } = service();
   const feeds = new FeedService({ store: new InMemoryFeedStore(), writeLimiter: createRateLimiter(100) });

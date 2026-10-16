@@ -5,6 +5,7 @@ import 'package:melens/features/plans/data/saved_plan.dart';
 /// The agent service's plan store for one user. [cards] are the plan cards
 /// the user's sessions hold, by card id: a save copies one, as the service
 /// copies it from the stored turn. [failure] makes the next calls throw.
+/// A stop refresh puts [parking] on the stop, as the service reads it.
 final class FakePlansClient implements PlansClient {
   FakePlansClient({List<SavedPlan>? stored, Map<String, AgentCard>? cards})
     : stored = stored ?? [],
@@ -13,6 +14,7 @@ final class FakePlansClient implements PlansClient {
   final List<SavedPlan> stored;
   final Map<String, AgentCard> cards;
   Object? failure;
+  StopParking? parking;
   final calls = <String>[];
 
   @override
@@ -47,5 +49,28 @@ final class FakePlansClient implements PlansClient {
     calls.add('remove:$id');
     if (failure case final error?) throw error;
     stored.removeWhere((plan) => plan.id == id);
+  }
+
+  @override
+  Future<SavedPlan> refreshStop(String id, int index) async {
+    calls.add('refresh:$id/$index');
+    if (failure case final error?) throw error;
+    final position = stored.indexWhere((plan) => plan.id == id);
+    final plan = stored[position];
+    final card = AgentCard.fromJson({
+      ...plan.card.toJson(),
+      'items': [
+        for (final (stop, item) in plan.card.items.indexed)
+          stop == index
+              ? {...item.toJson(), 'stop_parking': parking!.toJson()}
+              : item.toJson(),
+      ],
+    });
+    final refreshed = SavedPlan.fromJson({
+      ...plan.toJson(),
+      'card': card.toJson(),
+    });
+    stored[position] = refreshed;
+    return refreshed;
   }
 }

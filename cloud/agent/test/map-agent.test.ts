@@ -198,14 +198,14 @@ test('the pending question and stored history reach the model', async () => {
   const llm = new ScriptedLlm([() => streamedText('Fitzroy it is.', usage(80, 5))]);
   const pending = { id: 'q_1', text: 'Which gardens?', options: ['Fitzroy Gardens', 'Carlton Gardens'], allowFreeText: true };
   const history = [{ id: 't_0', seq: 1, createdAt: '2026-10-10T07:30:00.000Z', input: { kind: 'text' as const, text: 'take me to the gardens' }, attachments: [], text: '',
-    cards: [], uiActions: [], question: pending, stop: 'asked' as const, trace: [],
+    cards: [], uiActions: [], question: pending, questions: [pending], stop: 'asked' as const, trace: [],
     usage: { calls: 1, input: 1, cachedInput: 0, output: 1, thoughts: 0, toolUseInput: 0, total: 2, complete: true, perCall: [] } }];
   const turn = { ...turnContext('Fitzroy', { pendingQuestion: pending, history }), request: { input: { kind: 'answer' as const, questionId: 'q_1', value: 'Fitzroy Gardens' }, context: CONTEXT } };
   await runner(llm).runner.run(turn);
   const contents = llm.seen[0]!.contents;
   assert.equal(contents.length, 3, 'history user + model, then the new message');
   assert.match(contents[1]?.parts?.[0]?.text ?? '', /asked: "Which gardens\?"/);
-  assert.match(contents[2]?.parts?.[1]?.text ?? '', /Answer to question q_1: Fitzroy Gardens/);
+  assert.match(contents[2]?.parts?.[1]?.text ?? '', /Answer to your question "Which gardens\?": Fitzroy Gardens/);
 });
 
 test('photos reach the model with the message, recent history photos go back, older ones are named and a stopped answer is marked', async () => {
@@ -214,7 +214,7 @@ test('photos reach the model with the message, recent history photos go back, ol
   const recent = { id: 'a_recent', mimeType: 'image/png' as const, data: Buffer.from([0x89, 0x50, 0x4e, 0x47]) };
   const stored = (id: string, seq: number, text: string, answer: string, attachment: string, stop: 'end' | 'cancelled') => ({ id, seq,
     createdAt: '2026-10-10T07:30:00.000Z', input: { kind: 'text' as const, text }, attachments: [{ id: attachment, kind: 'image' as const, mimeType: 'image/png' as const, bytes: 4 }],
-    text: answer, cards: [], uiActions: [], question: null, stop, trace: [],
+    text: answer, cards: [], uiActions: [], question: null, questions: [], stop, trace: [],
     usage: { calls: 1, input: 1, cachedInput: 0, output: 1, thoughts: 0, toolUseInput: 0, total: 2, complete: true, perCall: [] } });
   const history = [stored('t_0', 1, '', 'A laneway.', 'a_old', 'end'), stored('t_1', 2, 'and this one?', 'Looking', 'a_recent', 'cancelled')];
   const turn = turnContext('Where is it?', { history, images: [photo], historyImages: new Map([[recent.id, recent]]) });

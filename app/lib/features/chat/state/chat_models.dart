@@ -150,7 +150,7 @@ final class ChatTurn {
     this.text = '',
     this.actions = const [],
     this.cards = const [],
-    this.question,
+    this.questions = const [],
     this.usage,
     this.stop,
     this.error,
@@ -174,7 +174,13 @@ final class ChatTurn {
   /// Every `ui_action` of the turn; those with a step are also on it.
   final List<ChatActionRecord> actions;
   final List<AgentCard> cards;
-  final AgentQuestion? question;
+
+  /// What the turn asked, in order: one question, or up to three about the
+  /// plan it showed.
+  final List<AgentQuestion> questions;
+
+  /// The first question, which the session reports as pending.
+  AgentQuestion? get question => questions.firstOrNull;
 
   /// Running totals while the turn runs; the final totals afterwards.
   final TurnUsage? usage;
@@ -207,7 +213,7 @@ final class ChatTurn {
     String? text,
     List<ChatActionRecord>? actions,
     List<AgentCard>? cards,
-    AgentQuestion? question,
+    List<AgentQuestion>? questions,
     TurnUsage? usage,
     StopReason? stop,
     ChatError? error,
@@ -222,7 +228,7 @@ final class ChatTurn {
     text: text ?? this.text,
     actions: actions ?? this.actions,
     cards: cards ?? this.cards,
-    question: question ?? this.question,
+    questions: questions ?? this.questions,
     usage: usage ?? this.usage,
     stop: stop ?? this.stop,
     error: error ?? this.error,
@@ -258,6 +264,7 @@ final class ChatState {
   final bool isRestoring;
 
   /// The question the agent is waiting on; tapping an option answers it.
+  /// When the last turn asked several, this is the first of them.
   final AgentQuestion? pendingQuestion;
 
   /// The plan card the next message asks to change; the input box says so.

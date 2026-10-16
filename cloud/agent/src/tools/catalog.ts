@@ -9,10 +9,10 @@ import { centroid, compactFeature, haversineMeters, matchesKeywords, type Compac
 import type { FeatureReader } from '../features/reader.js';
 import { readTurnFeatures, turnSearchTime } from '../features/turn-search.js';
 import { RouteNotFoundError, type RoutesClient } from '../routes/routes-client.js';
-import { latLngSchema, modelCardItemSchema, timeWindowSchema, type LatLng } from '../protocol/schemas.js';
+import { QUESTION_LIMITS, latLngSchema, modelCardItemSchema, timeWindowSchema, travelModeSchema, type CardItem, type LatLng, type StopParking } from '../protocol/schemas.js';
 import { cached, type ToolCache } from '../cache.js';
-import { analyseAnomalyTool, areaBriefTool, findParkingTool } from '../workflows/workflows.js';
-import { defineTool, isToolError, toolError, type ToolError, type ToolSpec, type TurnRegistry } from './define.js';
+import { PLAN_PARKING_STOPS, analyseAnomalyTool, areaBriefTool, findParkingTool, planParkingTool } from '../workflows/workflows.js';
+import { defineTool, isToolError, runTool, toolError, type ToolError, type ToolSpec, type TurnRegistry } from './define.js';
 
 /** The layers the agent can search: the point-feature layers of map contract v1 (tools.md, Shared types). */
 export const toolLayerSchema = z.enum(['pedestrian', 'anomaly', 'disruption', 'event', 'news', 'planning', 'parking']);
@@ -354,20 +354,31 @@ const highlightFeatures = (deps: ToolDependencies) => defineTool({
   },
 });
 
-const showCard = defineTool({
+/** Where a plan stop is: the point the model gave, else the feature it cites, when this turn has it. */
+function stopPoint(turn: TurnRegistry, item: CardItem): LatLng | undefined {
+  if (item.location !== undefined) return item.location;
+  const feature = 'feature_id' in item.source ? turn.features.get(item.source.feature_id) : undefined;
+  return feature?.geometry == null ? undefined : centroid(feature.geometry);
+}
+
+const showCard = (deps: ToolDependencies) => defineTool({
   name: 'show_card',
   description: 'Show the user a result card. Every specific recommendation (a place, an event, a stop on a walk, a historical fact about a place) '
     + 'goes in a card, not in plain text. Each item must cite a feature id or a URL that a tool returned in this turn. Keep getting_there under 80 '
-    + 'characters and give times as full ISO 8601 with an offset, or leave time out.',
+    + 'characters and give times as full ISO 8601 with an offset, or leave time out. A plan gives each stop its location and says how the user '
+    + 'travels in travel_mode; with "drive" the card adds the live parking near each stop by itself.',
   status: 'Preparing a card',
   readOnly: false,
   schema: z.strictObject({
     type: z.enum(['plan', 'history', 'list']).describe('plan lists stops in visiting order'),
     title: z.string().min(1).max(80),
     intro: z.string().max(300).optional(),
+    travel_mode: travelModeSchema.optional().describe('Plans only: walk, transit, drive or cycle. drive adds live parking at each located stop'),
     items: z.array(modelCardItemSchema).min(1).max(13),
   }),
-  detail(args) { return `"${args.title}" · ${args.items.length} ${args.items.length === 1 ? 'item' : 'items'}`; },
+  detail(args) {
+    return `"${args.title}" · ${args.items.length} ${args.items.length === 1 ? 'item' : 'items'}${args.type === 'plan' && args.travel_mode === 'drive' ? ' · with parking' : ''}`;
+  },
   async run(args, turn, step) {
     const failing = args.items.flatMap((item, index) => {
       const ok = 'feature_id' in item.source ? turn.featureIds.has(item.source.feature_id) : turn.urls.has(item.source.url);
@@ -376,14 +387,36 @@ const showCard = defineTool({
     if (failing.length > 0) {
       return toolError('unverified_sources', 'These items cite sources no tool returned in this turn; drop them or search for sources first.', { items: failing });
     }
-    const placeIds = args.items.flatMap((item) => item.place_id === undefined ? [] : [item.place_id]);
+    const plan = args.type === 'plan';
+    const items: CardItem[] = args.items.map((item) => ({ ...item }));
+    // A plan the user drives to carries the live parking at each stop it can place: its own step, read now.
+    let parking: { stop: string; vacant: number; nearest_vacant_m: number | null }[] | undefined;
+    if (plan && args.travel_mode === 'drive') {
+      const stops = items.flatMap((item, index) => {
+        const point = stopPoint(turn, item);
+        return point === undefined ? [] : [{ index, point, name: item.title }];
+      }).slice(0, PLAN_PARKING_STOPS);
+      if (stops.length > 0) {
+        const outcome = await runTool(planParkingTool(deps), turn, { stops });
+        if (!isToolError(outcome)) {
+          for (const { index, parking: stopParking } of (outcome as { stops: { index: number; parking: StopParking }[] }).stops) {
+            items[index] = { ...items[index]!, location: stops.find((stop) => stop.index === index)!.point, stop_parking: stopParking };
+          }
+          parking = items.flatMap((item) => item.stop_parking === undefined ? []
+            : [{ stop: item.title, vacant: item.stop_parking.vacant, nearest_vacant_m: item.stop_parking.bays[0]?.distance_m ?? null }]);
+        }
+      }
+    }
+    const placeIds = items.flatMap((item) => item.place_id === undefined ? [] : [item.place_id]);
     const attribution = placeIds.length === 0 ? undefined
       : { google_maps: placeIds.map((placeId) => ({ place_id: placeId, maps_uri: turn.places.get(placeId)?.maps_uri ?? null })) };
     const card = { id: turn.nextCardId(), type: args.type, title: args.title, ...(args.intro === undefined ? {} : { intro: args.intro }),
-      items: args.items, ...(attribution === undefined ? {} : { attribution }) };
+      ...(plan && args.travel_mode !== undefined ? { travel_mode: args.travel_mode } : {}),
+      items, ...(attribution === undefined ? {} : { attribution }) };
     turn.cards.push(card);
     turn.sink.emit({ event: 'card', stepId: step.id, card });
-    return { card_id: card.id };
+    return { card_id: card.id, ...(parking === undefined ? {} : { parking,
+      note: 'The card shows each stop\'s nearest free bays and the area rules; mention parking in one sentence at most, and that a vacant sensor is not permission to park.' }) };
   },
 });
 
@@ -436,7 +469,9 @@ const askUser = defineTool({
   name: 'ask_user',
   description: 'Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, '
     + 'which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about '
-    + 'preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. Calling this ends your turn.',
+    + 'preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. After you showed a plan '
+    + 'card in this turn you may ask up to three questions about it (when they leave, how long they have, how they travel), all in the same '
+    + 'response. Calling this ends your turn.',
   status: 'Asking you a question',
   readOnly: false,
   schema: z.strictObject({
@@ -446,8 +481,15 @@ const askUser = defineTool({
   }),
   detail(args) { return args.question; },
   async run(args, turn, step) {
-    const question = { id: turn.nextQuestionId(), text: args.question, options: args.options, allowFreeText: args.allow_free_text ?? true };
-    turn.asked = question;
+    // Questions after a plan are about that plan: their answers come back with the whole card (agent-protocol.md, Questions about a plan).
+    const plan = turn.cards.findLast((card) => card.type === 'plan');
+    const limit = plan === undefined ? QUESTION_LIMITS.perTurn : QUESTION_LIMITS.perPlanTurn;
+    if (turn.questions.length >= limit) {
+      return toolError('invalid_arguments', plan === undefined ? 'Ask one question per turn.' : `Ask at most ${limit} questions about a plan.`);
+    }
+    const question = { id: turn.nextQuestionId(), text: args.question, options: args.options, allowFreeText: args.allow_free_text ?? true,
+      ...(plan === undefined ? {} : { planCardId: plan.id }) };
+    turn.questions.push(question);
     turn.sink.emit({ event: 'question', stepId: step.id, question });
     return { question_id: question.id };
   },
@@ -532,7 +574,7 @@ function groundingTool(kind: 'maps' | 'search', deps: ToolDependencies): ToolSpe
 
 /** The registry for one turn: every tool bound to the turn's registry and dependencies. */
 export function toolSpecs(deps: ToolDependencies): ToolSpec<z.ZodObject>[] {
-  return [searchFeatures(deps), getFeature(deps), getAnomaly(deps), nearbyContext(deps), showLayers, focusMap(deps), drawRoute(deps), highlightFeatures(deps), showCard, askUser,
+  return [searchFeatures(deps), getFeature(deps), getAnomaly(deps), nearbyContext(deps), showLayers, focusMap(deps), drawRoute(deps), highlightFeatures(deps), showCard(deps), askUser,
     areaBriefTool(deps), analyseAnomalyTool(deps), findParkingTool(deps), groundingTool('maps', deps), groundingTool('search', deps)];
 }
 

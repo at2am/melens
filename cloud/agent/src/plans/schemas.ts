@@ -29,6 +29,9 @@ export type SavedPlan = z.infer<typeof savedPlanSchema>;
 /** The body of `POST /v1/plans`: which stored card to keep. The service copies the card itself, never the client's. */
 export const savePlanBodySchema = z.strictObject({ sessionId: identifierSchema, cardId: identifierSchema });
 
+/** The body of `POST /v1/plans/{planId}/stops/{index}/refresh`: which live part of the stop to read again. */
+export const refreshStopBodySchema = z.strictObject({ part: z.enum(['parking']) });
+
 /** Card ids are `c_{turnId}_{n}` (TurnRegistry.nextCardId); the turn id is everything between. */
 export function turnIdOfCard(cardId: string): string | null {
   return /^c_(.+)_\d+$/.exec(cardId)?.[1] ?? null;

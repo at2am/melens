@@ -29,6 +29,8 @@ import { createRoutesClient } from './routes/routes-client.js';
 import { createAgentHttpServer } from './server.js';
 import { createFirestoreSessionStore } from './sessions/firestore-store.js';
 import { InMemorySessionStore } from './sessions/store.js';
+import type { ToolDependencies } from './tools/catalog.js';
+import { refreshStopParking } from './workflows/workflows.js';
 
 const log = (line: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(line)}\n`);
 
@@ -41,14 +43,15 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
   // Local development may keep sessions in memory and trust a fixed token; Cloud Run never does.
   const development = env.AGENT_DEVELOPMENT_MODE === 'true';
   const model = new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation });
-  const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools: {
+  const tools: ToolDependencies = {
     features: createSharedFeatureReader({ config: config.query, publicSources }),
     grounding: createVertexGrounding({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
     groundingTimeoutMs: config.groundingTimeoutMs,
     structured: createVertexStructuredModel({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
     routes: createRoutesClient(env.AGENT_ROUTES_QUOTA_PROJECT === undefined ? {} : { quotaProject: env.AGENT_ROUTES_QUOTA_PROJECT }),
     cache: development ? createMemoryCache() : createFirestoreCache({ projectId: config.projectId, databaseId: config.firestoreDatabase }),
-  } });
+  };
+  const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools });
   const store = development ? new InMemorySessionStore()
     : createFirestoreSessionStore({ projectId: config.projectId, databaseId: config.firestoreDatabase });
   const verifier = development && env.AGENT_DEVELOPMENT_TOKEN !== undefined
@@ -63,6 +66,7 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
       : createFirestoreFeedStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
   // Saved plans (UC-03) likewise; they copy cards out of the session store.
   const plans = new PlanService({ sessions: store, writeLimiter: createRateLimiter(PLAN_LIMITS.writesPerHour),
+    refreshParking: (request) => refreshStopParking(tools, request),
     store: development ? new InMemoryPlanStore()
       : createFirestorePlanStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
   const server = createAgentHttpServer({ store, verifier, runner, events, feeds, plans, rateLimiter: createRateLimiter(config.turnsPerHour),

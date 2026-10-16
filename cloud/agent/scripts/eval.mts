@@ -75,6 +75,10 @@ const CASES: readonly Case[] = [
   { id: 20, use: 'UC-13', before: ['Take me to Fitzroy Gardens.'], input: { kind: 'text', text: 'Great, thanks a lot.' }, expect: [], noTools: true },
   { id: 21, use: 'UC-13', before: ["What's the history of Flinders Street Station?"], input: { kind: 'text', text: 'Cool, thank you, that was interesting.' }, expect: [], noTools: true },
   { id: 22, use: 'UC-13', before: ['What can I do after 7 PM tonight?'], input: { kind: 'text', text: 'Thanks! Anything on tomorrow night too?' }, expect: ['search_features'] },
+  // Plans ask about what the request left open, then revise from the answer (UC-03, Questions while planning).
+  { id: 23, use: 'UC-03', input: { kind: 'text', text: 'Plan something fun for me to do tonight.' }, expect: ['show_card', 'ask_user'], expectCard: true, expectQuestion: true },
+  { id: 24, use: 'UC-03', before: ['Plan something fun for me to do tonight.'], input: { kind: 'text', text: 'In about an hour, and we will drive.' },
+    expect: ['show_card', 'plan_parking'], forbid: ['find_parking'], expectCard: true },
   { id: 12, use: 'UC-04', input: { kind: 'text', text: 'Why is it so busy here right now?' }, expect: ['nearby_context'], layers: ['event', 'disruption', 'news', 'pedestrian', 'anomaly'] },
 ];
 
@@ -114,7 +118,13 @@ for (const testCase of CASES) {
     runner.run({ uid: 'eval', turnId: id, seq, startedAt: new Date(), signal: AbortSignal.timeout(280_000), sink: id === turnId ? sink : collectingSink(id),
       session: { id: `s_eval_${testCase.id}`, uid: 'eval', title: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         turnCount: history.length, pendingQuestion, activeTurn: null, expiresAt: new Date(Date.now() + 864e5).toISOString() },
-      request: { input, context: context(testCase.layers) } as never, images: [], history, historyImages: new Map() });
+      request: { input, context: context(testCase.layers) } as never, images: [], history, historyImages: new Map(),
+      // As the server does: a reply to a question about a plan carries that plan.
+      ...(() => {
+        const planCard = pendingQuestion?.planCardId === undefined ? undefined
+          : history.flatMap((turn) => turn.cards).find((card) => card.id === pendingQuestion.planCardId);
+        return planCard === undefined ? {} : { planCard };
+      })() });
   try {
     const history: StoredTurn[] = [];
     for (const [index, earlier] of (testCase.before ?? []).entries()) {

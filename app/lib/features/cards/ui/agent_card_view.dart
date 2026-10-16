@@ -34,6 +34,25 @@ String formatCardTimeWindow(
   return '';
 }
 
+String travelModeLabel(AppLocalizations strings, TravelMode mode) =>
+    switch (mode) {
+      TravelMode.walk => strings.cardTravelWalk,
+      TravelMode.transit => strings.cardTravelTransit,
+      TravelMode.drive => strings.cardTravelDrive,
+      TravelMode.cycle => strings.cardTravelCycle,
+    };
+
+IconData travelModeIcon(TravelMode mode) => switch (mode) {
+  TravelMode.walk => Icons.directions_walk,
+  TravelMode.transit => Icons.directions_transit,
+  TravelMode.drive => Icons.directions_car,
+  TravelMode.cycle => Icons.directions_bike,
+};
+
+String _distance(int metres) => metres >= 1000
+    ? '${(metres / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} km'
+    : '$metres m';
+
 String cardTypeLabel(AppLocalizations strings, CardType type) => switch (type) {
   CardType.areaBrief => strings.cardTypeAreaBrief,
   CardType.anomalyAnalysis => strings.cardTypeAnomalyAnalysis,
@@ -55,6 +74,7 @@ class AgentCardView extends ConsumerWidget {
     this.onItemTap,
     this.onOpenSource,
     this.footer,
+    this.itemFooter,
     super.key,
   });
 
@@ -63,6 +83,10 @@ class AgentCardView extends ConsumerWidget {
 
   /// Actions under the items, for example a plan's change and save buttons.
   final Widget? footer;
+
+  /// Actions inside one item's tile, for example refreshing a saved plan
+  /// stop's parking; null for none.
+  final Widget? Function(int index, CardItem item)? itemFooter;
 
   /// Plans list stops in visiting order.
   final bool numbered;
@@ -92,6 +116,23 @@ class AgentCardView extends ConsumerWidget {
                     style: theme.textTheme.labelSmall,
                   ),
                 ),
+                if (card.travelMode case final mode?)
+                  Row(
+                    key: ValueKey('agent-card-travel-${card.id}'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        travelModeIcon(mode),
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        travelModeLabel(strings, mode),
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 4),
@@ -109,6 +150,17 @@ class AgentCardView extends ConsumerWidget {
                 clock: clock,
                 onTap: onItemTap == null ? null : () => onItemTap!(item),
                 onOpenSource: onOpenSource,
+                // A bay opens on the map like any card item that cites it.
+                onBayTap: onItemTap == null
+                    ? null
+                    : (bay) => onItemTap!(
+                        CardItem(
+                          title: strings.stopParkingBayTitle,
+                          source: FeatureCardSource(featureId: bay.featureId),
+                          location: bay.location,
+                        ),
+                      ),
+                footer: itemFooter?.call(index, item),
               ),
             if (card.hasGoogleMapsAttribution) ...[
               const SizedBox(height: 4),
@@ -146,6 +198,8 @@ class _CardItemView extends StatelessWidget {
     required this.clock,
     this.onTap,
     this.onOpenSource,
+    this.onBayTap,
+    this.footer,
     super.key,
   });
 
@@ -154,6 +208,8 @@ class _CardItemView extends StatelessWidget {
   final MelbourneClock clock;
   final VoidCallback? onTap;
   final ValueChanged<Uri>? onOpenSource;
+  final ValueChanged<StopParkingBay>? onBayTap;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -247,6 +303,14 @@ class _CardItemView extends StatelessWidget {
                             onOpenSource: onOpenSource,
                           ),
                       },
+                      if (item.stopParking case final stopParking?)
+                        StopParkingView(
+                          parking: stopParking,
+                          clock: clock,
+                          onBayTap: onBayTap,
+                          onOpenSource: onOpenSource,
+                        ),
+                      ?footer,
                     ],
                   ),
                 ),
@@ -288,10 +352,6 @@ class ParkingCardItemBody extends StatelessWidget {
     CardParkingState.occupied => ParkingState.occupied,
     CardParkingState.noData => ParkingState.noData,
   };
-
-  static String _distance(int metres) => metres >= 1000
-      ? '${(metres / 1000).toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '')} km'
-      : '$metres m';
 
   @override
   Widget build(BuildContext context) {
@@ -399,6 +459,134 @@ class ParkingCardItemBody extends StatelessWidget {
             style: muted,
           ),
       ],
+    );
+  }
+}
+
+/// The live parking around a plan stop the user drives to: the nearest free
+/// bays (each opens on the map), how many sensors read free and taken, when
+/// they were read, and the area's rules with the note that the sign at the
+/// bay decides and that a free sensor is not permission to park.
+class StopParkingView extends StatelessWidget {
+  const StopParkingView({
+    required this.parking,
+    required this.clock,
+    this.onBayTap,
+    this.onOpenSource,
+    super.key,
+  });
+
+  final StopParking parking;
+  final MelbourneClock clock;
+  final ValueChanged<StopParkingBay>? onBayTap;
+  final ValueChanged<Uri>? onOpenSource;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
+    final checked = switch (DateTime.tryParse(parking.checkedAt)) {
+      final parsed? => DateFormat(
+        'h:mm a',
+        'en_AU',
+      ).format(clock.toMelbourne(parsed)),
+      null => parking.checkedAt,
+    };
+    final best = parking.bays.firstOrNull;
+    final radius = _distance(parking.radiusMetres);
+    final rules = [
+      (strings.cardParkingFee, parking.fee),
+      (strings.cardParkingTimeLimit, parking.timeLimit),
+      (strings.cardParkingHours, parking.hours),
+      (strings.cardParkingPayment, parking.payment),
+    ].where((rule) => rule.$2 != null).toList();
+    final known =
+        parking.policyScope == CardParkingPolicyScope.area && rules.isNotEmpty;
+    return Container(
+      key: const ValueKey('stop-parking'),
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.local_parking, size: 16, color: colors.primary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  strings.stopParkingTitle,
+                  style: theme.textTheme.labelLarge,
+                ),
+              ),
+              Text(
+                strings.stopParkingChecked(checked),
+                key: const ValueKey('stop-parking-checked'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            best == null
+                ? strings.stopParkingNone(radius)
+                : strings.stopParkingNearest(
+                    _distance(best.distanceMetres),
+                    best.walkMinutes,
+                  ),
+            style: theme.textTheme.bodyMedium,
+          ),
+          Text(
+            strings.stopParkingCounts(parking.vacant, parking.occupied, radius),
+            style: muted,
+          ),
+          if (parking.bays.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final (index, bay) in parking.bays.indexed)
+                  ActionChip(
+                    key: ValueKey('stop-parking-bay-$index'),
+                    avatar: Icon(
+                      index == 0 ? Icons.star_outline : Icons.local_parking,
+                      size: 16,
+                    ),
+                    label: Text(
+                      strings.stopParkingBay(
+                        _distance(bay.distanceMetres),
+                        bay.walkMinutes,
+                      ),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onBayTap == null ? null : () => onBayTap!(bay),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 4),
+          if (known) ...[
+            for (final (label, value) in rules)
+              Text('$label: $value', style: theme.textTheme.bodySmall),
+            Text(strings.cardParkingAreaRules, style: muted),
+            if (parking.policyUrl case final url?)
+              CardSourceLink(url: url, onOpenSource: onOpenSource),
+          ] else
+            Text(strings.cardParkingRulesUnknown, style: muted),
+          Text(strings.stopParkingSensorNote, style: muted),
+        ],
+      ),
     );
   }
 }

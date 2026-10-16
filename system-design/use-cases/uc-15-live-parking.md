@@ -48,6 +48,8 @@ The map shows, for the area the user searches or looks at, which on-street bays 
 
 ## Notes
 
+- **Parking at the stops of a plan.** A plan the user drives to (UC-03, `travel_mode` `drive`) carries each located stop's parking in `stop_parking`, read by the same sensor search as `find_parking` (400 m, then 800 m) with the same area rules lookup, in a `plan_parking` step the model cannot call; a saved plan reads one stop's parking again on `POST /v1/plans/{planId}/stops/{index}/refresh`, keeping the area's rules from the earlier reading. The same rules apply: the rules are the area's, and a vacant sensor is not permission.
+
 **Design rules. Do not revert these without the project owner's agreement.**
 
 - **No parking read for a wide view.** Asked for by the project owner on 2026-10-16 (zoom 16 is a first value, not yet tuned on devices): the map leaves parking out of the viewport request below zoom 16. Measured on live data on 2026-10-16, a parking read returned 370 to 470 KB at every zoom, even a metro-wide view that was one cluster, and the map service loads the layers of one request one after another, so a wide parking read held up every other layer and could miss the 30 s request deadline.

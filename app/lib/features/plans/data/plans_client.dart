@@ -19,6 +19,10 @@ abstract interface class PlansClient {
 
   /// `DELETE /v1/plans/{id}`.
   Future<void> remove(String id);
+
+  /// `POST /v1/plans/{id}/stops/{index}/refresh`: reads the live parking
+  /// around stop [index] again and returns the plan with it, as kept.
+  Future<SavedPlan> refreshStop(String id, int index);
 }
 
 final class HttpPlansClient implements PlansClient {
@@ -67,6 +71,18 @@ final class HttpPlansClient implements PlansClient {
   @override
   Future<void> remove(String id) async {
     await _transport.json('DELETE', ['v1', 'plans', id]);
+  }
+
+  @override
+  Future<SavedPlan> refreshStop(String id, int index) async {
+    final json = await _transport.json(
+      'POST',
+      ['v1', 'plans', id, 'stops', '$index', 'refresh'],
+      body: const {'part': 'parking'},
+    );
+    return _decode(
+      () => SavedPlan.fromJson(json!['plan'] as Map<String, dynamic>),
+    );
   }
 
   static T _decode<T>(T Function() decode) {

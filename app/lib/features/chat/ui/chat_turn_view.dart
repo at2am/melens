@@ -8,6 +8,7 @@ import '../../map/state/map_actions.dart';
 import '../../plans/ui/plan_card_actions.dart';
 import '../state/chat_models.dart';
 import 'chat_photo_view.dart';
+import 'chat_questions_view.dart';
 
 String chatInputText(AppLocalizations strings, TurnInput input) =>
     switch (input) {
@@ -18,6 +19,9 @@ String chatInputText(AppLocalizations strings, TurnInput input) =>
       ),
       AnalyseTurnInput(:final featureId) => strings.chatInputAnalyse(featureId),
       AnswerTurnInput(:final value) => strings.chatInputAnswer(value),
+      AnswersTurnInput(:final answers) => strings.chatInputAnswers(
+        answers.map((answer) => answer.value).join(', '),
+      ),
       RefineTurnInput(:final text) => text,
     };
 
@@ -98,6 +102,7 @@ class ChatTurnView extends StatelessWidget {
     required this.isLast,
     this.pendingQuestion,
     this.onAnswer,
+    this.onAnswers,
     this.onRetry,
     this.onCardItemTap,
     this.onOpenSource,
@@ -109,6 +114,9 @@ class ChatTurnView extends StatelessWidget {
   final bool isLast;
   final AgentQuestion? pendingQuestion;
   final void Function(AgentQuestion question, String option)? onAnswer;
+
+  /// Answers several questions of this turn at once.
+  final ValueChanged<List<QuestionAnswer>>? onAnswers;
   final VoidCallback? onRetry;
   final CardItemCallback? onCardItemTap;
   final ValueChanged<Uri>? onOpenSource;
@@ -124,11 +132,8 @@ class ChatTurnView extends StatelessWidget {
     final colors = theme.colorScheme;
     final question = turn.question;
     final refines = turn.input is RefineTurnInput;
-    final showOptions =
-        isLast &&
-        question != null &&
-        pendingQuestion?.id == question.id &&
-        onAnswer != null;
+    final pending =
+        isLast && question != null && pendingQuestion?.id == question.id;
     final error = turn.error;
     final usage = turn.usage;
     final unattached = turn.unattachedActions;
@@ -245,30 +250,14 @@ class ChatTurnView extends StatelessWidget {
                   ? PlanCardActions(card: card)
                   : null,
             ),
-          if (question != null) ...[
-            const SizedBox(height: 4),
-            Text(question.text, style: theme.textTheme.titleSmall),
-            if (showOptions) ...[
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  for (final option in question.options)
-                    FilledButton.tonal(
-                      key: ValueKey('chat-option-$option'),
-                      onPressed: () => onAnswer!(question, option),
-                      child: Text(option),
-                    ),
-                ],
-              ),
-              if (question.allowFreeText)
-                Text(
-                  strings.chatQuestionFreeText,
-                  style: theme.textTheme.bodySmall,
-                ),
-            ],
-          ],
+          if (question != null)
+            ChatQuestionsView(
+              key: ValueKey('chat-questions-${turn.localId}'),
+              questions: turn.questions,
+              active: pending,
+              onAnswer: onAnswer,
+              onAnswers: onAnswers,
+            ),
           if (turn.phase == ChatTurnPhase.cancelled)
             Text(
               strings.chatTurnCancelled,

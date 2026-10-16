@@ -57,8 +57,11 @@ Flutter                                  Cloud Run: agent service (ADK, TypeScri
 | `analyse` | The user taps Analyse on a "?" marker | `featureId` |
 | `answer` | The user taps an option under a question | `questionId`, `value` |
 | `refine` | The user tapped Change plan under a plan card and sends what to change | `cardId` (a `plan` card of this session), `text` (1 to 2,000 characters) |
+| `answers` | The user picked answers under several questions of the last turn and sent them together | `answers`: 1 to 3 of `{ questionId, value }`, one per question |
 
 A `refine` turn is the UC-03 plan refinement. The service reads the card from the session's stored turn, never from the request: an unknown card answers `404 notFound` and a card that is not a plan `400 invalidRequest` (`messageKey` `agent.error.invalidRequest.not_a_plan`), both before the turn starts. The model gets the whole card, not only the item titles the history carries, and the card's sources count as returned in this turn, so the revised `plan` card may cite the kept stops without searching again. The app sends the card's id as `context.openCardId` too.
+
+**Questions about a plan.** A plan turn may show the plan and then ask up to three questions about it (when the user leaves, how long they have, how they travel); each `question` carries `planCardId`, that card's id. While the session's pending question names a plan card, the next `answer`, `answers` or `text` input gets that card from the stored turn, in full, like a `refine` turn, with its sources counting as returned in this turn. The model reads each answer with its question's text and revises the plan; it may ask again about what is still open. The app sends the card's id as `context.openCardId`.
 
 A `text` or `refine` input may carry photos the user attached, in `attachments` next to `input`; a `text` input's `text` may then be empty. Each is `{ "kind": "image", "mimeType": "image/jpeg", "data": "<standard base64>" }`: at most 4 per turn, each at most 1,000,000 bytes, of type `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. The server checks that the bytes start like the declared type and answers `400` otherwise. The app downsizes photos before sending (long edge 1,600 px, JPEG quality 80 where the platform re-encodes) and re-encodes anything still too large, or of another type, as a smaller PNG. Gemini reads the photos with the message; a photo Gemini cannot decode ends the turn with an `error` that says so and is not `retryable`.
 
@@ -73,8 +76,8 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 | `status` | `stepId`, `state` (`running`, `done`, `failed`), `tool`, `text` (the tool's status line), `detail` (a short summary of the arguments); when finished also `rows`, `durationMs`, `error` (a tool error code) and `memo` (answered from an identical earlier call) | Shows the step in the turn's trace: a spinner while it runs, then its row count, duration or error. Every tool call sends one `running` and one finished event with the same `stepId`; an instant call (memoised or invalid) sends only the finished one. This is the visible reasoning trace in the demo |
 | `text` | `delta` | Appends to the current answer |
 | `ui_action` | `stepId`, `action` (`show_layers`, `focus_map`, `draw_route`, `highlight_features`) and its arguments | The map controller applies it; the chat shows the outcome on the step with that `stepId` |
-| `card` | `stepId`, `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution; a `find_parking` item also carries `parking` (see `CardParking` in tools.md) | Renders the card widget for that type, with sources and Google Maps attribution. An item with `parking` renders as a parking bay: reading, best-match badge, distance and walk to the destination, and the area's fee, time limit, hours and payment on labelled lines with the note that the sign at the bay decides |
-| `question` | `stepId`, `id`, `text`, `options`, `allowFreeText` | Shows the question with one button per option; a tap sends an `answer` input |
+| `card` | `stepId`, `id`, `type` (`area_brief`, `anomaly_analysis`, `plan`, `history`, `list`), items with sources, attribution; a `find_parking` item also carries `parking` (see `CardParking` in tools.md); a plan may carry `travel_mode`, and the stops of a driven plan `stop_parking` (see `StopParking` in tools.md) | Renders the card widget for that type, with sources and Google Maps attribution. An item with `parking` renders as a parking bay: reading, best-match badge, distance and walk to the destination, and the area's fee, time limit, hours and payment on labelled lines with the note that the sign at the bay decides. A plan shows its travel mode; a stop with `stop_parking` shows its nearest free bays (each opens on the map), the free and taken counts, when they were read and the area's rules |
+| `question` | `stepId`, `id`, `text`, `options`, `allowFreeText`, and `planCardId` when it is about a plan of this turn | One question shows a button per option; a tap sends an `answer` input. Several questions show their options as choices; the user picks for any of them and sends the picks as one `answers` input |
 | `usage` | `call` (one model call: `index`, `agent`, `model`, token counts, `durationMs`) and `turn` (running totals) | Updates the token counter of the turn in progress; see [Token usage](#token-usage) |
 | `done` | `stop` (`end`, `asked`, `budget`, `cancelled`), `usage` (the final `turn` totals plus `complete`) | Ends the turn |
 | `error` | `message`, `retryable`, `usage` (totals so far, `complete: false` when a model call was cut off) | Shows the error; the user may retry if `retryable` |
@@ -86,7 +89,7 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 3. **Features by id.** Cards and UI actions reference `featureId`s, which are [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem ids. The app resolves them against the items it has loaded from the map query service, which keeps events small and consistent with the map. Card items also carry a `location`, so an item the app has not loaded still shows a pin; `highlight_features` reports ids the server could not find as `missing`.
 4. **Server-side sessions, per user.** Conversation history is stored in Firestore under the caller's uid and survives restarts and new revisions. The app keeps the current `sessionId` locally and can list and reopen earlier sessions. A session belongs to one uid; another user's session id returns `not_found`, never `forbidden`. One turn runs at a time per session, and a new turn interrupts the running one, so the user can redirect the agent at any moment: the server asks the running turn to stop, waits up to 5 seconds for it to store what it has (so the new turn's history includes it, marked as stopped), then runs the new turn. A turn that does not stop in time loses its lease; it is stored when it ends, without touching the newer turn's lease or pending question. The store numbers turns in the order they finish.
 5. **Cancellation reaches the server.** When the user taps stop, the app aborts the request and calls `POST /v1/sessions/{sessionId}/cancel`; leaving the screen or the session aborts the request too. The server cancels the run on the disconnect, on the cancel route, on a newer turn and at the turn deadline, so it stops spending tokens and grounding calls: model calls, BigQuery queries and grounding calls in flight are aborted. The stop request travels through the session's lease (`activeTurn.cancelRequested`), which the running turn watches, so it works whichever Cloud Run instance runs the turn. A stopped turn ends with `done` stop `cancelled` and is stored with what it produced so far.
-6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. Tapping an option sends an `answer` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
+6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. A turn asks one question, or up to three about the plan it showed. Tapping an option sends an `answer` input; picks under several questions go as one `answers` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
 
 ## Token usage
 
@@ -127,8 +130,8 @@ Sessions are stored in Firestore in the project's agent database. Only the agent
 
 | Document | Fields |
 | --- | --- |
-| `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`) or null, `activeTurn` lease (`turnId`, `expiresAt`, `cancelRequested` once a stop is asked) or null, `expiresAt` for the TTL policy |
-| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), `attachments` (`id`, `kind`, `mimeType`, `bytes` of each photo), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question`, `done`), a compact tool trace (tool, arguments, status line, argument summary, row count, error, duration, memo flag) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
+| `users/{uid}/sessions/{sessionId}` | `createdAt`, `updatedAt`, `title` (the first user message, trimmed), `turnCount`, `pendingQuestion` (`id`, `text`, `options`, `planCardId`; the first question when the turn asked several) or null, `activeTurn` lease (`turnId`, `expiresAt`, `cancelRequested` once a stop is asked) or null, `expiresAt` for the TTL policy |
+| `users/{uid}/sessions/{sessionId}/turns/{turnId}` | `seq`, `input` (`kind` and `text`, `featureId` or `questionId`/`value`), `attachments` (`id`, `kind`, `mimeType`, `bytes` of each photo), the events the turn produced (`text` joined into one string, `card`, `ui_action`, `question` (the first) and `questions` (all of them; empty for turns stored before 2026-10-16), `done`), a compact tool trace (tool, arguments, status line, argument summary, row count, error, duration, memo flag) and `usage` (the final `turn` totals plus the per-call list, exactly as streamed) |
 
 | `users/{uid}/sessions/{sessionId}/attachments/{attachmentId}` | One photo: `turnId`, `mimeType`, `data` (the bytes), `createdAt`, `expiresAtTs`. Written with its turn, deleted with it |
 
@@ -243,13 +246,14 @@ Rules:
 
 ## Saved plans
 
-A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` and shown on the Home tab until the user removes it. It is a one-off: a copy of the card, not a subscription, and nothing refreshes it.
+A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` and shown on the Home tab until the user removes it. It is a one-off: a copy of the card, not a subscription. Its stops are not re-planned, but each stop's live part can be read again on request: today the parking around it, for a user who reached the stop before and drives on.
 
 | Method and path | Purpose |
 | --- | --- |
 | `GET /v1/plans` | The caller's saved plans, newest first: `{ "plans": […] }` |
 | `POST /v1/plans` | Save the plan card named by the body `{ "sessionId": …, "cardId": … }`; `201` with `{ "plan": … }`. Saving a card already saved returns that plan |
 | `DELETE /v1/plans/{planId}` | Remove one; `204`, or `404 notFound` |
+| `POST /v1/plans/{planId}/stops/{index}/refresh` | Read one live part of stop `index` (from 0) again, body `{ "part": "parking" }`; `200` with `{ "plan": … }` as kept |
 
 A saved plan:
 
@@ -269,7 +273,8 @@ Rules:
 1. **Copied, not sent.** The service copies the card from the caller's own stored turn, so its sources stay the ones it verified. A card id that is unknown, of another session or of another uid answers `404 notFound`; a card that is not a plan `400 invalidRequest` (`.not_a_plan`). The plan's `id` is the card's id.
 2. **Route.** `route` is the arguments of the turn's last `draw_route` action, when it drew one; the app draws it again on request. Absent otherwise.
 3. **Lifetime.** A saved plan outlives its 30-day session and has no TTL; the user removes it.
-4. **Limits.** At most 30 saved plans per uid (`409 conflict`, `.plan_limit`). Saves and removals count against a per-uid limit of 120 per hour (`429 rateLimited`); saving a card already saved does not count, and reads are not limited.
+4. **Limits.** At most 30 saved plans per uid (`409 conflict`, `.plan_limit`). Saves, removals and stop refreshes count against a per-uid limit of 120 per hour (`429 rateLimited`); saving a card already saved does not count, and reads are not limited.
+5. **Refreshing a stop.** The service reads the parking sensors around the stop's `location` again, as `find_parking` does, and replaces the stop's `stop_parking`; no model runs. The area's rules are kept from the earlier reading when it had them, and looked up once (cached by place and day) when it did not. Any located stop can be refreshed, also in a plan that was not driven. An unknown plan or stop answers `404 notFound`, a stop without a location `400 invalidRequest` (`.no_location`), another `part` `400`, and a service without the parking reader `503`. A plan removed while the sensors were read stays removed (`404`).
 
 | Document | Fields |
 | --- | --- |
