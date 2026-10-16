@@ -7,6 +7,7 @@ Melens shows City of Melbourne datasets as map layers, and Gemini agents answer 
 | [system-design/](system-design/) | Design docs, use cases and agent instructions |
 | [cloud/](cloud/) | Google Cloud backend: [data ingestion](cloud/data/infra/README.md), [shared query library](cloud/shared/README.md), [map query service](cloud/map/README.md), [agent service](cloud/agent/README.md) |
 | [app/](app/) | Flutter app for Android, iOS and Web; see [app/README.md](app/README.md) |
+| [.github/](.github/release/README.md) | Release workflow: a `v*` tag deploys the Cloud Run services and the Web app |
 
 ## Design docs
 

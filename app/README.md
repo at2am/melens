@@ -152,6 +152,8 @@ Against the deployed service, set `AGENT_BASE_URL` to its Cloud Run URL (`https:
 
 ## Deploying the Web app
 
+A `v*` tag releases the services and the Web app through GitHub Actions ([.github/release/README.md](../.github/release/README.md)); the steps below are the manual path.
+
 The Web build is served by Firebase Hosting at `https://melens-510012.web.app` (`firebase.json` rewrites every path to `index.html`, so deep links such as `/discover` work). Build against the deployed services and release:
 
 ```sh
