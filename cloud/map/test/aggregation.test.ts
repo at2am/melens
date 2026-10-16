@@ -37,6 +37,9 @@ function sensor(id: string, options: {
   const locationSource = { sourceId: 'sample.locations', url: null,
     attribution: 'Synthetic T026 acceptance locations', versionRef: null };
   return adaptPedestrianRow({
+    rights_evidence: 'latest_published_record_v1', source_record_id: `sample-observation:${id}`,
+    version_id: 'sample-native-observation-v1', location_source_record_id: `sample-location:${id}`,
+    location_version_id: 'sample-native-location-v1',
     source_id: source.sourceId, batch_id: 't026-synthetic-v1', sensor_id: id,
     observed_at: options.observedAt ?? WINDOW.from,
     total_count: options.count === undefined ? 12 : options.count,

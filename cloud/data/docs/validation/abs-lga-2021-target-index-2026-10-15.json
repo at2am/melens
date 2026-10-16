@@ -1,0 +1,342 @@
+{
+  "purpose": "Official target name/code index only. This does not establish the source geography used by Homes Victoria or CSA.",
+  "scheme": "ASGS_LGA",
+  "vintage": "2021",
+  "state_code": "2",
+  "fetched_at": "2026-10-15T13:56:46.121Z",
+  "query_url": "https://geo.abs.gov.au/arcgis/rest/services/ASGS2021/LGA/MapServer/0/query?where=state_code_2021%3D%272%27&outFields=lga_code_2021%2Clga_name_2021&returnGeometry=false&orderByFields=lga_code_2021&f=json",
+  "source_publication": "https://www.abs.gov.au/statistics/standards/australian-statistical-geography-standard-asgs/edition-3-july-2021-june-2026/non-abs-structures/local-government-areas",
+  "response_sha256": "0ee6e813c3eb8970ac59df1edcd655b2cbab79f2d8d60581ef84975ce4162014",
+  "count": 82,
+  "source_crosswalk_verified": false,
+  "rows": [
+    {
+      "code": "20110",
+      "name": "Alpine"
+    },
+    {
+      "code": "20260",
+      "name": "Ararat"
+    },
+    {
+      "code": "20570",
+      "name": "Ballarat"
+    },
+    {
+      "code": "20660",
+      "name": "Banyule"
+    },
+    {
+      "code": "20740",
+      "name": "Bass Coast"
+    },
+    {
+      "code": "20830",
+      "name": "Baw Baw"
+    },
+    {
+      "code": "20910",
+      "name": "Bayside (Vic.)"
+    },
+    {
+      "code": "21010",
+      "name": "Benalla"
+    },
+    {
+      "code": "21110",
+      "name": "Boroondara"
+    },
+    {
+      "code": "21180",
+      "name": "Brimbank"
+    },
+    {
+      "code": "21270",
+      "name": "Buloke"
+    },
+    {
+      "code": "21370",
+      "name": "Campaspe"
+    },
+    {
+      "code": "21450",
+      "name": "Cardinia"
+    },
+    {
+      "code": "21610",
+      "name": "Casey"
+    },
+    {
+      "code": "21670",
+      "name": "Central Goldfields"
+    },
+    {
+      "code": "21750",
+      "name": "Colac Otway"
+    },
+    {
+      "code": "21830",
+      "name": "Corangamite"
+    },
+    {
+      "code": "21890",
+      "name": "Darebin"
+    },
+    {
+      "code": "22110",
+      "name": "East Gippsland"
+    },
+    {
+      "code": "22170",
+      "name": "Frankston"
+    },
+    {
+      "code": "22250",
+      "name": "Gannawarra"
+    },
+    {
+      "code": "22310",
+      "name": "Glen Eira"
+    },
+    {
+      "code": "22410",
+      "name": "Glenelg"
+    },
+    {
+      "code": "22490",
+      "name": "Golden Plains"
+    },
+    {
+      "code": "22620",
+      "name": "Greater Bendigo"
+    },
+    {
+      "code": "22670",
+      "name": "Greater Dandenong"
+    },
+    {
+      "code": "22750",
+      "name": "Greater Geelong"
+    },
+    {
+      "code": "22830",
+      "name": "Greater Shepparton"
+    },
+    {
+      "code": "22910",
+      "name": "Hepburn"
+    },
+    {
+      "code": "22980",
+      "name": "Hindmarsh"
+    },
+    {
+      "code": "23110",
+      "name": "Hobsons Bay"
+    },
+    {
+      "code": "23190",
+      "name": "Horsham"
+    },
+    {
+      "code": "23270",
+      "name": "Hume"
+    },
+    {
+      "code": "23350",
+      "name": "Indigo"
+    },
+    {
+      "code": "23430",
+      "name": "Kingston (Vic.)"
+    },
+    {
+      "code": "23670",
+      "name": "Knox"
+    },
+    {
+      "code": "23810",
+      "name": "Latrobe (Vic.)"
+    },
+    {
+      "code": "23940",
+      "name": "Loddon"
+    },
+    {
+      "code": "24130",
+      "name": "Macedon Ranges"
+    },
+    {
+      "code": "24210",
+      "name": "Manningham"
+    },
+    {
+      "code": "24250",
+      "name": "Mansfield"
+    },
+    {
+      "code": "24330",
+      "name": "Maribyrnong"
+    },
+    {
+      "code": "24410",
+      "name": "Maroondah"
+    },
+    {
+      "code": "24600",
+      "name": "Melbourne"
+    },
+    {
+      "code": "24650",
+      "name": "Melton"
+    },
+    {
+      "code": "24780",
+      "name": "Mildura"
+    },
+    {
+      "code": "24850",
+      "name": "Mitchell"
+    },
+    {
+      "code": "24900",
+      "name": "Moira"
+    },
+    {
+      "code": "24970",
+      "name": "Monash"
+    },
+    {
+      "code": "25060",
+      "name": "Moonee Valley"
+    },
+    {
+      "code": "25150",
+      "name": "Moorabool"
+    },
+    {
+      "code": "25250",
+      "name": "Moreland"
+    },
+    {
+      "code": "25340",
+      "name": "Mornington Peninsula"
+    },
+    {
+      "code": "25430",
+      "name": "Mount Alexander"
+    },
+    {
+      "code": "25490",
+      "name": "Moyne"
+    },
+    {
+      "code": "25620",
+      "name": "Murrindindi"
+    },
+    {
+      "code": "25710",
+      "name": "Nillumbik"
+    },
+    {
+      "code": "25810",
+      "name": "Northern Grampians"
+    },
+    {
+      "code": "25900",
+      "name": "Port Phillip"
+    },
+    {
+      "code": "25990",
+      "name": "Pyrenees"
+    },
+    {
+      "code": "26080",
+      "name": "Queenscliffe"
+    },
+    {
+      "code": "26170",
+      "name": "South Gippsland"
+    },
+    {
+      "code": "26260",
+      "name": "Southern Grampians"
+    },
+    {
+      "code": "26350",
+      "name": "Stonnington"
+    },
+    {
+      "code": "26430",
+      "name": "Strathbogie"
+    },
+    {
+      "code": "26490",
+      "name": "Surf Coast"
+    },
+    {
+      "code": "26610",
+      "name": "Swan Hill"
+    },
+    {
+      "code": "26670",
+      "name": "Towong"
+    },
+    {
+      "code": "26700",
+      "name": "Wangaratta"
+    },
+    {
+      "code": "26730",
+      "name": "Warrnambool"
+    },
+    {
+      "code": "26810",
+      "name": "Wellington"
+    },
+    {
+      "code": "26890",
+      "name": "West Wimmera"
+    },
+    {
+      "code": "26980",
+      "name": "Whitehorse"
+    },
+    {
+      "code": "27070",
+      "name": "Whittlesea"
+    },
+    {
+      "code": "27170",
+      "name": "Wodonga"
+    },
+    {
+      "code": "27260",
+      "name": "Wyndham"
+    },
+    {
+      "code": "27350",
+      "name": "Yarra"
+    },
+    {
+      "code": "27450",
+      "name": "Yarra Ranges"
+    },
+    {
+      "code": "27630",
+      "name": "Yarriambiack"
+    },
+    {
+      "code": "29399",
+      "name": "Unincorporated Vic"
+    },
+    {
+      "code": "29499",
+      "name": "No usual address (Vic.)"
+    },
+    {
+      "code": "29799",
+      "name": "Migratory - Offshore - Shipping (Vic.)"
+    }
+  ]
+}

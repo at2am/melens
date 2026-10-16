@@ -14,17 +14,25 @@ result, an exact total or full geographic/time coverage.
 
 ## Record-level public access gates
 
+The fixes below were first validated on 2026-10-15 with the actual view SQL and
+read-only BigQuery fixture tables. That fixture-only check deployed no views and changed no IAM.
+The later authorized deployment and SQL readback are recorded in
+[the historical migration evidence](../../cloud/data/docs/validation/nonparking-sql-migration-readback-2026-10-15.json).
+The map adapters require `rights_evidence = 'latest_published_record_v1'` from
+the repaired boundary/pedestrian views. Existing deployed definitions without
+that column remain unavailable. Source-record contracts use `rights_status`
+and `record_status`; they do not have a `public_query_allowed` field.
+
 | View / owning path | Evidence | Required owner acceptance |
 | --- | --- | --- |
-| `v_boundaries`, `cloud/data/sql/006_area_views.sql:20` | Eligible rights are filtered before choosing the latest boundary version. A newer withdrawn/review-required record can leave an older eligible version drawable; there is no independent latest-record access gate. | Check the newest record's rights before serving any version. Prove withdrawal hides current and historical access without reviving an older eligible version. |
-| `v_pedestrian_observations`, `cloud/data/sql/004_street_views.sql:20` | Observation and location joins use published batches and admitted sources, but the joined source record's rights/withdrawal status is not checked. Observation native record/version identifiers are not exposed in the final view. | Prove latest observation and effective-location rights independently; expose enough public identity to revalidate exact versions. Test revoked observation, revoked location, changed rights with unchanged source watermark, and full-window location validity. |
+| `v_boundaries`, `cloud/data/sql/006_area_views.sql` | The repaired SQL selects the latest complete record permission before rights filtering. Exact and latest source-record rights plus current source admission gate every boundary. Unordered conflicting permissions deny access. | Read-only production SQL fixtures passed for withdrawal, rights/source revocation, equal-clock permission conflict and failed successor batches. Deploy and verify the served view separately. |
+| `v_pedestrian_observations`, `cloud/data/sql/004_street_views.sql` | Exact/latest observation and location source-record rights now gate each row. Native record/version identifiers bind snapshots. Location joins inspect every overlapping interval and require a complete count-window location without conflicting coordinates/status. | Read-only production SQL fixtures passed for count/location withdrawal, source revocation, equal-clock conflict, incomplete hourly windows, half-open endpoints and mid-window coordinate/status changes. Deploy and verify the served view separately. |
 | `v_geo_records_history`, `cloud/data/sql/002_core_views.sql:48` | An independent latest-record access check gates old public versions; the map also rechecks exact adapted id/version/content. | Preserve this protection in planning, event and disruption publication changes. |
 
-Until supplemental independent proof is available, production map viewport and
-unlocated routes fail closed for boundary/pedestrian. Their adapters and labelled
-sample renderers are implemented. Source-level catalog availability alone does
-not bypass the gate. Stored detail, continuation and member reads recheck source
-publication and exact public originals; retraction returns `notAvailable`.
+Production map viewport and unlocated routes require the repaired view evidence
+for boundary/pedestrian. A supplemental independent verifier remains available.
+Source-level catalog availability alone does not bypass the gate. Stored detail,
+continuation and member reads recheck source publication and exact public originals; retraction returns `notAvailable`.
 
 Planning is the positive real preview path. It uses the existing query identity
 and approved geo views, never raw/staging tables. The measured 383,847,461-byte

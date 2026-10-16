@@ -116,6 +116,54 @@ void main() {
     expect(find.byKey(const ValueKey('app-chat-panel')), findsNothing);
   });
 
+  testWidgets('an unsent chat draft survives tabs and closing the panel', (
+    tester,
+  ) async {
+    final container = appContainer();
+    addTearDown(container.dispose);
+    await pumpApp(tester, container, size: const Size(1440, 900));
+
+    await tester.tap(find.byKey(const ValueKey('chat-fab')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Keep this unsent draft',
+    );
+    for (final name in ['discover', 'settings', 'feed']) {
+      await tester.tap(tab(name));
+      await tester.pumpAndSettle();
+      expect(find.text('Keep this unsent draft'), findsOneWidget, reason: name);
+    }
+
+    await tester.tap(find.byKey(const ValueKey('chat-close')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-fab')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keep this unsent draft'), findsOneWidget);
+  });
+
+  testWidgets('an unsent phone chat draft survives reopening on another tab', (
+    tester,
+  ) async {
+    final container = appContainer();
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    await tester.tap(find.byKey(const ValueKey('chat-fab')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Keep the phone draft',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-close')));
+    await tester.pumpAndSettle();
+    await tester.tap(tab('discover'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('chat-fab')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keep the phone draft'), findsOneWidget);
+  });
+
   testWidgets('a card item tapped in the chat opens on the map', (
     tester,
   ) async {

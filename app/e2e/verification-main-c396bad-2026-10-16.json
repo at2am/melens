@@ -1,0 +1,790 @@
+{
+  "formatVersion": 1,
+  "status": "passed_for_selected_local_nonparking_scope",
+  "verifiedAt": "2026-10-16T01:17:08.238889+00:00",
+  "candidateBaseCommit": "c396bad446f14d74a6c9c20684f0e702786e69f7",
+  "evidenceRoot": "/Users/alexgao/.codex/worktrees/nonparking-main-integration/melens/app/e2e",
+  "tests": {
+    "flutter": {
+      "passed": 503,
+      "analysis": "no_issues"
+    },
+    "shared": {
+      "passed": 154,
+      "skipped": 1
+    },
+    "map": {
+      "passed": 111,
+      "skipped": 0
+    },
+    "agent": {
+      "passed": 65,
+      "skipped": 0
+    },
+    "data": {
+      "passed": 763,
+      "skipped": 17
+    },
+    "provenance": {
+      "passed": 4
+    },
+    "e2e": {
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "businessRetries": 0
+    }
+  },
+  "suites": [
+    {
+      "directory": ".e2e/c396-final-live-ui",
+      "runId": "01a14241-9b8a-73f6-96fa-d30fef4f428a",
+      "summary": {
+        "discovered": 11,
+        "selected": 11,
+        "executed": 11,
+        "passed": 11,
+        "failed": 0,
+        "interrupted": 0,
+        "flaky": 0,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-16T01:09:18.731Z",
+      "finishedAt": "2026-10-16T01:10:39.840Z",
+      "reportSha256": "8826bab0a1c321d7e0fb0fbe07ff20b2a78412968e29adea7a38b0af9b98cfe8",
+      "receiptSha256": "06815122901378a7b4d08f0a7c278e88762b3a5dbebf150daa6c99d161918097",
+      "builds": [
+        {
+          "manifest": "localLive",
+          "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+          "bundleSha256": "3629a4b884f2edfa6dd5b722bdf7dfe7370db06a57c29b3a35c4414896ebe4bb",
+          "servedManifestSha256": "6645e266140a0322700e985a1f6bb27a3ac06b583223bece455c023539047af1"
+        }
+      ]
+    },
+    {
+      "directory": ".e2e/c396-final-agent",
+      "runId": "01a14242-ef85-7ee2-941e-6c25e0c1707a",
+      "summary": {
+        "discovered": 3,
+        "selected": 3,
+        "executed": 3,
+        "passed": 3,
+        "failed": 0,
+        "interrupted": 0,
+        "flaky": 0,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-16T01:10:45.559Z",
+      "finishedAt": "2026-10-16T01:12:07.530Z",
+      "reportSha256": "cd3625c0abed806186d9ff4e583e31a57aa29007955f2c9ec25c17ad0cc23c27",
+      "receiptSha256": "1b5bc826f9170f1f7953df88b280e2f30bf50c54f810b5f531215ace1aecef4b",
+      "builds": [
+        {
+          "manifest": "localLive",
+          "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+          "bundleSha256": "3629a4b884f2edfa6dd5b722bdf7dfe7370db06a57c29b3a35c4414896ebe4bb",
+          "servedManifestSha256": "6645e266140a0322700e985a1f6bb27a3ac06b583223bece455c023539047af1"
+        }
+      ]
+    },
+    {
+      "directory": ".e2e/c396-final-events",
+      "runId": "01a14245-b9f5-7fbf-a985-ddf933f0d4c2",
+      "summary": {
+        "discovered": 1,
+        "selected": 1,
+        "executed": 1,
+        "passed": 1,
+        "failed": 0,
+        "interrupted": 0,
+        "flaky": 0,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-16T01:13:48.467Z",
+      "finishedAt": "2026-10-16T01:13:51.866Z",
+      "reportSha256": "68d4f9fc57a3d90dec49cd13c85bedd96f95fc262931da57731451851fb967f0",
+      "receiptSha256": "207ac25fb7c712fa49d651cc53cb84fecd7f42ca43ef8e996e9896ae2d9fa658",
+      "builds": [
+        {
+          "manifest": "localLive",
+          "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+          "bundleSha256": "3629a4b884f2edfa6dd5b722bdf7dfe7370db06a57c29b3a35c4414896ebe4bb",
+          "servedManifestSha256": "6645e266140a0322700e985a1f6bb27a3ac06b583223bece455c023539047af1"
+        }
+      ]
+    },
+    {
+      "directory": ".e2e/c396-final-sample-ui",
+      "runId": "01a14246-e328-78c0-a9da-d21008f04d5d",
+      "summary": {
+        "discovered": 11,
+        "selected": 11,
+        "executed": 11,
+        "passed": 11,
+        "failed": 0,
+        "interrupted": 0,
+        "flaky": 0,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-16T01:15:04.530Z",
+      "finishedAt": "2026-10-16T01:15:35.989Z",
+      "reportSha256": "45c288d65dcf39d75605c4c8cf121d411ab23fcbbbf181a57d5373d9096ac328",
+      "receiptSha256": "19517081080e14de8cd3337e98b06400f65927b2d16ea8da98884dda9b7466dc",
+      "builds": [
+        {
+          "manifest": "localSample",
+          "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+          "bundleSha256": "0edadfd33c6db2a217a2e31dbf4936306d55706b33c60da7f36a72b2c2f417ef",
+          "servedManifestSha256": "813c5a646cff2b90cda3d6b2cf262da1fcddde024b61035dc87c154a53c52c46"
+        }
+      ]
+    }
+  ],
+  "backend": {
+    "artifactFiles": 93,
+    "beforeSha256": "355daf577d524149be4a118856cf52c2f89bc28d2cad7044b4af2850db494836",
+    "afterSha256": "355daf577d524149be4a118856cf52c2f89bc28d2cad7044b4af2850db494836",
+    "restartedDuringFinalSuites": false,
+    "rateLimitEvents": 0,
+    "ports": [
+      8090,
+      8091
+    ]
+  },
+  "preservation": {
+    "excludedWipFilesVerified": 48,
+    "parkingQueryAndTestChangesExcluded": true,
+    "otherSessionProcessesPreserved": true,
+    "retainedStash": "ef95f5b030bc0f649c59b74ebb56ece4a8b838b3"
+  },
+  "testedFiles": [
+    {
+      "path": "app/README.md",
+      "sha256": "4be5d038f6b307b69a8fd3dd658df57b682f12e3fc4e4fb6cebcb385a2b026fa"
+    },
+    {
+      "path": "app/e2e/.gitignore",
+      "sha256": "7fb579ca79482b56f618f44a51741555579c6efdf365b06bb94bc5608cdff719"
+    },
+    {
+      "path": "app/e2e/README.md",
+      "sha256": "98fd490e6af29cfd59e5cb6654e10c905f28b577dd1ee7fee460293388e696af"
+    },
+    {
+      "path": "app/e2e/build.py",
+      "sha256": "de8115142b84c87dc394223edd7148cebee29a295dda25ef70a772a61c2e3b50"
+    },
+    {
+      "path": "app/e2e/build_release.py",
+      "sha256": "1871446efbb90c182fab49cefb73a2474e698a6ad26a0afdb22bdc4050358d85"
+    },
+    {
+      "path": "app/e2e/e2e.agent.config.ts",
+      "sha256": "8c6db3f483cab838af78cff9a582b5db912f95ca73b2c45003f9db2c7af4b6c8"
+    },
+    {
+      "path": "app/e2e/e2e.cloud.config.ts",
+      "sha256": "116bd0d9214ad9ee0b6ad97a67fba23520dffa7712b8ba194760c30fe481b6c7"
+    },
+    {
+      "path": "app/e2e/e2e.config.ts",
+      "sha256": "a19fcbd239158663440d2d4780b60168952a6ac059814aee8bd63ffd4a07f5c5"
+    },
+    {
+      "path": "app/e2e/e2e.events.config.ts",
+      "sha256": "3baff15f114f9a68cff1da871d0688fbdced6493526aaf59ff32028dce3c60b5"
+    },
+    {
+      "path": "app/e2e/e2e.nonparking.config.ts",
+      "sha256": "cc9dfad6e3da063d86bbad70201a296e524ccf71077a0321e30dcadebb66b24f"
+    },
+    {
+      "path": "app/e2e/flutter-input-verification-2026-10-16.md",
+      "sha256": "e75901a58a9d48b5b5d8a6b0820d3a7ad3d1ba4588f3af5a3cf4c7ed6262d4c7"
+    },
+    {
+      "path": "app/e2e/hosting_release.py",
+      "sha256": "417cc74ffac3a71c91c531e2ae4cf0bdd1ffaf7715df4c8ffa0e1b4eb6057c26"
+    },
+    {
+      "path": "app/e2e/package-lock.json",
+      "sha256": "69eeb978623a24ab6c95989fd2ab4b143c7c9c2f17e53d1828826f401f11a9b4"
+    },
+    {
+      "path": "app/e2e/package.json",
+      "sha256": "2bb5715f6be5216a1d11d3ed85ee48d74d6cf1c27964f52971c43fc2af28fa38"
+    },
+    {
+      "path": "app/e2e/provenance.py",
+      "sha256": "5059361e8518e7e6734a5fe81d6d150acf4bc5b9fd854417ad9f6c7e20f178d6"
+    },
+    {
+      "path": "app/e2e/serve.py",
+      "sha256": "b9973fa60ffc0398975b5c071b096bd48a0ca00378ba9fbec617f127c33f4d07"
+    },
+    {
+      "path": "app/e2e/test_provenance.py",
+      "sha256": "1b1a2056b8f22dd46bb5dd5d02283c6953ade5d5eed51f47676facfb6cc993d5"
+    },
+    {
+      "path": "app/e2e/tests/agent.e2e.ts",
+      "sha256": "87e7da33ae26259620af37517097936335a0122f805c96fa6ca4241832a9d80f"
+    },
+    {
+      "path": "app/e2e/tests/build-check.ts",
+      "sha256": "94a73b1a2820023e4791cca4f2122fb8468bdf69f1cb4a397323e7933ae07d68"
+    },
+    {
+      "path": "app/e2e/tests/cloud-acceptance.e2e.ts",
+      "sha256": "317f1cee181b02e53f2c54e9fd41a9f2c948819d5655c9f1189349fb61fb5cc2"
+    },
+    {
+      "path": "app/e2e/tests/events.e2e.ts",
+      "sha256": "ad9f3e8b1957cf5d9fd01523448282f47db2916f63896724960baee80d20482e"
+    },
+    {
+      "path": "app/e2e/tests/feed-original.e2e.ts",
+      "sha256": "351264b339f7dec8c4abe0033287143167108aad31acfd08b6bcc434e443b09b"
+    },
+    {
+      "path": "app/e2e/tests/feed-support.ts",
+      "sha256": "0b11d81d0da651c1642099d75928ece679e67a02a05713c3b6e8d33e8bd9f653"
+    },
+    {
+      "path": "app/e2e/tests/flutter-focus.ts",
+      "sha256": "4c7c89590bfe0c1bd7389f6af6a31ce973d768ea163c2a110784768c92f6e00f"
+    },
+    {
+      "path": "app/e2e/tests/local-targets.d.mts",
+      "sha256": "287d84027a823a9bd32cf1fe1c74f442297ec740986b53f484453afca8dcf04b"
+    },
+    {
+      "path": "app/e2e/tests/local-targets.mjs",
+      "sha256": "12e03d89c825154b9a56e0c30b4cfda1224f18675e5a1f0e9428aeac6af00891"
+    },
+    {
+      "path": "app/e2e/tests/map.e2e.ts",
+      "sha256": "17261cddbb7d39e49a64bcae2b2856c0573daa676e81c1a8cbf37b7d5a6e0bfd"
+    },
+    {
+      "path": "app/e2e/tests/navigation.e2e.ts",
+      "sha256": "65451e51703e6743b5238fba86d88f7ef8ed10de2bb8d5a8822378f8d85fee19"
+    },
+    {
+      "path": "app/e2e/tests/read-only-transport.d.mts",
+      "sha256": "bd5ea1d36e684ef60ec7a8c9efad5df0b7d411400390e022407526f0c1a7bf55"
+    },
+    {
+      "path": "app/e2e/tests/read-only-transport.mjs",
+      "sha256": "4df893fa78881aa97bb495bfcb592d401e580c3a6c0fa0f7ea77e1d8a8f5116f"
+    },
+    {
+      "path": "app/e2e/tests/run-with-receipt.mjs",
+      "sha256": "0b44c7f0d529b9c29b9978a4916c9a77fa01e367649c7405ed936731b73df72c"
+    },
+    {
+      "path": "app/e2e/tsconfig.json",
+      "sha256": "00515f87b25b73180139e7a339dc599f4265318c2e68b0b41514184daf2eed59"
+    },
+    {
+      "path": "app/e2e/verification-release-2026-10-16.json",
+      "sha256": "a140eda56039a0180b2f29b20c5377ad4ffe8d1b833528225d5dfcc6c7d37598"
+    },
+    {
+      "path": "app/firebase.json",
+      "sha256": "fcb183508dfd20579fc81c39fed6d52bd3c1565e8d80198b1bd6d5251de02ddf"
+    },
+    {
+      "path": "app/lib/app/app.dart",
+      "sha256": "804c41107397ef8ccf427809f075ed488323541da342c2a130e49f161b07799b"
+    },
+    {
+      "path": "app/lib/features/chat/state/chat_draft.dart",
+      "sha256": "5b275e94bfc7627dc151a7887313143d4d22b3eaf76cba78ae51a0f2eda41953"
+    },
+    {
+      "path": "app/lib/features/chat/state/chat_draft.g.dart",
+      "sha256": "39fcb07e41bb6bdece0f5b0482e5125aa8c28a25e35a74c6ee022ca0ee221b70"
+    },
+    {
+      "path": "app/lib/features/chat/ui/chat_panel.dart",
+      "sha256": "f9060c2c7e41102f4d54fb133bf5d357f1f193c8c31e2f801ec330b71995a459"
+    },
+    {
+      "path": "app/lib/features/feed/data/feed_models.dart",
+      "sha256": "b973975d14a63a416d110848236d118bf3d1c967b52529c5d4f08d943bfdad54"
+    },
+    {
+      "path": "app/lib/features/feed/state/feed_providers.dart",
+      "sha256": "b377f0e82419aea3db1ab6c6ecdb0eec3346d59bf8fcc4481f9b946fe9aec421"
+    },
+    {
+      "path": "app/lib/features/feed/state/feed_providers.g.dart",
+      "sha256": "17d276b0d0777797fdf91026e3b133b757bef996be16b07a95c4f43d7d83b1e6"
+    },
+    {
+      "path": "app/lib/features/feed/ui/feed_screen.dart",
+      "sha256": "f47574c531784f978ea13f39b46011d1dba765a393645e21f9e30600c9f1232e"
+    },
+    {
+      "path": "app/lib/features/map/data/sample_map_repository.dart",
+      "sha256": "2da7924ee8c81109004441cc687720658419aefe15580a3b395c7b81b7e2be64"
+    },
+    {
+      "path": "app/lib/features/map/state/viewport_controller.dart",
+      "sha256": "11c47fcaa96e6a5b38d225f3c47730d3974729524ec9bd0fe35a145a3003e4b5"
+    },
+    {
+      "path": "app/lib/features/map/state/viewport_controller.g.dart",
+      "sha256": "7a0bc174b72d2fa685d5596b6577af5c216d1e7d22aad022c1ec39681f3331de"
+    },
+    {
+      "path": "app/lib/features/map/ui/map_details.dart",
+      "sha256": "e86cf04123c575685a1a014f2804c178fc48e35625a21d9b05867ce3d9747f43"
+    },
+    {
+      "path": "app/lib/features/map/ui/map_screen.dart",
+      "sha256": "f769629017d37a9528c09bfa1090ae52a774d25475f4b7b509d392146b3bee89"
+    },
+    {
+      "path": "app/lib/features/shell/state/shell_providers.dart",
+      "sha256": "7ded100ced6222ef7124d239e47fc76794deb375272d50866abc041d47b76c6d"
+    },
+    {
+      "path": "app/lib/features/shell/state/shell_providers.g.dart",
+      "sha256": "75ea76c5e370553ea3302089aad7a750e0ba30e91f8ee759b25459dc19d5de8c"
+    },
+    {
+      "path": "app/lib/l10n/app_en.arb",
+      "sha256": "61bc08fa0cdb8e2a9cf2b76c0e023c7eee3ea74cd5d3a42b87465a022287fb57"
+    },
+    {
+      "path": "app/lib/l10n/app_localizations.dart",
+      "sha256": "c28f8872084b5b698fa47a7b64642a6ab5ef943fbe494bc214239ad384cc4418"
+    },
+    {
+      "path": "app/lib/l10n/app_localizations_en.dart",
+      "sha256": "64735577abf94d19b8238b6264e8b5a1202c4044a44e256e9701df71c012a250"
+    },
+    {
+      "path": "app/test/features/chat/ui/chat_panel_test.dart",
+      "sha256": "88d73f6b71187f8df525211d2889589a238124d7186b1868c0d23f78bdb280be"
+    },
+    {
+      "path": "app/test/features/feed/feed_original_record_test.dart",
+      "sha256": "35afdda8f114d4ab6fbd47a44827b6470bc18bb7190650e37a0e2d1476352e93"
+    },
+    {
+      "path": "app/test/features/feed/feed_query_test.dart",
+      "sha256": "430197205cc57a2d48ebbb64ab7e9ef9f99df2e8eb95b675be24cf607d43d5f9"
+    },
+    {
+      "path": "app/test/features/map/state/viewport_controller_test.dart",
+      "sha256": "1473e73a02f040e093856006e9f2d5c541489ad6e6c65cbffac4b09cd8a4b773"
+    },
+    {
+      "path": "app/test/features/map/ui/map_details_test.dart",
+      "sha256": "1f15d4a9a2c40e4c4b8242d293aabe397e46315b6e30ea08af21da79d84e08c1"
+    },
+    {
+      "path": "app/test/features/map/ui/map_screen_test.dart",
+      "sha256": "834329c4eaf8311e28db010578565a8bb65d07378daa6a2c47ea7b97e4c2df64"
+    },
+    {
+      "path": "app/test/features/shell/app_shell_test.dart",
+      "sha256": "2fb7d9f635e6bc470c8e0d4244b03400655d1d7ea7e2058e12532f57ac27311d"
+    },
+    {
+      "path": "app/test/features/shell/chat_tooltip_focus_test.dart",
+      "sha256": "331ac5c5c348a56cf5dacf8f109c455813bfb8b7cd186508ac53459f550ba491"
+    },
+    {
+      "path": "cloud/agent/README.md",
+      "sha256": "01f2d914e5e5b59ed15a86b94b85d6aa6df5a31002da54e32d60ae12923d62eb"
+    },
+    {
+      "path": "cloud/agent/src/features/reader.ts",
+      "sha256": "fe76eaeba892b391685bec02b65213e77c00aa114ce60cf079c318e5046e7fae"
+    },
+    {
+      "path": "cloud/agent/src/features/turn-search.ts",
+      "sha256": "5afc0331d00e765be8a60cc44f9c5af56485ac548ad7b69ba8342a0953b727aa"
+    },
+    {
+      "path": "cloud/agent/src/tools/catalog.ts",
+      "sha256": "76f07d2b3a9acc570104e883e0a9d176cbcda6d47cb64e3be6c017fd6be050e0"
+    },
+    {
+      "path": "cloud/agent/src/workflows/workflows.ts",
+      "sha256": "a046efecef2c90b97157f7ad30fd0a4dd3c8c3269356cadfee868bf84a5d1758"
+    },
+    {
+      "path": "cloud/agent/test/feature-reader-rights.test.ts",
+      "sha256": "20cd9464d5d032cb73f982a577c5fe502148e880c021c4c801941c2006b48f90"
+    },
+    {
+      "path": "cloud/agent/test/feature-search.test.ts",
+      "sha256": "646361ff823853519819d7eb3b3584539297a214b5c8db5ac817f861c329f516"
+    },
+    {
+      "path": "cloud/data/docs/source-policies/transport-unplanned-roads.md",
+      "sha256": "207a9ea16f6e91c41bdf49c7cbdb07cf1f272783b6513f78f91d8182b082862d"
+    },
+    {
+      "path": "cloud/data/docs/source-policies/tv-road-planned.md",
+      "sha256": "ba6e2226cb1af6918379d4580795ee083dfd3fd9ce74b09bfeec3e71ce0e8e8f"
+    },
+    {
+      "path": "cloud/data/docs/validation/abs-lga-2021-target-index-2026-10-15.json",
+      "sha256": "0e2cdaaff527975f2f794131e8042e5c817aa5bfe6c0d65d087f6e5195b5996e"
+    },
+    {
+      "path": "cloud/data/docs/validation/lga-mapping-evidence-2026-10-15.md",
+      "sha256": "a14774336223da37f620438ee4bab152c803a674f1e22c608933e9decb2de617"
+    },
+    {
+      "path": "cloud/data/docs/validation/maps-browser-key-2026-10-16.json",
+      "sha256": "8da451952e57443b730216631ec8c43a5fcf885e26ed753e333cda2362da5f9c"
+    },
+    {
+      "path": "cloud/data/docs/validation/news-live-smoke-2026-10-15.json",
+      "sha256": "2a1024053b68ce264657bbb350a4e0c82d6eb7dcb6dfe4f0d1c959ccfefb2168"
+    },
+    {
+      "path": "cloud/data/docs/validation/nonparking-public-record-key-join-live-ab-2026-10-15.json",
+      "sha256": "67ca4b95e50ff2d40cbe1a24c4138dc99bfe1e28cfbb114b69e4c51e93f764ed"
+    },
+    {
+      "path": "cloud/data/docs/validation/nonparking-query-benchmark-2026-10-15.json",
+      "sha256": "409dfaab6eb59da95ffd41c987dac83c43dbb430d24033ed2e2b71eaa18318c5"
+    },
+    {
+      "path": "cloud/data/docs/validation/nonparking-runtime-jobs-2026-10-16.json",
+      "sha256": "e6749a716cfee5db1026e43ba46486a606ed64bcb20b4a72ef86a7f2a5471667"
+    },
+    {
+      "path": "cloud/data/docs/validation/nonparking-sql-migration-plan-2026-10-15.md",
+      "sha256": "32a24447f94052c7b19c6b5a6a50e344ce18eff406e90009cf2ace88d3e64c81"
+    },
+    {
+      "path": "cloud/data/docs/validation/nonparking-sql-migration-readback-2026-10-15.json",
+      "sha256": "469984c48421cacf9eaf0ea2ade84c858bbe10acf85a3c588718730287c8da2b"
+    },
+    {
+      "path": "cloud/data/docs/validation/pedestrian-normalization-2026-10-15.md",
+      "sha256": "9fea32b9cc0056fbe5f47ed499e8f0fc9057ffc8e168b3a983fbe55b66153667"
+    },
+    {
+      "path": "cloud/data/docs/validation/publisher-scan-migration-2026-10-15.md",
+      "sha256": "26e7149ce821c49f27d440e76d61230a2f061cbb04688d1477c38d3255cbe8fd"
+    },
+    {
+      "path": "cloud/data/docs/validation/query-optimization-2026-10-15.md",
+      "sha256": "554e9f41c440ed32fe615dbebc33bf872f18d1b586d7a4e8b34fbead6b438909"
+    },
+    {
+      "path": "cloud/data/docs/validation/transport-fixes-2026-10-15.md",
+      "sha256": "a0eb4238823fba6a2a101bc5b2a923c993bce8e184cb84b56a5a06f0ad0c3d3d"
+    },
+    {
+      "path": "cloud/data/sql/002_core_views.sql",
+      "sha256": "5c451760c1d49326e2ef550786678703d83e2fed3b233e6b1c06dd96994d6520"
+    },
+    {
+      "path": "cloud/data/sql/004_street_views.sql",
+      "sha256": "c71fe55c6d384b4af72b1f669382215963be34b5373407856366e3dc0923e9de"
+    },
+    {
+      "path": "cloud/data/sql/006_area_views.sql",
+      "sha256": "ba78d15be7ee0b60f698d64a7d24187c914cd70da82d77f52093b7deffdc0b99"
+    },
+    {
+      "path": "cloud/data/sql/007_changes_views.sql",
+      "sha256": "2b3c2d77169ab1460c822cc6500f0ff2280c89cb1e0afc306dd5a16d5322fafc"
+    },
+    {
+      "path": "cloud/data/src/connectors/tv_gtfs_static/archive.ts",
+      "sha256": "10f8b5a79229dae8d398b2bce8652323e44a959ed9a4b25c9a5b9c427963e8d0"
+    },
+    {
+      "path": "cloud/data/src/connectors/tv_gtfs_static/index.ts",
+      "sha256": "4c2aba3ccaca3fe862acdd3bb3e35b1ca873c29a513bae88f8e8199474d1f587"
+    },
+    {
+      "path": "cloud/data/src/connectors/tv_road_planned/index.ts",
+      "sha256": "d90622ed31a1fcab56f4bdb641bc528c51c140780649d1ba13ee1333f5178235"
+    },
+    {
+      "path": "cloud/data/src/connectors/tv_road_unplanned/index.ts",
+      "sha256": "64cbfa587a950491dd817f04743da92f2f8cbd4e22f52075e302ca3d942339ed"
+    },
+    {
+      "path": "cloud/data/src/core/geo-records-current.ts",
+      "sha256": "d12aff7602cb728b397a9342718bcc7a7296eceee3c6c897b535c7be7e41fa3a"
+    },
+    {
+      "path": "cloud/data/src/core/gtfs-runtime.ts",
+      "sha256": "e6cd8368ffe97eed4187dccb7ffd0d4f4cfa9f35c5b436d59d666b8dd4407c65"
+    },
+    {
+      "path": "cloud/data/src/core/publisher.ts",
+      "sha256": "805d59df23353fd0bfa265f3cf6a6cfe65fe61de67b0f0d039e9c1005ab31d0c"
+    },
+    {
+      "path": "cloud/data/src/normalization/area-indicators.ts",
+      "sha256": "0a18debadd62aba478d7f6d35dcadc761e50d3732b3055536f6ed26f78bd14c3"
+    },
+    {
+      "path": "cloud/data/src/normalization/areas.ts",
+      "sha256": "a5dc5a75c97ac23906bc17f032cefc9b02e2cda6bd6c3545c0e828ee8c166ed7"
+    },
+    {
+      "path": "cloud/data/src/normalization/pedestrian.ts",
+      "sha256": "d746762f796a44226d3e65dba79c335047273379cc99560598ce44f72ea65d97"
+    },
+    {
+      "path": "cloud/data/test/connectors/csa_recorded_offences.test.ts",
+      "sha256": "ea5411d17efbc1f0669d15ee1315158be9c5e754f93366c7e212a474dda3c206"
+    },
+    {
+      "path": "cloud/data/test/connectors/tv-gtfs-static.test.ts",
+      "sha256": "f989bc20ec562aed71d477afdad098f9e7d6e79ac08eca6dc46cea4f024ad805"
+    },
+    {
+      "path": "cloud/data/test/connectors/tv-road-planned.test.ts",
+      "sha256": "3b24829d858556f519afcf7b4c798636ffda0b5fca37a825ec63af10cf3f85ee"
+    },
+    {
+      "path": "cloud/data/test/connectors/tv-road-unplanned.test.ts",
+      "sha256": "a2257fde8f721d2427f14d68d491e1af133dffc0af495174a4e7c09774faeba0"
+    },
+    {
+      "path": "cloud/data/test/core/geo-records-current.test.ts",
+      "sha256": "3b72080065873e175fc691405f50157e1dfc02a4543d67b9a0d5966962dfc68a"
+    },
+    {
+      "path": "cloud/data/test/core/gtfs-runtime.test.ts",
+      "sha256": "84d73e828b6f47ee8c518b1c70c17f84fee8a917ff7e7e42f4c0b8b8a33093b4"
+    },
+    {
+      "path": "cloud/data/test/integration/development-snapshot-view.test.ts",
+      "sha256": "3bbce23ec07e41865d615861b45858cc76a15091c73b90b8f57b9b043e5df35e"
+    },
+    {
+      "path": "cloud/data/test/integration/gtfs-snapshot-view.test.ts",
+      "sha256": "06b18337c2da1a702725b65af35100f17f840dced4aa61b4b952f33054da0c6c"
+    },
+    {
+      "path": "cloud/data/test/integration/map-record-rights-view.test.ts",
+      "sha256": "f6c3a6bb2463c3f021e86a001257602f6698435c1bafa9ba8b021adca885c8e3"
+    },
+    {
+      "path": "cloud/data/test/integration/p0-pedestrian-transport.test.ts",
+      "sha256": "9f30062d3628ba88d86cc16faebe1f2921db28e7789156c6f2e164e5a11cfd34"
+    },
+    {
+      "path": "cloud/data/test/integration/pedestrian-location-view.test.ts",
+      "sha256": "2e599800f12cec23ea15d4ad81f7c5e9f20ebc19e2b9b104d34794d93dc5727b"
+    },
+    {
+      "path": "cloud/data/test/integration/publish-replay.test.ts",
+      "sha256": "8ae085702f6e3e9b3083a789b97e9585d15ae90c98a3c0dec0057825ca01fdea"
+    },
+    {
+      "path": "cloud/data/test/integration/road-snapshot-view.test.ts",
+      "sha256": "80d46200610e9289dffb0400e6f00ae1741da1e6b942be41875a386d57671581"
+    },
+    {
+      "path": "cloud/data/test/integration/us1-street.test.ts",
+      "sha256": "a66d8a4f768eac4f743811bf36f356d81512d1e9bcc4d714f7d2697904a3f136"
+    },
+    {
+      "path": "cloud/data/test/integration/us3-area.test.ts",
+      "sha256": "cc39b2a45c44a3547996a070390bb1ad89d0ae8ddc1d5e394e7ca10d3bbb9ff1"
+    },
+    {
+      "path": "cloud/data/test/integration/us4-changes.test.ts",
+      "sha256": "3d26e69bfc2d7901138a51a836ab84cd5e676a7a33af939831927c829539c844"
+    },
+    {
+      "path": "cloud/data/test/normalization/area-indicators.test.ts",
+      "sha256": "356a45f59e40b11baf630c730238e7a65ae2d2ac04f339cc8b2b007561ca878e"
+    },
+    {
+      "path": "cloud/data/test/normalization/areas-crosswalk.test.ts",
+      "sha256": "61541ead68e7ef2992e41780a29230436469461076f9b6606706960b410686ca"
+    },
+    {
+      "path": "cloud/data/test/normalization/pedestrian.test.ts",
+      "sha256": "cc6e13606f5efca7e1a038a275240152bd43acd2a8859f95315e1d1e2b082df5"
+    },
+    {
+      "path": "cloud/map/README.md",
+      "sha256": "f459a6a196bd40b8484a2f08c997e5e2bb3d29394456cbfa6bdaa7f30b166e7b"
+    },
+    {
+      "path": "cloud/map/infra/README.md",
+      "sha256": "9b582783e9cc4bb998d311be0d40d2b7b89f4f48e77a91782bc11e62d87be457"
+    },
+    {
+      "path": "cloud/map/src/map-service.ts",
+      "sha256": "2f1f653e90c3a15ad8687c574772a35ff26394f2f311d4f880147c12a614ee39"
+    },
+    {
+      "path": "cloud/map/src/server.ts",
+      "sha256": "c6f7a8757dba9ecaa000cc1285376e777abf8815a02fab627b252101a2320ffe"
+    },
+    {
+      "path": "cloud/map/src/services/details.ts",
+      "sha256": "83964d19b8681cdc46e55d592c923ce242fb17cf8899b697db814b9798c2cb24"
+    },
+    {
+      "path": "cloud/map/src/services/public-records.ts",
+      "sha256": "01310dc58e9409ec2501cb7d0455be383cc257bee2339bae08a9522fa9f19abe"
+    },
+    {
+      "path": "cloud/map/src/services/snapshot-store.ts",
+      "sha256": "c937013a9e4338bb47e2a33e32ca6de23f13c12fb6e4bce3a1c7f9fe38ef3b94"
+    },
+    {
+      "path": "cloud/map/src/services/viewport.ts",
+      "sha256": "9474c42215589a997a444d5c682fb071a7a0822d2f49429b0838473f32599fa1"
+    },
+    {
+      "path": "cloud/map/test/aggregation.test.ts",
+      "sha256": "2c255a888a5620efced8084093be94384cda92e9c47466495bef6a48dbbcc8b2"
+    },
+    {
+      "path": "cloud/map/test/current-cache-rights.test.ts",
+      "sha256": "529228039cdea3f8f904d6594c60d75234b33d3347926b6cc6e795e605c4a265"
+    },
+    {
+      "path": "cloud/map/test/externally-verified-layers.test.ts",
+      "sha256": "c457b3b41af516cc4bf91a88049fd20a2e92af0b370753ac40065b4ff252b73f"
+    },
+    {
+      "path": "cloud/map/test/news.test.ts",
+      "sha256": "832dfaf9013af87966b65a26eab5cdee718e307af98cf411812714c440a87e78"
+    },
+    {
+      "path": "cloud/map/test/snapshot-reuse.test.ts",
+      "sha256": "f22cbaf573cff2fa8ce44215c83f591799d0cd148e7a0d408f354fc69f81274e"
+    },
+    {
+      "path": "cloud/map/test/viewport-acceptance.test.ts",
+      "sha256": "38cea1954f370caed5d0f7be8940c379cfecf71bca0dccb526a12ea9d753bfac"
+    },
+    {
+      "path": "cloud/map/test/viewport.test.ts",
+      "sha256": "e7ba1b3b03b41093b5c5c53a495f4a2904dc865859d02a6aebd1453cd9ade9e8"
+    },
+    {
+      "path": "cloud/map/test/zoom-aggregation-integration.test.ts",
+      "sha256": "315657d82f5f1ea9b5d65171583ad8d0efb7583e4996f78cedfeef0d267c769b"
+    },
+    {
+      "path": "cloud/shared/src/query/boundaries.ts",
+      "sha256": "55bf8d014d12b425cc38c9ffb97fa4bd4f071407b46c21c82efdb9fc6b5803b0"
+    },
+    {
+      "path": "cloud/shared/src/query/current-layer-cache.ts",
+      "sha256": "6ec2b73ad3c7f0b778c4747e844893c9eb1389c63632986ad7e3313353a03a9d"
+    },
+    {
+      "path": "cloud/shared/src/query/events.ts",
+      "sha256": "378188012f54d137d73ac98bdd513095d0cb61baac77c0a57ff86112b413a115"
+    },
+    {
+      "path": "cloud/shared/src/query/layer-adapters.ts",
+      "sha256": "99ea8ee400b9b4aecb7154f2994f6b86ad3df14298a7b175fa5f79c6d62cf1cf"
+    },
+    {
+      "path": "cloud/shared/src/query/news.ts",
+      "sha256": "b537b1d92c1e92f3dddf8f4bc7dc15c4402c7fe91d25499b5e43aebd1bc0937e"
+    },
+    {
+      "path": "cloud/shared/src/query/pedestrian.ts",
+      "sha256": "f25bc3413d4f197c2f913b1b84e9d2f04f898b7b30f14a2e089f216d047d30f0"
+    },
+    {
+      "path": "cloud/shared/src/query/public-record-queries.ts",
+      "sha256": "4595017998d2abf1607d37303acfd99fcd79d8911069f729f4f400d1df8cca76"
+    },
+    {
+      "path": "cloud/shared/src/query/query-runner.ts",
+      "sha256": "397dbb7aac7a1506fbd336423c0272fa6c86e563ec67d7a994b473b462cf2622"
+    },
+    {
+      "path": "cloud/shared/src/query/source-coverage.ts",
+      "sha256": "cf59cac65691cafb0844efb679d9222231b0764d64497aaf58e2a546b891c42e"
+    },
+    {
+      "path": "cloud/shared/src/query/sql.ts",
+      "sha256": "4f21542ff7b3a6f431f51f7c842b44be0197872d5f3d360cece3973920509959"
+    },
+    {
+      "path": "cloud/shared/src/query/unlocated-queries.ts",
+      "sha256": "173a60499fbb4e380175976b527b95128b3b36002421b90f9f862371f61b73e4"
+    },
+    {
+      "path": "cloud/shared/src/query/view-queries.ts",
+      "sha256": "7c39a604db4adbb51e4430e56c4ce4118317d38bf8e1e01a60f82f63e3f6f851"
+    },
+    {
+      "path": "cloud/shared/test/authoritative-geo-read.test.ts",
+      "sha256": "ee382cc935a8442d389b04f29c3700489494f80ab9eb51a879464fef758400c9"
+    },
+    {
+      "path": "cloud/shared/test/current-layer-cache.test.ts",
+      "sha256": "d77a16490ae2f1842883c8cb4b6935458a3250fad8ae5a5ee229988bc6236ff5"
+    },
+    {
+      "path": "cloud/shared/test/dynamic-adapters.test.ts",
+      "sha256": "8458960ccf4310afa06ad5245aae93a260169c000050a0ec6797a1daf3dd63f0"
+    },
+    {
+      "path": "cloud/shared/test/geo-rights-view.test.ts",
+      "sha256": "b02b76a1a0b78ee41e0964fd32b6673b53f01f4fd0d914f9fdead3d5c35f14ce"
+    },
+    {
+      "path": "cloud/shared/test/news.test.ts",
+      "sha256": "ed41239a97a854c7694190457107382f0851233ac263d6c8743b286d2b2de430"
+    },
+    {
+      "path": "cloud/shared/test/planning-boundaries.test.ts",
+      "sha256": "d31f8e8fbfb7b059e9020ea8dee75b50242dc2b612fd3627863671ee25aeb575"
+    },
+    {
+      "path": "cloud/shared/test/public-record-key-joins.test.ts",
+      "sha256": "58aa62f4d7a9443829cdc52c0dd399a2fbd44329aa1b1bf14fa46d4e0fb90902"
+    },
+    {
+      "path": "cloud/shared/test/query-extensions.test.ts",
+      "sha256": "37fa630e03e4e5865a4e7f9a0bfca91d067c7df0646ad52c46378f0629c3d273"
+    },
+    {
+      "path": "cloud/shared/test/source-coverage.test.ts",
+      "sha256": "ad13a0abf6e2b22326786e513fb0ff2e2a57c968b967a35f743a64596046ab07"
+    },
+    {
+      "path": "specs/002-map-data-presentation/p0-source-readiness.md",
+      "sha256": "3996c85c9433e7e980a5ced557635054d1c1ebe7166f98ada5aefdd84c0b51e6"
+    },
+    {
+      "path": "specs/002-map-data-presentation/task-handoffs/performance/t026-fixed-sample.json",
+      "sha256": "39e946fc23753a87a0a87e14b79210e06d506f5fee7c7d1e01879d42df95680a"
+    }
+  ],
+  "boundaries": [
+    "No cloud deployment or new cloud acceptance is claimed by this integration. Historical cloud reports remain tied to their original commit, bundle and revisions.",
+    "Parking E2E is excluded. Eighteen opt-in external-data tests remain skipped in the default backend suites.",
+    "The pinned Flutter SDK instant-input race remains unresolved. Functional typing waits for the existing semantics focus handoff, types once, and asserts the full value.",
+    "Pre-final UI/model reports, including HTTP 429, remain unchanged. Final suites used the snapshot reuse fix with the original capacity and TTL; no backend reset occurred between them.",
+    "No load, p95 latency, ingestion scheduling, all-source admission, or planar versus BigQuery geometry equivalence is established."
+  ],
+  "formattingAfterE2E": {
+    "path": "cloud/shared/test/news.test.ts",
+    "change": "Remove one trailing blank line. Production sources and compiled backend artifact bytes are unchanged."
+  }
+}

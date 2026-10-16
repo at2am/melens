@@ -19,14 +19,18 @@ async function fixture() {
   return parseRoadPage(JSON.parse(bytes));
 }
 
-test('road incident keeps parent and each impact, with resolved status based on closure', async () => {
+test('road incident keeps parent and each impact, with resolved status and unverified closure time', async () => {
   const page = await fixture();
   const result = normalizeRoadSnapshot(page.data.features, input, fetchedAt);
   assert.equal(result.geoRecords.length, 2);
   assert.equal(result.geoRecords[0]?.record_status, 'active');
   assert.equal(result.geoRecords[1]?.record_status, 'resolved');
   assert.equal(result.geoRecords[0]?.valid_to, null);
-  assert.equal(result.geoRecords[1]?.valid_to, '2026-09-28T00:04:00.000Z');
+  assert.equal(result.geoRecords[1]?.valid_to, null);
+  const resolvedSource = result.sourceRecords.find(row => row.source_record_id.endsWith(':IMP-2'));
+  assert.ok(resolvedSource);
+  assert.match(resolvedSource.time_missing_reason ?? '', /lastClosed and lastActive definitions conflict/);
+  assert.equal(JSON.parse(result.geoRecords[1]?.summary ?? '{}').last_closed, '2026-09-28T00:04:00Z');
   assert.equal(result.geoRecords[0]?.geometry_geojson?.includes('LineString'), true);
   assert.equal(result.geoRecordSources.filter(link => link.evidence_role === 'parent_incident').length, 2);
   assert.equal(result.geoRecordSources.filter(link => link.evidence_role === 'child_impact').length, 2);
@@ -52,6 +56,37 @@ test('one complete v3 page can be collected without logging KeyID', async () => 
     .collect(input);
   assert.equal(withoutKey.kind, 'failure');
   if (withoutKey.kind === 'failure') assert.equal(withoutKey.code, 'auth_failed');
+});
+
+test('future absolute report times fail while estimated future times and unknown wall clocks remain valid', async () => {
+  const page = await fixture();
+  const first = page.data.features[0];
+  assert.ok(first);
+  for (const field of ['created', 'lastUpdated', 'lastClosed']) {
+    const changed = { ...first, properties: { ...first.properties, [field]: '2099-01-01T00:00:00Z' } };
+    assert.throws(() => normalizeRoadSnapshot([changed], input, fetchedAt), /five minutes after fetch time/);
+  }
+  const estimates = normalizeRoadSnapshot([{ ...first, properties: { ...first.properties,
+    lastUpdated: '2026-09-28T00:11:00Z', endTime: '2099-01-01T00:00:00Z',
+    nextUpdateDue: '2099-01-01T00:00:00Z' } }], input, fetchedAt);
+  assert.equal(estimates.latestUpdate, '2026-09-28T00:11:00.000Z');
+  assert.equal(estimates.geoRecords[0]?.record_status, 'active');
+  assert.equal(estimates.geoRecords[0]?.valid_to, null);
+  const unknown = normalizeRoadSnapshot([{ ...first, properties: { ...first.properties,
+    lastUpdated: '2099-01-01T00:00:00' } }], input, fetchedAt);
+  assert.equal(unknown.latestUpdate, null);
+  const futureFeature = { ...first, properties: { ...first.properties,
+    lastUpdated: '2099-01-01T00:00:00Z' } };
+  class FutureClient extends HttpClient {
+    override async getJson() {
+      return { body: { ...page, meta: { ...page.meta, total_records: 1, count: 1 },
+        data: { ...page.data, features: [futureFeature] } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new UnplannedRoadConnector(new FutureClient(), () => 'fixture-key', 0).collect(input);
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
 });
 
 test('a pending impact stays out of current incident status and missing geometry stays unlocated', async () => {
@@ -129,7 +164,7 @@ test('incident without child impacts creates one parent geography with parent an
     },
   };
 
-  const result = normalizeRoadSnapshot([featureWithoutImpact], input, fetchedAt);
+  const result = normalizeRoadSnapshot([featureWithoutImpact], input, '2026-09-28T01:06:00Z');
 
   assert.equal(result.sourceRecords.length, 2, 'The parent incident and complete snapshot are emitted when impactId is absent');
   assert.equal(result.sourceRecords[0]?.source_record_id, 'victoria.transport.road_unplanned:incident:RUD-INC-SINGLE');
@@ -192,7 +227,7 @@ test('incident clearance ("解除"): resolved status preserved, missing lastClos
     },
   };
 
-  const result = normalizeRoadSnapshot([inactiveWithoutLastClosed], input, fetchedAt);
+  const result = normalizeRoadSnapshot([inactiveWithoutLastClosed], input, '2026-09-28T00:31:00Z');
   const geo = result.geoRecords[0];
   assert.ok(geo);
   assert.equal(geo.record_status, 'resolved', 'Inactive disruption is correctly classified as resolved');
@@ -320,7 +355,9 @@ test('temporal clearance progression across batches (Run 1 active -> Run 2 resol
 
   const resultRun2 = normalizeRoadSnapshot([clearedFeature], run2Input, '2026-09-28T00:25:00Z');
   assert.equal(resultRun2.geoRecords[0]?.record_status, 'resolved');
-  assert.equal(resultRun2.geoRecords[0]?.valid_to, '2026-09-28T00:20:00.000Z');
+  assert.equal(resultRun2.geoRecords[0]?.valid_to, null);
+  assert.match(resultRun2.sourceRecords.find(row => row.source_record_id.includes(':impact:'))
+    ?.time_missing_reason ?? '', /lastClosed and lastActive definitions conflict/);
   assert.equal(resultRun2.geoRecords[0]?.geo_record_id, resultRun1.geoRecords[0]?.geo_record_id);
   assert.notEqual(resultRun2.geoRecords[0]?.version_id, resultRun1.geoRecords[0]?.version_id, 'Version must update upon clearance');
 });
@@ -363,7 +400,7 @@ test('sourceLatestUpdateAt tracks max lastUpdated and missing created sets time_
     },
   };
 
-  const result = normalizeRoadSnapshot([feat1, feat2], input, fetchedAt);
+  const result = normalizeRoadSnapshot([feat1, feat2], input, '2026-09-28T00:16:00Z');
   assert.equal(result.latestUpdate, '2026-09-28T00:15:00.000Z');
 
   const missingCreatedParent = result.sourceRecords.find(r => r.source_record_id.endsWith(':incident:RUD-INC-TIME-1'));
@@ -593,7 +630,7 @@ test('estimates vs resolution: nextUpdateDue and endTime never mark active incid
     },
   };
 
-  const result = normalizeRoadSnapshot([activeWithPastEstimates], input, fetchedAt);
+  const result = normalizeRoadSnapshot([activeWithPastEstimates], input, '2026-09-28T02:30:00Z');
   const geo = result.geoRecords[0];
   assert.ok(geo);
 

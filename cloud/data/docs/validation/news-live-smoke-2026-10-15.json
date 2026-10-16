@@ -1,0 +1,134 @@
+{
+  "checkedAt": "2026-10-15T14:55:51Z",
+  "endpoint": "http://127.0.0.1:8081/v1/map/unlocated",
+  "request": {
+    "requestId": "news-live-smoke-20261015",
+    "layers": [
+      "news"
+    ],
+    "mode": "current",
+    "window": {
+      "from": "2026-10-14T14:55:29Z",
+      "to": "2026-10-15T14:55:29Z"
+    },
+    "scope": {
+      "sourceJurisdiction": "global"
+    },
+    "pageSize": 3
+  },
+  "httpStatus": 200,
+  "dataMode": "live",
+  "scope": {
+    "kind": "unlocated",
+    "areaRefs": [],
+    "sourceJurisdiction": "global"
+  },
+  "completeness": "partial",
+  "totalMatching": null,
+  "returnedItems": 3,
+  "hasNextCursor": true,
+  "error": null,
+  "transportErrorType": null,
+  "items": [
+    {
+      "id": "00072112cf233a09b1341464f64837cfc92552b926f587454c0db56f69c8d505",
+      "versionId": "4f12ff5eabaf1b8b3b90f4678e0923ce9e0f4b61d3a9699193c0a385dd70030b",
+      "kind": "news",
+      "geometryIsNull": true,
+      "locationRole": "mention",
+      "reportedAt": null,
+      "sources": [
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.hardenexpress.com.au/story/9364927/corruption-charges-linked-to-states-train-service",
+          "attribution": "The GDELT Project (https://www.gdeltproject.org/)",
+          "versionRef": "4f12ff5eabaf1b8b3b90f4678e0923ce9e0f4b61d3a9699193c0a385dd70030b"
+        },
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.gdeltproject.org/",
+          "attribution": "The GDELT Project — dataset attribution",
+          "versionRef": "4f12ff5eabaf1b8b3b90f4678e0923ce9e0f4b61d3a9699193c0a385dd70030b"
+        }
+      ],
+      "articleRefs": [
+        {
+          "url": "https://www.hardenexpress.com.au/story/9364927/corruption-charges-linked-to-states-train-service",
+          "reportedAt": null
+        }
+      ],
+      "dedupStatus": "unconfirmed"
+    },
+    {
+      "id": "000d882fcd6b4750b0ab751cfad83bbe98be3749daeb41f2f191a07891f50779",
+      "versionId": "12ba8b50b38b0113c734f513bf235ccc5dff23eb27e5779ea65b4b7627a0e39a",
+      "kind": "news",
+      "geometryIsNull": true,
+      "locationRole": "mention",
+      "reportedAt": null,
+      "sources": [
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.bordermail.com.au/story/9367211/telstra-takes-aim-at-roaming-in-anti-regulation-salvo",
+          "attribution": "The GDELT Project (https://www.gdeltproject.org/)",
+          "versionRef": "12ba8b50b38b0113c734f513bf235ccc5dff23eb27e5779ea65b4b7627a0e39a"
+        },
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.gdeltproject.org/",
+          "attribution": "The GDELT Project — dataset attribution",
+          "versionRef": "12ba8b50b38b0113c734f513bf235ccc5dff23eb27e5779ea65b4b7627a0e39a"
+        }
+      ],
+      "articleRefs": [
+        {
+          "url": "https://www.bordermail.com.au/story/9367211/telstra-takes-aim-at-roaming-in-anti-regulation-salvo",
+          "reportedAt": null
+        }
+      ],
+      "dedupStatus": "unconfirmed"
+    },
+    {
+      "id": "000eeeb00bf656d04c6cc71c376de0c1514875a134940060d7c65cbd0fa8c592",
+      "versionId": "d74729f20d92794bae844a2ad84d9f9914322d5d70f3f77cb17eb527a57aa187",
+      "kind": "news",
+      "geometryIsNull": true,
+      "locationRole": "mention",
+      "reportedAt": null,
+      "sources": [
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.tenterfieldstar.com.au/story/9364636/business-lobby-looks-beyond-the-hype-and-risks-of-ai",
+          "attribution": "The GDELT Project (https://www.gdeltproject.org/)",
+          "versionRef": "d74729f20d92794bae844a2ad84d9f9914322d5d70f3f77cb17eb527a57aa187"
+        },
+        {
+          "sourceId": "gdelt.news",
+          "url": "https://www.gdeltproject.org/",
+          "attribution": "The GDELT Project — dataset attribution",
+          "versionRef": "d74729f20d92794bae844a2ad84d9f9914322d5d70f3f77cb17eb527a57aa187"
+        }
+      ],
+      "articleRefs": [
+        {
+          "url": "https://www.tenterfieldstar.com.au/story/9364636/business-lobby-looks-beyond-the-hype-and-risks-of-ai",
+          "reportedAt": null
+        }
+      ],
+      "dedupStatus": "unconfirmed"
+    }
+  ],
+  "assertions": {
+    "positiveLiveNews": true,
+    "allOriginalArticleUrlsRetained": true,
+    "allGdeltAttributionLinksPresent": true,
+    "allUnlocatedMentions": true,
+    "allUnknownPublicationTimesStayNull": true
+  },
+  "limitations": [
+    "The 24-hour window is request context. These rows have no verified publication timestamp, so it does not prove their articles were published in the last 24 hours.",
+    "The source-jurisdiction query is global and does not prove Melbourne incident locations.",
+    "The returned page is partial. totalMatching remains null and a continuation is available.",
+    "This read did not open publisher pages, fetch full article text, deploy services or write cloud tables."
+  ]
+}

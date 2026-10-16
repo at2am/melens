@@ -9,7 +9,7 @@
   "originals": [
     {
       "id": "pedestrian:1f9e112fece630493c712accc591ad4b0476b290f8792bf6e262e3bcc1d4c84b",
-      "versionId": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42",
+      "versionId": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09",
       "layerId": "pedestrian",
       "title": "Sensor A",
       "geometry": {
@@ -41,13 +41,13 @@
           "sourceId": "sample.minute",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+          "versionRef": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -68,7 +68,7 @@
     },
     {
       "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
-      "versionId": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614",
+      "versionId": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e",
       "layerId": "pedestrian",
       "title": "Sensor B",
       "geometry": {
@@ -100,13 +100,13 @@
           "sourceId": "sample.minute",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+          "versionRef": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -127,7 +127,7 @@
     },
     {
       "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
-      "versionId": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62",
+      "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77",
       "layerId": "pedestrian",
       "title": "Sensor C",
       "geometry": {
@@ -159,13 +159,13 @@
           "sourceId": "sample.minute",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+          "versionRef": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -186,7 +186,7 @@
     },
     {
       "id": "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26",
-      "versionId": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75",
+      "versionId": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc",
       "layerId": "pedestrian",
       "title": "Sensor D",
       "geometry": {
@@ -218,13 +218,13 @@
           "sourceId": "sample.minute",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+          "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -245,7 +245,7 @@
     },
     {
       "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-      "versionId": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc",
+      "versionId": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88",
       "layerId": "pedestrian",
       "title": "Sensor E",
       "geometry": {
@@ -277,13 +277,13 @@
           "sourceId": "sample.minute",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+          "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -304,7 +304,7 @@
     },
     {
       "id": "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142",
-      "versionId": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b",
+      "versionId": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a",
       "layerId": "pedestrian",
       "title": "Sensor F",
       "geometry": {
@@ -336,13 +336,13 @@
           "sourceId": "sample.hourly",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+          "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -363,7 +363,7 @@
     },
     {
       "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-      "versionId": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2",
+      "versionId": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b",
       "layerId": "pedestrian",
       "title": "Sensor G",
       "geometry": {
@@ -395,13 +395,13 @@
           "sourceId": "sample.hourly",
           "url": null,
           "attribution": "Synthetic T026 acceptance observations",
-          "versionRef": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+          "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
         },
         {
           "sourceId": "sample.locations",
           "url": null,
           "attribution": "Synthetic T026 acceptance locations",
-          "versionRef": null
+          "versionRef": "sample-native-location-v1"
         }
       ],
       "kind": "pedestrian",
@@ -677,7 +677,7 @@
           "items": [
             {
               "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.6663a9055b85ebf9c272efa9171853655b528f82213a008f403498ff57c8b56d",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -715,19 +715,19 @@
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "aggregate",
@@ -780,7 +780,7 @@
             },
             {
               "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.a7ba1f3d399f0657c3496cba58e9eb7166739efe31c394314e70f387fe918794",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -818,19 +818,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 }
               ],
               "kind": "aggregate",
@@ -883,7 +883,7 @@
             },
             {
               "id": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
-              "versionId": "aggregate-v1.fe6dfd540acd4d86210040604cc257d43d8905371062431cfddfbf2807a1d091",
+              "versionId": "aggregate-v1.6690bb6b3ebbad4a5c2b6971f9dd4fb8acd6539e638d63b3588b1359299e2d09",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -925,25 +925,25 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionRef": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionRef": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionRef": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 }
               ],
               "kind": "aggregate",
@@ -1003,15 +1003,15 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
-                  "versionId": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionId": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 },
                 {
                   "id": "pedestrian:1f9e112fece630493c712accc591ad4b0476b290f8792bf6e262e3bcc1d4c84b",
-                  "versionId": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionId": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
-                  "versionId": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 }
               ]
             },
@@ -1020,11 +1020,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "versionId": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionId": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "id": "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142",
-                  "versionId": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionId": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 }
               ]
             },
@@ -1033,11 +1033,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "versionId": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionId": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 },
                 {
                   "id": "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26",
-                  "versionId": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionId": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 }
               ]
             }
@@ -1279,7 +1279,7 @@
           "items": [
             {
               "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.6663a9055b85ebf9c272efa9171853655b528f82213a008f403498ff57c8b56d",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -1317,19 +1317,19 @@
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "aggregate",
@@ -1382,7 +1382,7 @@
             },
             {
               "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.a7ba1f3d399f0657c3496cba58e9eb7166739efe31c394314e70f387fe918794",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -1420,19 +1420,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 }
               ],
               "kind": "aggregate",
@@ -1485,7 +1485,7 @@
             },
             {
               "id": "aggregate.pedestrian.fccbcf3dd81c2152eeb9f5086dba6d58007c624e9700d6d6c479a161713043cd",
-              "versionId": "aggregate-v1.fe6dfd540acd4d86210040604cc257d43d8905371062431cfddfbf2807a1d091",
+              "versionId": "aggregate-v1.6690bb6b3ebbad4a5c2b6971f9dd4fb8acd6539e638d63b3588b1359299e2d09",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -1527,25 +1527,25 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionRef": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionRef": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionRef": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 }
               ],
               "kind": "aggregate",
@@ -1605,15 +1605,15 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
-                  "versionId": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionId": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 },
                 {
                   "id": "pedestrian:1f9e112fece630493c712accc591ad4b0476b290f8792bf6e262e3bcc1d4c84b",
-                  "versionId": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionId": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
-                  "versionId": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 }
               ]
             },
@@ -1622,11 +1622,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "versionId": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionId": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "id": "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142",
-                  "versionId": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionId": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 }
               ]
             },
@@ -1635,11 +1635,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "versionId": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionId": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 },
                 {
                   "id": "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26",
-                  "versionId": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionId": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 }
               ]
             }
@@ -1881,7 +1881,7 @@
           "items": [
             {
               "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.6663a9055b85ebf9c272efa9171853655b528f82213a008f403498ff57c8b56d",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -1919,19 +1919,19 @@
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "aggregate",
@@ -1984,7 +1984,7 @@
             },
             {
               "id": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
-              "versionId": "aggregate-v1.cbe2bbe2c77c49c71126814fc635ee14c1b7da2a3f3618f3dd2f9f61ffa941cb",
+              "versionId": "aggregate-v1.c84a92a3d5767cd4a0d12aa17d3ab2c8fa8a4d3b021d709894deb4894c8730b9",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -2022,19 +2022,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionRef": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionRef": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 }
               ],
               "kind": "aggregate",
@@ -2087,7 +2087,7 @@
             },
             {
               "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.a7ba1f3d399f0657c3496cba58e9eb7166739efe31c394314e70f387fe918794",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -2125,19 +2125,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 }
               ],
               "kind": "aggregate",
@@ -2190,7 +2190,7 @@
             },
             {
               "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
-              "versionId": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62",
+              "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77",
               "layerId": "pedestrian",
               "title": "Sensor C",
               "geometry": {
@@ -2222,13 +2222,13 @@
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionRef": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "pedestrian",
@@ -2255,11 +2255,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
-                  "versionId": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionId": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 },
                 {
                   "id": "pedestrian:1f9e112fece630493c712accc591ad4b0476b290f8792bf6e262e3bcc1d4c84b",
-                  "versionId": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionId": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 }
               ]
             },
@@ -2268,11 +2268,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "versionId": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionId": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "id": "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142",
-                  "versionId": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionId": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 }
               ]
             },
@@ -2281,11 +2281,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "versionId": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionId": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 },
                 {
                   "id": "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26",
-                  "versionId": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionId": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 }
               ]
             }
@@ -2527,7 +2527,7 @@
           "items": [
             {
               "id": "aggregate.pedestrian.7ef4dcb4b26015d4debaaf2f4b565ee675d432f640020a1472f50f4099c419d5",
-              "versionId": "aggregate-v1.6663a9055b85ebf9c272efa9171853655b528f82213a008f403498ff57c8b56d",
+              "versionId": "aggregate-v1.b4e66149511297919c3d11354d8887560e966c5f04204d98693bb3e47d10308f",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -2565,19 +2565,19 @@
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionRef": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "sourceId": "sample.hourly",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionRef": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "aggregate",
@@ -2630,7 +2630,7 @@
             },
             {
               "id": "aggregate.pedestrian.c8456cff82bfa8b4392b1f5adb869a5749af5707caf57415c7331603495c12ef",
-              "versionId": "aggregate-v1.cbe2bbe2c77c49c71126814fc635ee14c1b7da2a3f3618f3dd2f9f61ffa941cb",
+              "versionId": "aggregate-v1.c84a92a3d5767cd4a0d12aa17d3ab2c8fa8a4d3b021d709894deb4894c8730b9",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -2668,19 +2668,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionRef": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionRef": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 }
               ],
               "kind": "aggregate",
@@ -2733,7 +2733,7 @@
             },
             {
               "id": "aggregate.pedestrian.edd6841f0cd4b0a203c55fec01dd4350d61870861f68a966d5947888c662ba7c",
-              "versionId": "aggregate-v1.a7ba1f3d399f0657c3496cba58e9eb7166739efe31c394314e70f387fe918794",
+              "versionId": "aggregate-v1.fc995fada95c5a2fc0cf3219384f54cec0941e72603b273b229599ad14f79e91",
               "layerId": "pedestrian",
               "title": "Effective sensors",
               "geometry": {
@@ -2771,19 +2771,19 @@
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionRef": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 },
                 {
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionRef": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 }
               ],
               "kind": "aggregate",
@@ -2836,7 +2836,7 @@
             },
             {
               "id": "pedestrian:7ee7cf983549ae89ff2df39fa72770a97e088051e4fa0583404c3f86105fb2be",
-              "versionId": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62",
+              "versionId": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77",
               "layerId": "pedestrian",
               "title": "Sensor C",
               "geometry": {
@@ -2868,13 +2868,13 @@
                   "sourceId": "sample.minute",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance observations",
-                  "versionRef": "pedestrian-v1:9e7f74d813731e9f549d6bf8ab6ea07f9b98791e73313c29aca72559ad22bf62"
+                  "versionRef": "pedestrian-v1:5e08b258bcf29dd15e8ab74b2f68b554e0e72399cc9e4922f334da778178ed77"
                 },
                 {
                   "sourceId": "sample.locations",
                   "url": null,
                   "attribution": "Synthetic T026 acceptance locations",
-                  "versionRef": null
+                  "versionRef": "sample-native-location-v1"
                 }
               ],
               "kind": "pedestrian",
@@ -2901,11 +2901,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:055c979e2c48b016ac05a2471b4ef60b653fdc0e77620ca2ef2899f1a99eb18f",
-                  "versionId": "pedestrian-v1:5155d093f6b71fd56b09f3d83b2761351a0a7a9a67a06a8c2af9ef90e58de614"
+                  "versionId": "pedestrian-v1:a775942f161e20bbf811a4fa27c9b0808c09697ace00537cbd5f28be62eb882e"
                 },
                 {
                   "id": "pedestrian:1f9e112fece630493c712accc591ad4b0476b290f8792bf6e262e3bcc1d4c84b",
-                  "versionId": "pedestrian-v1:23ef6a6b3f951ea8df894cdbd33f9ce0e8df88e0af2f2aa577695129d6a68d42"
+                  "versionId": "pedestrian-v1:477fb7dd66f0cdcd7c4e9d9efaaf1d0bf7568a922d23f629ea13ed68bf3cdd09"
                 }
               ]
             },
@@ -2914,11 +2914,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:415d5ebe8166c96e441b793fbf5367b2deb8a3c083c751c9cb30fb20b918beda",
-                  "versionId": "pedestrian-v1:148b482b7fcb5dceea9445d38417b5c2f609ce680f819aa933d1e62e305e94e2"
+                  "versionId": "pedestrian-v1:a4d50f327489663cfe5b6854a7323cf0094e293a60c74e35c0ff107bc16da09b"
                 },
                 {
                   "id": "pedestrian:5b589b9ffb004b8d222ebb57c291d1e6e45706e78d68b5a3e6a3d69d80ff5142",
-                  "versionId": "pedestrian-v1:44cc314491daa7b1fb8bbe713b56ede23893d3ce742b2faada9d7d08d776f08b"
+                  "versionId": "pedestrian-v1:d902c1f20f1f23d6825c8c5a3d1e946b03259a5f257f45bba510d938d94eb68a"
                 }
               ]
             },
@@ -2927,11 +2927,11 @@
               "memberReferences": [
                 {
                   "id": "pedestrian:b7d1a39e6e50c431366ce176c0c7021d74d4a22654c773e7f55494e1bd4f9508",
-                  "versionId": "pedestrian-v1:e225f01fcae898504cb0b7ae7305c11aeacf45e9a7fb079e4df494dc92cb28cc"
+                  "versionId": "pedestrian-v1:f8f0d6eacb5a7579ef1dc1cdb7f77b87a5e5cd86e7b0e9605662ed469cb96d88"
                 },
                 {
                   "id": "pedestrian:d1e108929db2d34f530775f5bc272195917b5e6bdec51a84b4e3f227b3a74b26",
-                  "versionId": "pedestrian-v1:a4024b55e76a4d2ae5e21c96219ec799d7466a390e2b0b2df6b65d7d3f136b75"
+                  "versionId": "pedestrian-v1:b58cccbeee81045e9fab664fa384703a4652a83ae9833695bdb4a231609c91cc"
                 }
               ]
             }

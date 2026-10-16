@@ -111,11 +111,23 @@ in `v_source_coverage` at all (`notCovered`), anomalies need a wired producer
 (`unavailable`), and the parking bay and restriction references, crime statistics,
 rent and census references wait for their own review.
 
-The current boundary/pedestrian views do not prove latest record rights after
-withdrawal, so production composition rejects those record families without a
-trusted supplemental checker. A published source reference does not unlock
-them. Planning is the positive live preview; the view owner must fix the record
-rights boundary before boundary/pedestrian acceptance.
+The local 2026-10-15 fix adds the news row adapter in `cloud/shared`, including
+scoped unlocated reads and exact record-access checks. It preserves each original
+article URL, keeps GDELT processing time separate from publication time, and adds
+a clickable GDELT website attribution reference. News without geometry is not
+placed on the map. The same link fix preserves restricted council project and
+Ticketmaster event URLs instead of replacing them with registry landing pages.
+The existing registry and source admission checks remain in place. This local
+change is not evidence of a deployed revision or of UC-06 top-three acceptance.
+
+Boundary and pedestrian reads require `rights_evidence` from the repaired
+`004_street_views.sql` and `006_area_views.sql` definitions. The views check exact
+and latest published source-record permissions, current source admission and
+complete count-window location eligibility. The map service rejects older views
+that lack this evidence. Read-only GoogleSQL fixtures verify withdrawal,
+source revocation, conflicting permissions and mid-window location conflicts.
+These checks do not deploy SQL. Deployment acceptance must verify the served
+definitions and bounded results before claiming those layers work live.
 
 After deployment, record the Cloud Run URL, revision, immutable digest, service
 identity, runtime limits, allowed origin and actual JSON/CORS checks. The

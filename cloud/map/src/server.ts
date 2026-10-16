@@ -184,7 +184,11 @@ export function createMapHttpServer(options: {
       if (request.method !== routeMethod(route)) throw new MapServiceError('invalidRequest');
       if (route.kind !== 'viewport' && (request.headers['transfer-encoding'] !== undefined
         || Number(request.headers['content-length'] ?? '0') !== 0)) throw new MapServiceError('invalidRequest');
-      if (active >= maxConcurrent) throw new MapServiceError('rateLimited');
+      if (active >= maxConcurrent) {
+        process.stderr.write(`${JSON.stringify({ severity: 'WARNING', event: 'mapRateLimited',
+          reason: 'concurrentRequests', active, limit: maxConcurrent })}\n`);
+        throw new MapServiceError('rateLimited');
+      }
       active += 1;
       admitted = true;
       timer = setTimeout(() => { controller.abort(); writeError(response, 'queryTimeout', context.requestId); }, timeoutMs);

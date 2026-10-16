@@ -124,6 +124,28 @@ test('empty complete snapshots do not require static queries but still require t
   assert.equal(await withPublishedGtfsLocations(other, config, bq), other);
 });
 
+test('runtime rejects a snapshot parent whose timestamp disagrees with its identity', async () => {
+  const bq = new BigQuery({ projectId: config.projectId });
+  const original = realtime();
+  const empty = { ...original, geoRecords: [], geoRecordSources: [],
+    sourceRecords: original.sourceRecords.map(row => row.source_record_id.includes(':feed:metro_train:')
+      ? { ...row, source_updated_at: '2026-09-28T00:04:00.000Z' } : row) };
+  await assert.rejects(withPublishedGtfsLocations(empty, config, bq), /parent timestamp/);
+});
+
+test('runtime rejects alert membership in a different mode snapshot', async t => {
+  const bq = new BigQuery({ projectId: config.projectId });
+  const query = t.mock.method(bq, 'query', async () => [ [] ]);
+  const original = realtime();
+  const tram = original.sourceRecords.find(row => row.source_record_id.includes(':feed:yarra_tram:'));
+  assert.ok(tram);
+  const wrongMode = { ...original, geoRecordSources: original.geoRecordSources.map(link =>
+    link.evidence_role === 'parent_feed_snapshot' ? { ...link,
+      source_record_id: tram.source_record_id, source_version_id: tram.version_id } : link) };
+  await assert.rejects(withPublishedGtfsLocations(wrongMode, config, bq), /snapshot membership/);
+  assert.equal(query.mock.callCount(), 0);
+});
+
 test('malformed, excessive or missing-provenance static references fail before publication', async t => {
   const bq = new BigQuery({ projectId: config.projectId });
   await assert.rejects(loadPublishedStaticGtfsVersions({ ...config, maxBytesBilled: null }, bq), /billed-byte ceiling/);

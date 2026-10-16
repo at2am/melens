@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,15 +39,111 @@ MapSelectionState _state(
   MapItem item, {
   MapSelectionDisposition disposition = MapSelectionDisposition.matching,
   Object? error,
+  bool isLoading = false,
 }) => MapSelectionState(
   selectedItemId: item.id,
   item: item,
   disposition: disposition,
   dataMode: MapDataMode.sample,
   detailError: error,
+  isLoading: isLoading,
+);
+
+Future<void> _showWithLayerControl(
+  WidgetTester tester, {
+  required ValueNotifier<MapSelectionState> selection,
+  required FocusNode layerFocus,
+  required VoidCallback onSelect,
+}) => _show(
+  tester,
+  Column(
+    children: [
+      FilterChip(
+        label: const Text('Development projects'),
+        selected: true,
+        focusNode: layerFocus,
+        onSelected: (_) {},
+      ),
+      TextButton(onPressed: onSelect, child: const Text('Open sample record')),
+      Expanded(
+        child: ValueListenableBuilder<MapSelectionState>(
+          valueListenable: selection,
+          builder: (context, state, child) => MapDetails(
+            state: state,
+            onClose: () => selection.value = const MapSelectionState(),
+          ),
+        ),
+      ),
+    ],
+  ),
 );
 
 void main() {
+  testWidgets(
+    'opening details moves layer focus and Escape closes after async loading',
+    (tester) async {
+      final item = t016Item();
+      final details = Completer<MapItem>();
+      final selection = ValueNotifier(const MapSelectionState());
+      final layerFocus = FocusNode();
+      addTearDown(selection.dispose);
+      addTearDown(layerFocus.dispose);
+      await _showWithLayerControl(
+        tester,
+        selection: selection,
+        layerFocus: layerFocus,
+        onSelect: () {
+          selection.value = _state(item, isLoading: true);
+          unawaited(
+            details.future.then((loaded) => selection.value = _state(loaded)),
+          );
+        },
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(layerFocus.hasFocus, isTrue);
+      await tester.tap(find.text('Open sample record'));
+      await tester.pump();
+      expect(layerFocus.hasFocus, isFalse);
+      details.complete(item);
+      await tester.pump();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(find.byKey(const ValueKey('map-details-close')), findsNothing);
+    },
+  );
+
+  testWidgets('same-record updates preserve user focus until a new selection', (
+    tester,
+  ) async {
+    final selection = ValueNotifier(const MapSelectionState());
+    final layerFocus = FocusNode();
+    final item = t016Item();
+    addTearDown(selection.dispose);
+    addTearDown(layerFocus.dispose);
+    await _showWithLayerControl(
+      tester,
+      selection: selection,
+      layerFocus: layerFocus,
+      onSelect: () => selection.value = _state(item, isLoading: true),
+    );
+    await tester.tap(find.text('Open sample record'));
+    await tester.pump();
+    layerFocus.requestFocus();
+    await tester.pump();
+    await Future<void>.microtask(() => selection.value = _state(item));
+    await tester.pump();
+    expect(layerFocus.hasFocus, isTrue);
+    final next = MapItem.fromJson({...item.toJson(), 'id': 'sample.sensor.B'});
+    selection.value = _state(next);
+    await tester.pump();
+    expect(layerFocus.hasFocus, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('map-details-close')), findsNothing);
+  });
+
   testWidgets('desktop side and narrow bottom layouts stay bounded', (
     tester,
   ) async {

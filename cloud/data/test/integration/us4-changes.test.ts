@@ -1656,7 +1656,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   assert.equal(imp1.valid_to, null, 'Active incident remains open with null valid_to');
 
   assert.equal(imp2.record_status, 'resolved');
-  assert.equal(imp2.valid_to, '2026-09-28T00:04:00.000Z', 'Resolved incident retains lastClosed as valid_to');
+  assert.equal(imp2.valid_to, null, 'Provider closure status does not verify the ambiguous lastClosed timestamp');
 
   const currentTime = '2026-09-28T00:10:00Z' as UtcTimestamp;
   const historyRun1 = queryViewHistory(normalizedRun1.geoRecords);
@@ -1704,7 +1704,7 @@ test('US4 Suite 4: Incident clearance transitions to resolved; VicEmergency poli
   const imp1V2 = normalizedRun2.geoRecords[0]!;
   assert.equal(imp1V2.geo_record_id, imp1.geo_record_id);
   assert.equal(imp1V2.record_status, 'resolved');
-  assert.equal(imp1V2.valid_to, '2026-09-28T00:20:00.000Z');
+  assert.equal(imp1V2.valid_to, null);
 
   assert.notEqual(imp1V2.version_id, imp1.version_id, 'Clearance creates a new business version');
   assert.ok(

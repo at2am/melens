@@ -226,7 +226,13 @@ function sparseStopTimes(bytes: Uint8Array, tripRoutes: Map<string, string>): Re
 }
 
 function parseMode(zip: Uint8Array): OfficialGtfsArchive['raw'] {
-  const entries = new Map(directory(zip, zip.length).entries.map(entry => [entry.name.split('/').pop(), entry]));
+  const entries = new Map<string, ZipEntry>();
+  for (const entry of directory(zip, zip.length).entries) {
+    const name = entry.name.split('/').pop();
+    if (!name?.endsWith('.txt')) continue;
+    if (entries.has(name)) invalid(`duplicate GTFS table: ${name}`);
+    entries.set(name, entry);
+  }
   const required = ['routes.txt', 'stops.txt', 'trips.txt', 'stop_times.txt'] as const;
   for (const name of required) if (!entries.has(name)) invalid(`nested mode ZIP missing ${name}`);
   const get = (name: string): Uint8Array => innerEntry(zip, entries.get(name)!);

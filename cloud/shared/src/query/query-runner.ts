@@ -6,7 +6,7 @@ import { MapQueryError } from '../errors.js';
 import type { AdapterQueryJob, BigQueryViewAdapter, PreparedViewQuery } from './bigquery-adapter.js';
 import { publicRecordKeysSchema, preparePublicRecordQuery } from './public-record-queries.js';
 import { approvedUnlocatedScopeSchema, prepareUnlocatedQuery } from './unlocated-queries.js';
-import { prepareViewQuery, viewQueryIdSchema, type IndicatorFilter } from './view-queries.js';
+import { prepareViewQuery, viewQueryIdSchema, type CurrentGeoRead, type IndicatorFilter } from './view-queries.js';
 
 const queryInputSchema = z.strictObject({
   queryId: viewQueryIdSchema,
@@ -106,6 +106,8 @@ export function createViewQueryRunner(options: {
   readonly config: MapConfig;
   readonly adapter: BigQueryViewAdapter;
   readonly validateIndicatorSelection?: IndicatorSelectionValidator;
+  /** Server-owned reader policy; caller input cannot select a view or change this policy. */
+  readonly currentGeoRead?: CurrentGeoRead;
 }) {
   const config = validateMapConfig(options.config);
   const maximumResultBudget = config.maxResponseBytes - config.responseEnvelopeReserveBytes;
@@ -194,6 +196,7 @@ export function createViewQueryRunner(options: {
         ? prepareUnlocatedQuery({ queryId: parsed.queryId, request: request as ReturnType<typeof parseUnlocatedQuery>,
           config, pageSize, approvedScope: parsed.approvedScope! })
         : prepareViewQuery({ queryId: parsed.queryId, request: request as ReturnType<typeof parseViewportQuery>, config, pageSize,
+          currentGeoRead: options.currentGeoRead ?? 'served',
           ...(parsed.publicSourceIds === undefined ? {} : { publicSourceIds: parsed.publicSourceIds }) }); }
       catch { throw new MapQueryError('invalidRequest'); }
       return execute(query, { pageSize, byteBudget }, execution);

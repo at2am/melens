@@ -1,0 +1,105 @@
+{
+  "checkedAt": "2026-10-15T15:18:31.716Z",
+  "seedJobId": "10a2bd04-5086-4fca-b6f5-ba55cde97b59",
+  "maximumBytesBilled": "1000000000",
+  "jobTimeoutMs": 10000,
+  "results": [
+    {
+      "kind": "original-correlated-exists",
+      "jobId": "44b25ae3-1f2a-4ff7-822f-9d17d8b11c3c",
+      "keyCount": 324,
+      "sourceIds": [
+        "melbourne.development_monitor"
+      ],
+      "estimateBytes": "497046859",
+      "bytesProcessed": "497046859",
+      "durationMs": 3651,
+      "wallMs": 8458,
+      "totalSlotMs": "213680",
+      "cacheHit": false,
+      "returnedRows": 324,
+      "resultSha256": "370ad67376004e0c68fed7abdcf0f1042596826e9e15128f8ddd80f606ab78db",
+      "sameRowsAsOriginal": null,
+      "jsonStages": [
+        {
+          "name": "S63: Sort+",
+          "recordsRead": "92713",
+          "recordsWritten": "324",
+          "slotMs": "31010",
+          "jsonOperationCount": 3,
+          "joinKinds": []
+        }
+      ],
+      "finalStages": [
+        {
+          "name": "S63: Sort+",
+          "recordsRead": "92713",
+          "recordsWritten": "324",
+          "slotMs": "31010",
+          "jsonOperationCount": 3,
+          "joinKinds": []
+        },
+        {
+          "name": "S64: Output",
+          "recordsRead": "324",
+          "recordsWritten": "324",
+          "slotMs": "153",
+          "jsonOperationCount": 0,
+          "joinKinds": []
+        }
+      ]
+    },
+    {
+      "kind": "revised-distinct-key-join",
+      "jobId": "eadb37dd-b070-4c10-80ea-cbc020b5ac30",
+      "keyCount": 324,
+      "sourceIds": [
+        "melbourne.development_monitor"
+      ],
+      "estimateBytes": "497046859",
+      "bytesProcessed": "497047025",
+      "durationMs": 3280,
+      "wallMs": 11743,
+      "totalSlotMs": "168086",
+      "cacheHit": false,
+      "returnedRows": 324,
+      "resultSha256": "370ad67376004e0c68fed7abdcf0f1042596826e9e15128f8ddd80f606ab78db",
+      "sameRowsAsOriginal": true,
+      "jsonStages": [
+        {
+          "name": "S64: Input",
+          "recordsRead": "1",
+          "recordsWritten": "324",
+          "slotMs": "33",
+          "jsonOperationCount": 3,
+          "joinKinds": []
+        }
+      ],
+      "finalStages": [
+        {
+          "name": "S67: Join+",
+          "recordsRead": "125214",
+          "recordsWritten": "324",
+          "slotMs": "6926",
+          "jsonOperationCount": 0,
+          "joinKinds": [
+            "INNER HASH JOIN EACH  WITH ALL  ON $281 = $3960, $282 = $3961, $283 = $3962"
+          ]
+        },
+        {
+          "name": "S68: Output",
+          "recordsRead": "324",
+          "recordsWritten": "324",
+          "slotMs": "43",
+          "jsonOperationCount": 0,
+          "joinKinds": []
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "One sequential A/B pair; no p95 or load claim.",
+    "Both queries use the same approved current view, selected fields, lifecycle predicate, keys, sort and row limit.",
+    "The local comparison does not deploy a service or change cloud tables."
+  ]
+}

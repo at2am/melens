@@ -47,16 +47,20 @@ test('pedestrian drawable/unlocated SQL are complementary for full observation-e
 test('public record proofs retain native identity/version/source or observation identity and exclude withdrawal', () => {
   const keys = [{ id: 'public:item', versionId: 'version1', sourceId: 'public.planning' }];
   const geo = preparePublicRecordQuery({ queryId: 'planning', request, config, pageSize: 1000, recordKeys: keys });
-  assert.match(geo.query, /JSON_VALUE\(k, '\$.versionId'\) = g.version_id/);
-  assert.match(geo.query, /JSON_VALUE\(k, '\$.sourceId'\) = g.source_id/);
+  assert.match(geo.query, /requested\.version_id = g\.version_id/);
+  assert.match(geo.query, /requested\.source_id = g\.source_id/);
   assert.doesNotMatch(geo.query, /public:item|public\.planning/);
   const historical = preparePublicRecordQuery({ queryId: 'planning', request: { ...request, mode: 'historical' }, config, pageSize: 1000, recordKeys: keys });
   assert.match(historical.query, /v_geo_records_history/); assert.match(historical.query, /g.record_status != 'withdrawn'/);
   const boundary = preparePublicRecordQuery({ queryId: 'boundary', request, config, pageSize: 1000, recordKeys: keys });
   assert.match(boundary.query, /v_boundaries/); assert.match(boundary.query, /b.version_id/);
+  assert.match(boundary.query, /b.rights_evidence/);
   const pedestrian = preparePublicRecordQuery({ queryId: 'pedestrian', request, config, pageSize: 1000,
     recordKeys: [{ ...keys[0]!, sensorId: 'sensor1', observedAt: '2026-10-01T00:00:00Z' }] });
-  assert.match(pedestrian.query, /p.sensor_id/); assert.match(pedestrian.query, /p.observed_at = SAFE_CAST/);
+  assert.match(pedestrian.query, /p.sensor_id/); assert.match(pedestrian.query, /SAFE_CAST\(JSON_VALUE\(k, '\$.observedAt'\) AS TIMESTAMP\) AS observed_at/);
+  assert.match(pedestrian.query, /requested\.observed_at = p\.observed_at/);
+  assert.match(pedestrian.query, /p.source_record_id/); assert.match(pedestrian.query, /p.location_version_id/);
+  assert.match(pedestrian.query, /p.rights_evidence/);
 });
 
 test('unlocated/public-record internal families reject unbound scope/keys before query execution', async () => {

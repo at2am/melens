@@ -24,7 +24,9 @@ test('production GTFS SQL uses latest published FULL_DATASET per mode, including
     .replaceAll('`melens_ingest.geo_records`', 'synthetic_geo')
     .replaceAll('`melens_ingest.source_records`', 'synthetic_sources')
     .replaceAll('`melens_ingest.geo_record_sources`', 'synthetic_links')
+    .replaceAll('`melens_ingest.parking_sensor_memberships`', 'synthetic_parking_memberships')
     .replaceAll('`melens_query.v_geo_records_history`', 'synthetic_history');
+  assert.doesNotMatch(view, /`melens_(?:ingest|query)\./, 'Synthetic SQL must not read production tables');
   const query = `WITH synthetic_batches AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id, JSON_VALUE(row, '$.source_id') AS source_id,
       JSON_VALUE(row, '$.source_revision') AS source_revision, JSON_VALUE(row, '$.state') AS state,
@@ -50,6 +52,10 @@ test('production GTFS SQL uses latest published FULL_DATASET per mode, including
       JSON_VALUE(row, '$.source_version_id') AS source_version_id,
       JSON_VALUE(row, '$.geo_record_id') AS geo_record_id, JSON_VALUE(row, '$.version_id') AS version_id,
       JSON_VALUE(row, '$.evidence_role') AS evidence_role FROM UNNEST(JSON_QUERY_ARRAY(@links)) row
+  ), synthetic_parking_memberships AS (
+    SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
+      CAST(NULL AS STRING) AS business_source_record_id, CAST(NULL AS STRING) AS business_version_id
+    FROM UNNEST(ARRAY<BOOL>[])
   ), synthetic_history AS (
     SELECT g.* FROM synthetic_geo g JOIN synthetic_batches b USING (batch_id, source_id)
     WHERE b.state = 'published'
@@ -120,4 +126,19 @@ test('production GTFS SQL uses latest published FULL_DATASET per mode, including
   assert.deepEqual(await ids(), []);
   assert.equal(records.every(record => record.record_status === 'active'), true);
   assert.equal(records.length, 4);
+  // Identical provider snapshots repeated in different batches keep their members.
+  const metroCurrent = parent('metro-current', 'metro_train', 32);
+  const current = member(metroCurrent, 'metro_train:CURRENT');
+  batches.push(batch('metro-current', 33), batch('metro-repeat', 34));
+  parents.push(metroCurrent, parent('metro-current', 'yarra_tram', 30),
+    parent('metro-repeat', 'metro_train', 32), parent('metro-repeat', 'yarra_tram', 30));
+  records.push(current.record);
+  links.push(current.link);
+  assert.deepEqual(await ids(), [current.record.geo_record_id]);
+  // A different FULL_DATASET body at that same provider timestamp is ambiguous.
+  // An empty conflicting snapshot cannot leave members from its previous body current.
+  batches.push(batch('metro-conflict', 35));
+  parents.push({ ...parent('metro-conflict', 'metro_train', 32), version_id: 'conflicting-empty-body' },
+    parent('metro-conflict', 'yarra_tram', 30));
+  assert.deepEqual(await ids(), []);
 });

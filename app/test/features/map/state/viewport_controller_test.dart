@@ -4,6 +4,7 @@ import 'package:melens/core/config/env.dart';
 import 'package:melens/core/time/melbourne_time.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
+import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/state/viewport_controller.dart';
 
@@ -42,6 +43,44 @@ void main() {
     controller = container.read(viewportControllerProvider.notifier);
   });
   tearDown(() => container.dispose());
+
+  test('live current window follows the clock and rounds to the minute', () {
+    final window = currentViewportWindow(
+      MelbourneClock(now: () => DateTime.utc(2026, 10, 15, 1, 23, 55)),
+    );
+    expect(window.from, DateTime.utc(2026, 10, 15, 1, 8));
+    expect(window.to, DateTime.utc(2026, 10, 15, 1, 23));
+  });
+
+  test(
+    'sample defaults query the fixed observations after their date',
+    () async {
+      final sample = ProviderContainer(
+        overrides: [
+          envProvider.overrideWithValue(container.read(envProvider)),
+          mapRepositoryProvider.overrideWithValue(const SampleMapRepository()),
+          melbourneClockProvider.overrideWithValue(
+            MelbourneClock(now: () => DateTime.utc(2026, 10, 15, 1)),
+          ),
+        ],
+      );
+      addTearDown(sample.dispose);
+      final active = sample.read(viewportControllerProvider.notifier);
+      active.setLayers([MapLayerId.pedestrian], debounce: false);
+      active.setRegion(t017Region, 14, debounce: false);
+      await settle();
+      final state = sample.read(viewportControllerProvider);
+      expect(state.window.from, DateTime.utc(2026, 10, 1, 0, 59));
+      expect(state.window.to, DateTime.utc(2026, 10, 1, 1));
+      expect(state.response!.layers.single.state, MapLayerState.available);
+      expect(
+        state.response!.layers.single.items.map((item) => item.id),
+        contains('sample.sensor.A'),
+      );
+      expect(state.response!.generatedAt, DateTime.utc(2026, 10, 1, 1));
+      expect(state.dataMode, MapDataMode.sample);
+    },
+  );
 
   test('empty and unconfigured boundary layers skip network', () {
     controller.setRegion(t017Region, 14, debounce: false);

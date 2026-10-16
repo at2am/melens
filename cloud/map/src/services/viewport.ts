@@ -39,6 +39,14 @@ export const ROUTINELY_REPUBLISHED_SOURCES: ReadonlySet<string> = new Set(['melb
 
 export async function assertSnapshotPublic(snapshot: StoredSnapshot, access: SnapshotAccess,
   execution: { readonly signal?: AbortSignal } = {}): Promise<void> {
+  const records = [...snapshot.layers.flatMap((layer) => layer.items), ...snapshot.listItems,
+    ...snapshot.groups.flatMap((group) => [...group.members])].filter((item) => item.kind !== 'aggregate');
+  await assertSnapshotRecordsPublic(snapshot, access, records, execution);
+}
+
+/** Detail reads keep the snapshot's source versions and recheck the records behind their response. */
+export async function assertSnapshotRecordsPublic(snapshot: StoredSnapshot, access: SnapshotAccess,
+  records: readonly MapItem[], execution: { readonly signal?: AbortSignal } = {}): Promise<void> {
   const coverage = await access.readCoverage(coverageRequest(snapshot), execution);
   if (coverage.completeness !== 'complete') throw new MapServiceError('serviceUnavailable');
   // A publication change cannot prove that a stored old version remains public.
@@ -48,8 +56,6 @@ export async function assertSnapshotPublic(snapshot: StoredSnapshot, access: Sna
     if (ROUTINELY_REPUBLISHED_SOURCES.has(mark.sourceId)) continue;
     if (current.publishedBatchId !== mark.batchId || current.publishedAt !== mark.publishedAt) throw new MapServiceError('notAvailable');
   }
-  const records = [...snapshot.layers.flatMap((layer) => layer.items), ...snapshot.listItems,
-    ...snapshot.groups.flatMap((group) => [...group.members])].filter((item) => item.kind !== 'aggregate');
   if (records.length > 0 && (access.checkPublicRecords === undefined
     || !await access.checkPublicRecords(records, snapshot, coverage, execution))) throw new MapServiceError('notAvailable');
 }
@@ -134,13 +140,21 @@ export function createViewportService(options: SnapshotAccess & {
       sourceWatermarks(coverage, rowSourceIds);
       const publishedIds = [...layers.flatMap((layer) => layer.sourceIds), ...rowSourceIds]
         .filter((id) => findPublicSource(coverage, id) !== null);
-      const snapshot = options.store.create({ family: 'viewport', identity: normalizedViewportIdentity(request),
+      const input = { family: 'viewport' as const, identity: normalizedViewportIdentity(request),
         request, selectedLayers: request.layers, sourceWatermarks: sourceWatermarks(coverage, publishedIds),
-        layers, listItems: [], listCompleteness: 'complete', listTotal: null, listScope: null, groups });
+        layers, listItems: [], listCompleteness: 'complete' as const, listTotal: null, listScope: null, groups };
+      const reuse = request.layers.includes('parking') ? null : options.store.createOrReuse(input);
+      const snapshot = reuse === null ? options.store.create(input) : reuse.snapshot;
       try {
         await assertSnapshotPublic(snapshot, options, execution);
-        return responsePage(snapshot, request);
-      } catch (error) { options.store.discard(snapshot.id); throw error; }
+        const response = responsePage(snapshot, request);
+        if (reuse !== null) options.store.finishReuse(snapshot.id, { retained: true });
+        return response;
+      } catch (error) {
+        if (reuse === null) options.store.discard(snapshot.id);
+        else options.store.finishReuse(snapshot.id, { retained: false });
+        throw error;
+      }
     },
   };
 }

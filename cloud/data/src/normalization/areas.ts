@@ -1,6 +1,7 @@
 import { BigQuery } from '@google-cloud/bigquery';
 
 import type { DataConfig } from '../core/config.js';
+import type { Boundary } from '../core/types.js';
 
 export interface AreaRef {
   scheme: string;
@@ -13,6 +14,28 @@ export interface AreaRef {
 export interface BoundaryVintage {
   scheme: string;
   vintage: string;
+}
+
+export type BoundaryIdentity = Pick<Boundary, 'boundary_id' | 'scheme' | 'vintage'>
+  & Partial<Pick<Boundary, 'code'>>;
+
+/** A crosswalk may select only one supplied official boundary of the expected level. */
+export function validateCrosswalkTarget(input: {
+  boundaryId: string;
+  boundaries: readonly BoundaryIdentity[];
+  allowedSchemes: readonly string[];
+}): string {
+  const matches = input.boundaries.filter(boundary => boundary.boundary_id === input.boundaryId);
+  const boundary = matches.length === 1 ? matches[0] : undefined;
+  const parts = input.boundaryId.split(':');
+  if (!boundary || !input.allowedSchemes.includes(boundary.scheme)
+    || parts.length !== 3 || parts[0] !== boundary.scheme
+    || !parts[1] || parts[2] !== boundary.vintage
+    || boundary.vintage === 'unresolved'
+    || (boundary.code !== undefined && parts[1] !== boundary.code)) {
+    throw new Error(`Crosswalk target is not a unique official boundary of the expected geography: ${input.boundaryId}`);
+  }
+  return boundary.boundary_id;
 }
 
 function validateName(value: string): string {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 import type { DataConfig } from '../../src/core/config.js';
@@ -62,13 +63,14 @@ test('a rebuild swaps the sources rows and their state in one transaction', () =
   assert.match(sql, /'rebuild'/);
 });
 
-test('an incremental apply reads only the new batches and their recent partitions', () => {
+test('an incremental apply reads recent batch payloads and checks published version clocks', () => {
   const sql = applyGeoRecordsCurrentBatchesSql(config);
   assert.match(sql, /^\/\* apply-geo-records-current \*\/\nDECLARE/);
   assert.ok(sql.includes(`RAISE USING MESSAGE = '${NO_STATE_MESSAGE}'`));
   assert.match(sql, /published_at > state_published/);
   // A scripting variable is a constant, so BigQuery prunes partitions on it.
   assert.match(sql, /DATE\(g\.fetched_at\) >= fetched_floor/);
+  assert.match(sql, /JOIN published_batches AS b ON g\.batch_id = b\.batch_id AND g\.source_id = b\.source_id/);
   // Newest version wins by the history view's ordering; the same version prefers the newer batch.
   assert.match(sql, /source_updated_at DESC NULLS LAST,\s*source_version_ordinal DESC NULLS LAST, version_id DESC, is_incoming DESC/);
   // A newer version that is not public or that ended the record removes it, as the views do.
@@ -76,6 +78,65 @@ test('an incremental apply reads only the new batches and their recent partition
   assert.match(sql, /i\.record_status NOT IN \('cancelled', 'resolved', 'withdrawn'\)/);
   // No new batch: the state is kept rather than cleared.
   assert.match(sql, /DELETE FROM `melens-test\.melens_ingest_test\.geo_records_current_state` WHERE source_id = @sourceId AND EXISTS \(SELECT 1 FROM new_batches\)/);
+});
+
+test('late old batches cannot restore an ended or private record after the current copy removes it', () => {
+  const sql = applyGeoRecordsCurrentBatchesSql(config);
+  const current = '`melens-test.melens_ingest_test.geo_records_current`';
+  const state = '`melens-test.melens_ingest_test.geo_records_current_state`';
+  const columns = sql.match(/INSERT INTO `[^`]+geo_records_current` \(([^)]+)\)/)?.[1]?.split(', ');
+  assert.ok(columns);
+  const start = sql.indexOf('CREATE TEMP TABLE winners AS');
+  const end = sql.indexOf(`DELETE FROM ${state}`, start);
+  assert.ok(start > 0 && end > start);
+  // Execute the generated winner/delete/insert statements. SQLite needs only the
+  // dataset names, script variables and unrelated geography conversion adapted.
+  const update = sql.slice(start, end)
+    .replaceAll(current, 'geo_records_current')
+    .replaceAll('`melens-test.melens_ingest_test.geo_records`', 'geo_records')
+    .replaceAll('@sourceId', "'user.events'")
+    .replace(/\bsource_public\b/g, 'TRUE')
+    .replaceAll('SAFE.ST_GEOGFROMGEOJSON(i.geometry_geojson)', 'i.geometry_geojson');
+
+  for (const removed of [
+    { status: 'withdrawn', rights: 'verified_open', allowed: 1 },
+    { status: 'cancelled', rights: 'verified_open', allowed: 1 },
+    { status: 'resolved', rights: 'verified_open', allowed: 1 },
+    { status: 'active', rights: 'review_required', allowed: 0 },
+  ]) {
+    const db = new DatabaseSync(':memory:');
+    try {
+      const definitions = columns.map(column => `${column} ${column === 'source_version_ordinal' ? 'INTEGER' : 'TEXT'}`).join(', ');
+      db.exec(`CREATE TABLE geo_records_current (${definitions});
+        CREATE TABLE incoming (${definitions}, public_query_allowed INTEGER);
+        CREATE TABLE geo_records AS SELECT * FROM incoming WHERE FALSE;
+        CREATE TABLE published_batches (batch_id TEXT, source_id TEXT);`);
+      function refresh(batch: string, version: string, clock: string,
+        access = { status: 'active', rights: 'verified_open', allowed: 1 }): void {
+        db.exec('DELETE FROM incoming; DROP TABLE IF EXISTS winners;');
+        db.prepare(`INSERT INTO incoming (geo_record_id, version_id, batch_id, source_id,
+          source_updated_at, assertion_kind, record_status, rights_status, public_query_allowed)
+          VALUES ('event-1', ?, ?, 'user.events', ?, 'observation', ?, ?, ?)`)
+          .run(version, batch, clock, access.status, access.rights, access.allowed);
+        db.exec('INSERT INTO geo_records SELECT * FROM incoming;');
+        db.prepare("INSERT INTO published_batches VALUES (?, 'user.events')").run(batch);
+        db.exec(update);
+      }
+      const versions = () => db.prepare('SELECT version_id FROM geo_records_current').all().map(row => row.version_id);
+      refresh('B1', 'v1', '2026-10-15T01:00:00Z');
+      assert.deepEqual(versions(), ['v1']);
+      refresh('B2', 'v2', '2026-10-15T02:00:00Z', removed);
+      assert.deepEqual(versions(), []);
+      refresh('B3', 'v1', '2026-10-15T01:00:00Z');
+      assert.deepEqual(versions(), [], `${removed.status}/${removed.rights} stays absent after a late old version`);
+      db.exec(`INSERT INTO geo_records (geo_record_id, version_id, batch_id, source_id, source_updated_at)
+        VALUES ('event-1', 'v4', 'unpublished', 'user.events', '2026-10-15T04:00:00Z');`);
+      refresh('B4', 'v3', '2026-10-15T03:00:00Z');
+      assert.deepEqual(versions(), ['v3'], 'A genuinely newer public version can restore the record');
+    } finally {
+      db.close();
+    }
+  }
 });
 
 test('GDELT applies its new batches under the source ceiling', async () => {
@@ -122,7 +183,8 @@ test('only map geo sources can be refreshed, and a ceiling is required', async (
 
 test('every connector the map draws in a geo layer is refreshed', () => {
   const root = new URL('../../src/connectors/', import.meta.url);
-  const notDrawn = new Set(['victoria.transport.gtfs_static', 'melbourne.transport.activity_counts']);
+  // Police candidates use a private table and do not enter the public geo publisher.
+  const notDrawn = new Set(['victoria.transport.gtfs_static', 'melbourne.transport.activity_counts', 'victoria.police.news']);
   const drawn = readdirSync(root, { withFileTypes: true }).filter(entry => entry.isDirectory())
     .map(entry => JSON.parse(readFileSync(new URL(`${entry.name}/source.json`, root), 'utf8')) as { source_id: string; topic: string })
     .filter(source => ['planning', 'transport', 'road_disruption', 'event', 'news'].includes(source.topic))

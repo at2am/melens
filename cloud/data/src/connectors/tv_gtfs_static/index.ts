@@ -208,6 +208,7 @@ export function parseGtfsZip(zipBytes: Uint8Array): GtfsStaticSnapshot {
   for (const [filepath, bytes] of Object.entries(unzipped)) {
     const filename = filepath.split('/').pop();
     if (filename && filename.endsWith('.txt')) {
+      if (fileContents.has(filename)) throw new Error(`Duplicate GTFS table: ${filename}`);
       fileContents.set(filename, strFromU8(bytes));
     }
   }
@@ -299,14 +300,13 @@ export function normalizeGtfsSnapshot(
       throw new Error(`StopTime references unknown stop ${stopTime.stop_id}`);
     }
     const routeId = tripToRouteId.get(stopTime.trip_id);
-    if (routeId) {
-      let set = stopToRouteIds.get(stopTime.stop_id);
-      if (!set) {
-        set = new Set<string>();
-        stopToRouteIds.set(stopTime.stop_id, set);
-      }
-      set.add(routeId);
+    if (routeId === undefined) throw new Error(`StopTime references unknown trip ${stopTime.trip_id}`);
+    let set = stopToRouteIds.get(stopTime.stop_id);
+    if (!set) {
+      set = new Set<string>();
+      stopToRouteIds.set(stopTime.stop_id, set);
     }
+    set.add(routeId);
   }
 
   const primaryFeedInfo = snapshot.feed_info[0];

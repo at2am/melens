@@ -20,6 +20,7 @@ const userEventSummarySchema = z.object({
   description: z.string().nullish(), placeName: z.string().nullish(), attendeeCount: z.number().int().nonnegative().nullish(),
   anonymousAttendance: z.boolean().nullish(),
 });
+const originalEventUrlSchema = z.url({ protocol: /^https?$/ });
 
 /** The public summary of a user event: the description and how many are going; the place is the venue. */
 function userEventSummary(summary: string | null): { readonly summary: string | null; readonly placeName: string | null } | null {
@@ -43,6 +44,8 @@ export function adaptEventRow(row: ViewRow, options: {
     const sourceId = publishedIdentifier(row.source_id);
     if (options.source.sourceId !== sourceId) throw new MapAdapterError('notPublic');
     if (row.topic !== 'event') throw new MapAdapterError();
+    const originalUrl = sourceId === 'ticketmaster.events'
+      ? originalEventUrlSchema.parse(row.original_url) : row.original_url;
     const id = publishedIdentifier(row.geo_record_id);
     const versionId = publishedIdentifier(row.version_id);
     const startAt = publishedInstant(row.valid_from);
@@ -75,7 +78,7 @@ export function adaptEventRow(row: ViewRow, options: {
       time: publishedItemTime({ ...row, valid_to: endAt,
         source_time_text: row.source_time_text ?? sourceClock,
         source_timezone: row.source_timezone ?? sourceTimezone }),
-      sources: [publicSourceReference(options.source, versionId, row.original_url)],
+      sources: [publicSourceReference(options.source, versionId, originalUrl)],
       details: { summary, venueName, category: userSummary === null ? null : USER_EVENTS_CATEGORY, startAt, endAt,
         status: lifecycle === 'withdrawn' ? 'unknown' : lifecycle },
     });

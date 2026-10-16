@@ -474,6 +474,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _takeCardItemRequest(CardItemRequest request) {
     ref.read(cardItemRequestsProvider.notifier).consume(request.sequence);
+    final record = request.mapRecord;
+    if (record != null) {
+      _selectCardRecord(record);
+      return;
+    }
     final item = request.item;
     final loaded = ref.read(viewportControllerProvider).response != null;
     if (item.source is FeatureCardSource && !loaded) {
@@ -482,6 +487,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return;
     }
     _onCardItemTap(item);
+  }
+
+  void _selectCardRecord(MapItemResponse record) {
+    _awaitingItem = null;
+    _selectedWindow = null;
+    _selectedFilters = null;
+    final layer = record.item.layerId;
+    final layers = ref.read(layerControllerProvider.notifier);
+    if (!ref.read(layerControllerProvider).availableLayers.contains(layer)) {
+      layers.selectTopic(
+        layer == MapLayerId.news ? MapTopic.nearbyNews : MapTopic.cityActivity,
+      );
+    }
+    layers.setLayerEnabled(layer, true);
+    setState(() {
+      _showUnlocated = false;
+      _cardItem = null;
+    });
+    unawaited(
+      ref
+          .read(selectionControllerProvider.notifier)
+          .selectItem(
+            record.item,
+            context: MapReadContext(
+              requestId: 'map-detail-${++_detailSequence}',
+              snapshotId: record.snapshotId,
+            ),
+            mode: record.mode,
+            dataMode: record.dataMode,
+          )
+          .then((_) {
+            if (mounted) _reconcileSelection();
+          }),
+    );
   }
 
   /// Why My location did not work; nothing is shown otherwise.
@@ -1452,13 +1491,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       const Duration(days: 31): strings.mapTimePastMonth,
     };
     final span = state.window.to.difference(state.window.from);
+    final currentLabel = state.dataMode == MapDataMode.sample
+        ? strings.mapTimeSampleWindow
+        : strings.mapTimeNow;
     final label = state.mode == MapQueryMode.current
-        ? strings.mapTimeNow
+        ? currentLabel
         : ranges[span] ?? strings.mapScreenHistorical;
 
     void now() => controller.setWindow(
       MapQueryMode.current,
-      currentViewportWindow(clock),
+      currentViewportWindow(clock, dataMode: state.dataMode),
     );
 
     void past(Duration duration) {
@@ -1471,7 +1513,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     void refresh() {
       if (state.mode == MapQueryMode.current) {
-        final window = currentViewportWindow(clock);
+        final window = currentViewportWindow(clock, dataMode: state.dataMode);
         if (window.from != state.window.from || window.to != state.window.to) {
           controller.setWindow(MapQueryMode.current, window, debounce: false);
           return;
@@ -1495,7 +1537,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               key: const ValueKey('map-time-current'),
               value: Duration.zero,
               checked: state.mode == MapQueryMode.current,
-              child: Text(strings.mapTimeNow),
+              child: Text(currentLabel),
             ),
             for (final entry in ranges.entries)
               CheckedPopupMenuItem<Duration>(
@@ -1516,7 +1558,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 children: [
                   Icon(Icons.schedule, size: 18, color: scheme.primary),
                   const SizedBox(width: 6),
-                  Text(label, style: Theme.of(context).textTheme.labelLarge),
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   const Icon(Icons.arrow_drop_down),
                   IconButton(
                     key: const ValueKey('map-refresh'),

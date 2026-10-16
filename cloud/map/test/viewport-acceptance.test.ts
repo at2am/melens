@@ -32,7 +32,9 @@ function planning(id: string, status = 'active'): ViewRow {
     fetched_at: timestamp, freshness_state: 'current', record_status: status };
 }
 function observation(sensorId: string, count: number | null): ViewRow {
-  return { source_id: 'acceptance.pedestrian', batch_id: 'acceptance-batch', sensor_id: sensorId,
+  return { rights_evidence: 'latest_published_record_v1', source_record_id: `counts:${sensorId}`,
+    version_id: 'native-observation-v1', location_source_record_id: null, location_version_id: null,
+    source_id: 'acceptance.pedestrian', batch_id: 'acceptance-batch', sensor_id: sensorId,
     observed_at: '2026-10-01T00:59:00.000001Z', direction_a_count: null, direction_b_count: null,
     total_count: count, record_granularity: 'sensor_minute', fetched_at: timestamp,
     source_last_success_at: timestamp, location_source_id: null, location_valid_from: null,
@@ -42,14 +44,14 @@ function pedestrianRight(item: Extract<MapItem, { kind: 'pedestrian' }>): string
   return JSON.stringify([item.sources[0]!.sourceId, item.details.sensorId, item.time.observedAt]);
 }
 
-/** A deterministic published-view adapter; these tests never access cloud records. */
+/** Direct SQL responses; publication-cache behavior is tested in current-cache-rights.test.ts. */
 function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: boolean; partial?: boolean;
-  independentPedestrianRights?: boolean; productionAggregation?: boolean; sqlRecheck?: boolean } = {}) {
+  independentPedestrianRights?: boolean; productionAggregation?: boolean } = {}) {
   const sources = [metadata('acceptance.planning', 'planning'), metadata('acceptance.traffic', 'transport'),
     metadata('acceptance.pedestrian', 'pedestrian'), metadata('acceptance.boundary', 'boundary')];
   const rows = options.rows ?? [planning('acceptance:first'), planning('acceptance:second')];
   const unlocated = [observation('unknown', null), observation('zero', 0)];
-  const boundaries: ViewRow[] = [{ boundary_id: 'ASGS_LGA:24600:2021', version_id: 'acceptance-boundary-version',
+  const boundaries: ViewRow[] = [{ rights_evidence: 'latest_published_record_v1', boundary_id: 'ASGS_LGA:24600:2021', version_id: 'acceptance-boundary-version',
     source_id: 'acceptance.boundary', source_record_id: 'acceptance.boundary:24600', scheme: 'ASGS_LGA',
     code: '24600', name: 'Synthetic acceptance area', vintage: '2021', valid_from: null, valid_to: null,
     fetched_at: timestamp, geometry_geojson: JSON.stringify({ type: 'Polygon', coordinates: [
@@ -100,7 +102,7 @@ function publishedFixture(options: { rows?: ViewRow[]; unavailableTraffic?: bool
     },
   };
   const service = createMapService({ adapter, config: loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' }),
-    ...(options.sqlRecheck === true ? { currentLayerCache: false } : {}),
+    currentLayerCache: false,
     // Flat-record acceptance deliberately separates paging/state semantics from T025 grouping.
     ...(options.productionAggregation === true ? {} : {
       aggregateLayer: (layer) => ({ items: layer.items, groups: new Map() }),
@@ -201,10 +203,8 @@ test('current and historical contexts retain eligible lifecycle and source-time 
   assert.ok(!historical.layers[0]!.items.some((item) => item.id === 'acceptance:withdrawn'));
 });
 
-// The SQL recheck sees a removal at once. The current-layer cache sees it at the next publication or when its
-// entry ages out (current-layer-cache.test.ts); the served copy itself changes only on refresh.
 test('record removal with unchanged public-source watermark invalidates both detail and continuation', async () => {
-  const f = publishedFixture({ sqlRecheck: true });
+  const f = publishedFixture();
   const first = await f.service.queryViewport({ ...request, pageSize: 1 });
   const item = first.layers[0]!.items[0]!;
   assert.ok(first.layers[0]!.nextCursor);
@@ -231,10 +231,11 @@ test('same-publication content changes cannot be served from an immutable unloca
   assert.equal(f.rightsChecks.length, 2);
 });
 
-test('default boundary and pedestrian view reads fail closed without an independent current rights verifier', async () => {
+test('older boundary and pedestrian views fail closed when latest-record permission evidence is absent', async () => {
   const f = publishedFixture({ productionAggregation: true });
   assert.equal(f.boundaries.length, 1);
   assert.equal(f.unlocated.length, 2);
+  for (const row of [...f.boundaries, ...f.unlocated]) delete row.rights_evidence;
   const body = await f.service.queryViewport({ ...request, layers: ['boundary', 'pedestrian'],
     boundaryFilter: { level: 'LGA', vintage: '2021' } });
   for (const layer of body.layers) {
@@ -246,10 +247,9 @@ test('default boundary and pedestrian view reads fail closed without an independ
   const { bbox: _bbox, zoom: _zoom, ...context } = request;
   await assert.rejects(f.service.queryUnlocated({ ...context, layers: ['pedestrian'],
     scope: { sourceJurisdiction: 'acceptance-jurisdiction' } }),
-  (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable');
+  (error: unknown) => error instanceof MapServiceError && error.code === 'serviceUnavailable');
   assert.equal(f.rightsChecks.length, 0);
-  assert.ok(f.queries.every((query) => query.query.includes('v_source_coverage')),
-    'An unsafe record view must not be read before the required rights verifier exists.');
+  assert.ok(f.queries.some((query) => query.query.includes('v_boundaries')));
 });
 
 test('independent pedestrian rights revocation blocks detail and paging while public view rows remain unchanged', async () => {
@@ -271,4 +271,33 @@ test('independent pedestrian rights revocation blocks detail and paging while pu
   assert.equal(f.rightsChecks.length, 3);
   assert.equal(JSON.stringify(f.unlocated), originalRows);
   assert.equal(f.sources[2]!.latest_published_batch_id, 'acceptance-batch');
+});
+
+test('permission-checked boundary and pedestrian views work without a supplemental verifier', async () => {
+  const f = publishedFixture();
+  const boundary = await f.service.queryViewport({ ...request, layers: ['boundary'],
+    boundaryFilter: { level: 'LGA', vintage: '2021' } });
+  assert.equal(boundary.layers[0]?.state, 'available');
+  assert.equal(boundary.layers[0]?.items[0]?.kind, 'boundary');
+  const { bbox: _bbox, zoom: _zoom, ...context } = request;
+  const pedestrians = await f.service.queryUnlocated({ ...context, layers: ['pedestrian'],
+    scope: { sourceJurisdiction: 'acceptance-jurisdiction' } });
+  assert.equal(pedestrians.items.length, 2);
+  assert.equal(f.rightsChecks.length, 0);
+});
+
+test('default pedestrian snapshots recheck record withdrawal with an unchanged source publication watermark', async () => {
+  const f = publishedFixture();
+  const { bbox: _bbox, zoom: _zoom, ...context } = request;
+  const query = { ...context, pageSize: 1, layers: ['pedestrian'],
+    scope: { sourceJurisdiction: 'acceptance-jurisdiction' } };
+  const first = await f.service.queryUnlocated(query);
+  const item = first.items[0]!;
+  assert.ok(first.nextCursor);
+  const stillPublic = f.unlocated.filter((row) => row.sensor_id !== (item.kind === 'pedestrian' ? item.details.sensorId : null));
+  f.unlocated.splice(0, f.unlocated.length, ...stillPublic);
+  const unavailable = (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable';
+  await assert.rejects(f.service.getItem(item.id, { requestId: 'withdrawn-pedestrian', snapshotId: first.snapshotId }), unavailable);
+  await assert.rejects(f.service.queryUnlocated({ ...query, snapshotId: first.snapshotId, cursor: first.nextCursor }), unavailable);
+  assert.equal(f.sources.find((source) => source.source_id === 'acceptance.pedestrian')?.latest_published_batch_id, 'acceptance-batch');
 });

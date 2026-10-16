@@ -77,8 +77,8 @@ class MapDetails extends ConsumerWidget {
     final colors = Theme.of(context).colorScheme;
     return CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): onClose},
-      child: Focus(
-        autofocus: true,
+      child: _SelectedDetailsFocus(
+        selectedItemId: state.selectedItemId!,
         child: Semantics(
           container: true,
           label: strings.mapDetailsTitle,
@@ -403,6 +403,47 @@ class MapDetails extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _SelectedDetailsFocus extends StatefulWidget {
+  const _SelectedDetailsFocus({
+    required this.selectedItemId,
+    required this.child,
+  });
+
+  final String selectedItemId;
+  final Widget child;
+
+  @override
+  State<_SelectedDetailsFocus> createState() => _SelectedDetailsFocusState();
+}
+
+class _SelectedDetailsFocusState extends State<_SelectedDetailsFocus> {
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(_SelectedDetailsFocus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedItemId != oldWidget.selectedItemId) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      Focus(focusNode: _focusNode, child: widget.child);
 }
 
 Widget _fact(AppLocalizations strings, String label, String? value) =>

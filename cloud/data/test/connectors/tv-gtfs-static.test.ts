@@ -11,6 +11,7 @@ import {
   gtfsRouteTypeToMode,
   normalizeGtfsSnapshot,
   parseGtfsSnapshot,
+  parseGtfsZip,
   type GtfsStaticSnapshot,
 } from '../../src/connectors/tv_gtfs_static/index.js';
 import { parseConnectorInput } from '../../src/core/connector.js';
@@ -253,6 +254,44 @@ test('referential integrity violation in trips or stops triggers validation fail
     assert.equal(result.code, 'validation_failed');
     assert.ok(result.message.includes('unknown route'));
   }
+});
+
+test('stop_times cannot claim a complete schedule when their trip is absent', async () => {
+  const snapshot = await loadFixture();
+  const connector = new TvGtfsStaticConnector(async () => ({ ...snapshot,
+    stop_times: [...snapshot.stop_times, { trip_id: 'missing-trip', stop_id: '19499' }],
+  }));
+  const result = await connector.collect(input);
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') {
+    assert.equal(result.code, 'validation_failed');
+    assert.match(result.message, /unknown trip/);
+  }
+});
+
+test('a GTFS ZIP cannot silently select one of two tables with the same name', () => {
+  const archive = zipSync({
+    'a/routes.txt': strToU8('route_id,route_type\na,2\n'),
+    'b/routes.txt': strToU8('route_id,route_type\nb,2\n'),
+    'stops.txt': strToU8('stop_id,stop_name,stop_lat,stop_lon\ns,Stop,-37.8,144.96\n'),
+  });
+  assert.throws(() => parseGtfsZip(archive), /Duplicate GTFS table: routes\.txt/);
+});
+
+test('official nested mode ZIP rejects duplicate table names', async () => {
+  const duplicateMode = zipSync({
+    'a/routes.txt': strToU8('route_id,route_type\na,2\n'),
+    'b/routes.txt': strToU8('route_id,route_type\nb,2\n'),
+    'stops.txt': strToU8('stop_id,stop_name,stop_lat,stop_lon\ns,Stop,-37.8,144.96\n'),
+    'trips.txt': strToU8('route_id,trip_id\nb,t\n'),
+    'stop_times.txt': strToU8('trip_id,stop_id\nt,s\n'),
+  });
+  const archive = zipSync({
+    '2/google_transit.zip': duplicateMode,
+    '3/google_transit.zip': modeArchive(3),
+  });
+  await assert.rejects(fetchOfficialGtfsArchive(new ArchiveRangeClient(archive),
+    'https://example.test/gtfs.zip'), /duplicate GTFS table: routes\.txt/);
 });
 
 test('official archive rejects a range response with corrupted entry CRC32 checksum', async () => {

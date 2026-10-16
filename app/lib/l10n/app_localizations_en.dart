@@ -1252,6 +1252,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapTimeNow => 'Now';
 
   @override
+  String get mapTimeSampleWindow => 'Sample observation window';
+
+  @override
   String get mapTimePastHour => 'Past hour';
 
   @override

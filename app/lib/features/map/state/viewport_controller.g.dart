@@ -111,7 +111,7 @@ final class ViewportControllerProvider
 }
 
 String _$viewportControllerHash() =>
-    r'2a058df17c94d10126eefb05c46f942a1802fb59';
+    r'fccdf4c2668a20026c08b0ad3e597634f654135d';
 
 /// Cancels superseded operations before the debounce, and guards every result.
 

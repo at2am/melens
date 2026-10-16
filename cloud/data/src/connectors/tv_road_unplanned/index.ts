@@ -13,7 +13,8 @@ const LANDING_URL = 'https://opendata.transport.vic.gov.au/dataset/unplanned-dis
 const API_URL = 'https://api.opendata.transport.vic.gov.au/api/opendata/roads/disruptions/unplanned/v3';
 const PAGE_SIZE = 100;
 const PAGE_DELAY_MS = 3100; // Safely below the documented 20 calls per 60 seconds.
-const NORMALIZATION_POLICY = 'explicit-offset-road-v2';
+const MAX_SOURCE_CLOCK_SKEW_MS = 300_000;
+const NORMALIZATION_POLICY = 'explicit-offset-closure-unverified-road-v3';
 
 /** Only explicitly offset timestamps prove an absolute instant. */
 export function parseVictorianTimestamp(value: string | null | undefined): string | null {
@@ -136,6 +137,8 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
   const geoRecordSources: GeoRecordSource[] = [];
   const parentVersions = new Map<string, string>();
   const seenFeature = new Set<string>();
+  const latestReportTime = Date.parse(z.iso.datetime({ offset: true }).parse(fetchedAt))
+    + MAX_SOURCE_CLOCK_SKEW_MS;
   let latestUpdate: string | null = null;
   for (const feature of features) {
     const p = feature.properties;
@@ -147,26 +150,30 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
     const updatedAt = parseVictorianTimestamp(p.lastUpdated);
     const createdAt = parseVictorianTimestamp(p.created);
     const closedAt = parseVictorianTimestamp(p.lastClosed);
+    if ([createdAt, updatedAt, closedAt].some(timestamp =>
+      timestamp !== null && Date.parse(timestamp) > latestReportTime)) {
+      throw new Error('Unplanned road report timestamp is more than five minutes after fetch time');
+    }
     if (updatedAt && (latestUpdate === null || updatedAt > latestUpdate)) latestUpdate = updatedAt;
 
     const recordStatus = disruptionStatus(p);
     const isInactive = recordStatus === 'resolved';
     const timezoneUnverified = [p.created, p.lastUpdated, p.lastClosed, p.endTime, p.nextUpdateDue]
       .some(hasUnverifiedTimezone);
-    const parentTimeMissing = timezoneUnverified
-      ? 'Source timestamp timezone unverified; original wall clocks retained without absolute ordering'
-      : createdAt === null
-      ? (p.status === 'Inactive' && closedAt === null
-        ? 'Incident created and clearance times absent upstream'
-        : 'Incident created time absent upstream')
-      : (p.status === 'Inactive' && closedAt === null ? 'Incident clearance time absent upstream' : null);
-    const childTimeMissing = timezoneUnverified
-      ? 'Source timestamp timezone unverified; original wall clocks retained without absolute ordering'
-      : createdAt === null
-      ? (isInactive && closedAt === null
-        ? 'Incident created and clearance times absent upstream'
-        : 'Incident created time absent upstream')
-      : (isInactive && closedAt === null ? 'Incident clearance time absent upstream' : null);
+    const hasClosureField = p.lastClosed != null && p.lastClosed.trim() !== '';
+    const clearanceReason = hasClosureField
+      ? 'Incident clearance time unverified; provider lastClosed and lastActive definitions conflict'
+      : 'Incident clearance time absent upstream';
+    const missingTimeReason = (inactive: boolean): string | null => {
+      const reasons: string[] = [];
+      if (timezoneUnverified) reasons.push(
+        'Source timestamp timezone unverified; original wall clocks retained without absolute ordering');
+      else if (createdAt === null) reasons.push('Incident created time absent upstream');
+      if (inactive) reasons.push(clearanceReason);
+      return reasons.length === 0 ? null : reasons.join('; ');
+    };
+    const parentTimeMissing = missingTimeReason(p.status === 'Inactive');
+    const childTimeMissing = missingTimeReason(isInactive);
 
     const parentId = sourceRecordId({ sourceId: SOURCE_ID, nativeId: `incident:${parentKey}`,
       originalUrl: LANDING_URL, sourceTime: createdAt });
@@ -189,7 +196,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
         original_url: LANDING_URL, raw_uri: null, published_at: null,
         observed_at: createdAt, first_accessible_at: null,
         time_missing_reason: parentTimeMissing,
-        valid_from: createdAt, valid_to: p.status === 'Inactive' ? closedAt : null,
+        valid_from: createdAt, valid_to: null,
         source_updated_at: updatedAt, source_version_ordinal: null,
         record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
     }
@@ -207,7 +214,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
         observed_at: createdAt, first_accessible_at: null,
         time_missing_reason: childTimeMissing,
         valid_from: createdAt,
-        valid_to: isInactive ? closedAt : null,
+        valid_to: null,
         source_updated_at: updatedAt, source_version_ordinal: null,
         record_status: 'active', assertion_kind: 'report', rights_status: 'review_required' });
     }
@@ -233,7 +240,7 @@ export function normalizeRoadSnapshot(features: readonly RoadFeature[], input: C
       location_role: geometry === null ? 'unknown' : 'event_site',
       location_confidence: geometry === null ? 'unverified' : 'source_coordinate',
       area_refs: [], published_at: null, observed_at: createdAt,
-      valid_from: createdAt, valid_to: recordStatus === 'resolved' ? closedAt : null,
+      valid_from: createdAt, valid_to: null,
       source_updated_at: updatedAt, source_version_ordinal: null,
       freshness_state: 'unknown', record_status: recordStatus,
       rights_status: 'review_required', public_query_allowed: false });

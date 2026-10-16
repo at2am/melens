@@ -130,14 +130,16 @@ export function cacheSourceCoverage(read: SourceCoverageReader, options: {
     return entry;
   };
   return async (request, execution = {}) => {
+    if (execution.signal?.aborted) throw new MapQueryError('queryTimeout');
     const now = clock().getTime();
     const age = cached === null || now < cached.startedAt ? Number.POSITIVE_INFINITY : now - cached.startedAt;
     if (cached !== null && age >= options.ttlMs && age < options.ttlMs + staleMs && cached.value !== undefined) {
       const current = cached.value;
       if (!refreshing) {
         refreshing = true;
+        const previous = cached;
         const entry = start(request, now);
-        entry.snapshot.then(() => { cached = entry; }, () => {}).finally(() => { refreshing = false; });
+        entry.snapshot.then(() => { if (cached === previous) cached = entry; }, () => {}).finally(() => { refreshing = false; });
       }
       return current;
     }

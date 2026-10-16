@@ -5,7 +5,7 @@ import { loadMapConfig } from '../src/config.js';
 import type { PreparedViewQuery } from '../src/query/bigquery-adapter.js';
 import { createCurrentLayerCache, instantMicros } from '../src/query/current-layer-cache.js';
 import { intersectsBox, prepareGeometry } from '../src/query/geo-box.js';
-import type { ViewQueryResult } from '../src/query/query-runner.js';
+import { MapQueryError, type ViewQueryResult } from '../src/query/query-runner.js';
 import { cacheSourceCoverage, type PublicSourceCoverage, type SourceCoverageSnapshot } from '../src/query/source-coverage.js';
 
 const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' });
@@ -54,7 +54,8 @@ function geoRow(id: string, x: number, y: number, extra: Record<string, unknown>
 const complete = (rows: readonly Record<string, unknown>[]): ViewQueryResult =>
   ({ kind: 'complete', rows: rows as never, totalMatching: rows.length, resultBytes: 2 });
 
-function harness(options: { rows?: Record<string, unknown>[]; state?: Record<string, unknown>[]; partial?: boolean } = {}) {
+function harness(options: { rows?: Record<string, unknown>[]; state?: Record<string, unknown>[]; partial?: boolean;
+  partialState?: boolean; partialCoverage?: boolean } = {}) {
   let now = Date.parse('2026-10-15T01:00:00Z');
   let coverage: SourceCoverageSnapshot = { completeness: 'complete', sources: [source('planning.source', 'planning', 'batch-1')] };
   const rows = options.rows ?? [geoRow('planning:b', 144.96, -37.81), geoRow('planning:a', 144.96, -37.815),
@@ -63,20 +64,23 @@ function harness(options: { rows?: Record<string, unknown>[]; state?: Record<str
   let state = options.state ?? [{ source_id: 'planning.source', batch_id: 'batch-1' }];
   const loads: PreparedViewQuery[] = [];
   const fallbacks: unknown[] = [];
+  const publicRows: Record<string, unknown>[] = [];
   let fail = false;
   const runner = {
-    async run(input: unknown) { fallbacks.push(input); return complete([]); },
+    async run(input: unknown) { fallbacks.push(input); return complete(publicRows); },
     async runPrepared(query: PreparedViewQuery) {
       loads.push(query);
       if (fail) throw new Error('BigQuery unavailable');
-      if (query.query.includes('v_geo_records_current_state')) return complete(state);
+      if (query.query.includes('v_geo_records_current_state')) return options.partialState === true
+        ? { ...complete(state), kind: 'partial' as const, totalMatching: null, reason: 'rowLimit' as const }
+        : complete(state);
       return options.partial === true ? { kind: 'partial', rows: [], totalMatching: null, resultBytes: 2, reason: 'rowLimit' } as ViewQueryResult
         : complete(rows);
     },
   };
   const cache = createCurrentLayerCache({ config, runner, clock: () => new Date(now),
-    readCoverage: async () => coverage });
-  return { cache, loads, fallbacks, rows,
+    readCoverage: async () => options.partialCoverage === true ? { ...coverage, completeness: 'partial' } : coverage });
+  return { cache, loads, fallbacks, rows, publicRows,
     publish(batchId: string) { coverage = { ...coverage, sources: [source('planning.source', 'planning', batchId)] }; },
     reflect(batchId: string) { state = [{ source_id: 'planning.source', batch_id: batchId }]; },
     advance(ms: number) { now += ms; }, fail(value: boolean) { fail = value; } };
@@ -104,21 +108,25 @@ test('a layer loads once per publication and answers viewports from memory with 
   assert.equal(h.loads.length, 4, 'a new publication reloads the layer');
 });
 
-test('a copy that lags the registry answers its request and is reloaded shortly after', async () => {
+test('a geo copy that lags the registry fails closed until the matching publication is reflected', async () => {
   const h = harness();
   h.publish('batch-2');
-  await h.cache.runQuery(viewport());
-  await h.cache.runQuery(viewport());
+  const unavailable = (error: unknown) => error instanceof MapQueryError && error.code === 'serviceUnavailable';
+  await assert.rejects(h.cache.runQuery(viewport()), unavailable);
   assert.equal(h.loads.length, 2);
-  h.advance(5_000); h.reflect('batch-2');
-  await h.cache.runQuery(viewport());
+  h.advance(5_000);
+  await assert.rejects(h.cache.runQuery(viewport()), unavailable);
   assert.equal(h.loads.length, 4);
+  assert.equal(h.fallbacks.length, 0, 'the same stale served view cannot prove the new publication');
+  h.reflect('batch-2');
+  assert.deepEqual(ids(await h.cache.runQuery(viewport())), ['planning:a', 'planning:b']);
+  assert.equal(h.loads.length, 6);
   h.advance(60_000);
   await h.cache.runQuery(viewport());
-  assert.equal(h.loads.length, 4, 'a current copy is kept');
+  assert.equal(h.loads.length, 6, 'a current copy is kept');
   h.advance(60_000);
   await h.cache.runQuery(viewport());
-  assert.equal(h.loads.length, 6, 'and reloaded after two minutes, so time limits and unpublished removals apply');
+  assert.equal(h.loads.length, 8, 'time-dependent display limits still expire after two minutes');
 });
 
 test('the time window follows the SQL current-mode rules', async () => {
@@ -141,15 +149,16 @@ test('the time window follows the SQL current-mode rules', async () => {
   assert.deepEqual(ids(result), ['event:open', 'event:unknown']);
 });
 
-test('public-record rechecks are answered from the same entry', async () => {
+test('non-parking public-record checks observe same-publication withdrawal through the live runner', async () => {
   const h = harness();
   await h.cache.runQuery(viewport());
-  const result = await h.cache.runQuery({ family: 'publicRecords', queryId: 'planning', request,
-    recordKeys: [{ id: 'planning:b', versionId: 'v1', sourceId: 'planning.source' },
-      { id: 'planning:unlocated', versionId: 'v1', sourceId: 'planning.source' },
-      { id: 'planning:gone', versionId: 'v1', sourceId: 'planning.source' },
-      { id: 'planning:a', versionId: 'v0', sourceId: 'planning.source' }] });
-  assert.deepEqual(ids(result), ['planning:b', 'planning:unlocated']);
+  h.publicRows.push(geoRow('planning:b', 144.96, -37.81));
+  const proof = { family: 'publicRecords', queryId: 'planning', request,
+    recordKeys: [{ id: 'planning:b', versionId: 'v1', sourceId: 'planning.source' }] };
+  assert.deepEqual(ids(await h.cache.runQuery(proof)), ['planning:b']);
+  h.publicRows.splice(0);
+  assert.deepEqual(ids(await h.cache.runQuery(proof)), [], 'the warm display entry cannot grant a withdrawn record');
+  assert.deepEqual(h.fallbacks, [proof, proof]);
   assert.equal(h.loads.length, 2);
 });
 
@@ -166,16 +175,29 @@ test('everything the cache does not hold runs its fixed query', async () => {
   assert.equal(h.loads.length, 0);
 });
 
-test('a layer too large to hold, or a failed load, falls back to SQL', async () => {
+test('a layer too large to hold uses bounded SQL only after its publication state is verified', async () => {
   const large = harness({ partial: true });
   await large.cache.runQuery(viewport());
   await large.cache.runQuery(viewport());
   assert.equal(large.fallbacks.length, 2);
   assert.equal(large.loads.length, 2, 'a layer found too large is not reloaded for every request');
+  const staleLarge = harness({ partial: true });
+  staleLarge.publish('batch-2');
+  await assert.rejects(staleLarge.cache.runQuery(viewport()),
+    (error: unknown) => error instanceof MapQueryError && error.code === 'serviceUnavailable');
+  assert.equal(staleLarge.fallbacks.length, 0);
+});
+
+test('failed or incomplete geo state cannot bind an unverified copy to a snapshot', async () => {
+  const unavailable = (error: unknown) => error instanceof MapQueryError && error.code === 'serviceUnavailable';
+  for (const h of [harness({ partialState: true }), harness({ partialCoverage: true })]) {
+    await assert.rejects(h.cache.runQuery(viewport()), unavailable);
+    assert.equal(h.fallbacks.length, 0);
+  }
   const failing = harness();
   failing.fail(true);
-  await failing.cache.runQuery(viewport());
-  assert.equal(failing.fallbacks.length, 1);
+  await assert.rejects(failing.cache.runQuery(viewport()), unavailable);
+  assert.equal(failing.fallbacks.length, 0);
   failing.fail(false);
   assert.deepEqual(ids(await failing.cache.runQuery(viewport())), ['planning:a', 'planning:b'], 'a failure is not kept');
 });

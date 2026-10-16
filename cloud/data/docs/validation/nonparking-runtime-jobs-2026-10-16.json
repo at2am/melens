@@ -1,0 +1,413 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-15T17:10:45.836Z",
+  "project": "melens-510012",
+  "location": "australia-southeast2",
+  "suiteReports": [
+    {
+      "report": "app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/report.json",
+      "runId": "01a14084-c496-7534-a064-e8d39f9f8842",
+      "status": "passed",
+      "startedAt": "2026-10-15T17:03:25.525Z",
+      "finishedAt": "2026-10-15T17:04:51.713Z",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "report": "app/e2e/.e2e/focus-fix-cloud-model-final/report.json",
+      "runId": "01a14086-cf09-75f8-b318-87b1e15bb0ef",
+      "status": "passed",
+      "startedAt": "2026-10-15T17:05:39.284Z",
+      "finishedAt": "2026-10-15T17:09:40.446Z",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "combinedWindow": {
+    "startedAt": "2026-10-15T17:03:25.525Z",
+    "finishedAt": "2026-10-15T17:09:40.446Z"
+  },
+  "selection": {
+    "creationTime": "At or after combined startedAt; before combined finishedAt.",
+    "success": "SELECT job is DONE, has no error, and ends at or before combined finishedAt.",
+    "jobType": "QUERY",
+    "statementType": "SELECT",
+    "users": [
+      "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "melens-dev-agent@melens-510012.iam.gserviceaccount.com"
+    ],
+    "viewRoots": [
+      "v_source_coverage",
+      "v_boundaries",
+      "v_pedestrian_observations",
+      "v_area_indicators",
+      "v_anomaly_current",
+      "v_geo_records_current",
+      "v_geo_records_history"
+    ],
+    "explicitParkingQueryTextExcluded": true,
+    "genericViewMayHaveExistingParkingDependencies": true,
+    "fullQueryTextIncluded": false,
+    "maxGroups": 100,
+    "maxSuccessfulExamplesPerGroup": 3
+  },
+  "auditBounds": {
+    "maximumBytesBilled": "100000000",
+    "dryRunEstimatedBytes": "92635227",
+    "jobTimeoutMs": 10000,
+    "jobTimeoutIsBestEffort": true,
+    "appliesTo": "The read-only INFORMATION_SCHEMA audit query, not the runtime jobs being measured."
+  },
+  "runtimeIdentityChecks": [
+    {
+      "service": "map",
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "successfulJobs": 43,
+      "successfulDataJobs": 38,
+      "failedJobs": 0,
+      "runtimeSaQueryObserved": true,
+      "runtimeSaDataQueryObserved": true
+    },
+    {
+      "service": "agent",
+      "actualUserEmail": "melens-dev-agent@melens-510012.iam.gserviceaccount.com",
+      "successfulJobs": 4,
+      "successfulDataJobs": 3,
+      "failedJobs": 0,
+      "runtimeSaQueryObserved": true,
+      "runtimeSaDataQueryObserved": true
+    }
+  ],
+  "jobGroups": [
+    {
+      "actualUserEmail": "melens-dev-agent@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "geo",
+      "queryScope": "layerReadOrUnscoped",
+      "observedJobs": 3,
+      "successfulJobs": 3,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 3,
+      "successfulProcessedBytes": 1412707287,
+      "successfulBilledBytes": 1415577600,
+      "successfulSlotMs": 647041,
+      "firstCreationTime": "2026-10-15T17:07:07.870Z",
+      "lastCreationTime": "2026-10-15T17:07:08.002Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "750f3416-295e-48fd-acf6-4a2da6b95939",
+          "creationTime": "2026-10-15T17:07:08.002Z",
+          "startTime": "2026-10-15T17:07:08.473Z",
+          "endTime": "2026-10-15T17:07:11.974Z",
+          "durationMs": 3501,
+          "processedBytes": 470902429,
+          "billedBytes": 471859200,
+          "slotMs": 211401,
+          "cacheHit": false
+        },
+        {
+          "jobId": "6410b388-d5a5-4277-b1c5-fa45abf0c734",
+          "creationTime": "2026-10-15T17:07:07.990Z",
+          "startTime": "2026-10-15T17:07:08.599Z",
+          "endTime": "2026-10-15T17:07:12.130Z",
+          "durationMs": 3531,
+          "processedBytes": 470902429,
+          "billedBytes": 471859200,
+          "slotMs": 215610,
+          "cacheHit": false
+        },
+        {
+          "jobId": "e1e5e5c8-39c5-46f5-87ce-fdd50446791c",
+          "creationTime": "2026-10-15T17:07:07.870Z",
+          "startTime": "2026-10-15T17:07:08.405Z",
+          "endTime": "2026-10-15T17:07:11.713Z",
+          "durationMs": 3308,
+          "processedBytes": 470902429,
+          "billedBytes": 471859200,
+          "slotMs": 220030,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-agent@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "sourceCoverage",
+      "queryScope": "sharedMetadataRead",
+      "observedJobs": 1,
+      "successfulJobs": 1,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 1,
+      "successfulProcessedBytes": 1269268,
+      "successfulBilledBytes": 20971520,
+      "successfulSlotMs": 27228,
+      "firstCreationTime": "2026-10-15T17:07:05.716Z",
+      "lastCreationTime": "2026-10-15T17:07:05.716Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "c5ee1a4d-efa3-4b24-b92d-f2b8ac779649",
+          "creationTime": "2026-10-15T17:07:05.716Z",
+          "startTime": "2026-10-15T17:07:06.210Z",
+          "endTime": "2026-10-15T17:07:06.613Z",
+          "durationMs": 403,
+          "processedBytes": 1269268,
+          "billedBytes": 20971520,
+          "slotMs": 27228,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "anomaly",
+      "queryScope": "producerReadOrRecheck",
+      "observedJobs": 20,
+      "successfulJobs": 20,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 20,
+      "successfulProcessedBytes": 17640980,
+      "successfulBilledBytes": 629145600,
+      "successfulSlotMs": 226585,
+      "firstCreationTime": "2026-10-15T17:03:40.137Z",
+      "lastCreationTime": "2026-10-15T17:06:57.273Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "25e4f92c-26bc-428f-8546-093f18383b0f",
+          "creationTime": "2026-10-15T17:06:57.273Z",
+          "startTime": "2026-10-15T17:06:57.491Z",
+          "endTime": "2026-10-15T17:06:57.721Z",
+          "durationMs": 230,
+          "processedBytes": 882663,
+          "billedBytes": 31457280,
+          "slotMs": 7157,
+          "cacheHit": false
+        },
+        {
+          "jobId": "7ecf2a52-d167-4208-8c5d-5b506ded69ea",
+          "creationTime": "2026-10-15T17:06:57.202Z",
+          "startTime": "2026-10-15T17:06:57.421Z",
+          "endTime": "2026-10-15T17:06:57.829Z",
+          "durationMs": 408,
+          "processedBytes": 882663,
+          "billedBytes": 31457280,
+          "slotMs": 22833,
+          "cacheHit": false
+        },
+        {
+          "jobId": "69e6e82d-3bf3-46a6-ab98-837b124b8527",
+          "creationTime": "2026-10-15T17:06:56.236Z",
+          "startTime": "2026-10-15T17:06:56.453Z",
+          "endTime": "2026-10-15T17:06:56.870Z",
+          "durationMs": 417,
+          "processedBytes": 882663,
+          "billedBytes": 31457280,
+          "slotMs": 23904,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "geo",
+      "queryScope": "layerReadOrUnscoped",
+      "observedJobs": 10,
+      "successfulJobs": 10,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 10,
+      "successfulProcessedBytes": 4709013156,
+      "successfulBilledBytes": 4718592000,
+      "successfulSlotMs": 2173282,
+      "firstCreationTime": "2026-10-15T17:03:51.430Z",
+      "lastCreationTime": "2026-10-15T17:06:59.652Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "c6365f19-7d46-4107-a986-a70612d893c2",
+          "creationTime": "2026-10-15T17:06:59.652Z",
+          "startTime": "2026-10-15T17:07:00.298Z",
+          "endTime": "2026-10-15T17:07:03.650Z",
+          "durationMs": 3352,
+          "processedBytes": 470902429,
+          "billedBytes": 471859200,
+          "slotMs": 213761,
+          "cacheHit": false
+        },
+        {
+          "jobId": "938b2521-0d53-4461-8197-0514357c2d7d",
+          "creationTime": "2026-10-15T17:06:34.974Z",
+          "startTime": "2026-10-15T17:06:35.512Z",
+          "endTime": "2026-10-15T17:06:38.954Z",
+          "durationMs": 3442,
+          "processedBytes": 470901851,
+          "billedBytes": 471859200,
+          "slotMs": 218763,
+          "cacheHit": false
+        },
+        {
+          "jobId": "65ed5276-3d01-4aa1-93ab-0c8567e1aa3e",
+          "creationTime": "2026-10-15T17:06:29.257Z",
+          "startTime": "2026-10-15T17:06:29.807Z",
+          "endTime": "2026-10-15T17:06:33.104Z",
+          "durationMs": 3297,
+          "processedBytes": 470901851,
+          "billedBytes": 471859200,
+          "slotMs": 218900,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "geo",
+      "queryScope": "publicRecords",
+      "observedJobs": 7,
+      "successfulJobs": 7,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 7,
+      "successfulProcessedBytes": 2886323443,
+      "successfulBilledBytes": 2891972608,
+      "successfulSlotMs": 1245743,
+      "firstCreationTime": "2026-10-15T17:03:58.156Z",
+      "lastCreationTime": "2026-10-15T17:06:39.803Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "7f92d97d-4acb-4964-b7ce-3eb5287bd9f2",
+          "creationTime": "2026-10-15T17:06:39.803Z",
+          "startTime": "2026-10-15T17:06:40.394Z",
+          "endTime": "2026-10-15T17:06:43.918Z",
+          "durationMs": 3524,
+          "processedBytes": 470902195,
+          "billedBytes": 471859200,
+          "slotMs": 207914,
+          "cacheHit": false
+        },
+        {
+          "jobId": "717645a2-6076-48a5-a2a7-550186615df5",
+          "creationTime": "2026-10-15T17:04:37.712Z",
+          "startTime": "2026-10-15T17:04:37.952Z",
+          "endTime": "2026-10-15T17:04:38.838Z",
+          "durationMs": 886,
+          "processedBytes": 265908974,
+          "billedBytes": 266338304,
+          "slotMs": 58245,
+          "cacheHit": false
+        },
+        {
+          "jobId": "5583f53b-d483-436a-be36-d648d55f6f86",
+          "creationTime": "2026-10-15T17:04:35.216Z",
+          "startTime": "2026-10-15T17:04:35.437Z",
+          "endTime": "2026-10-15T17:04:36.354Z",
+          "durationMs": 917,
+          "processedBytes": 265908974,
+          "billedBytes": 266338304,
+          "slotMs": 55853,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "geo",
+      "queryScope": "unlocated",
+      "observedJobs": 1,
+      "successfulJobs": 1,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 1,
+      "successfulProcessedBytes": 265908974,
+      "successfulBilledBytes": 266338304,
+      "successfulSlotMs": 49090,
+      "firstCreationTime": "2026-10-15T17:04:33.771Z",
+      "lastCreationTime": "2026-10-15T17:04:33.771Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "0f74ad8d-9ccf-4a05-825a-50e358727009",
+          "creationTime": "2026-10-15T17:04:33.771Z",
+          "startTime": "2026-10-15T17:04:33.997Z",
+          "endTime": "2026-10-15T17:04:34.816Z",
+          "durationMs": 819,
+          "processedBytes": 265908974,
+          "billedBytes": 266338304,
+          "slotMs": 49090,
+          "cacheHit": false
+        }
+      ]
+    },
+    {
+      "actualUserEmail": "melens-dev-query@melens-510012.iam.gserviceaccount.com",
+      "queryFamily": "sourceCoverage",
+      "queryScope": "sharedMetadataRead",
+      "observedJobs": 5,
+      "successfulJobs": 5,
+      "failedJobs": 0,
+      "notCompleteWithinWindow": 0,
+      "successfulUncachedJobs": 5,
+      "successfulProcessedBytes": 6342173,
+      "successfulBilledBytes": 104857600,
+      "successfulSlotMs": 91696,
+      "firstCreationTime": "2026-10-15T17:03:38.458Z",
+      "lastCreationTime": "2026-10-15T17:06:55.033Z",
+      "failureReasons": [],
+      "successfulJobExamples": [
+        {
+          "jobId": "b8c6e854-e3e0-48b8-9798-d47c7b8a7224",
+          "creationTime": "2026-10-15T17:06:55.033Z",
+          "startTime": "2026-10-15T17:06:55.619Z",
+          "endTime": "2026-10-15T17:06:55.890Z",
+          "durationMs": 271,
+          "processedBytes": 1269268,
+          "billedBytes": 20971520,
+          "slotMs": 12988,
+          "cacheHit": false
+        },
+        {
+          "jobId": "39453362-ef5f-4466-af49-9f9ba093094a",
+          "creationTime": "2026-10-15T17:06:24.818Z",
+          "startTime": "2026-10-15T17:06:25.427Z",
+          "endTime": "2026-10-15T17:06:25.702Z",
+          "durationMs": 275,
+          "processedBytes": 1268781,
+          "billedBytes": 20971520,
+          "slotMs": 12833,
+          "cacheHit": false
+        },
+        {
+          "jobId": "14e09c93-12e8-49e5-89f8-219e87083d26",
+          "creationTime": "2026-10-15T17:05:54.728Z",
+          "startTime": "2026-10-15T17:05:55.248Z",
+          "endTime": "2026-10-15T17:05:55.534Z",
+          "durationMs": 286,
+          "processedBytes": 1268532,
+          "billedBytes": 20971520,
+          "slotMs": 13971,
+          "cacheHit": false
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "This is evidence for this acceptance traffic window. It is not a p95 measurement or production forecast.",
+    "Actual job user_email proves the runtime service account ran the selected successful queries.",
+    "Job metadata does not identify the exact HTTP request or Cloud Run revision. The two suites have separate deployment and UI evidence.",
+    "The combined window includes the interval between suites. Query family and scope are inferred from SQL shape.",
+    "The selection excludes other identities, other view roots, non-SELECT jobs, and jobs with explicit parking SQL text.",
+    "Successful query execution alone does not prove non-empty rows, business correctness, or all application flows.",
+    "Each group includes at most three successful job examples. Group counts and metric sums cover all selected jobs.",
+    "Unknown BigQuery metrics remain null."
+  ],
+  "writes": {
+    "businessData": false,
+    "tablesOrViews": false,
+    "permissions": false
+  }
+}

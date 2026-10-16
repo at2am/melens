@@ -1,0 +1,640 @@
+{
+  "formatVersion": 1,
+  "releaseDate": "2026-10-16",
+  "generatedAt": "2026-10-15T17:11:12.214106+00:00",
+  "status": "passed",
+  "scope": {
+    "localSelectedFlows": "22 UI + 3 agent + 1 events",
+    "cloudSelectedFlows": "3 UI + 3 model",
+    "parking": "excluded",
+    "additionalReportsIncludedInMainTotals": false,
+    "diagnosticProbesIncludedInMainTotalsOrVerdict": false,
+    "passingStatus": "Only the selected flows under the documented driver synchronization and supplied release evidence."
+  },
+  "checks": {
+    "localUi": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/report.json",
+      "fileSha256": "e96db2e63b266152c3e4e597da453d96b0ad572341e224fde2555d48ddb04fdc",
+      "status": "passed",
+      "expectedSelected": 22,
+      "run": {
+        "id": "01a1407d-0b6e-7290-99f4-b77e4c936057",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T16:54:59.367Z",
+        "finishedAt": "2026-10-15T16:57:41.596Z",
+        "summary": {
+          "discovered": 24,
+          "selected": 22,
+          "executed": 22,
+          "passed": 22,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "buildProof": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/suite-receipt.json",
+        "fileSha256": "9f0312684735bcd4ab07755fc52b0a1d27905342b34b6678bfca4e7bd79c9c10",
+        "status": "passed",
+        "runId": "01a1407d-0b6e-7290-99f4-b77e4c936057",
+        "builds": [
+          {
+            "manifest": "localLive",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localLive-before-manifest.json",
+                "capturedAt": "2026-10-15T16:54:58.966Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localLive-before-bundle-proof.json",
+                  "fileSha256": "e7153bc1d83dbc1faa3161c4957990ec4cd2ed0c67625c9efeee59bd88dc70c3",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localLive-after-manifest.json",
+                "capturedAt": "2026-10-15T16:57:41.687Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localLive-after-bundle-proof.json",
+                  "fileSha256": "1ce866c0fe9be6a551baff8a1e41c1efc829bb6b2f33f59f64948f95428da165",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          },
+          {
+            "manifest": "localSample",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "29dadef3467d93b144ff6d80be095df7afb0b32139f488aaa26f0702a83cda8a",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localSample-before-manifest.json",
+                "capturedAt": "2026-10-15T16:54:59.038Z",
+                "servedManifestSha256": "2d694c9f059772fcd41bd8d34eb615b611c70d603c62fc8c5bfe2de3689566e2",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localSample-before-bundle-proof.json",
+                  "fileSha256": "3f35eb9c62e390135fe7cfb5ba0f49eb0e115b9616f291717b08f321a939e4cd",
+                  "actualBundleSha256": "29dadef3467d93b144ff6d80be095df7afb0b32139f488aaa26f0702a83cda8a",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localSample-after-manifest.json",
+                "capturedAt": "2026-10-15T16:57:41.752Z",
+                "servedManifestSha256": "2d694c9f059772fcd41bd8d34eb615b611c70d603c62fc8c5bfe2de3689566e2",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-ui-final/served-provenance/localSample-after-bundle-proof.json",
+                  "fileSha256": "3ee9060efd9b4389c91f720c452f073bf4e9cad01f4a140faff48ad664252f0d",
+                  "actualBundleSha256": "29dadef3467d93b144ff6d80be095df7afb0b32139f488aaa26f0702a83cda8a",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "localAgent": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/report.json",
+      "fileSha256": "8fd296e161024e0aec70a55ed407b8fc46e55bd7313a7db30c15507777c6a7ef",
+      "status": "passed",
+      "expectedSelected": 3,
+      "run": {
+        "id": "01a14085-7cbb-76cc-905c-99ec54547022",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T17:04:12.692Z",
+        "finishedAt": "2026-10-15T17:06:24.171Z",
+        "summary": {
+          "discovered": 3,
+          "selected": 3,
+          "executed": 3,
+          "passed": 3,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "buildProof": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/suite-receipt.json",
+        "fileSha256": "47572614c03915095e9f8f6cd9e55ef8f0650d765474b5b3b9b3347b3d01d591",
+        "status": "passed",
+        "runId": "01a14085-7cbb-76cc-905c-99ec54547022",
+        "builds": [
+          {
+            "manifest": "localLive",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/served-provenance/localLive-before-manifest.json",
+                "capturedAt": "2026-10-15T17:04:12.309Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/served-provenance/localLive-before-bundle-proof.json",
+                  "fileSha256": "2b4331d6a299f186170fe154c08cf0f09a4a431fac1533fc2f8ed93d8c8c0f81",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/served-provenance/localLive-after-manifest.json",
+                "capturedAt": "2026-10-15T17:06:24.253Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-ttl-settled/served-provenance/localLive-after-bundle-proof.json",
+                  "fileSha256": "22c220823c3a6b4cad99a2a028af0b3fa5c4c329f8645fbe3aaad702d7a1ad06",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "localEvents": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/report.json",
+      "fileSha256": "ff4b633b2393907afbe7ba8612a23444f23e123b1243474312c7d640f722503b",
+      "status": "passed",
+      "expectedSelected": 1,
+      "run": {
+        "id": "01a14087-cad3-7862-a452-06821f4b5148",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T17:06:43.766Z",
+        "finishedAt": "2026-10-15T17:06:48.583Z",
+        "summary": {
+          "discovered": 1,
+          "selected": 1,
+          "executed": 1,
+          "passed": 1,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "buildProof": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/suite-receipt.json",
+        "fileSha256": "4dc890edd26e49e24a2202eb61404877c56b0eab030d311a9f459267acf181b5",
+        "status": "passed",
+        "runId": "01a14087-cad3-7862-a452-06821f4b5148",
+        "builds": [
+          {
+            "manifest": "localLive",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/served-provenance/localLive-before-manifest.json",
+                "capturedAt": "2026-10-15T17:06:43.372Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/served-provenance/localLive-before-bundle-proof.json",
+                  "fileSha256": "a85a9aeaa09420dbecb6403b87112fc211cb7342f120ed596559a412dbc8a57f",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/served-provenance/localLive-after-manifest.json",
+                "capturedAt": "2026-10-15T17:06:48.664Z",
+                "servedManifestSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-events-final/served-provenance/localLive-after-bundle-proof.json",
+                  "fileSha256": "548d2e307b82928fd45fad54194eda7e83050f115a0dd5277681da59ad0cba83",
+                  "actualBundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "cloudUi": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/report.json",
+      "fileSha256": "7ed30db9eb4224bb8feb3216c671e6c60c88aa7323e6d00cbb96d7fe9c348982",
+      "status": "passed",
+      "expectedSelected": 3,
+      "run": {
+        "id": "01a14084-c496-7534-a064-e8d39f9f8842",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T17:03:25.525Z",
+        "finishedAt": "2026-10-15T17:04:51.713Z",
+        "summary": {
+          "discovered": 6,
+          "selected": 3,
+          "executed": 3,
+          "passed": 3,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "buildProof": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/suite-receipt.json",
+        "fileSha256": "990e67f3c310ab4298c162411005cfb0f22cc55ed1da4274e3d4f69f029f3113",
+        "status": "passed",
+        "runId": "01a14084-c496-7534-a064-e8d39f9f8842",
+        "builds": [
+          {
+            "manifest": "cloudRelease",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/served-provenance/cloudRelease-before-manifest.json",
+                "capturedAt": "2026-10-15T17:03:25.158Z",
+                "servedManifestSha256": "e85ed3efca2fb04fb26875500fa6cdc873c676a42e2cff9af29137cea433a3f0",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/served-provenance/cloudRelease-before-bundle-proof.json",
+                  "fileSha256": "2c936eafc2485d78425321b2d3a83ffcf2037e1fa1e3ff05e1a3b2877a53b320",
+                  "actualBundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/served-provenance/cloudRelease-after-manifest.json",
+                "capturedAt": "2026-10-15T17:04:56.445Z",
+                "servedManifestSha256": "e85ed3efca2fb04fb26875500fa6cdc873c676a42e2cff9af29137cea433a3f0",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/served-provenance/cloudRelease-after-bundle-proof.json",
+                  "fileSha256": "c13282170c3ab6b776d8747e38e4dc3987d565a624c68b010777a7aeaed756a5",
+                  "actualBundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "cloudModel": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/report.json",
+      "fileSha256": "7f28eaa9c9cb840b920939171198fd1ebdd3709be8b8e0e91a26d8774950ff30",
+      "status": "passed",
+      "expectedSelected": 3,
+      "run": {
+        "id": "01a14086-cf09-75f8-b318-87b1e15bb0ef",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T17:05:39.284Z",
+        "finishedAt": "2026-10-15T17:09:40.446Z",
+        "summary": {
+          "discovered": 6,
+          "selected": 3,
+          "executed": 3,
+          "passed": 3,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "buildProof": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/suite-receipt.json",
+        "fileSha256": "0618e6d851d4f26df60293fbf7c3c852d96f521f366b00808191162c833e8c22",
+        "status": "passed",
+        "runId": "01a14086-cf09-75f8-b318-87b1e15bb0ef",
+        "builds": [
+          {
+            "manifest": "cloudRelease",
+            "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+            "bundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+            "captures": {
+              "before": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/served-provenance/cloudRelease-before-manifest.json",
+                "capturedAt": "2026-10-15T17:05:38.913Z",
+                "servedManifestSha256": "e85ed3efca2fb04fb26875500fa6cdc873c676a42e2cff9af29137cea433a3f0",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/served-provenance/cloudRelease-before-bundle-proof.json",
+                  "fileSha256": "16e7ea13717f9b913594d8595f8c67ebb3effef623fc195f65f3c722356d9d5e",
+                  "actualBundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+                  "cachePolicyVerified": true
+                }
+              },
+              "after": {
+                "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/served-provenance/cloudRelease-after-manifest.json",
+                "capturedAt": "2026-10-15T17:09:42.247Z",
+                "servedManifestSha256": "e85ed3efca2fb04fb26875500fa6cdc873c676a42e2cff9af29137cea433a3f0",
+                "bundleProof": {
+                  "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-model-final/served-provenance/cloudRelease-after-bundle-proof.json",
+                  "fileSha256": "9b93669eb383981cfc10e0aeaa68e225be8cff03cc30fd5f3396bea1b9047c82",
+                  "actualBundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+                  "cachePolicyVerified": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "totals": {
+    "local": {
+      "status": "passed",
+      "expectedSelected": 26,
+      "countsBasis": "Valid supplied report summaries only; missing runs remain unreportedSelected.",
+      "selected": 26,
+      "executed": 26,
+      "passed": 26,
+      "failed": 0,
+      "interrupted": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "unreportedSelected": 0,
+      "verifiedPassed": 26
+    },
+    "cloud": {
+      "status": "passed",
+      "expectedSelected": 6,
+      "countsBasis": "Valid supplied report summaries only; missing runs remain unreportedSelected.",
+      "selected": 6,
+      "executed": 6,
+      "passed": 6,
+      "failed": 0,
+      "interrupted": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "unreportedSelected": 0,
+      "verifiedPassed": 6
+    },
+    "main": {
+      "status": "passed",
+      "expectedSelected": 32,
+      "countsBasis": "Valid supplied report summaries only; missing runs remain unreportedSelected.",
+      "selected": 32,
+      "executed": 32,
+      "passed": 32,
+      "failed": 0,
+      "interrupted": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "unreportedSelected": 0,
+      "verifiedPassed": 32
+    }
+  },
+  "manifests": {
+    "localLive": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/build/web-e2e-live/build-provenance.json",
+      "fileSha256": "68acb23193ac5495ab341af89fcb400d5a912ecc8e01ca5d5da67925d8ea8d97",
+      "status": "passed",
+      "identity": {
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c",
+        "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+        "bundleSha256": "de81981a68e3938157eff8392db441adb7e5989dce7e909849095e62c5edef0b",
+        "dataMode": "live",
+        "builtAt": "2026-10-15T16:42:08.293206+00:00"
+      }
+    },
+    "localSample": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/build/web-e2e-sample/build-provenance.json",
+      "fileSha256": "2d694c9f059772fcd41bd8d34eb615b611c70d603c62fc8c5bfe2de3689566e2",
+      "status": "passed",
+      "identity": {
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c",
+        "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+        "bundleSha256": "29dadef3467d93b144ff6d80be095df7afb0b32139f488aaa26f0702a83cda8a",
+        "dataMode": "sample",
+        "builtAt": "2026-10-15T16:42:33.320450+00:00"
+      }
+    },
+    "cloudRelease": {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/build/web-cloud-release/release-provenance.json",
+      "fileSha256": "e85ed3efca2fb04fb26875500fa6cdc873c676a42e2cff9af29137cea433a3f0",
+      "status": "passed",
+      "identity": {
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c",
+        "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+        "bundleSha256": "1956e0ea7779e6368cbba4229f5f41322e7068726223d87e96c1f51e943344bd",
+        "dataMode": "live",
+        "builtAt": "2026-10-15T16:42:58.455578+00:00",
+        "mapRevision": "melens-dev-map-00009-4xs",
+        "agentRevision": "melens-dev-agent-00009-vzf",
+        "mapImageDigest": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map@sha256:8d5d7a5eaedb4fd4a07e6231c243619aa4077cac07bf238a25b3829ddcb6e033",
+        "agentImageDigest": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/agent@sha256:a3a6dccc990b321b98487ddc9b318bd9381d8aa77285852d503139512bad8ee3"
+      }
+    }
+  },
+  "manifestSourcesMatch": true,
+  "hosting": {
+    "path": "/private/tmp/melens-hosting-release-f1m_4o8c",
+    "files": {
+      "plan": {
+        "path": "/private/tmp/melens-hosting-release-f1m_4o8c/plan.json",
+        "fileSha256": "ccb9837fefeb4789eed318f33e1e31789286d99399574657637b240ba12923b8",
+        "status": "loaded"
+      },
+      "result": {
+        "path": "/private/tmp/melens-hosting-release-f1m_4o8c/result.json",
+        "fileSha256": "236c5ddb8b80721c2fb8838b52fd4dd344fbc0606a4e3535bb6dfad74a8d0c6d",
+        "status": "loaded"
+      },
+      "before": {
+        "path": "/private/tmp/melens-hosting-release-f1m_4o8c/before.json",
+        "fileSha256": "48f25b7f4be1ab216fdcd50c04d191ce8f831a44797edea776060f0fdbd9e2ba",
+        "status": "loaded"
+      },
+      "backend-before": {
+        "path": "/private/tmp/melens-hosting-release-f1m_4o8c/backend-before.json",
+        "fileSha256": "ef96bf53b54ebc4185e3ce4c47bb5ff727acdeda2fbe40090975e7951bb8d51a",
+        "status": "loaded"
+      },
+      "backend-after": {
+        "path": "/private/tmp/melens-hosting-release-f1m_4o8c/backend-after.json",
+        "fileSha256": "ef96bf53b54ebc4185e3ce4c47bb5ff727acdeda2fbe40090975e7951bb8d51a",
+        "status": "loaded"
+      }
+    },
+    "phase": "live-version-confirmed",
+    "version": "sites/melens-510012/versions/1aab647267b914fb",
+    "previousVersion": "sites/melens-510012/versions/94f563e9e9542077",
+    "sourceMatchesManifest": true,
+    "backendBindings": {
+      "map": {
+        "revision": "melens-dev-map-00009-4xs",
+        "imageDigest": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/map@sha256:8d5d7a5eaedb4fd4a07e6231c243619aa4077cac07bf238a25b3829ddcb6e033",
+        "trafficPercent": 100,
+        "developmentMode": false
+      },
+      "agent": {
+        "revision": "melens-dev-agent-00009-vzf",
+        "imageDigest": "australia-southeast2-docker.pkg.dev/melens-510012/melens-data/agent@sha256:a3a6dccc990b321b98487ddc9b318bd9381d8aa77285852d503139512bad8ee3",
+        "trafficPercent": 100,
+        "developmentMode": false
+      }
+    },
+    "backendProofsMatch": true,
+    "status": "passed"
+  },
+  "additionalChecks": [
+    {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-extra-focus-final/report.json",
+      "fileSha256": "6a67beccf6a518847893a4ce01acaf0fa32abc8b1841ae84018bdcd9a9cd7199",
+      "status": "passed",
+      "expectedSelected": 4,
+      "run": {
+        "id": "01a14088-4297-76af-ab8c-791ee979bf28",
+        "status": "passed",
+        "exitCode": 0,
+        "startedAt": "2026-10-15T17:07:14.398Z",
+        "finishedAt": "2026-10-15T17:07:31.292Z",
+        "summary": {
+          "discovered": 4,
+          "selected": 4,
+          "executed": 4,
+          "passed": 4,
+          "failed": 0,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "includedInMainTotals": false,
+      "duplicatesMainRun": false
+    }
+  ],
+  "diagnosticReports": [
+    {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/feed-prefix-probe-adjacent/report.json",
+      "fileSha256": "0662de3ced0828829c8d93c5e76378970eb83838ccd87e33c4e0c7b89fd61d34",
+      "status": "failed",
+      "expectedSelected": 5,
+      "run": {
+        "id": "01a1407f-977f-7636-8df2-4de636c249c2",
+        "status": "failed",
+        "exitCode": 1,
+        "startedAt": "2026-10-15T16:57:46.306Z",
+        "finishedAt": "2026-10-15T16:58:05.020Z",
+        "summary": {
+          "discovered": 5,
+          "selected": 5,
+          "executed": 5,
+          "passed": 3,
+          "failed": 2,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "reason": "reported_failure",
+      "includedInMainTotals": false,
+      "includedInReleaseVerdict": false
+    },
+    {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-cloud-ui-optional-bound/report.json",
+      "fileSha256": "492ac508b14fb5785b84057732d879b06f370249d085854452dadb395cb2a8b1",
+      "status": "failed",
+      "expectedSelected": 3,
+      "run": {
+        "id": "01a14077-8bb9-7e59-9d49-fec6a212fdb3",
+        "status": "failed",
+        "exitCode": 1,
+        "startedAt": "2026-10-15T16:48:59.031Z",
+        "finishedAt": "2026-10-15T16:51:45.742Z",
+        "summary": {
+          "discovered": 6,
+          "selected": 3,
+          "executed": 3,
+          "passed": 1,
+          "failed": 2,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "reason": "reported_failure",
+      "includedInMainTotals": false,
+      "includedInReleaseVerdict": false
+    },
+    {
+      "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/focus-fix-local-agent-final/report.json",
+      "fileSha256": "20e0f9f631ad0174b699dc8bfe3e3e789f4f5c171ed1c85eb60c4cc9995aefde",
+      "status": "failed",
+      "expectedSelected": 3,
+      "run": {
+        "id": "01a1407f-a88c-7847-a2d5-ed5c4d9409d6",
+        "status": "failed",
+        "exitCode": 1,
+        "startedAt": "2026-10-15T16:57:50.671Z",
+        "finishedAt": "2026-10-15T16:59:46.043Z",
+        "summary": {
+          "discovered": 3,
+          "selected": 3,
+          "executed": 3,
+          "passed": 2,
+          "failed": 1,
+          "interrupted": 0,
+          "flaky": 0,
+          "skipped": 0
+        },
+        "sourceCommit": "2f0374a52a0ff56bb460b5257dabc2f46f32e63c"
+      },
+      "reason": "reported_failure",
+      "includedInMainTotals": false,
+      "includedInReleaseVerdict": false
+    }
+  ],
+  "knownLimitations": {
+    "pinnedFlutterSemanticsInstantInputRace": {
+      "status": "unresolved",
+      "flutterVersion": "3.47.5",
+      "semanticsEnabledOnly": true,
+      "observedListenerActivationWindowMs": [
+        6,
+        20
+      ],
+      "effect": "Characters entered after focus but before listener activation can be cleared.",
+      "evidence": {
+        "path": "/Users/alexgao/Dev/hackathon/melens/app/e2e/.e2e/feed-prefix-probe-evidence/root-cause.md",
+        "fileSha256": "d054f8b7bfd38260031e43ce5bb91158b1c055126fab3c8bd338203578d6c0ea",
+        "status": "available"
+      },
+      "standardDriverSynchronization": "After tap, wait for two animation frames and verify the same DOM input remains focused. Then send one real keyboard sequence and assert the complete text.",
+      "synchronizationRepairsSdkRace": false
+    },
+    "tooltipRouteRemount": {
+      "status": "fixed",
+      "sourceReference": "source32c",
+      "note": "The application fix for Tooltip route remount is independent of the unresolved Flutter semantics race."
+    },
+    "snapshotCapacity429": {
+      "status": "candidate_unconfirmed",
+      "defaultSnapshotCount": 32,
+      "defaultBytes": 16777216,
+      "defaultTtlSeconds": 300,
+      "capacityStatsObservedDuring429": false,
+      "laterObservation": "Strict camera returned HTTP 200 after a natural TTL interval.",
+      "capacityChanged": false,
+      "serviceRestarted": false,
+      "note": "Capacity is a candidate cause. The later successful request does not confirm the cause of the earlier 429."
+    }
+  },
+  "openWork": {
+    "nonParkingPhysicalCurrentTables": "unimplemented",
+    "gcsMemoryDelivery": "unimplemented",
+    "sourceAdmissionAndRecollection": "incomplete",
+    "anomalyProducer": "incomplete"
+  },
+  "completionBoundary": "A passing status does not mean all bugs are fixed. It covers only the supplied selected flows and release evidence. The Flutter semantics race remains unresolved, and the excluded and open work remain incomplete."
+}

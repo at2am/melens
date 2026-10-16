@@ -1,4 +1,5 @@
 import type { LayerId, MapGeometry, MapItem } from '@melens/shared/contracts/map-contract';
+import { timeWindowSchema as queryTimeWindowSchema } from '@melens/shared/contracts/map-contract';
 import { z } from 'zod';
 
 import type { GroundingModel } from '../agent/grounding.js';
@@ -6,6 +7,7 @@ import type { StructuredModel } from '../agent/structured.js';
 import { melbourneDate, toInstant, toMelbourneIso } from '../agent/time.js';
 import { centroid, compactFeature, haversineMeters, matchesKeywords, type CompactFeature } from '../features/compact.js';
 import type { FeatureReader } from '../features/reader.js';
+import { readTurnFeatures, turnSearchTime } from '../features/turn-search.js';
 import { RouteNotFoundError, type RoutesClient } from '../routes/routes-client.js';
 import { cardItemSchema, latLngSchema, timeWindowSchema, type LatLng } from '../protocol/schemas.js';
 import { cached, type ToolCache } from '../cache.js';
@@ -66,10 +68,17 @@ export function boxOf(area: Area): { readonly bbox: [number, number, number, num
 export const HOUR = 60 * 60 * 1_000;
 
 export function windowOf(time: { from?: string | undefined; to?: string | undefined } | undefined, now: Date, defaults: { readonly back: number; readonly ahead: number }) {
-  const from = time?.from === undefined ? new Date(now.getTime() - defaults.back) : new Date(time.from);
-  const to = time?.to === undefined ? new Date(now.getTime() + defaults.ahead) : new Date(time.to);
-  if (!(from.getTime() < to.getTime())) return null;
-  return { from: toInstant(from), to: toInstant(to) };
+  const instantOf = (value: string | undefined, fallback: number): string => {
+    if (value === undefined) return toInstant(new Date(fallback));
+    const utc = toInstant(value);
+    const fraction = /\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1];
+    return fraction === undefined ? utc : utc.replace(/\.\d{3}Z$/, `.${fraction}Z`);
+  };
+  try {
+    const parsed = queryTimeWindowSchema.safeParse({ from: instantOf(time?.from, now.getTime() - defaults.back),
+      to: instantOf(time?.to, now.getTime() + defaults.ahead) });
+    return parsed.success ? parsed.data : null;
+  } catch { return null; }
 }
 
 function overlaps(feature: CompactFeature, window: { from: string; to: string }): boolean {
@@ -101,8 +110,8 @@ interface SearchOutcome { readonly features: CompactFeature[]; readonly states: 
 export async function searchArea(deps: ToolDependencies, turn: TurnRegistry, area: Area, layers: readonly ToolLayer[],
   window: { from: string; to: string }): Promise<SearchOutcome> {
   const { bbox, centre, radius } = boxOf(area);
-  const results = await deps.features.search({ requestId: `${turn.turn.turnId}-${turn.trace.length}`, bbox, layers,
-    window, mode: 'current', signal: turn.signal });
+  const results = await readTurnFeatures(deps.features, turn, { requestId: `${turn.turn.turnId}-${turn.trace.length}`, bbox, layers,
+    window, mode: 'current' });
   const states: Record<string, string> = {};
   const features: CompactFeature[] = [];
   for (const layer of results) {
@@ -149,10 +158,10 @@ const searchFeatures = (deps: ToolDependencies) => defineTool({
     return [layerList(searchLayers(args.layers, turn)), area, ...(args.query === undefined ? [] : [`"${args.query}"`])].join(' · ');
   },
   async run(args, turn) {
-    const now = turn.now();
+    const layers = searchLayers(args.layers, turn);
+    const now = layers.includes('parking') ? turn.now() : turnSearchTime(turn);
     const window = windowOf(args.time, now, { back: 24 * HOUR, ahead: 24 * HOUR });
     if (window === null) return toolError('invalid_arguments', 'time.from must be before time.to');
-    const layers = searchLayers(args.layers, turn);
     const { features, states } = await searchArea(deps, turn, args.area, layers, window);
     const filtered = args.query === undefined ? features : features.filter((feature) => matchesKeywords(feature, args.query!));
     filtered.sort(args.sort === 'time'
@@ -186,15 +195,17 @@ function simplify(geometry: MapGeometry): MapGeometry {
  * features a user can tap or select are in the request's viewport, so no lookup-by-id query surface is needed.
  */
 export async function resolveFeature(deps: ToolDependencies, turn: TurnRegistry, id: string): Promise<MapItem | undefined> {
+  const parking = id.startsWith('parking:');
+  if (!parking) turn.signal.throwIfAborted();
   const known = turn.features.get(id);
   if (known !== undefined) return known;
   const v = turn.turn.request.context.viewport;
-  const window = windowOf(undefined, turn.now(), { back: 7 * 24 * HOUR, ahead: 7 * 24 * HOUR });
+  const window = windowOf(undefined, parking ? turn.now() : turnSearchTime(turn), { back: 7 * 24 * HOUR, ahead: 7 * 24 * HOUR });
   if (window === null) return undefined;
   const layers = toolLayerSchema.options.filter((layer) => id.startsWith(`${layer}:`));
-  const results = await deps.features.search({ requestId: `${turn.turn.turnId}-resolve-${turn.trace.length}`, bbox: [v.west, v.south, v.east, v.north],
-    layers: layers.length > 0 ? layers : DEFAULT_LAYERS, window, mode: 'current', signal: turn.signal });
-  for (const layer of results) turn.rememberFeatures(layer.items.filter((item) => item.id === id));
+  const results = await readTurnFeatures(deps.features, turn, { requestId: `${turn.turn.turnId}-resolve-${turn.trace.length}`, bbox: [v.west, v.south, v.east, v.north],
+    layers: layers.length > 0 ? layers : DEFAULT_LAYERS, window, mode: 'current' });
+  for (const layer of results) turn.rememberFeatures(parking ? layer.items.filter((item) => item.id === id) : layer.items);
   return turn.features.get(id);
 }
 
@@ -248,7 +259,7 @@ const nearbyContext = (deps: ToolDependencies) => defineTool({
   }),
   detail(args) { return `within ${distanceLabel(args.radius_m ?? 1_000)} of ${pointLabel(args.point)}`; },
   async run(args, turn) {
-    const window = windowOf(args.time, turn.now(), { back: 24 * HOUR, ahead: 6 * HOUR });
+    const window = windowOf(args.time, turnSearchTime(turn), { back: 24 * HOUR, ahead: 6 * HOUR });
     if (window === null) return toolError('invalid_arguments', 'time.from must be before time.to');
     const area: Area = { center: args.point, radius_m: args.radius_m ?? 1_000 };
     const { features } = await searchArea(deps, turn, area, ['news', 'event', 'disruption'], window);

@@ -13,6 +13,7 @@ import '../../map/data/map_models.dart';
 import '../../map/state/selection_controller.dart';
 import '../data/chat_photos.dart';
 import '../state/chat_controller.dart';
+import '../state/chat_draft.dart';
 import '../state/chat_models.dart';
 import '../state/chat_photo_providers.dart';
 import '../state/request_context.dart';
@@ -45,17 +46,20 @@ class ChatPanel extends ConsumerStatefulWidget {
 
 class _ChatPanelState extends ConsumerState<ChatPanel> {
   static final _log = Logger('ChatPanel');
-  final _input = TextEditingController();
+  late final ChatDraft _draft;
+  TextEditingController get _input => _draft.input;
   final _scroll = ScrollController();
   final _inputFocus = FocusNode();
-  final List<ChatPhoto> _photos = [];
-  String? _photoNotice;
+  List<ChatPhoto> get _photos => _draft.photos;
+  String? get _photoNotice => _draft.photoNotice;
+  set _photoNotice(String? notice) => _draft.photoNotice = notice;
   int _renderedTurns = 0;
   int _renderedLength = 0;
 
   @override
   void initState() {
     super.initState();
+    _draft = ref.read(chatDraftProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(ref.read(chatControllerProvider.notifier).start());
     });
@@ -63,7 +67,6 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   @override
   void dispose() {
-    _input.dispose();
     _scroll.dispose();
     _inputFocus.dispose();
     super.dispose();

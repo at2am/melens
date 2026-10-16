@@ -63,6 +63,29 @@ test('documented Victorian clocks convert seasons and retain ambiguous or nonexi
   assert.throws(() => parseVictorianTimestamp('2026-02-30T12:00:00'));
 });
 
+test('future provider updates fail while future schedules and five-minute clock skew remain valid', async () => {
+  const page = await fixture();
+  const first = page.data.features[0];
+  assert.ok(first);
+  const changed = (lastUpdated: string) => ({ ...first,
+    properties: { ...first.properties, lastUpdated } });
+  assert.throws(() => normalizePlannedRoadSnapshot([changed('2099-01-01T00:00:00Z')],
+    input, fetchedAt), /five minutes after fetch time/);
+  const tolerated = normalizePlannedRoadSnapshot([changed('2026-09-28T02:35:00Z')], input, fetchedAt);
+  assert.equal(tolerated.latestUpdate, '2026-09-28T02:35:00.000Z');
+  assert.equal(tolerated.geoRecords[0]?.valid_from, '2026-10-01T10:00:00.000Z');
+  class FutureClient extends HttpClient {
+    override async getJson() {
+      return { body: { ...page, meta: { ...page.meta, total_records: 1, count: 1 },
+        data: { ...page.data, features: [changed('2099-01-01T00:00:00Z')] } },
+      status: 200, fetchedAt, etag: null, lastModified: null, contentType: 'application/json' };
+    }
+  }
+  const result = await new PlannedRoadConnector(new FutureClient(), () => 'fixture-key', 0).collect(input);
+  assert.equal(result.kind, 'failure');
+  if (result.kind === 'failure') assert.equal(result.code, 'validation_failed');
+});
+
 test('classifyPlannedStatus correctly maps future, pending, active, cancelled, resolved and rejects unknown', () => {
   assert.deepEqual(classifyPlannedStatus('Pending', '2026-10-01T00:00:00Z', '2026-09-28T00:00:00Z'), {
     sourceRecordStatus: 'active',
@@ -353,7 +376,7 @@ test('repeated payload replay produces strictly idempotent version and timestamp
     runId: 'batch-run-beta',
   });
 
-  const run1 = normalizePlannedRoadSnapshot(page.data.features, inputA, '2026-09-28T01:00:00.000Z');
+  const run1 = normalizePlannedRoadSnapshot(page.data.features, inputA, fetchedAt);
   const run2 = normalizePlannedRoadSnapshot(page.data.features, inputB, '2026-09-28T05:00:00.000Z');
 
   assert.equal(run1.sourceRecords.length, run2.sourceRecords.length);
@@ -412,7 +435,7 @@ test('upstream content changes produce new version_id while maintaining stable s
       description: 'Updated road resurfacing schedule',
     },
   };
-  const updated = normalizePlannedRoadSnapshot([updatedFeature], input, fetchedAt);
+  const updated = normalizePlannedRoadSnapshot([updatedFeature], input, '2026-09-29T04:05:00.000Z');
 
   assert.equal(original.sourceRecords[0]?.source_record_id, updated.sourceRecords[0]?.source_record_id);
   assert.notEqual(original.sourceRecords[0]?.version_id, updated.sourceRecords[0]?.version_id,

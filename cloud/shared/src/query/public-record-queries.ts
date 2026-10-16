@@ -5,7 +5,7 @@ import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
   BOUNDARY_COLUMNS, BOUNDARY_ORDER, GEO_COLUMNS, GEO_ORDER, PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS,
   PEDESTRIAN_ORDER,
-  bind, geoView, isGeoQuery, queryDefaults, recordProjection, recordStatusFilter, resultLimit, viewPath,
+  bind, geoRightsView, isGeoQuery, queryDefaults, recordProjection, recordStatusFilter, resultLimit, viewPath,
 } from './sql.js';
 import type { ViewQueryId } from './view-queries.js';
 
@@ -24,25 +24,30 @@ export function preparePublicRecordQuery(options: {
   const defaults = queryDefaults(config, request.mode, queryId);
   const bindings = bind(resultLimit(pageSize),
     { params: { publicRecordKeysJson: JSON.stringify(keys) }, types: { publicRecordKeysJson: 'STRING' } });
-  const matchesKey = (idColumn: string, versionColumn: string, sourceColumn: string) => `EXISTS (
-    SELECT 1 FROM UNNEST(JSON_QUERY_ARRAY(@publicRecordKeysJson)) k
-    WHERE JSON_VALUE(k, '$.id') = ${idColumn} AND JSON_VALUE(k, '$.versionId') = ${versionColumn}
-      AND JSON_VALUE(k, '$.sourceId') = ${sourceColumn})`;
+  const joinRecordKeys = (idColumn: string, versionColumn: string, sourceColumn: string) => `JOIN (
+    SELECT DISTINCT JSON_VALUE(k, '$.id') AS id, JSON_VALUE(k, '$.versionId') AS version_id,
+      JSON_VALUE(k, '$.sourceId') AS source_id
+    FROM UNNEST(JSON_QUERY_ARRAY(@publicRecordKeysJson)) k) requested
+    ON requested.id = ${idColumn} AND requested.version_id = ${versionColumn}
+      AND requested.source_id = ${sourceColumn}`;
 
   if (queryId === 'boundary') {
     return { ...defaults, ...bindings,
       query: `${recordProjection(BOUNDARY_COLUMNS)} FROM ${viewPath(config, 'v_boundaries')} b
-      WHERE ${matchesKey('b.boundary_id', 'b.version_id', 'b.source_id')}
+      ${joinRecordKeys('b.boundary_id', 'b.version_id', 'b.source_id')}
       ${BOUNDARY_ORDER}` };
   }
   if (queryId === 'pedestrian') {
-    // Observations carry no native version id; the sensor and start instant identify the row.
+    // Sensor/start select the observation; adaptation also binds its native record and location revisions.
     return { ...defaults, ...bindings,
       query: `${recordProjection(PEDESTRIAN_COLUMNS)}
-      FROM ${viewPath(config, 'v_pedestrian_observations')} p WHERE EXISTS (
-        SELECT 1 FROM UNNEST(JSON_QUERY_ARRAY(@publicRecordKeysJson)) k
-        WHERE JSON_VALUE(k, '$.sourceId') = p.source_id AND JSON_VALUE(k, '$.sensorId') = p.sensor_id
-          AND p.observed_at = SAFE_CAST(JSON_VALUE(k, '$.observedAt') AS TIMESTAMP))
+      FROM ${viewPath(config, 'v_pedestrian_observations')} p
+      JOIN (SELECT DISTINCT JSON_VALUE(k, '$.sourceId') AS source_id,
+          JSON_VALUE(k, '$.sensorId') AS sensor_id,
+          SAFE_CAST(JSON_VALUE(k, '$.observedAt') AS TIMESTAMP) AS observed_at
+        FROM UNNEST(JSON_QUERY_ARRAY(@publicRecordKeysJson)) k) requested
+        ON requested.source_id = p.source_id AND requested.sensor_id = p.sensor_id
+          AND requested.observed_at = p.observed_at
       ${PEDESTRIAN_ORDER}` };
   }
   if (queryId === 'parking') {
@@ -55,11 +60,11 @@ export function preparePublicRecordQuery(options: {
         WHERE JSON_VALUE(k, '$.sourceId') = s.source_id AND JSON_VALUE(k, '$.sensorId') = s.sensor_id)
       ${PARKING_ORDER}` };
   }
-  if (!isGeoQuery(queryId) || queryId === 'news') throw new RangeError('Public record verifier unavailable');
+  if (!isGeoQuery(queryId)) throw new RangeError('Public record verifier unavailable');
   return { ...defaults, ...bindings,
     query: `${recordProjection(GEO_COLUMNS)}
-      FROM ${viewPath(config, geoView(request.mode))} g
-      WHERE ${matchesKey('g.geo_record_id', 'g.version_id', 'g.source_id')}
-        AND ${recordStatusFilter(request.mode)}
+      FROM ${viewPath(config, geoRightsView(request.mode))} g
+      ${joinRecordKeys('g.geo_record_id', 'g.version_id', 'g.source_id')}
+      WHERE ${recordStatusFilter(request.mode)}
       ${GEO_ORDER}` };
 }

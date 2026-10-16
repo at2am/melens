@@ -193,11 +193,39 @@ export async function withPublishedGtfsLocations(result: ConnectorSuccess, confi
     throw new Error('GTFS runtime requires both complete mode snapshots');
   }
   const parents = result.sourceRecords.flatMap(record => {
-    const match = /^victoria\.transport\.gtfs_realtime:feed:(metro_train|yarra_tram):/.exec(record.source_record_id);
-    return match ? [{ mode: mode.parse(match[1]), timestamp: utc.parse(record.source_updated_at) }] : [];
+    const match = /^victoria\.transport\.gtfs_realtime:feed:(metro_train|yarra_tram):(.+)$/.exec(record.source_record_id);
+    if (!match) return [];
+    const timestamp = utc.parse(record.source_updated_at);
+    if (Date.parse(utc.parse(match[2])) !== Date.parse(timestamp)) {
+      throw new Error('GTFS snapshot parent timestamp disagrees with its identity');
+    }
+    return [{ mode: mode.parse(match[1]), timestamp, record }];
   });
   if (parents.length !== 2 || new Set(parents.map(parent => parent.mode)).size !== 2) {
     throw new Error('GTFS runtime requires one timestamped parent for each mode');
+  }
+  const memberships = new Map<string, Array<(typeof result.geoRecordSources)[number]>>();
+  for (const link of result.geoRecordSources) {
+    if (link.evidence_role !== 'parent_feed_snapshot') continue;
+    const key = JSON.stringify([link.geo_record_id, link.version_id]);
+    const existing = memberships.get(key);
+    if (existing) existing.push(link);
+    else memberships.set(key, [link]);
+  }
+  for (const alert of result.geoRecords) {
+    const alertMode = /^victoria\.transport\.gtfs_realtime:alert:(metro_train|yarra_tram):/.exec(alert.geo_record_id)?.[1];
+    const parent = parents.find(item => item.mode === alertMode);
+    const membership = memberships.get(JSON.stringify([alert.geo_record_id, alert.version_id])) ?? [];
+    const link = membership[0];
+    if (!parent || membership.length !== 1 || !link
+      || alert.source_id !== REALTIME_SOURCE_ID || alert.batch_id !== result.runId
+      || alert.source_updated_at !== parent.timestamp
+      || parent.record.source_id !== REALTIME_SOURCE_ID || parent.record.batch_id !== result.runId
+      || link.source_id !== REALTIME_SOURCE_ID || link.batch_id !== result.runId
+      || link.source_record_id !== parent.record.source_record_id
+      || link.source_version_id !== parent.record.version_id) {
+      throw new Error('GTFS alert snapshot membership does not match its mode parent');
+    }
   }
   const staticVersions = result.geoRecords.length === 0 ? []
     : await loadPublishedStaticGtfsVersions(config, bigquery);

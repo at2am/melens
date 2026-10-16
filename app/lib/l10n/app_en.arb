@@ -1707,6 +1707,10 @@
   "@mapTimeNow": {
     "description": "The time pill on the map while it shows current data."
   },
+  "mapTimeSampleWindow": "Sample observation window",
+  "@mapTimeSampleWindow": {
+    "description": "Development sample time pill and menu use the fixed fixture observation interval, not the current time."
+  },
   "mapTimePastHour": "Past hour",
   "@mapTimePastHour": {
     "description": "Time pill menu entry."

@@ -1,0 +1,23 @@
+{
+  "name": "@melens/app-e2e",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "test": "e2e run --config e2e.nonparking.config.ts --exclude-tag parking --output .e2e/ui",
+    "test:live": "e2e run --config e2e.nonparking.config.ts --exclude-tag parking --target live",
+    "test:sample": "e2e run --config e2e.nonparking.config.ts --exclude-tag parking --target sample",
+    "test:agent": "e2e run --config e2e.agent.config.ts --output .e2e/agent-live",
+    "test:events": "e2e run --config e2e.events.config.ts",
+    "test:all": "npm test && npm run test:agent && npm run test:events",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "devDependencies": {
+    "@e2e-dev/web": "0.15.1",
+    "@types/node": "24.19.0",
+    "e2e": "0.21.1",
+    "typescript": "5.9.3"
+  }
+}

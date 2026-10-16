@@ -230,7 +230,7 @@ final class FeedItem {
     this.place,
     this.sourceLabel,
     this.userEventId,
-    this.mapFeatureId,
+    this.mapRecord,
     this.isSample = false,
   });
 
@@ -250,8 +250,9 @@ final class FeedItem {
   /// Set for community events: tapping opens the event page.
   final String? userEventId;
 
-  /// Set for map items: tapping selects the item on the map.
-  final String? mapFeatureId;
+  /// The original record and its read snapshot survive navigation to the map.
+  final MapItemResponse? mapRecord;
+  String? get mapFeatureId => mapRecord?.item.id;
   final bool isSample;
 
   FeedItem inFeeds(Set<String> feedIds) => FeedItem(
@@ -264,7 +265,7 @@ final class FeedItem {
     place: place,
     sourceLabel: sourceLabel,
     userEventId: userEventId,
-    mapFeatureId: mapFeatureId,
+    mapRecord: mapRecord,
     isSample: isSample,
   );
 }

@@ -6,7 +6,7 @@ import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
   ANOMALY_COLUMNS, BOUNDARY_COLUMNS, BOUNDARY_ORDER, BOUNDARY_SCHEMES, GEO_COLUMNS, GEO_ORDER, NO_BINDINGS,
   PARKING_COLUMNS, PARKING_ORDER, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER, bboxBindings, bind, geoTimeFilter,
-  geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection, recordStatusFilter,
+  geoRightsView, geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection, recordStatusFilter,
   resultLimit, spatialFilter, timeWindow, topicFilter, usesTimeWindow, viewPath, type ViewName,
 } from './sql.js';
 
@@ -16,6 +16,7 @@ export const viewQueryIdSchema = z.enum([
 ]);
 export type ViewQueryId = z.infer<typeof viewQueryIdSchema>;
 export type IndicatorFilter = NonNullable<ViewportQuery['areaFilter']>;
+export type CurrentGeoRead = 'served' | 'authoritative';
 
 /** Bounded viewport reads over the published views; sql.ts owns every shared fragment. */
 export function prepareViewQuery(options: {
@@ -24,6 +25,8 @@ export function prepareViewQuery(options: {
   readonly config: MapConfig;
   readonly pageSize: number;
   readonly publicSourceIds?: readonly string[];
+  /** Server composition only: readers without a later rights recheck need the live current gate. */
+  readonly currentGeoRead?: CurrentGeoRead;
 }): PreparedViewQuery {
   const { queryId, request, config, pageSize } = options;
   const mode = request.mode;
@@ -40,7 +43,7 @@ export function prepareViewQuery(options: {
     const windowed = usesTimeWindow(queryId, mode);
     return { ...defaults,
       query: `${recordProjection(GEO_COLUMNS)}
-        FROM ${path(geoView(mode))} g
+        FROM ${path(options.currentGeoRead === 'authoritative' ? geoRightsView(mode) : geoView(mode))} g
         WHERE ${topic.sql} AND ${spatialFilter('g.geometry')} ${admitted('g.source_id')}
           AND ${recordStatusFilter(mode)} ${windowed ? `AND ${geoTimeFilter(queryId, mode)}` : ''}
         ${GEO_ORDER}`,

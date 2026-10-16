@@ -1,0 +1,96 @@
+[
+  {
+    "kind": "existing-live-geo-public-record",
+    "jobId": "10a2bd04-5086-4fca-b6f5-ba55cde97b59",
+    "durationMs": 3540,
+    "bytesProcessed": "574913253",
+    "totalSlotMs": "194403",
+    "cacheHit": false,
+    "stages": [
+      {
+        "name": "S64: Sort+",
+        "recordsRead": "92709",
+        "recordsWritten": "324",
+        "slotMs": "29199",
+        "computeMsAvg": "279",
+        "computeMsMax": "420",
+        "joins": [],
+        "jsonOperationCount": 3
+      }
+    ],
+    "keyCount": 324
+  },
+  {
+    "kind": "correlated-json-exists",
+    "fixtureRows": 4000,
+    "keyCount": 1000,
+    "resultRows": 989,
+    "sameRowsAsOriginal": null,
+    "wallMs": 5706,
+    "jobId": "b138d183-87aa-4a80-a36e-a2a098f712ec",
+    "durationMs": 3149,
+    "bytesProcessed": "0",
+    "totalSlotMs": "7902",
+    "cacheHit": false,
+    "stages": [
+      {
+        "name": "S01: Output",
+        "recordsRead": "1",
+        "recordsWritten": "989",
+        "slotMs": "7875",
+        "computeMsAvg": "7515",
+        "computeMsMax": "7515",
+        "joins": [],
+        "jsonOperationCount": 3
+      }
+    ]
+  },
+  {
+    "kind": "distinct-typed-equi-join",
+    "fixtureRows": 4000,
+    "keyCount": 1000,
+    "resultRows": 989,
+    "sameRowsAsOriginal": true,
+    "wallMs": 2725,
+    "jobId": "38c342e2-1ef2-4cf3-90c0-841211e4dfa2",
+    "durationMs": 253,
+    "bytesProcessed": "0",
+    "totalSlotMs": "95",
+    "cacheHit": false,
+    "stages": [
+      {
+        "name": "S00: Input",
+        "recordsRead": "0",
+        "recordsWritten": "1",
+        "slotMs": "27",
+        "computeMsAvg": "7",
+        "computeMsMax": "7",
+        "joins": [],
+        "jsonOperationCount": 1
+      },
+      {
+        "name": "S01: Aggregate+",
+        "recordsRead": "1",
+        "recordsWritten": "998",
+        "slotMs": "24",
+        "computeMsAvg": "12",
+        "computeMsMax": "12",
+        "joins": [],
+        "jsonOperationCount": 5
+      },
+      {
+        "name": "S03: Output",
+        "recordsRead": "4960",
+        "recordsWritten": "989",
+        "slotMs": "19",
+        "computeMsAvg": "9",
+        "computeMsMax": "9",
+        "joins": [
+          "$70 := $10, $71 := $11, $72 := $12",
+          "INNER HASH JOIN ALL  WITH ALL  ON $10 = $60"
+        ],
+        "jsonOperationCount": 0
+      }
+    ]
+  }
+]

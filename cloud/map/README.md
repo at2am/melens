@@ -74,7 +74,7 @@ T007 implemented `src/config.ts` and the fixed query runner. The validated setti
 
 The runner allows fixed parameterized queries over approved views and implements dry runs, billed-byte ceilings, timeouts, cancellation, row lookahead and result-byte limits. Caller SQL, arbitrary table names, raw/staging datasets, provider URLs and client credentials stay outside it. Public-field adapters, coverage evidence, immutable snapshot storage, final envelope budgeting and HTTP integration are implemented. T025 applies default zoom grouping only after validating the global 1,000-original-row allocation; each aggregate retains exact original member ids and versions.
 
-The 2026-10-01 real BigQuery dry runs validated all thirteen current/historical query combinations. Current planning/disruption/event/news each estimated 383847461 bytes, exceeding the default 100000000-byte dynamic ceiling. The guard correctly blocks those queries under the default. The reviewed development preview configured 400000000 bytes after a fresh exact planning dry run, and 1000000000 bytes from 2026-10-09 when that estimate reached 481467396 bytes; library defaults were not relaxed. The lasting fix is a smaller current view on the data side, tracked in [issue #9](https://github.com/at2am/melens/issues/9) and summarised in [infra/README.md](infra/README.md). Since 2026-10-15 current geo reads use `v_geo_records_current_served`, a copy refreshed per publication (see `cloud/data/docs/operations.md`), and the service holds current planning, disruption, event, news, parking and anomaly layers in memory per publication (`@melens/shared/query/current-layer-cache`): a viewport read and its public-record recheck run no BigQuery job until a source publishes, the entry is two minutes old, or the copy lags the registry. A record removed without a publication therefore leaves the map within two minutes. The registry read is served for up to two more minutes while a background read replaces it, and the layers of one request load together. See [joint validation](../../specs/002-map-data-presentation/validation.md) for estimates and acceptance limits.
+The 2026-10-01 real BigQuery dry runs validated all thirteen current/historical query combinations. Current planning/disruption/event/news each estimated 383847461 bytes, exceeding the default 100000000-byte dynamic ceiling. The guard correctly blocks those queries under the default. The reviewed development preview configured 400000000 bytes after a fresh exact planning dry run, and 1000000000 bytes from 2026-10-09 when that estimate reached 481467396 bytes; library defaults were not relaxed. The lasting fix is a smaller current view on the data side, tracked in [issue #9](https://github.com/at2am/melens/issues/9) and summarised in [infra/README.md](infra/README.md). Since 2026-10-15 current geo reads use `v_geo_records_current_served`, a copy refreshed per publication (see `cloud/data/docs/operations.md`), and the service holds current planning, disruption, event, news, parking and anomaly layers in memory per publication (`@melens/shared/query/current-layer-cache`): ordinary layer loads reuse the current rows until the publication changes or the entry expires. Non-parking record-rights checks use live authoritative queries, and anomaly checks use an independent live producer. They do not reuse a successful cached permission result. A Geo copy that does not match the source publication is unavailable. Source coverage retains its existing 30-second cache, with no stale grace window by default. The layers of one request load together. Parking behavior remains on its existing path. See [joint validation](../../specs/002-map-data-presentation/validation.md) for estimates and acceptance limits.
 
 ## Read-only identity requirements
 
@@ -104,14 +104,21 @@ local files; keys use the configured Secret Manager delivery path.
 
 Snapshots and cursors expire after five minutes and are process-local. Detail,
 continuation and member reads recheck publication plus exact original record
-access; source or record withdrawal returns `notAvailable`. Current boundary and
-pedestrian views lack complete latest-record rights proof, so their production
-outputs are denied without an independent trusted verifier. See the
+access; source or record withdrawal returns `notAvailable`. Boundary and
+pedestrian rows require the repaired views' latest published record permission
+evidence. Older deployed views without that evidence remain
+unavailable. The repaired SQL checks exact and latest source-record rights plus
+current source admission, and exposes native observation/location revisions. See the
 [source-readiness handoff](../../specs/002-map-data-presentation/p0-source-readiness.md).
 Planning is the eligible positive preview path. Anomaly requires independently
 verified external producer output; this package introduces no detector.
 
 The app's explicit sample mode is visibly labelled and does not replace live
-failures. News, area comparison, H3 and 3D are later stories. Full source/runtime
+failures. The shared news adapter serves permitted metadata through viewport,
+scoped unlocated and detail reads; a missing geometry stays unlocated. Original
+article and council project links are preserved, as are Ticketmaster event links.
+GDELT includes a separate clickable dataset attribution reference. UC-06 top-three
+ranking and map movement behavior remain separate acceptance work. Area comparison,
+H3 and 3D are later stories. Full source/runtime
 and rendered browser acceptance remain recorded in
 [validation](../../specs/002-map-data-presentation/validation.md).

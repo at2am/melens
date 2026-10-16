@@ -41,7 +41,7 @@ final class CardItemRequestsProvider
   }
 }
 
-String _$cardItemRequestsHash() => r'a6e4b3f4ccd1b5ace433f0cec9dc63120aa5756a';
+String _$cardItemRequestsHash() => r'0abb82a3406a41d015ece6d69cc12b5394d1ca11';
 
 abstract class _$CardItemRequests extends $Notifier<CardItemRequest?> {
   CardItemRequest? build();

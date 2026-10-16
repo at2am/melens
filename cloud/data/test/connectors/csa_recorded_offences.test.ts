@@ -678,16 +678,22 @@ test('GM-02 Delivery Standard: Unversioned LGA names retain boundary_mapping_sta
   const merribekInd = partialMappedResult.indicators.find(i => i.source_area_name === 'Merri-bek')!;
   assert.ok(merribekInd.boundary_id.includes('unresolved'), 'Merri-bek must remain unresolved without explicit 2021 crosswalk');
 
-  // With explicit crosswalk supplied, Merri-bek can be mapped safely:
-  const crosswalkEvidence: AreaBoundaryEvidence = {
+  // A malformed ID must fail even when it appears in an explicit crosswalk.
+  assert.throws(() => normalizeCsaStatistics(result, {
     ...asgs2021Evidence,
     crosswalk: new Map([['Merri-bek', 'ASGS_LGA:2021:25250']]),
+  }), /Crosswalk target is not a unique official boundary/);
+
+  // A reviewed crosswalk must point to a supplied boundary at its actual code/vintage.
+  const crosswalkEvidence: AreaBoundaryEvidence = {
+    ...asgs2021Evidence,
+    crosswalk: new Map([['Merri-bek', 'ASGS_LGA:25250:2021']]),
   };
   const fullyMappedResult = normalizeCsaStatistics(result, crosswalkEvidence);
   assert.equal(fullyMappedResult.mapped, 5);
   assert.equal(fullyMappedResult.unresolved, 0);
 
   const mappedMerribek = fullyMappedResult.indicators.find(i => i.source_area_name === 'Merri-bek')!;
-  assert.equal(mappedMerribek.boundary_id, 'ASGS_LGA:2021:25250');
+  assert.equal(mappedMerribek.boundary_id, 'ASGS_LGA:25250:2021');
   assert.equal(mappedMerribek.source_area_vintage, '2021');
 });

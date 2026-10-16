@@ -7,6 +7,7 @@ import { parseViewportQuery, parseMapItem, type ViewportResponse, type MapItemPa
 import { COVERAGE_CACHE_TTL_MS, createMapService } from '../src/map-service.js';
 import { createMapHttpServer } from '../src/server.js';
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
+import { publicRecordKeysSchema } from '@melens/shared/query/public-record-queries';
 import { aggregateLayer } from '../src/services/aggregation.js';
 import { createSnapshotStore, MapServiceError } from '../src/services/snapshot-store.js';
 
@@ -34,9 +35,9 @@ function row(id: string, located = true, topic = 'planning', idSource = sourceId
     freshness_state: 'current', record_status: 'planned' };
 }
 function fixture(options: { rows?: ReturnType<typeof row>[]; partial?: boolean; aggregate?: boolean; maxBytes?: number;
-  coverageStaleMs?: number } = {}) {
+  coverageStaleMs?: number; extraSources?: ReturnType<typeof registry>[] } = {}) {
   let clockValue = Date.parse(time);
-  const metadata = [registry()];
+  const metadata = [registry(), ...(options.extraSources ?? [])];
   const rows = options.rows ?? [row('planning:first/a'), row('planning:second'), row('planning:third')];
   const unlocated = [row('planning:missing-1', false), row('planning:missing-2', false)];
   const queries: PreparedViewQuery[] = [];
@@ -61,7 +62,8 @@ function fixture(options: { rows?: ReturnType<typeof row>[]; partial?: boolean; 
   const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing', ...(options.maxBytes === undefined ? {} : {
     MAP_MAX_RESPONSE_BYTES: String(options.maxBytes), MAP_RESPONSE_ENVELOPE_RESERVE_BYTES: '512' }) });
   const store = createSnapshotStore({ clock });
-  const service = createMapService({ config, adapter, publicSources: [source], clock, snapshotStore: store,
+  const service = createMapService({ config, adapter,
+    publicSources: [source, ...(options.extraSources ?? []).map((entry) => ({ ...source, sourceId: entry.source_id }))], clock, snapshotStore: store,
     ...(options.coverageStaleMs === undefined ? {} : { coverageStaleMs: options.coverageStaleMs }),
     aggregateLayer: options.aggregate === true ? aggregateLayer : (layer) => ({ items: layer.items, groups: new Map() }) });
   return { service, metadata, rows, unlocated, queries, store, withdrawnIds, advance(ms: number) { clockValue += ms; } };
@@ -226,15 +228,100 @@ test('snapshot store bounds count and memory and expires immutable pages at five
 
 test('unchanged source watermark cannot bypass row-level withdrawal on details, members or paging', async () => {
   const f = fixture(); const initial = await f.service.queryViewport(base);
-  f.withdrawnIds.add('planning:second');
+  f.withdrawnIds.add('planning:first/a');
   await assert.rejects(f.service.getItem('planning:first/a', { requestId: 'detail', snapshotId: initial.snapshotId }),
     (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
   await assert.rejects(f.service.queryViewport({ ...base, cursor: initial.layers[0]!.nextCursor, snapshotId: initial.snapshotId }),
     (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
   const grouped = fixture({ aggregate: true }); const aggregateReply = await grouped.service.queryViewport({ ...base, zoom: 8 });
   grouped.withdrawnIds.add('planning:second');
+  await assert.rejects(grouped.service.getItem(aggregateReply.layers[0]!.items[0]!.id, { requestId: 'aggregate-detail', snapshotId: aggregateReply.snapshotId }),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
   await assert.rejects(grouped.service.getMembers(aggregateReply.layers[0]!.items[0]!.id, { requestId: 'members', snapshotId: aggregateReply.snapshotId }),
     (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+});
+
+function proofIds(queries: readonly PreparedViewQuery[]): string[][] {
+  return queries.flatMap((query) => typeof query.params.publicRecordKeysJson === 'string'
+    ? [publicRecordKeysSchema.parse(JSON.parse(query.params.publicRecordKeysJson)).map((key) => key.id).sort()] : []);
+}
+
+test('an original detail rechecks only its record while unrelated withdrawal still blocks snapshot paging', async () => {
+  const f = fixture(); const initial = await f.service.queryViewport(base);
+  f.withdrawnIds.add('planning:second');
+  let start = f.queries.length;
+  const detail = await f.service.getItem('planning:first/a', { requestId: 'scoped-detail', snapshotId: initial.snapshotId });
+  assert.equal(detail.item.id, 'planning:first/a');
+  assert.deepEqual(proofIds(f.queries.slice(start)), [['planning:first/a']]);
+  await assert.rejects(f.service.queryViewport({ ...base, cursor: initial.layers[0]!.nextCursor, snapshotId: initial.snapshotId }),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+  f.withdrawnIds.add('planning:first/a'); start = f.queries.length;
+  await assert.rejects(f.service.getItem('planning:first/a', { requestId: 'revoked-detail', snapshotId: initial.snapshotId }),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+  assert.deepEqual(proofIds(f.queries.slice(start)), [['planning:first/a']]);
+});
+
+test('an original detail avoids unrelated layer queries but retains every snapshot source watermark', async () => {
+  const f = fixture({ rows: [row('planning:target'), row('event:other', true, 'event', 'test.event')],
+    extraSources: [registry('test.event', 'event')], coverageStaleMs: 0 });
+  const initial = await f.service.queryViewport({ ...base, layers: ['planning', 'event'], pageSize: 1000 });
+  assert.deepEqual(initial.layers.map((layer) => layer.state), ['available', 'available']);
+  assert.equal(proofIds(f.queries).length, 2);
+  let start = f.queries.length;
+  assert.equal((await f.service.getItem('planning:target', { requestId: 'one-layer-detail', snapshotId: initial.snapshotId })).item.id,
+    'planning:target');
+  assert.equal(f.queries.length - start, 1);
+  assert.deepEqual(proofIds(f.queries.slice(start)), [['planning:target']]);
+  f.metadata[1]!.access_status = 'paused'; f.advance(COVERAGE_CACHE_TTL_MS); start = f.queries.length;
+  await assert.rejects(f.service.getItem('planning:target', { requestId: 'withdrawn-source', snapshotId: initial.snapshotId }),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+  assert.deepEqual(proofIds(f.queries.slice(start)), []);
+});
+
+test('aggregate details and member pages recheck every group member but exclude unrelated groups', async () => {
+  const rows = ['group-a:1', 'group-a:2', 'group-b:1', 'group-b:2'].map((id, index) => ({ ...row(id),
+    geometry_geojson: JSON.stringify({ type: 'Point', coordinates: index < 2 ? [144.96, -37.81] : [145.04, -37.85] }) }));
+  const f = fixture({ rows, aggregate: true });
+  const initial = await f.service.queryViewport({ ...base, pageSize: 1000 });
+  const aggregate = initial.layers[0]!.items[0]!;
+  assert.equal(initial.layers[0]!.items.length, 2);
+  assert.ok(aggregate.kind === 'aggregate');
+  const ids = [...aggregate.details.memberIds].sort();
+  assert.equal(ids.length, 2);
+  const unrelated = rows.find((item) => !ids.includes(item.geo_record_id));
+  assert.ok(unrelated);
+  f.withdrawnIds.add(unrelated.geo_record_id);
+  const context = { requestId: 'scoped-group', snapshotId: initial.snapshotId };
+  let start = f.queries.length;
+  assert.equal((await f.service.getItem(aggregate.id, context)).item.id, aggregate.id);
+  assert.deepEqual(proofIds(f.queries.slice(start)), [ids]);
+  start = f.queries.length;
+  const page = await f.service.getMembers(aggregate.id, { ...context, pageSize: 1 });
+  assert.equal(page.items.length, 1); assert.ok(page.nextCursor);
+  assert.deepEqual(proofIds(f.queries.slice(start)), [ids]);
+  const offPage = ids.find((id) => id !== page.items[0]!.id);
+  assert.ok(offPage); f.withdrawnIds.add(offPage);
+  start = f.queries.length;
+  await assert.rejects(f.service.getItem(aggregate.id, context),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+  assert.deepEqual(proofIds(f.queries.slice(start)), [ids]);
+  start = f.queries.length;
+  await assert.rejects(f.service.getMembers(aggregate.id, { ...context, pageSize: 1 }),
+    (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+  assert.deepEqual(proofIds(f.queries.slice(start)), [ids]);
+});
+
+test('scoped original details still reject source withdrawal and changed publication before record queries', async () => {
+  for (const change of ['withdrawn', 'republished']) {
+    const f = fixture({ coverageStaleMs: 0 }); const initial = await f.service.queryViewport(base);
+    if (change === 'withdrawn') f.metadata[0]!.access_status = 'paused';
+    else f.metadata[0]!.latest_published_batch_id = 'batch-2';
+    f.advance(COVERAGE_CACHE_TTL_MS);
+    const start = f.queries.length;
+    await assert.rejects(f.service.getItem('planning:first/a', { requestId: 'source-recheck', snapshotId: initial.snapshotId }),
+      (e: unknown) => e instanceof MapServiceError && e.code === 'notAvailable');
+    assert.deepEqual(proofIds(f.queries.slice(start)), []);
+  }
 });
 
 test('aggregate member HTTP route returns only stored actual original identities and inherited historical mode', async () => {

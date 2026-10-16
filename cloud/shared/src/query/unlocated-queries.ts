@@ -31,7 +31,7 @@ export function prepareUnlocatedQuery(options: {
   } else if (scope.sourceJurisdiction !== request.scope.sourceJurisdiction || scope.areaRefs.length !== 0) {
     throw new RangeError('Unapproved scope');
   }
-  const geo = isGeoQuery(queryId) && queryId !== 'news';
+  const geo = isGeoQuery(queryId);
   if (!geo && queryId !== 'pedestrian') throw new RangeError('Unlocated layer unavailable');
   if (queryId === 'pedestrian' && scope.areaRefs.length > 0) throw new RangeError('Observation view has no area association');
 

@@ -310,7 +310,7 @@ final class MapFeedItemsProvider
   }
 }
 
-String _$mapFeedItemsHash() => r'4b3a6a18b34e6111ee8cf678924348b78e2a8c4e';
+String _$mapFeedItemsHash() => r'3591dee6d8e108c62d17082a265dbd25192482ef';
 
 /// What one layer holds now inside one scope. Each layer is its own request,
 /// so the layers load in parallel and a slow one delays only its own items.

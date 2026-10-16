@@ -143,10 +143,17 @@ current_gtfs_mode_snapshots AS (
   WHERE mode IS NOT NULL
   QUALIFY source_updated_at = MAX(source_updated_at) OVER (PARTITION BY mode)
 ),
+unambiguous_gtfs_mode_snapshots AS (
+  SELECT * FROM current_gtfs_mode_snapshots
+  -- Conflicting FULL_DATASET contents at one provider timestamp do not prove
+  -- either membership set. Identical repeated parent versions remain valid.
+  QUALIFY COUNT(DISTINCT CONCAT(source_record_id, '\x1f', version_id))
+    OVER (PARTITION BY mode) = 1
+),
 current_gtfs_members AS (
   SELECT DISTINCT l.geo_record_id, l.version_id
   FROM `melens_ingest.geo_record_sources` l
-  JOIN current_gtfs_mode_snapshots snapshot ON l.batch_id = snapshot.batch_id
+  JOIN unambiguous_gtfs_mode_snapshots snapshot ON l.batch_id = snapshot.batch_id
     AND l.source_record_id = snapshot.source_record_id
     AND l.source_version_id = snapshot.version_id
   WHERE l.source_id = 'victoria.transport.gtfs_realtime'
@@ -220,8 +227,8 @@ WHERE (g.source_id != 'melbourne.development_monitor'
   -- FULL_DATASET disappearance removes current membership, preserving history.
   -- A NO_SERVICE effect or an omitted alert does not invent a cancellation.
   AND (g.source_id != 'victoria.transport.gtfs_realtime'
-    OR EXISTS (SELECT 1 FROM current_gtfs_members member
-      WHERE member.geo_record_id = g.geo_record_id AND member.version_id = g.version_id))
+    OR STRUCT(g.geo_record_id, g.version_id) IN (
+      SELECT AS STRUCT geo_record_id, version_id FROM current_gtfs_members))
   -- A disappeared road impact leaves current results without asserting that
   -- the provider resolved it. Failed/unpublished snapshots preserve the last
   -- complete published membership; an empty complete snapshot removes it all.

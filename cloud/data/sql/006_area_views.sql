@@ -17,18 +17,65 @@ sources AS (
     PARTITION BY source_id ORDER BY updated_at DESC
   ) = 1
 ),
-eligible AS (
-  SELECT b.*, sr.source_updated_at, sr.source_version_ordinal
+published_records AS (
+  SELECT r.*, b.published_at AS record_batch_published_at
+  FROM `melens_ingest.source_records` r
+  JOIN batches b USING (batch_id, source_id)
+  WHERE b.state = 'published' AND b.published_at IS NOT NULL
+),
+record_versions AS (
+  SELECT * FROM published_records
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY source_id, source_record_id, version_id
+    ORDER BY record_batch_published_at DESC, fetched_at DESC,
+      IF(rights_status IN ('verified_open', 'restricted')
+        AND record_status IN ('active', 'corrected'), 1, 0), batch_id DESC
+  ) = 1
+),
+orderable_records AS (
+  SELECT source_id, source_record_id
+  FROM record_versions
+  GROUP BY source_id, source_record_id
+  HAVING COUNT(*) = 1
+    OR COUNTIF(source_updated_at IS NULL) = 0
+    OR (COUNTIF(source_updated_at IS NOT NULL) = 0
+      AND COUNTIF(source_version_ordinal IS NULL) = 0)
+    -- Unknown revision order is harmless only when every version grants the
+    -- same access. A conflicting permission with no upstream order denies all.
+    OR COUNT(DISTINCT TO_JSON_STRING(STRUCT(rights_status, record_status))) = 1
+),
+ranked_record_access AS (
+  SELECT r.*, DENSE_RANK() OVER (
+    PARTITION BY source_id, source_record_id
+    ORDER BY source_updated_at DESC NULLS LAST, source_version_ordinal DESC NULLS LAST
+  ) AS access_rank
+  FROM record_versions r
+  JOIN orderable_records USING (source_id, source_record_id)
+),
+latest_record_access AS (
+  -- A source revision can close one location interval and open another.
+  -- Equal revision clocks therefore agree on permission, or deny access.
+  SELECT source_id, source_record_id,
+    LOGICAL_AND(rights_status IN ('verified_open', 'restricted')
+      AND record_status IN ('active', 'corrected')) AS is_public
+  FROM ranked_record_access WHERE access_rank = 1
+  GROUP BY source_id, source_record_id
+),
+boundary_versions AS (
+  SELECT b.*, sr.source_updated_at, sr.source_version_ordinal,
+    sr.rights_status, sr.record_status,
+    access.is_public AS latest_record_is_public
   FROM `melens_ingest.boundaries` AS b
   JOIN batches AS batch USING (batch_id, source_id)
   JOIN sources AS s USING (source_id)
-  JOIN `melens_ingest.source_records` AS sr
+  JOIN published_records AS sr
     ON sr.batch_id = b.batch_id AND sr.source_id = b.source_id
     AND sr.source_record_id = b.source_record_id AND sr.version_id = b.version_id
+  JOIN latest_record_access access
+    ON access.source_id = b.source_id AND access.source_record_id = b.source_record_id
   WHERE batch.state = 'published' AND batch.published_at IS NOT NULL
     AND s.license_status IN ('verified_open', 'restricted')
     AND s.access_status = 'active'
-    AND sr.rights_status IN ('verified_open', 'restricted')
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY b.boundary_id, b.version_id
     ORDER BY batch.published_at DESC, b.fetched_at DESC, b.batch_id DESC
@@ -36,7 +83,7 @@ eligible AS (
 ),
 orderable AS (
   SELECT boundary_id
-  FROM eligible
+  FROM boundary_versions
   GROUP BY boundary_id
   HAVING COUNT(*) = 1
     OR (COUNTIF(source_updated_at IS NULL) = 0
@@ -44,19 +91,25 @@ orderable AS (
     OR (COUNTIF(source_updated_at IS NOT NULL) = 0
       AND COUNTIF(source_version_ordinal IS NULL) = 0
       AND COUNT(DISTINCT source_version_ordinal) = COUNT(*))
+),
+latest_boundaries AS (
+  SELECT b.* FROM boundary_versions b
+  JOIN orderable USING (boundary_id)
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY b.boundary_id
+    ORDER BY b.source_updated_at DESC NULLS LAST, b.source_version_ordinal DESC NULLS LAST
+  ) = 1
 )
 SELECT b.boundary_id, b.version_id, b.scheme, b.code, b.name,
        b.vintage, b.geometry_geojson,
        SAFE.ST_GEOGFROMGEOJSON(b.geometry_geojson) AS geometry,
        b.valid_from, b.valid_to, b.source_record_id,
-       b.source_id, b.batch_id, b.fetched_at
-FROM eligible AS b
-JOIN orderable USING (boundary_id)
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY b.boundary_id
-  ORDER BY b.source_updated_at DESC NULLS LAST,
-           b.source_version_ordinal DESC NULLS LAST
-) = 1;
+       b.source_id, b.batch_id, b.fetched_at,
+       'latest_published_record_v1' AS rights_evidence
+FROM latest_boundaries AS b
+WHERE b.rights_status IN ('verified_open', 'restricted')
+  AND b.record_status IN ('active', 'corrected')
+  AND b.latest_record_is_public;
 
 -- Explicit missing/suppressed rows survive with NULL values. An indicator
 -- whose exact boundary ID is unavailable remains visible with missing mapping

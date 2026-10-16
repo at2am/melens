@@ -133,6 +133,8 @@ Build-time values come from `--dart-define-from-file=config/<env>.json`. The fil
 
 `config/example.json` explicitly selects `sample` for development. Samples must carry the persistent Sample data label. Production uses `MELENS_ENV=prod` and `MAP_DATA_MODE=live`; the app rejects production sample mode at startup. The service URL must be HTTP(S), without credentials, query or fragment. The map repository never changes data mode after a failed live request.
 
+In sample mode, the time pill and its current-mode menu entry read "Sample observation window". The default and refresh use the fixture's fixed observation interval. Refresh keeps its original timestamps. Live mode uses the latest fifteen-minute window.
+
 On the Android emulator, the host machine is `10.0.2.2`, not `localhost`. Cloud Build should write ignored `config/prod.json` from Secret Manager before `flutter build web`. Browser Maps keys are visible in the built app and network requests; restrict the key to the intended Web origins and Maps JavaScript API. Do not print keys or commit populated configuration files.
 
 ## Testing the agent locally
@@ -156,7 +158,7 @@ fvm flutter build web --release --no-web-resources-cdn --dart-define-from-file=c
 firebase deploy --only hosting --project melens-510012
 ```
 
-Startup speed: the first load downloads the engine (CanvasKit, about 1.5 MB brotli) and `main.dart.js` (about 1 MB brotli). `--no-web-resources-cdn` serves CanvasKit from our own Hosting site instead of `gstatic.com`, and Roboto is bundled (`assets/fonts`, `pubspec.yaml`) instead of downloaded from `fonts.gstatic.com`; both hosts are slow or blocked on some networks and each blocked the first frame. `web/index.html` shows a splash until the `flutter-first-frame` event. `firebase.json` caches `/canvaskit` and `/assets` for a day; `main.dart.js` is not content-hashed, so it keeps the one-hour default. Not done: `--wasm` (smaller and faster, but needs cross-origin isolation headers that break the Maps script) and deferred loading of the chat.
+Startup speed: the first load downloads the engine (CanvasKit, about 1.5 MB brotli) and `main.dart.js` (about 1 MB brotli). `--no-web-resources-cdn` serves CanvasKit from our own Hosting site instead of `gstatic.com`, and Roboto is bundled (`assets/fonts`, `pubspec.yaml`) instead of downloaded from `fonts.gstatic.com`; both hosts are slow or blocked on some networks and each blocked the first frame. `web/index.html` shows a splash until the `flutter-first-frame` event. `firebase.json` caches `/canvaskit` for a day. The unversioned app script, Flutter loaders, bundled assets, service worker, index and release provenance require cache revalidation so a release does not keep serving an old UI or a previous tree-shaken icon font. Not done: `--wasm` (smaller and faster, but needs cross-origin isolation headers that break the Maps script) and deferred loading of the chat.
 
 The Firebase CLI account must have access to `melens-510012`. The first release (2026-10-15) was made through the Hosting REST API with the project owner's gcloud token, because the CLI was logged in to another account.
 
@@ -175,7 +177,7 @@ The site is public and so is the agent behind it: anyone with the link can start
 
 ## Maps Web setup
 
-The dependency and loader are configured; the current map screen is still a placeholder. A real browser-restricted key has not been supplied or validated by this setup. Both live and sample overlays need a configured base map key.
+The Web map renders Google Maps with record overlays. Both live and sample modes need a browser key for the project, restricted to the intended origins and Maps JavaScript API. The local and cloud acceptance builds use the existing project Web Maps key. Its value stays in ignored configuration files. See `cloud/data/docs/validation/maps-browser-key-2026-10-16.json` for the restriction readback and acceptance status.
 
 1. Enable Maps JavaScript API in the Google Cloud project and configure its billing and Web-origin restrictions. Put the key in ignored `config/dev.json` under `GOOGLE_MAPS_WEB_API_KEY`.
 2. Create a `GoogleMapsWebApiLoader` in a provider and await `load(env)` before constructing the Web `GoogleMap`. The helper calls the loader in `web/index.html` through supported Dart JS interop. It uses the compile-time key from `Env`, so no key substitution or second Maps script is needed in HTML.
@@ -199,4 +201,4 @@ Sources: [Maps Flutter plugin](https://pub.dev/packages/google_maps_flutter), [e
 
 | Item | Why it waits | Already decided |
 | --- | --- | --- |
-| Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Dependency and Web loader are prepared; 2D surface integration is T015, native setup is separate |
+| Live Maps acceptance | Needs a configured and authorized Maps key on each scheduled platform | Web 2D is integrated; verify actual rendering and camera behavior against the served bundle. Native setup is separate |

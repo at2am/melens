@@ -165,56 +165,88 @@ const _feedZoom = 18.0;
 Future<List<FeedItem>> mapFeedItems(Ref ref, FeedLayerQuery query) async {
   final topic = FeedTopic.forLayer(query.layer);
   if (topic == null) return const [];
+  final cancellation = MapRequestCancellation();
+  ref.onDispose(cancellation.cancel);
   final clock = ref.watch(melbourneClockProvider);
   final repository = ref.watch(mapRepositoryProvider);
+  final catalog = query.scope is CityFeedScope || query.includeUnlocated
+      ? await ref.watch(mapLayerCatalogProvider.future)
+      : null;
+  cancellation.throwIfCancelled();
   final bbox = switch (query.scope) {
-    CityFeedScope() => boundedViewportRegion(
-      (await ref.watch(mapLayerCatalogProvider.future)).serviceBounds,
-    ),
+    CityFeedScope() => boundedViewportRegion(catalog!.serviceBounds),
     AreaFeedScope(:final area) => area?.bounds,
     BoxFeedScope(:final bounds) => boundedViewportRegion(bounds),
   };
   // A named area this build no longer knows reads nothing.
   if (bbox == null) return const [];
+  // A changed subscription disposes this instance before its queries start.
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  cancellation.throwIfCancelled();
   final window = currentViewportWindow(clock);
   final requestId =
       'feed-${query.layer.name}-${clock.now().millisecondsSinceEpoch}';
-  final unlocated = query.includeUnlocated
-      ? _unlocatedItems(ref, repository, query.layer, window, requestId)
-      : null;
-  final response = await repository.queryViewport(
-    ViewportQuery(
-      requestId: requestId,
-      bbox: bbox,
-      zoom: _feedZoom,
-      layers: [query.layer],
-      mode: MapQueryMode.current,
-      window: window,
-      pageSize: 200,
-    ),
-  );
-  final sample = response.dataMode == MapDataMode.sample;
-  return [
-    for (final layer in response.layers)
-      if (layer.layerId == query.layer)
-        for (final item in layer.items)
-          if (item is! AggregateMapItem) _fromMapItem(item, topic, sample),
-    if (unlocated != null)
-      for (final item in await unlocated) _fromMapItem(item, topic, sample),
-  ];
+  Future<List<FeedItem>> locatedItems() async {
+    final response = await repository.queryViewport(
+      ViewportQuery(
+        requestId: requestId,
+        bbox: bbox,
+        zoom: _feedZoom,
+        layers: [query.layer],
+        mode: MapQueryMode.current,
+        window: window,
+        pageSize: 200,
+      ),
+      cancellation: cancellation,
+    );
+    cancellation.throwIfCancelled();
+    return [
+      for (final layer in response.layers)
+        if (layer.layerId == query.layer)
+          for (final item in layer.items)
+            if (item is! AggregateMapItem)
+              _fromMapItem(
+                MapItemResponse(
+                  schemaVersion: response.schemaVersion,
+                  requestId: response.requestId,
+                  snapshotId: response.snapshotId,
+                  generatedAt: response.generatedAt,
+                  mode: response.mode,
+                  dataMode: response.dataMode,
+                  item: item,
+                ),
+                topic,
+              ),
+    ];
+  }
+
+  final results = await Future.wait([
+    locatedItems(),
+    if (query.includeUnlocated)
+      _unlocatedItems(
+        repository,
+        query.layer,
+        topic,
+        window,
+        requestId,
+        catalog!,
+        cancellation,
+      ),
+  ]);
+  cancellation.throwIfCancelled();
+  return [for (final items in results) ...items];
 }
 
-/// The layer's records with no location, read by the area its sources cover
-/// (the same evidence the map's unlocated list uses). A layer without that
-/// evidence has none to add.
-Future<List<MapItem>> _unlocatedItems(
-  Ref ref,
+/// The layer's records with no location retain their own list snapshot.
+Future<List<FeedItem>> _unlocatedItems(
   MapRepository repository,
   MapLayerId layer,
+  FeedTopic topic,
   TimeWindow window,
   String requestId,
+  MapLayerCatalog catalog,
+  MapRequestCancellation cancellation,
 ) async {
-  final catalog = await ref.watch(mapLayerCatalogProvider.future);
   final coverage = [
     for (final descriptor in catalog.layers)
       if (descriptor.id == layer) descriptor.coverage,
@@ -226,6 +258,7 @@ Future<List<MapItem>> _unlocatedItems(
     return const [];
   }
   try {
+    cancellation.throwIfCancelled();
     final page = await repository.getUnlocated(
       UnlocatedQuery(
         requestId: '$requestId-unlocated',
@@ -235,8 +268,24 @@ Future<List<MapItem>> _unlocatedItems(
         scope: UnlocatedScope.areaRefs([...coverage.areaRefs]..sort()),
         pageSize: 100,
       ),
+      cancellation: cancellation,
     );
-    return page.items;
+    cancellation.throwIfCancelled();
+    return [
+      for (final item in page.items)
+        _fromMapItem(
+          MapItemResponse(
+            schemaVersion: page.schemaVersion,
+            requestId: page.requestId,
+            snapshotId: page.snapshotId,
+            generatedAt: page.generatedAt,
+            mode: page.mode,
+            dataMode: page.dataMode,
+            item: item,
+          ),
+          topic,
+        ),
+    ];
   } on MapHttpException catch (error) {
     if (error.code == MapServiceErrorCode.notAvailable) return const [];
     rethrow;
@@ -368,7 +417,8 @@ FeedItem _fromUserEvent(UserEvent event) => FeedItem(
   userEventId: event.id,
 );
 
-FeedItem _fromMapItem(MapItem item, FeedTopic topic, bool sample) {
+FeedItem _fromMapItem(MapItemResponse record, FeedTopic topic) {
+  final item = record.item;
   final time = item.time;
   return FeedItem(
     id: item.id,
@@ -390,7 +440,7 @@ FeedItem _fromMapItem(MapItem item, FeedTopic topic, bool sample) {
       _ => null,
     },
     sourceLabel: item.sources.isEmpty ? null : item.sources.first.attribution,
-    mapFeatureId: item.id,
-    isSample: sample,
+    mapRecord: record,
+    isSample: record.dataMode == MapDataMode.sample,
   );
 }

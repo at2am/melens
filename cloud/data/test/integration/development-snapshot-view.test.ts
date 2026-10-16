@@ -25,7 +25,9 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
     .replaceAll('`melens_ingest.geo_records`', 'synthetic_geo')
     .replaceAll('`melens_ingest.source_records`', 'synthetic_sources')
     .replaceAll('`melens_ingest.geo_record_sources`', 'synthetic_links')
+    .replaceAll('`melens_ingest.parking_sensor_memberships`', 'synthetic_parking_memberships')
     .replaceAll('`melens_query.v_geo_records_history`', 'synthetic_history');
+  assert.doesNotMatch(view, /`melens_(?:ingest|query)\./, 'Synthetic SQL must not read production tables');
   const query = `WITH synthetic_batches AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id,
       JSON_VALUE(row, '$.source_id') AS source_id,
@@ -54,6 +56,10 @@ test('production current-view SQL handles snapshot removals, failed refresh and 
       CAST(NULL AS STRING) AS source_record_id, CAST(NULL AS STRING) AS source_version_id,
       CAST(NULL AS STRING) AS geo_record_id, CAST(NULL AS STRING) AS version_id,
       CAST(NULL AS STRING) AS evidence_role FROM UNNEST(ARRAY<BOOL>[])
+  ), synthetic_parking_memberships AS (
+    SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
+      CAST(NULL AS STRING) AS business_source_record_id, CAST(NULL AS STRING) AS business_version_id
+    FROM UNNEST(ARRAY<BOOL>[])
   ), synthetic_history AS (
     SELECT * FROM synthetic_geo WHERE batch_id != 'failed'
   ), ${view}`;

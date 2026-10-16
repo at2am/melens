@@ -17,6 +17,7 @@ import type {
 import { normalizeRentalPayload } from '../connectors/homes_victoria_rents/index.js';
 import type { ConnectorSuccess } from '../core/connector.js';
 import type { AreaIndicator, Boundary, SourceRecord } from '../core/types.js';
+import { validateCrosswalkTarget } from './areas.js';
 
 function digest(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -36,10 +37,10 @@ export function areaNameKey(name: string): string {
 }
 
 export interface AreaBoundaryEvidence {
-  /** The named official boundary must be the exact geography used by the source statistic. */
+  /** An independently attested source geography vintage. A target boundary name/code index alone is insufficient. */
   sourceAreaVintage: string;
   boundaries: readonly (Pick<Boundary, 'boundary_id' | 'scheme' | 'name' | 'vintage'> & Partial<Pick<Boundary, 'code'>>)[];
-  /** Optional explicit crosswalk mapping from source area/boundary to target boundary ID when vintages or schemes differ. */
+  /** Reviewed explicit crosswalk. Every target must also be present in boundaries at its actual scheme/code/vintage. */
   crosswalk?: ReadonlyMap<string, string> | Readonly<Record<string, string>>;
 }
 
@@ -129,9 +130,11 @@ function boundaryFor(name: string, evidence: AreaBoundaryEvidence | null): strin
   if (!evidence) return null;
   const matches = evidence.boundaries.filter(boundary => boundary.scheme === 'ASGS_LGA'
     && boundary.vintage === evidence.sourceAreaVintage
-    && areaNameKey(boundary.name) === areaNameKey(name));
+    && boundary.name.trim() === name.trim());
   if (matches.length > 1) throw new Error(`Ambiguous official LGA name: ${name}`);
-  return matches[0]?.boundary_id ?? null;
+  const boundary = matches[0];
+  return boundary ? validateCrosswalkTarget({ boundaryId: boundary.boundary_id,
+    boundaries: evidence.boundaries, allowedSchemes: ['ASGS_LGA'] }) : null;
 }
 
 function metric(stat: CsaOffenceStat, kind: 'count' | 'rate', boundaryId: string,
@@ -172,7 +175,10 @@ export function normalizeCsaStatistics(result: CsaSuccess,
       throw new Error('CSA statistic lacks its matching source record');
     }
     const crosswalkTarget = getCrosswalkTarget(evidence?.crosswalk, stat.lgaName, stat.sourceRecordId);
-    const officialBoundaryId = crosswalkTarget ?? boundaryFor(stat.lgaName, evidence);
+    const officialBoundaryId = crosswalkTarget && evidence
+      ? validateCrosswalkTarget({ boundaryId: crosswalkTarget, boundaries: evidence.boundaries,
+        allowedSchemes: ['ASGS_LGA'] })
+      : boundaryFor(stat.lgaName, evidence);
     if (officialBoundaryId) mapped += 1;
     else unresolved += 1;
     const boundaryId = officialBoundaryId
@@ -537,9 +543,8 @@ export function normalizeHomesVictoriaStatistics(
       null;
 
     const schemeToken = isSuburb ? 'suburb' : 'lga';
-    const codeToken = isSuburb ? slugify(suburbName ?? '') : slugify(lgaName);
-    const vintageToken = inputVintage ?? 'unknown';
-    const areaKey = `${schemeToken}:${codeToken}:${vintageToken}`;
+    const areaKey = JSON.stringify([schemeToken, lgaName.trim(), suburbName?.trim() ?? null,
+      base.source_area_code ?? null, inputVintage]);
 
     let resolution = areaMappingResults.get(areaKey);
     if (!resolution) {
@@ -576,6 +581,8 @@ export function normalizeHomesVictoriaStatistics(
       }
 
       if (crosswalkTarget) {
+        validateCrosswalkTarget({ boundaryId: crosswalkTarget, boundaries: evidence?.boundaries ?? [],
+          allowedSchemes: isSuburb ? ['VIC_SUBURB', 'ASGS_SAL', 'SAL'] : ['ASGS_LGA'] });
         resolution = {
           boundaryId: crosswalkTarget,
           sourceVintage: inputVintage ?? (evidence?.sourceAreaVintage ?? null),
@@ -605,21 +612,25 @@ export function normalizeHomesVictoriaStatistics(
       } else {
         let matches: (Pick<Boundary, 'boundary_id' | 'scheme' | 'name' | 'vintage'> & Partial<Pick<Boundary, 'code'>>)[] = [];
         if (isSuburb && suburbName) {
+          const exactSuburbName = suburbName.trim();
           matches = evidence.boundaries.filter(b =>
             (b.scheme === 'VIC_SUBURB' || b.scheme === 'ASGS_SAL' || b.scheme === 'SAL') &&
             b.vintage === evidence.sourceAreaVintage &&
-            (areaNameKey(b.name) === areaNameKey(suburbName!) || ('code' in b && b.code === slugify(suburbName!)))
+            b.name.trim() === exactSuburbName
           );
         } else if (!isSuburb) {
           matches = evidence.boundaries.filter(b =>
             b.scheme === 'ASGS_LGA' &&
             b.vintage === evidence.sourceAreaVintage &&
-            (areaNameKey(b.name) === areaNameKey(lgaName) ||
-             (base.source_area_code && b.code && String(b.code) === String(base.source_area_code)))
+            (base.source_area_code
+              ? b.code === base.source_area_code
+              : b.name.trim() === lgaName.trim())
           );
         }
 
         if (matches.length === 1) {
+          validateCrosswalkTarget({ boundaryId: matches[0]!.boundary_id, boundaries: evidence.boundaries,
+            allowedSchemes: isSuburb ? ['VIC_SUBURB', 'ASGS_SAL', 'SAL'] : ['ASGS_LGA'] });
           resolution = {
             boundaryId: matches[0]!.boundary_id,
             sourceVintage: inputVintage ?? evidence.sourceAreaVintage,

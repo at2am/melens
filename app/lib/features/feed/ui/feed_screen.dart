@@ -384,15 +384,16 @@ class FeedCard extends ConsumerWidget {
         context.go(AppRoutes.discover);
         return;
       }
-      final featureId = item.mapFeatureId;
-      if (featureId == null) return;
+      final record = item.mapRecord;
+      if (record == null) return;
       ref
           .read(cardItemRequestsProvider.notifier)
           .request(
             CardItem(
               title: item.title,
-              source: FeatureCardSource(featureId: featureId),
+              source: FeatureCardSource(featureId: record.item.id),
             ),
+            mapRecord: record,
           );
       context.go(AppRoutes.discover);
     }

@@ -3,8 +3,15 @@ import { MAX_PAGE_ITEMS, parseMapItemPage, parseMapItemResponse, parseMapReadCon
   from '@melens/shared/contracts/map-contract';
 import { jsonBytes } from '../util.js';
 import { fitPage } from './page-budget.js';
-import { assertSnapshotPublic, type SnapshotAccess } from './viewport.js';
-import { CURSOR_PLACEHOLDER, MapServiceError } from './snapshot-store.js';
+import { assertSnapshotPublic, assertSnapshotRecordsPublic, type SnapshotAccess } from './viewport.js';
+import { CURSOR_PLACEHOLDER, MapServiceError, type StoredMemberGroup } from './snapshot-store.js';
+
+function originalMembers(group: StoredMemberGroup): readonly MapItem[] {
+  if (group.members.length !== group.aggregate.details.memberIds.length
+    || group.members.some((item, i) => item.id !== group.aggregate.details.memberIds[i]
+      || item.layerId !== group.aggregate.layerId)) throw new MapServiceError('cursorMismatch');
+  return group.members;
+}
 
 export function createDetailService(options: SnapshotAccess & { readonly maxResponseBytes?: number }) {
   const maxBytes = options.maxResponseBytes ?? 2 * 1024 * 1024;
@@ -25,8 +32,19 @@ export function createDetailService(options: SnapshotAccess & { readonly maxResp
       const matches = items.filter((item) => item.id === id);
       if (matches.length === 0) throw new MapServiceError('notFound');
       if (new Set(matches.map((item) => item.versionId)).size !== 1) throw new MapServiceError('cursorMismatch');
-      await assertSnapshotPublic(snapshot, options, execution);
-      const response = { ...base(request, snapshot.request.mode), item: matches[0]! };
+      const item = matches[0]!;
+      if (item.layerId === 'parking') await assertSnapshotPublic(snapshot, options, execution);
+      else {
+        let records: readonly MapItem[] = [item];
+        if (item.kind === 'aggregate') {
+          const group = snapshot.groups.find((entry) => entry.aggregate.id === item.id
+            && entry.aggregate.versionId === item.versionId && entry.aggregate.layerId === item.layerId);
+          if (group === undefined) throw new MapServiceError('cursorMismatch');
+          records = originalMembers(group);
+        }
+        await assertSnapshotRecordsPublic(snapshot, options, records, execution);
+      }
+      const response = { ...base(request, snapshot.request.mode), item };
       if (jsonBytes(response) > maxBytes) throw new MapServiceError('budgetExceeded');
       return parseMapItemResponse(response, { production: true });
     },
@@ -37,9 +55,7 @@ export function createDetailService(options: SnapshotAccess & { readonly maxResp
       if (snapshot.family !== 'viewport') throw new MapServiceError('cursorMismatch');
       const group = snapshot.groups.find((entry) => entry.aggregate.id === id);
       if (group === undefined) throw new MapServiceError('cursorMismatch');
-      if (group.members.length !== group.aggregate.details.memberIds.length
-        || group.members.some((item, i) => item.id !== group.aggregate.details.memberIds[i]
-          || item.layerId !== group.aggregate.layerId)) throw new MapServiceError('cursorMismatch');
+      const members = originalMembers(group);
       const pageSize = request.pageSize ?? MAX_PAGE_ITEMS;
       let offset = 0;
       if (request.cursor !== undefined) {
@@ -48,7 +64,8 @@ export function createDetailService(options: SnapshotAccess & { readonly maxResp
           || cursor.aggregateId !== id || cursor.identity !== snapshot.identity || cursor.pageSize !== pageSize) throw new MapServiceError('cursorMismatch');
         offset = cursor.offset;
       }
-      await assertSnapshotPublic(snapshot, options, execution);
+      if (group.aggregate.layerId === 'parking') await assertSnapshotPublic(snapshot, options, execution);
+      else await assertSnapshotRecordsPublic(snapshot, options, members, execution);
       const details = group.aggregate.details;
       const scope: MapItemPage['scope'] = { kind: 'aggregateMembers', aggregateId: id,
         bounds: details.bounds, window: details.window, unit: details.metric.unit };

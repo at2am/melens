@@ -7,6 +7,7 @@ import '../../../core/config/env.dart';
 import '../../../core/time/melbourne_time.dart';
 import '../data/map_models.dart';
 import '../data/map_repository.dart';
+import '../data/sample_map_repository.dart';
 import 'map_providers.dart';
 import 'zoom_presentation.dart';
 
@@ -36,7 +37,13 @@ MapBounds? boundedViewportRegion(MapBounds visible) {
   return MapBounds(west: west, south: south, east: east, north: north);
 }
 
-TimeWindow currentViewportWindow(MelbourneClock clock) {
+TimeWindow currentViewportWindow(
+  MelbourneClock clock, {
+  MapDataMode dataMode = MapDataMode.live,
+}) {
+  if (dataMode == MapDataMode.sample) {
+    return SampleMapRepository.currentObservationWindow;
+  }
   final now = clock.now().toUtc();
   final end = DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
   return TimeWindow(from: end.subtract(const Duration(minutes: 15)), to: end);
@@ -198,9 +205,13 @@ class ViewportController extends _$ViewportController {
     ref.listen(mapAutoSearchProvider, (previous, next) {
       if (next) searchPendingRegion();
     });
+    final dataMode = ref.watch(envProvider).mapDataMode;
     return ViewportState(
-      window: currentViewportWindow(ref.watch(melbourneClockProvider)),
-      dataMode: ref.watch(envProvider).mapDataMode,
+      window: currentViewportWindow(
+        ref.watch(melbourneClockProvider),
+        dataMode: dataMode,
+      ),
+      dataMode: dataMode,
     );
   }
 

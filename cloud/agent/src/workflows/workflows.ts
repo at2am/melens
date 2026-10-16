@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { melbourneDate, melbourneHourLabel, toMelbourneIso } from '../agent/time.js';
 import { cached } from '../cache.js';
 import { centroid, compactFeature, type CompactFeature } from '../features/compact.js';
+import { turnSearchTime } from '../features/turn-search.js';
 import { latLngSchema, type Card, type CardItem, type LatLng } from '../protocol/schemas.js';
 import { grounded, searchArea, resolveFeature, distanceLabel, windowOf, HOUR, type Area, type ToolDependencies } from '../tools/catalog.js';
 import { defineTool, isToolError, toolError, type ToolSpec, type TurnRegistry } from '../tools/define.js';
@@ -104,7 +105,7 @@ export const areaBriefTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> => 
     const outcome = await cached<CachedWorkflow | WorkflowSummary>(deps.cache, key, 3 * HOUR, async () => {
       const now = turn.now();
       const area: Area = { center: args.point, radius_m: radius };
-      const window = windowOf(undefined, now, { back: 12 * HOUR, ahead: 7 * 24 * HOUR })!;
+      const window = windowOf(undefined, turnSearchTime(turn), { back: 12 * HOUR, ahead: 7 * 24 * HOUR })!;
       // Fetch in parallel: layer features, and a Search-grounded answer for places the layers do not carry.
       const [found, grounding] = await Promise.all([
         searchArea(deps, turn, area, ['event', 'disruption', 'news', 'planning'], window),

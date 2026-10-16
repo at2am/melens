@@ -15,6 +15,7 @@ export const PAGE_SIZE = 1000;
 export const MAX_PAGES = 1000;
 // The linked OpenAPI still says 10/minute while the landing page says 20/minute.
 export const PAGE_DELAY_MS = 6100;
+const MAX_SOURCE_CLOCK_SKEW_MS = 300_000;
 const NORMALIZATION_POLICY = 'documented-victorian-local-provider-status-v2';
 const localClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -171,12 +172,17 @@ export function normalizePlannedRoadSnapshot(features: readonly RoadFeature[],
   const geoRecords: GeoRecord[] = [];
   const geoRecordSources: GeoRecordSource[] = [];
   const seen = new Set<string>();
+  const latestReportTime = Date.parse(z.iso.datetime({ offset: true }).parse(fetchedAt))
+    + MAX_SOURCE_CLOCK_SKEW_MS;
   let latestUpdate: string | null = null;
   for (const feature of features) {
     const p = feature.properties;
     if (seen.has(p.id)) throw new Error('Duplicate planned disruption ID');
     seen.add(p.id);
     const updatedAt = parseVictorianTimestamp(p.lastUpdated);
+    if (updatedAt !== null && Date.parse(updatedAt) > latestReportTime) {
+      throw new Error('Planned road update timestamp is more than five minutes after fetch time');
+    }
     const start = parseVictorianTimestamp(p.duration?.start);
     const end = parseVictorianTimestamp(p.duration?.end);
     const localTimeUnresolved = [p.lastUpdated, p.duration?.start, p.duration?.end]

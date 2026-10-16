@@ -20,8 +20,8 @@ import { createViewportService, type ViewportLayerAggregator, type ViewportLayer
 
 /** The source registry changes per ingest batch, minutes apart; one read serves the requests of this window. */
 export const COVERAGE_CACHE_TTL_MS = 30_000;
-/** After that, requests keep the last registry read for this long while one background read replaces it. */
-export const COVERAGE_STALE_MS = 120_000;
+/** Expired coverage requires a new read before it can authorize access. */
+export const COVERAGE_STALE_MS = 0;
 
 /** Composition root: wires the query runner, layer loaders, rights checker and page services. */
 export function createMapService(options: {
@@ -50,8 +50,8 @@ export function createMapService(options: {
     adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
   const readCoverage = cacheSourceCoverage(createSourceCoverageReader({ runner }).read, {
     ttlMs: options.coverageCacheTtlMs ?? COVERAGE_CACHE_TTL_MS, staleMs: options.coverageStaleMs ?? COVERAGE_STALE_MS, clock });
-  // Current layers change only when a source publishes, so each is loaded once per publication and every
-  // viewport read and public-record recheck is answered from memory; everything else runs its fixed query.
+  // Current layer rows are shared across viewport loads for the same publication.
+  // Record rights can change within that publication and require a live query.
   const layerCache = options.currentLayerCache === false ? null
     : createCurrentLayerCache({ config: options.config, runner, readCoverage, clock });
   const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) =>
@@ -65,6 +65,8 @@ export function createMapService(options: {
   // its own producer, unless a caller injects one. A stored anomaly stays readable only while the same version still
   // comes back from the published view, so its record check re-reads the view and compares item for item.
   const anomalyProducer = createViewAnomalyProducer({ runQuery, references });
+  const anomalyRightsProducer = createViewAnomalyProducer({
+    runQuery: (input, execution) => runner.run(input, execution), references });
   const loadAnomalyLayer = options.loadAnomalyLayer ?? failSoftAnomalyLayerLoader(createAnomalyLayerLoader({ producer: anomalyProducer,
     ...(options.resolveArea === undefined ? {} : { resolveArea: options.resolveArea }) }));
   const anomalyConfigured = options.loadAnomalyLayer === undefined ? options.anomalyProducerConfigured !== false
@@ -72,7 +74,7 @@ export function createMapService(options: {
   const checkAnomalyRecords: PublicRecordChecker = async (items, snapshot, coverage, execution) => {
     try {
       const request = { ...coverageRequest(snapshot), layers: ['anomaly' as const] };
-      const batch = consumeVerifiedAnomalyBatch(await anomalyProducer.read(request, { ...execution, rowLimit: options.config.maxPageItems,
+      const batch = consumeVerifiedAnomalyBatch(await anomalyRightsProducer.read(request, { ...execution, rowLimit: options.config.maxPageItems,
         resultBudgetBytes: options.config.maxResponseBytes - options.config.responseEnvelopeReserveBytes }),
       { request, coverage, rowLimit: options.config.maxPageItems, resultBudgetBytes: options.config.maxResponseBytes - options.config.responseEnvelopeReserveBytes });
       const published = new Set(batch.items.map((item) => JSON.stringify(item)));
@@ -86,7 +88,8 @@ export function createMapService(options: {
       if (others.length > 0 && (options.checkPublicRecords === undefined || !await options.checkPublicRecords(others, snapshot, coverage, execution))) return false;
       return anomalies.length === 0 || (anomalyConfigured && await checkAnomalyRecords(anomalies, snapshot, coverage, execution));
     };
-  const checkPublicRecords = createPublicRecordChecker({ runQuery, resolveSource, external: externalChecker });
+  const checkPublicRecords = createPublicRecordChecker({ runQuery, resolveSource, external: externalChecker,
+    supplementalVerifier: options.checkPublicRecords !== undefined });
   const loaders = { runQuery, resolveSource, clock, externalVerifier: options.checkPublicRecords !== undefined,
     resolveArea: options.resolveArea, loadAnomalyLayer };
   const shared = { store, readCoverage, clock, checkPublicRecords, maxResponseBytes: options.config.maxResponseBytes };

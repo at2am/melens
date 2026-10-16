@@ -249,6 +249,58 @@ test('the coverage cache shares one read per window and keeps no failure', async
   assert.equal(reads, 3);
 });
 
+test('an older background refresh cannot replace a newer source withdrawal', async () => {
+  let now = 0;
+  let reads = 0;
+  let release!: (value: SourceCoverageSnapshot) => void;
+  const delayed = new Promise<SourceCoverageSnapshot>((resolve) => { release = resolve; });
+  const allowed = parseSourceCoverage(result(sourceRow()));
+  const denied = parseSourceCoverage(result(sourceRow({ access_status: 'paused' })));
+  const read = cacheSourceCoverage(async () => {
+    reads += 1;
+    return reads === 1 ? allowed : reads === 2 ? delayed : denied;
+  }, { ttlMs: 30_000, staleMs: 120_000, clock: () => new Date(now) });
+
+  assert.ok(findPublicSource(await read(request), 'melbourne.development_monitor'));
+  now = 30_000;
+  assert.ok(findPublicSource(await read(request), 'melbourne.development_monitor'));
+  now = 151_000;
+  assert.equal(findPublicSource(await read(request), 'melbourne.development_monitor'), null);
+  release(allowed);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(findPublicSource(await read(request), 'melbourne.development_monitor'), null);
+  assert.equal(reads, 3);
+});
+
+test('expired admission waits for a fresh read when no stale window is configured', async () => {
+  let now = 0;
+  let reads = 0;
+  const allowed = parseSourceCoverage(result(sourceRow()));
+  const denied = parseSourceCoverage(result(sourceRow({ access_status: 'paused' })));
+  const read = cacheSourceCoverage(async () => ++reads === 1 ? allowed : denied,
+    { ttlMs: 30_000, clock: () => new Date(now) });
+  assert.ok(findPublicSource(await read(request), 'melbourne.development_monitor'));
+  now = 30_000;
+  assert.equal(findPublicSource(await read(request), 'melbourne.development_monitor'), null);
+  assert.equal(reads, 2);
+});
+
+test('an aborted caller cannot use stale source admission or start its background refresh', async () => {
+  let now = 0;
+  let reads = 0;
+  const read = cacheSourceCoverage(async () => {
+    reads += 1;
+    return parseSourceCoverage(result(sourceRow()));
+  }, { ttlMs: 30_000, staleMs: 120_000, clock: () => new Date(now) });
+  await read(request);
+  now = 30_000;
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(read(request, { signal: controller.signal }),
+    (error: unknown) => error instanceof MapQueryError && error.code === 'queryTimeout');
+  assert.equal(reads, 1);
+});
+
 test('a caller that gives up does not fail the shared coverage read', async () => {
   let release!: () => void;
   const snapshot: SourceCoverageSnapshot = { sources: [], completeness: 'complete' };

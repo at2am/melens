@@ -20,14 +20,14 @@ import {
  * used to run its own BigQuery job (plus a second one to recheck the rows were still public),
  * about 1-4 s each. Here a layer is loaded once from its small current table and reused until
  * the source registry shows a newer publication of any of its sources. Requests are answered in
- * memory with the same filters, order and limits as the SQL in view-queries.ts and
- * public-record-queries.ts; the SQL path still serves everything else.
+ * memory with the same filters, order and limits as the SQL in view-queries.ts.
+ * Non-parking public-record checks always use the live SQL rights gate.
  */
 export const CACHED_LAYERS: ReadonlySet<LayerId> = new Set(['planning', 'disruption', 'event', 'news', 'parking', 'anomaly']);
 
 /** News rows are mostly ungeolocated GDELT articles (about 40 MB); only drawable ones are held. */
 const DRAWABLE_ONLY: ReadonlySet<LayerId> = new Set(['news']);
-/** News has no public-record verifier in SQL either. */
+/** Non-parking checks use the live SQL verifier. */
 const VERIFIABLE: ReadonlySet<LayerId> = new Set(['planning', 'disruption', 'event', 'parking']);
 /** The parking table carries its batch on every row; the geo copy records its batch per source. */
 const PARKING_SOURCE = 'melbourne.parking.sensors';
@@ -161,7 +161,7 @@ export function createCurrentLayerCache(options: {
     const stateLoad = POINT_LAYERS.has(layerId) ? null
       : options.runner.runPrepared(prepareStateLoad(config, 1_000), { pageSize: 1_000, byteBudget: 1024 * 1024 }, execution);
     const [result, state] = await Promise.all([rowsLoad, stateLoad]);
-    if (result.kind !== 'complete' || (state !== null && state.kind !== 'complete')) return null;
+    if (state !== null && state.kind !== 'complete') throw new MapQueryError('serviceUnavailable');
     const rows = result.rows.map((row) => cachedRow(layerId, JSON.stringify(row)));
     // The copy is current only when it reflects every publication the registry reports.
     let current: boolean;
@@ -174,6 +174,8 @@ export function createCurrentLayerCache(options: {
       const reflected = new Map(state!.rows.map((row) => [String(row.source_id), row.batch_id]));
       current = [...published].every(([sourceId, batchId]) => reflected.get(sourceId) === batchId);
     }
+    if (!current && layerId !== 'parking') throw new MapQueryError('serviceUnavailable');
+    if (result.kind !== 'complete') return null;
     const now = clock().getTime();
     return { key, rows, expiresAt: now + (current ? MAX_ENTRY_AGE_MS : LAGGING_ENTRY_AGE_MS) };
   }
@@ -181,7 +183,10 @@ export function createCurrentLayerCache(options: {
   async function entryFor(layerId: LayerId, request: ViewportQuery,
     execution: { readonly signal?: AbortSignal }): Promise<Entry | null> {
     const coverage = await options.readCoverage(request, execution);
-    if (coverage.completeness !== 'complete') return null;
+    if (coverage.completeness !== 'complete') {
+      if (!POINT_LAYERS.has(layerId)) throw new MapQueryError('serviceUnavailable');
+      return null;
+    }
     const marks = watermark(layerId, coverage);
     const key = JSON.stringify([layerId, marks]);
     const now = clock().getTime();
@@ -222,13 +227,14 @@ export function createCurrentLayerCache(options: {
       if (!parsed.success || request === null || layerId === null || request.mode !== 'current'
         || request.cursor !== undefined || request.snapshotId !== undefined || !request.layers.includes(layerId)
         || (family === 'viewport' && parsed.data.publicSourceIds === undefined)
-        || (family === 'publicRecords' && (!VERIFIABLE.has(layerId) || parsed.data.recordKeys === undefined))
+        || (family === 'publicRecords' && (layerId !== 'parking' || !VERIFIABLE.has(layerId) || parsed.data.recordKeys === undefined))
         || (parsed.data.resultBudgetBytes ?? maximumResultBudget) > maximumResultBudget) {
         return options.runner.run(input, execution);
       }
       let entry: Entry | null;
       try { entry = await entryFor(layerId, request, execution); } catch (error) {
         if (execution.signal?.aborted) throw error;
+        if (!POINT_LAYERS.has(layerId)) throw error instanceof MapQueryError ? error : new MapQueryError('serviceUnavailable');
         entry = null; // A failed load leaves the request to the SQL path, which reports its own outcome.
       }
       if (entry === null) return options.runner.run(input, execution);

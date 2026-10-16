@@ -89,7 +89,10 @@ test('production pedestrian SQL preserves closure gaps and rejects inactive, amb
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id, JSON_VALUE(row, '$.source_id') AS source_id,
       JSON_VALUE(row, '$.source_record_id') AS source_record_id, JSON_VALUE(row, '$.version_id') AS version_id,
       TIMESTAMP(JSON_VALUE(row, '$.source_updated_at')) AS source_updated_at,
-      CAST(NULL AS INT64) AS source_version_ordinal FROM UNNEST(JSON_QUERY_ARRAY(@records)) row
+      CAST(NULL AS INT64) AS source_version_ordinal,
+      TIMESTAMP('2026-09-28T01:00:00Z') AS fetched_at,
+      'verified_open' AS rights_status, 'active' AS record_status
+    FROM UNNEST(JSON_QUERY_ARRAY(@records)) row
   ), result AS (${view.replace(/^/, 'WITH ')} )
   SELECT sensor_id, FORMAT_TIMESTAMP('%M', observed_at) AS minute, location_status,
     geometry_geojson, total_count FROM result ORDER BY sensor_id, observed_at`;

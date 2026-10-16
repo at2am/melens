@@ -88,7 +88,7 @@ test('minute counts join the location effective at that minute without filling m
   assert.equal(joined[0]?.observation.total_count, null);
 });
 
-test('hourly counts join the location effective at that hour and preserve hour granularity', () => {
+test('hourly counts require a location effective throughout the hour and preserve hour granularity', () => {
   const joined = joinPedestrianObservations({
     observations: [observationHourly],
     locations: [earlierLocation],
@@ -96,8 +96,8 @@ test('hourly counts join the location effective at that hour and preserve hour g
   });
   assert.equal(joined.length, 1);
   assert.equal(joined[0]?.granularity, 'hour');
-  assert.equal(joined[0]?.locationStatus, 'located');
-  assert.equal(joined[0]?.location?.version_id, 'loc-old');
+  assert.equal(joined[0]?.locationStatus, 'unlocated');
+  assert.equal(joined[0]?.location, null);
   assert.equal(joined[0]?.observation.observed_at, '2026-09-28T00:00:00Z');
   assert.equal(joined[0]?.observation.direction_a_count, 45);
   assert.equal(joined[0]?.observation.direction_b_count, 65);
@@ -327,14 +327,22 @@ test('edge-of-window timestamps respect valid_from <= observed_at < valid_to', (
   assert.equal(beforeFrom[0]?.locationStatus, 'unlocated');
   assert.equal(beforeFrom[0]?.location, null);
 
-  // 1ms before valid_to: included in windowLoc
+  // A minute ending exactly at valid_to is included in windowLoc.
   const beforeTo = joinPedestrianObservations({
-    observations: [{ ...observationMinute, observed_at: '2026-09-28T00:44:59.999Z' }],
+    observations: [{ ...observationMinute, observed_at: '2026-09-28T00:44:00.000Z' }],
     locations: [windowLoc, nextLoc],
     granularity: 'minute',
   });
   assert.equal(beforeTo[0]?.locationStatus, 'located');
   assert.equal(beforeTo[0]?.location?.version_id, windowLoc.version_id);
+
+  const crossingTo = joinPedestrianObservations({
+    observations: [{ ...observationMinute, observed_at: '2026-09-28T00:44:59.999Z' }],
+    locations: [windowLoc, nextLoc],
+    granularity: 'minute',
+  });
+  assert.equal(crossingTo[0]?.locationStatus, 'unlocated');
+  assert.equal(crossingTo[0]?.location, null);
 
   // Exactly at valid_to: excluded from windowLoc, joins nextLoc
   const atToContiguous = joinPedestrianObservations({
@@ -362,6 +370,37 @@ test('edge-of-window timestamps respect valid_from <= observed_at < valid_to', (
   });
   assert.equal(farFuture[0]?.locationStatus, 'located');
   assert.equal(farFuture[0]?.location?.version_id, nextLoc.version_id);
+});
+
+test('hourly counts can use a location whose validity ends exactly at the count window end', () => {
+  const joined = joinPedestrianObservations({
+    observations: [observationHourly],
+    locations: [{ ...earlierLocation, valid_to: '2026-09-28T01:00:00Z' }],
+    granularity: 'hour',
+  });
+  assert.equal(joined[0]?.locationStatus, 'located');
+  assert.equal(joined[0]?.location?.version_id, 'loc-old');
+});
+
+test('overlapping location intervals with different start times stay ambiguous', () => {
+  for (const validFrom of ['2026-09-27T12:00:00Z', '2026-09-28T00:30:00Z']) {
+    const joined = joinPedestrianObservations({
+      observations: [observationHourly],
+      locations: [{ ...earlierLocation, valid_to: null },
+        { ...movedLocation, valid_from: validFrom }],
+      granularity: 'hour',
+    });
+    assert.equal(joined[0]?.locationStatus, 'ambiguous');
+    assert.equal(joined[0]?.location, null);
+  }
+});
+
+test('a sensor move inside an hourly count window cannot locate the full count at either site', () => {
+  const joined = joinPedestrianObservations({
+    observations: [observationHourly], locations: [earlierLocation, movedLocation], granularity: 'hour',
+  });
+  assert.equal(joined[0]?.locationStatus, 'unlocated');
+  assert.equal(joined[0]?.location, null);
 });
 
 test('zero-fill absence strictly preserves missing counts and does not backfill missing rows', () => {

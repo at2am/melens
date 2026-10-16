@@ -9,7 +9,7 @@ const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' });
 const request = parseViewportQuery({ requestId: 'scope', bbox: [144.9, -37.9, 145.1, -37.7], zoom: 14,
   layers: ['planning'], mode: 'current', window: { from: '2026-10-01T00:00:00Z', to: '2026-10-01T01:00:00Z' } });
 
-test('boundary and pedestrian reads fail closed without a trusted supplemental current record-rights verifier', async () => {
+test('boundary and pedestrian reads reject rows without current record-rights evidence', async () => {
   const geoStarts: string[] = [];
   const coverage = ['boundary', 'pedestrian'].map((topic) => ({ source_id: `public.${topic}`, topic,
     scope: 'city-of-melbourne', coverage_area_refs: ['com:municipal'], coverage_from: '2026-09-01T00:00:00Z', coverage_to: null,
@@ -20,11 +20,11 @@ test('boundary and pedestrian reads fail closed without a trusted supplemental c
     async startQuery(query) {
       if (!query.query.includes('v_source_coverage')) geoStarts.push(query.query);
       return { async readPage() { return { rows: query.query.includes('v_source_coverage')
-        ? coverage.map((row) => ({ record: JSON.stringify(row) })) : [], complete: true, hasMore: false }; }, async cancel() {} };
+        ? coverage.map((row) => ({ record: JSON.stringify(row) })) : [{ record: JSON.stringify({ source_id: query.query.includes('v_boundaries') ? 'public.boundary' : 'public.pedestrian' }) }], complete: true, hasMore: false }; }, async cancel() {} };
     } };
   const service = createMapService({ config, adapter, publicSources: coverage.map((source) => ({ sourceId: source.source_id,
     url: 'https://example.org/public', attribution: 'Official published source', versionRef: null })) });
   const reply = await service.queryViewport({ ...request, layers: ['boundary', 'pedestrian'], boundaryFilter: { level: 'LGA', vintage: '2021' } });
   assert.deepEqual(reply.layers.map((layer) => layer.state), ['unavailable', 'unavailable']);
-  assert.equal(geoStarts.length, 0);
+  assert.equal(geoStarts.length, 2);
 });

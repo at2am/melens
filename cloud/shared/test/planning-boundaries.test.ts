@@ -38,6 +38,7 @@ function planningRow(extra: ViewRow = {}): ViewRow {
 }
 function boundaryRow(extra: ViewRow = {}): ViewRow {
   return {
+    rights_evidence: 'latest_published_record_v1',
     boundary_id: 'com_clue_block:101:2025', version_id: 'boundary-revision-1',
     scheme: 'com_clue_block', code: '101', name: 'Example CLUE block', vintage: '2025',
     geometry_geojson: polygon, valid_from: null, valid_to: null,
@@ -215,4 +216,14 @@ test('published clocks and geometry cannot acquire inferred precision', () => {
     { type: 'Point', coordinates: [144.963, -37.814, 20] },
     { type: 'GeometryCollection', geometries: [] },
   ]) assert.throws(() => parsePublishedGeometry(value), isAdapterError());
+});
+
+
+test('boundary rejects missing and obsolete latest-record permission evidence', () => {
+  const missing = boundaryRow();
+  delete missing.rights_evidence;
+  assert.throws(() => adaptBoundaryRow(missing, { selection, source: boundarySource }), isAdapterError());
+  for (const rights_evidence of [null, 'published']) {
+    assert.throws(() => adaptBoundaryRow(boundaryRow({ rights_evidence }), { selection, source: boundarySource }), isAdapterError());
+  }
 });

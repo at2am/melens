@@ -1384,7 +1384,7 @@ test('Road disruption normalization retains clearance facts and exact parent, im
   assert.ok(resolvedRecord, 'Must have resolved road disruption');
 
   assert.equal(activeRecord?.valid_to, null, 'Active incident must have null valid_to');
-  assert.equal(resolvedRecord?.valid_to, '2026-09-28T00:04:00.000Z', 'Resolved incident must record closure timestamp');
+  assert.equal(resolvedRecord?.valid_to, null, 'Resolved status does not prove the provider closure timestamp');
 
   const parents = new Set<string>();
   const snapshots = new Set<string>();

@@ -2225,6 +2225,12 @@ abstract class AppLocalizations {
   /// **'Now'**
   String get mapTimeNow;
 
+  /// Development sample time pill and menu use the fixed fixture observation interval, not the current time.
+  ///
+  /// In en, this message translates to:
+  /// **'Sample observation window'**
+  String get mapTimeSampleWindow;
+
   /// Time pill menu entry.
   ///
   /// In en, this message translates to:

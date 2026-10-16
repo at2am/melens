@@ -15,7 +15,7 @@ import type { ConnectorFailure, ConnectorSuccess } from '../../src/core/connecto
 import type { DataConfig } from '../../src/core/config.js';
 import { addCompletedWindow, type CheckpointManifest, GcsStore,
   type StoredObject } from '../../src/core/gcs.js';
-import { BigQueryPublisher } from '../../src/core/publisher.js';
+import { BigQueryPublisher, PUBLISHER_FACT_TABLES } from '../../src/core/publisher.js';
 import { withPublishedPedestrianHistory } from '../../src/core/pedestrian-history.js';
 import type { DataSource, GeoRecord, SourceRecord, SyncBatch } from '../../src/core/types.js';
 
@@ -266,6 +266,25 @@ test('publisher passes the configured billed-byte ceiling to every BigQuery quer
   assert.ok(bigquery.queryByteLimits.every(limit => limit === '100000000'));
 });
 
+test('batch lookup and cross-version validation use explicit source and logical-key filters', async () => {
+  const { publisher, bigquery } = setup();
+  const query = bigquery.query.bind(bigquery);
+  let lookups = 0;
+  bigquery.query = async input => {
+    if (input.query.includes('TO_JSON_STRING(t) AS batch')) {
+      assert.match(input.query, /WHERE source_id = @sourceId AND batch_id = @batchId/);
+      assert.equal(input.params.sourceId, source.source_id);
+      lookups += 1;
+    }
+    return query(input);
+  };
+  await publisher.publish(window);
+  assert.equal(lookups, 1);
+  const sql = bigquery.validationQueries.get('source_records');
+  assert.ok(sql);
+  assert.match(sql, /t\.source_record_id IN UNNEST\(JSON_VALUE_ARRAY\(@logicalIds\)\)/);
+});
+
 test('publisher converts BigQuery FLOAT metadata to GoogleSQL FLOAT64 casts', async () => {
   const store = new FakeStore();
   class MetadataAliasBigQuery extends FakeBigQuery {
@@ -456,14 +475,28 @@ test('simultaneous same-source batches cannot cross the validation/publication b
   assert.equal(bigquery.visible('source_records').length, 1);
 });
 
-// The current copies are not publisher fact tables: the ingest job refreshes them after the batch is
-// published (src/core/parking-sensor-current.ts and geo-records-current.ts, with their own tests).
-const NOT_PUBLISHER_FACT_TABLES = new Set(['sync_batches', 'data_sources', 'parking_sensor_current',
-  'geo_records_current', 'geo_records_current_state']);
-for (const table of [...schemas.keys()].filter(name => !NOT_PUBLISHER_FACT_TABLES.has(name ?? ''))) {
+const OTHER_TABLE_WRITERS = {
+  sync_batches: 'publisher batch-state control',
+  data_sources: 'source-registry control',
+  parking_sensor_current: 'core/parking-sensor-current.ts atomic snapshot',
+  geo_records_current: 'core/geo-records-current.ts current serving copy',
+  geo_records_current_state: 'core/geo-records-current.ts refresh state',
+  anomaly_results: 'scripts/anomaly_replay.py derived results',
+};
+
+test('every warehouse table has an explicit writer and only connector facts use generic publication validation', () => {
+  const separatelyWritten = Object.keys(OTHER_TABLE_WRITERS);
+  assert.deepEqual([...PUBLISHER_FACT_TABLES, ...separatelyWritten].sort(), [...schemas.keys()].sort(),
+    'A new table needs an explicit publisher or separate-writer classification');
+  assert.equal(PUBLISHER_FACT_TABLES.some(table => separatelyWritten.includes(table)), false);
+  assert.equal(PUBLISHER_FACT_TABLES.includes('anomaly_results'), false,
+    'Replay results are not part of ConnectorSuccess or a generic connector batch');
+});
+
+for (const table of PUBLISHER_FACT_TABLES) {
   test(`quality failures in ${table} block publication even when the plan is empty`, async () => {
     const { publisher, bigquery, store } = setup();
-    bigquery.validationOverrides.set(table ?? '', { conflicts: 1 });
+    bigquery.validationOverrides.set(table, { conflicts: 1 });
     await assert.rejects(publisher.publish(window), /validation failed/);
     assert.equal(bigquery.visible('source_records').length, 0);
     assert.equal(store.manifest.checkpoint, window.initialCheckpoint);
@@ -969,5 +1002,33 @@ test('large expected batches are validated without losing rows across request ch
   await publisher.publish({ ...window, result: { ...result, sourceRecords: rows,
     inputCount: rows.length, outputCount: rows.length,
     completeness: { ...result.completeness, expected_records: rows.length, fetched_records: rows.length } } });
+  assert.equal(bigquery.visible('source_records').length, rows.length);
+});
+
+test('large census-style batches keep logical IDs and escaped parameters within each request budget', async () => {
+  const { publisher, bigquery } = setup();
+  const rows = Array.from({ length: 1600 }, (_, index) => ({ ...record,
+    source_record_id: `census:${String(index).padStart(4000, '0')}:"\\`,
+    original_url: `https://example.org/census/${index}` }));
+  const covered = new Set<string>();
+  let chunks = 0;
+  const query = bigquery.query.bind(bigquery);
+  bigquery.query = async input => {
+    if (input.query.includes('/* validate:source_records */')) {
+      const expected = parseRows(JSON.parse(input.params.expectedRows ?? '[]'));
+      const ids = z.array(z.string()).parse(JSON.parse(input.params.logicalIds ?? '[]'));
+      assert.deepEqual(ids, [...new Set(expected.map(row => row.source_record_id))]);
+      assert.ok(Buffer.byteLength(JSON.stringify({ query: input.query, params: input.params })) < 8_000_000,
+        'The whole query request must leave headroom below the 10 MB service limit');
+      ids.forEach(id => covered.add(id));
+      chunks += 1;
+    }
+    return query(input);
+  };
+  await publisher.publish({ ...window, result: { ...result, sourceRecords: rows,
+    inputCount: rows.length, outputCount: rows.length,
+    completeness: { ...result.completeness, expected_records: rows.length, fetched_records: rows.length } } });
+  assert.ok(chunks > 1);
+  assert.deepEqual(covered, new Set(rows.map(row => row.source_record_id)));
   assert.equal(bigquery.visible('source_records').length, rows.length);
 });

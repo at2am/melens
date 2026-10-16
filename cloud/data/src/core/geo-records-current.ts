@@ -12,7 +12,7 @@ import type { DataConfig } from './config.js';
  * are 84% of geo_records). This table holds the same rows and is refreshed after publication:
  * - a snapshot source rebuilds its own rows from the view's own SQL (a few to a few hundred MB);
  * - an append source that publishes every few minutes (GDELT) applies only its newly published
- *   batches, reading their recent partitions;
+ *   batches, reading their recent payload partitions and checking published version clocks;
  * - the source-retention job rebuilds every source from the view's SQL, so drift between the
  *   incremental path and the view lasts at most one retention cycle.
  * geo_records_current_state records which published batch each source's rows reflect, so a reader
@@ -22,9 +22,9 @@ export const GEO_CURRENT_TABLE = 'geo_records_current';
 export const GEO_CURRENT_STATE_TABLE = 'geo_records_current_state';
 
 /**
- * Sources with rows in the map's geo layers (planning, disruption, event, news): every connector
- * of those topics except GTFS static and the activity counts, which the map does not draw. A test
- * reads the connectors' source.json files so a new map source cannot be left out.
+ * Sources supported by the map's public geo layers (planning, disruption, event, news). GTFS
+ * static, activity counts and separate private candidate collectors do not enter these layers.
+ * A test reads the connectors' source.json files so a new map source cannot be left out.
  */
 export const GEO_CURRENT_SOURCES: ReadonlySet<string> = new Set([
   'melbourne.development_monitor', 'victoria.council.engagement', 'victoria.vicmap.planning',
@@ -58,7 +58,8 @@ export const NO_STATE_MESSAGE = 'geo_records_current has no refreshed state for 
  * Ceiling for a rebuild. Small daily partitions hold every source's rows in the same blocks, so a
  * rebuild reads most of geo_records, source_records and geo_record_sources whatever its sources:
  * 490 MB on 2026-10-15, against the 500 MB per-query source ceiling. Rebuilds run a few times a day
- * (snapshot publications and the retention cycle); the frequent GDELT path reads about 60 MB.
+ * (snapshot publications and the retention cycle). The incremental path reads recent payloads
+ * and historical version clocks for the incoming record IDs.
  */
 export const GEO_CURRENT_REBUILD_MAX_BYTES = '1500000000';
 
@@ -137,8 +138,9 @@ COMMIT TRANSACTION;`;
 /**
  * Apply an append source's batches published since its recorded state. Each record keeps its newest
  * version by the history view's ordering; a newer version that is not public, or that ended the
- * record, removes it, as the views do. The read covers only the recent partitions those batches
- * wrote. Without a recorded state the script fails, and the caller rebuilds instead.
+ * record, removes it, as the views do. Historical version clocks prevent an older late batch from
+ * restoring a record whose newer withdrawal or access restriction removed it from the current
+ * table. Without a recorded state the script fails, and the caller rebuilds instead.
  */
 export function applyGeoRecordsCurrentBatchesSql(config: Pick<DataConfig, 'projectId' | 'ingestDataset'>): string {
   const { path, current, state } = paths(config);
@@ -155,11 +157,13 @@ SET state_published = (SELECT published_at FROM ${state} WHERE source_id = @sour
 IF state_published IS NULL THEN
   RAISE USING MESSAGE = '${NO_STATE_MESSAGE}';
 END IF;
-CREATE TEMP TABLE new_batches AS
+CREATE TEMP TABLE published_batches AS
 SELECT batch_id, source_id, published_at FROM (
   SELECT batch_id, source_id, state, published_at FROM ${path('sync_batches')} WHERE source_id = @sourceId
   QUALIFY ROW_NUMBER() OVER (PARTITION BY batch_id ORDER BY state_updated_at DESC, started_at DESC, batch_id DESC) = 1
-) WHERE state = 'published' AND published_at IS NOT NULL AND published_at > state_published;
+) WHERE state = 'published' AND published_at IS NOT NULL;
+CREATE TEMP TABLE new_batches AS
+SELECT * FROM published_batches WHERE published_at > state_published;
 -- Rows are written before their batch publishes; two days covers a run that spans midnight.
 SET fetched_floor = DATE_SUB(DATE((SELECT MIN(published_at) FROM new_batches)), INTERVAL 2 DAY);
 SET source_public = EXISTS (
@@ -175,13 +179,21 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY g.geo_record_id, g.version_id
   ORDER BY b.published_at DESC, g.fetched_at DESC, g.batch_id DESC) = 1;
 CREATE TEMP TABLE winners AS
 SELECT geo_record_id, version_id, is_incoming FROM (
-  SELECT geo_record_id, version_id, source_updated_at, source_version_ordinal, 1 AS is_incoming FROM incoming
-  UNION ALL
-  SELECT geo_record_id, version_id, source_updated_at, source_version_ordinal, 0 AS is_incoming FROM ${current}
-  WHERE source_id = @sourceId AND geo_record_id IN (SELECT geo_record_id FROM incoming)
-)
-QUALIFY ROW_NUMBER() OVER (PARTITION BY geo_record_id ORDER BY source_updated_at DESC NULLS LAST,
-  source_version_ordinal DESC NULLS LAST, version_id DESC, is_incoming DESC) = 1;
+  SELECT geo_record_id, version_id, is_incoming,
+    ROW_NUMBER() OVER (PARTITION BY geo_record_id ORDER BY source_updated_at DESC NULLS LAST,
+      source_version_ordinal DESC NULLS LAST, version_id DESC, is_incoming DESC) AS version_rank
+  FROM (
+    SELECT geo_record_id, version_id, source_updated_at, source_version_ordinal, 1 AS is_incoming FROM incoming
+    UNION ALL
+    SELECT geo_record_id, version_id, source_updated_at, source_version_ordinal, 0 AS is_incoming FROM ${current}
+    WHERE source_id = @sourceId AND geo_record_id IN (SELECT geo_record_id FROM incoming)
+    UNION ALL
+    SELECT g.geo_record_id, g.version_id, g.source_updated_at, g.source_version_ordinal, 0 AS is_incoming
+    FROM ${path('geo_records')} AS g
+    JOIN published_batches AS b ON g.batch_id = b.batch_id AND g.source_id = b.source_id
+    WHERE g.source_id = @sourceId AND g.geo_record_id IN (SELECT geo_record_id FROM incoming)
+  )
+) WHERE version_rank = 1;
 DELETE FROM ${current} WHERE source_id = @sourceId
   AND geo_record_id IN (SELECT geo_record_id FROM winners WHERE is_incoming = 1);
 INSERT INTO ${current} (${COLUMNS.join(', ')})

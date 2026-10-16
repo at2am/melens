@@ -33,7 +33,7 @@ function classifyLocation(loc: SensorLocation): {
 /**
  * Associate both minute and hourly pedestrian observations with sensor locations
  * based on sensor_id and effective location time window:
- * valid_from <= observation.observed_at < (valid_to ?? infinity).
+ * A single location must cover the complete minute or hour count window.
  *
  * Strictly preserves observation granularity and native timestamps.
  * Missing minutes and unavailable/decommissioned locations never fabricate points or fill counts.
@@ -59,18 +59,28 @@ export function joinPedestrianObservations(input: {
       throw new Error('Invalid pedestrian observation time');
     }
 
-    const eligible = (bySensor.get(observation.sensor_id) ?? []).filter(location => {
+    const end = time + (input.granularity === 'minute' ? 60_000 : 3_600_000);
+    const intersecting = (bySensor.get(observation.sensor_id) ?? []).filter(location => {
       const from = Date.parse(location.valid_from);
       if (!Number.isFinite(from)) return false;
       if (location.valid_to === null) {
-        return from <= time;
+        return from < end;
       }
       const to = Date.parse(location.valid_to);
       if (!Number.isFinite(to)) return false;
-      return from <= time && time < to;
+      return from < end && time < to;
+    });
+    const eligible = intersecting.filter(location => Date.parse(location.valid_from) <= time
+      && (location.valid_to === null || end <= Date.parse(location.valid_to)));
+
+    eligible.sort((a, b) => {
+      const diff = Date.parse(b.valid_from) - Date.parse(a.valid_from);
+      if (diff !== 0) return diff;
+      return b.valid_from.localeCompare(a.valid_from);
     });
 
-    if (eligible.length === 0) {
+    const latest = eligible[0];
+    if (latest === undefined) {
       return {
         observation,
         granularity: input.granularity,
@@ -79,19 +89,8 @@ export function joinPedestrianObservations(input: {
       };
     }
 
-    eligible.sort((a, b) => {
-      const diff = Date.parse(b.valid_from) - Date.parse(a.valid_from);
-      if (diff !== 0) return diff;
-      return b.valid_from.localeCompare(a.valid_from);
-    });
-
-    const latest = eligible[0]!;
-    const latestFromMs = Date.parse(latest.valid_from);
-    const sameStart = eligible.filter(location =>
-      Date.parse(location.valid_from) === latestFromMs);
-
     const signatures = new Set(
-      sameStart.map(loc => {
+      intersecting.map(loc => {
         const c = classifyLocation(loc);
         return `${c.geometry}\u001f${c.state}`;
       })

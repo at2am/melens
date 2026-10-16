@@ -1,0 +1,67 @@
+{
+  "status": "passed_for_defined_local_and_cloud_map_acceptance",
+  "project": "melens-510012",
+  "mapsJavaScriptApiEnabled": true,
+  "billingEnabled": true,
+  "cause": "The local preview configuration used a Google Maps demo key. Its daily quota was exhausted during E2E.",
+  "priorFailureReport": "app/e2e/.e2e/uc14-local-nonparking/report.json",
+  "existingKeyResource": "projects/401001961508/locations/global/keys/b02f39c8-40c3-405f-a950-addde656788b",
+  "createdNewKey": false,
+  "changedExistingRestrictionFrom": {
+    "iosKeyRestrictions": {}
+  },
+  "apiTargets": [
+    {
+      "service": "maps-backend.googleapis.com"
+    }
+  ],
+  "allowedReferrers": [
+    "http://localhost:8000",
+    "http://localhost:8000/*",
+    "http://localhost:8001",
+    "http://localhost:8001/*",
+    "https://melens-510012.web.app",
+    "https://melens-510012.web.app/*"
+  ],
+  "keySha256": "e7df32289915b2cfafabb0aaf025f66b3affa1f8cd4fead9c117ee35baa368e0",
+  "keyValuesPrintedOrCommitted": false,
+  "iamChanges": false,
+  "billingConfigurationChanged": false,
+  "ignoredConfigFilesUpdated": [
+    "app/config/dev-preview.json",
+    "app/config/local-e2e-live.json",
+    "app/config/local-e2e-sample.json",
+    "app/config/cloud-release.json"
+  ],
+  "localCameraReport": "app/e2e/.e2e/focus-fix-local-ttl-camera/report.json",
+  "localUiReport": "app/e2e/.e2e/focus-fix-local-ui-final/report.json",
+  "cloudUiReport": "app/e2e/.e2e/focus-fix-cloud-ui-focus-settled/report.json",
+  "releaseSummary": "app/e2e/verification-release-2026-10-16.json",
+  "hostingVersion": "1aab647267b914fb",
+  "appSourceSha256": "32c674bc8576984a1ab847a06960b4ab2be4fbe7b5fade49e0de16117975485e",
+  "completionBoundary": "Real map camera and query passed on the verified project key. This does not complete all sources or the separate Flutter SDK input race.",
+  "currentIgnoredConfigProof": {
+    "configurations": [
+      {
+        "path": "app/config/dev-preview.json",
+        "sha256": "c3788b89b4138ea41272d060f1b6be9167cc0738cdcd98e064cc995837908e4f",
+        "verifiedProjectKeyMatches": 1
+      },
+      {
+        "path": "app/config/local-e2e-live.json",
+        "sha256": "5e92ce47289547cfa6bdcabfd110f665e4566f538dafe9519378c76ab4399446",
+        "verifiedProjectKeyMatches": 1
+      },
+      {
+        "path": "app/config/local-e2e-sample.json",
+        "sha256": "5d7f42a9adf225414de9668e8962955f953964add42b52a80cb91b4f76229773",
+        "verifiedProjectKeyMatches": 1
+      },
+      {
+        "path": "app/config/cloud-release.json",
+        "sha256": "50449cc9adbe01c9ae5ad387cda015bec4658cbac878ce091973e2306ea41fb7",
+        "verifiedProjectKeyMatches": 1
+      }
+    ]
+  }
+}

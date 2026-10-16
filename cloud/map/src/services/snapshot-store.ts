@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 
 import { SNAPSHOT_TTL_MS, type LayerId, type LayerResult, type MapItem,
   type MapItemPage, type UnlocatedQuery, type ViewportQuery } from '@melens/shared/contracts/map-contract';
@@ -30,6 +31,18 @@ export interface StoredCursor {
   readonly identity: string; readonly layerId: LayerId | null;
   readonly aggregateId: string | null; readonly offset: number; readonly pageSize: number;
 }
+type SnapshotInput = Omit<StoredSnapshot, 'id' | 'createdAt' | 'expiresAt'>;
+interface SnapshotEntry {
+  readonly snapshot: StoredSnapshot;
+  readonly bytes: number;
+  pendingUses: number;
+  retained: boolean;
+}
+
+function reusableInput(input: SnapshotInput): SnapshotInput {
+  const { requestId: _requestId, ...request } = input.request;
+  return { ...input, request: { ...request, requestId: '' } };
+}
 
 const TOKEN_BYTES = 24;
 const token = () => randomBytes(TOKEN_BYTES).toString('base64url');
@@ -45,7 +58,7 @@ export function createSnapshotStore(options: {
   const maxBytes = options.maxBytes ?? 16 * 1024 * 1024;
   const maxCursors = options.maxCursors ?? 4_096;
   if (![maxSnapshots, maxBytes, maxCursors].every((n) => Number.isSafeInteger(n) && n > 0)) throw new TypeError('Invalid snapshot bounds');
-  const snapshots = new Map<string, { snapshot: StoredSnapshot; bytes: number }>();
+  const snapshots = new Map<string, SnapshotEntry>();
   const cursors = new Map<string, { cursor: StoredCursor; bytes: number }>();
   // Identical bindings share one token, and a snapshot releases its cursors without a scan.
   const cursorIdsByBinding = new Map<string, string>();
@@ -73,15 +86,49 @@ export function createSnapshotStore(options: {
     const time = now();
     for (const [id, entry] of snapshots) if (time >= entry.snapshot.expiresAt) remove(id, true);
   }
+  function storeSnapshot(input: SnapshotInput, ownership: 'retained' | 'pending'): StoredSnapshot {
+    prune();
+    const createdAt = now();
+    const snapshot = deepFreeze(structuredClone({ ...input, id: token(), createdAt, expiresAt: createdAt + SNAPSHOT_TTL_MS }));
+    const size = jsonBytes(snapshot);
+    if (size > maxBytes || snapshots.size >= maxSnapshots || memoryBytes + size > maxBytes) {
+      process.stderr.write(`${JSON.stringify({ severity: 'WARNING', event: 'mapRateLimited',
+        reason: size > maxBytes || memoryBytes + size > maxBytes ? 'snapshotBytes' : 'snapshotCount',
+        snapshots: snapshots.size, cursors: cursors.size, memoryBytes, requestedBytes: size, maxSnapshots, maxBytes })}\n`);
+      throw new MapServiceError('rateLimited');
+    }
+    snapshots.set(snapshot.id, { snapshot, bytes: size, pendingUses: ownership === 'pending' ? 1 : 0,
+      retained: ownership === 'retained' });
+    memoryBytes += size;
+    return snapshot;
+  }
   return {
-    create(input: Omit<StoredSnapshot, 'id' | 'createdAt' | 'expiresAt'>): StoredSnapshot {
+    create(input: SnapshotInput): StoredSnapshot {
+      return storeSnapshot(input, 'retained');
+    },
+    /** Exact immutable inputs share a token. Each use must finish after its own rights check. */
+    createOrReuse(input: SnapshotInput): { snapshot: StoredSnapshot; created: boolean } {
       prune();
-      const createdAt = now();
-      const snapshot = deepFreeze(structuredClone({ ...input, id: token(), createdAt, expiresAt: createdAt + SNAPSHOT_TTL_MS }));
-      const size = jsonBytes(snapshot);
-      if (size > maxBytes || snapshots.size >= maxSnapshots || memoryBytes + size > maxBytes) throw new MapServiceError('rateLimited');
-      snapshots.set(snapshot.id, { snapshot, bytes: size }); memoryBytes += size;
-      return snapshot;
+      const comparable = reusableInput(input);
+      const time = now();
+      for (const entry of snapshots.values()) {
+        const { id: _id, createdAt, expiresAt: _expiresAt, ...stored } = entry.snapshot;
+        if (time < createdAt || stored.identity !== input.identity || stored.family !== input.family) continue;
+        if (!isDeepStrictEqual(comparable, reusableInput(stored))) continue;
+        entry.pendingUses += 1;
+        return { snapshot: entry.snapshot, created: false };
+      }
+      return { snapshot: storeSnapshot(input, 'pending'), created: true };
+    },
+    /** Failed concurrent users cannot remove a token another request has successfully issued. */
+    finishReuse(id: string, outcome: { readonly retained: boolean }): void {
+      if (outcome.retained) this.read(id);
+      const entry = snapshots.get(id);
+      if (entry === undefined) return;
+      if (entry.pendingUses < 1) throw new TypeError('Snapshot has no pending use');
+      entry.pendingUses -= 1;
+      if (outcome.retained) entry.retained = true;
+      if (entry.pendingUses === 0 && !entry.retained) remove(id, false);
     },
     read(id: string): StoredSnapshot {
       prune();
@@ -99,7 +146,12 @@ export function createSnapshotStore(options: {
       if (existing !== undefined) return existing;
       const cursor = deepFreeze({ ...input, id: token() });
       const bytes = jsonBytes(cursor);
-      if (cursors.size >= maxCursors || memoryBytes + bytes > maxBytes) throw new MapServiceError('rateLimited');
+      if (cursors.size >= maxCursors || memoryBytes + bytes > maxBytes) {
+        process.stderr.write(`${JSON.stringify({ severity: 'WARNING', event: 'mapRateLimited',
+          reason: cursors.size >= maxCursors ? 'cursorCount' : 'cursorBytes',
+          snapshots: snapshots.size, cursors: cursors.size, memoryBytes, requestedBytes: bytes, maxCursors, maxBytes })}\n`);
+        throw new MapServiceError('rateLimited');
+      }
       // Cursor overhead is separately bounded by maxCursors; reserve it against total memory too.
       cursors.set(cursor.id, { cursor, bytes }); memoryBytes += bytes;
       cursorIdsByBinding.set(key, cursor.id);

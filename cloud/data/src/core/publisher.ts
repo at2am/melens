@@ -44,6 +44,8 @@ const TABLE_KEYS: Record<FactTable, readonly string[]> = {
   sensor_locations: ['sensor_id', 'version_id'],
   pedestrian_observations: ['sensor_id', 'observed_at', 'version_id'],
 };
+/** Connector facts written and validated by this publisher; derived writers own other tables. */
+export const PUBLISHER_FACT_TABLES: readonly string[] = Object.freeze(Object.keys(TABLE_KEYS));
 const utc = z.iso.datetime({ offset: false });
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const auditFields = new Set(['batch_id', 'fetched_at', 'raw_uri', 'first_accessible_at', 'freshness_state']);
@@ -74,13 +76,18 @@ function sourceLease(source: DataSource): string {
 }
 
 function validationChunks(table: PlannedTable): readonly (readonly Record<string, unknown>[])[] {
+  const logicalId = TABLE_KEYS[table.name].find(key => key !== 'version_id');
+  if (logicalId === undefined) throw new Error(`Missing logical key in ${table.name}`);
   const unique = new Map(table.rows.map(row => [rowKey(table.name, row), row]));
   const chunks: Record<string, unknown>[][] = [[]];
   let chunk = chunks[0];
   let bytes = 0;
   for (const row of unique.values()) {
-    // Account for the JSON parameter's outer escaping as well as row bytes.
-    const size = Buffer.byteLength(JSON.stringify(JSON.stringify(row)));
+    // Both string parameters repeat the logical ID. Include their outer JSON
+    // escaping together, leaving room below BigQuery's request-size limit.
+    const size = Buffer.byteLength(JSON.stringify(JSON.stringify(row)))
+      + Buffer.byteLength(JSON.stringify(JSON.stringify(row[logicalId])));
+    if (size > 7_000_000) throw new Error(`Validation row exceeds request budget in ${table.name}`);
     if (!chunk || (chunk.length > 0 && bytes + size > 7_000_000)) {
       chunk = [];
       chunks.push(chunk);
@@ -209,10 +216,11 @@ export class BigQueryPublisher {
     return z.array(z.record(z.string(), z.unknown())).parse(rows);
   }
 
-  private async latestBatch(batchId: string): Promise<SyncBatch | null> {
+  private async latestBatch(batchId: string, sourceId: string): Promise<SyncBatch | null> {
     const rows = await this.query(`SELECT TO_JSON_STRING(t) AS batch
       FROM \`${this.config.projectId}.${this.config.ingestDataset}.sync_batches\` t
-      WHERE batch_id = @batchId ORDER BY state_updated_at DESC LIMIT 1`, { batchId });
+      WHERE source_id = @sourceId AND batch_id = @batchId
+      ORDER BY state_updated_at DESC LIMIT 1`, { batchId, sourceId });
     if (!rows.length) return null;
     return batchSchema.parse(JSON.parse(z.string().parse(rows[0]?.batch)));
   }
@@ -505,6 +513,8 @@ export class BigQueryPublisher {
         continue;
       }
       for (const expectedRows of validationChunks(table)) {
+        const logicalId = logicalKeys[0];
+        if (logicalId === undefined) throw new Error(`Missing logical key in ${table.name}`);
         const rows = await this.query(`/* validate:${table.name} */
         WITH batch_states AS (
           SELECT batch_id, state FROM ${path('sync_batches')} WHERE source_id = @sourceId
@@ -518,7 +528,9 @@ export class BigQueryPublisher {
         ), eligible AS (
           SELECT t.*, ${tuple(keys)} AS row_key, ${tuple(contentFields)} AS content
           FROM ${path(table.name)} t
-          WHERE t.source_id = @sourceId ${snapshotScope} AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
+          WHERE t.source_id = @sourceId ${snapshotScope}
+            AND t.${logicalId} IN UNNEST(JSON_VALUE_ARRAY(@logicalIds))
+            AND ${visible('t')} AND ${tuple(logicalKeys)} IN (
             SELECT ${tuple(logicalKeys)} FROM batch_rows t
           )
         )
@@ -532,6 +544,7 @@ export class BigQueryPublisher {
           batchId, sourceId: source.source_id, licenseStatus: source.license_status,
           allowedFields: JSON.stringify(source.admission_evidence.allowed_fields ?? []),
           expectedRows: JSON.stringify(expectedRows),
+          logicalIds: JSON.stringify([...new Set(expectedRows.map(row => row[logicalId]))]),
         });
         const values = rows[0];
         const number = (key: string) => count.parse(Number(values?.[key] ?? NaN));
@@ -603,7 +616,7 @@ export class BigQueryPublisher {
         || (sourceState.licenseStatus === 'restricted' && source.license_status === 'verified_open')) {
         throw new Error('Stored source permission has been withdrawn or narrowed');
       }
-      const previous = await this.latestBatch(batchId);
+      const previous = await this.latestBatch(batchId, source.source_id);
       const now = previous === null ? new Date().toISOString() : after(previous.state_updated_at);
       const before = input.initialCheckpoint === null ? null
         : (await this.gcs.readCheckpoint(source.source_id, input.initialCheckpoint)).manifest.checkpoint;
@@ -681,7 +694,7 @@ export class BigQueryPublisher {
         let remote: SyncBatch | null | undefined;
         if (!published) {
           try {
-            remote = await this.latestBatch(batchId);
+            remote = await this.latestBatch(batchId, source.source_id);
           } catch {
             // An uncertain publish must be reconciled before any failure marker can hide it.
           }

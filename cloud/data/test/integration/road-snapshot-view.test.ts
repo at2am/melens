@@ -10,6 +10,48 @@ const enabled = project === 'melens-510012' && process.env.MELENS_GUARD_TEST_CON
 const unplanned = 'victoria.transport.road_unplanned';
 const planned = 'victoria.transport.road_planned';
 
+test('production transport view preserves provider active status and reports future schedule separately', {
+  skip: !enabled, timeout: 120_000,
+}, async () => {
+  assert.ok(project);
+  const sql = await readFile(new URL('../../../sql/007_changes_views.sql', import.meta.url), 'utf8');
+  const view = sql.split('CREATE OR REPLACE VIEW `melens_query.v_transport_changes_current` AS')[1]
+    ?.split(';')[0]?.trim();
+  assert.ok(view);
+  const query = `WITH fixture_current AS (
+    SELECT id AS geo_record_id, 'v1' AS version_id, @source AS source_id,
+      'road_disruption' AS topic, 'Works' AS title, CAST(NULL AS STRING) AS summary,
+      'https://example.test/road' AS original_url, CAST(NULL AS GEOGRAPHY) AS geometry,
+      CAST(NULL AS STRING) AS geometry_geojson, 'unknown' AS location_role,
+      'unverified' AS location_confidence, ARRAY<STRING>[] AS area_refs,
+      CAST(NULL AS TIMESTAMP) AS observed_at, CAST(NULL AS TIMESTAMP) AS published_at,
+      TIMESTAMP(start_time) AS valid_from, CAST(NULL AS TIMESTAMP) AS valid_to,
+      TIMESTAMP('2026-09-28T00:00:00Z') AS fetched_at, 'unknown' AS freshness_state,
+      status AS record_status, 'plan' AS assertion_kind, false AS is_prediction
+    FROM UNNEST([
+      STRUCT('future-active' AS id, 'active' AS status, '2026-10-01T00:00:00Z' AS start_time),
+      STRUCT('future-pending' AS id, 'planned' AS status, '2026-10-01T00:00:00Z' AS start_time),
+      STRUCT('current-active' AS id, 'active' AS status, '2026-09-27T00:00:00Z' AS start_time)
+    ])
+  ) ${view.replaceAll('`melens_query.v_geo_records_current`', 'fixture_current')
+    .replaceAll('CURRENT_TIMESTAMP()', "TIMESTAMP('2026-09-28T00:00:00Z')")}`;
+  const bq = new BigQuery({ projectId: project });
+  let rows: unknown;
+  try {
+    [rows] = await bq.query({ query, location: 'australia-southeast2',
+      maximumBytesBilled: '100000000', useQueryCache: false, params: { source: planned } });
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Cloud query failed');
+  }
+  const actual = z.array(z.object({ geo_record_id: z.string(), record_status: z.string(),
+    time_state: z.string() })).parse(rows).sort((a, b) => a.geo_record_id.localeCompare(b.geo_record_id));
+  assert.deepEqual(actual, [
+    { geo_record_id: 'current-active', record_status: 'active', time_state: 'current' },
+    { geo_record_id: 'future-active', record_status: 'active', time_state: 'future' },
+    { geo_record_id: 'future-pending', record_status: 'planned', time_state: 'future' },
+  ]);
+});
+
 test('production road SQL uses complete published snapshots, removes missing impacts and fails closed on conflicting proofs', {
   skip: !enabled, timeout: 120_000,
 }, async () => {
@@ -24,7 +66,9 @@ test('production road SQL uses complete published snapshots, removes missing imp
     .replaceAll('`melens_ingest.geo_records`', 'fixture_geo')
     .replaceAll('`melens_ingest.source_records`', 'fixture_sources')
     .replaceAll('`melens_ingest.geo_record_sources`', 'fixture_links')
+    .replaceAll('`melens_ingest.parking_sensor_memberships`', 'fixture_parking_memberships')
     .replaceAll('`melens_query.v_geo_records_history`', 'fixture_history');
+  assert.doesNotMatch(view, /`melens_(?:ingest|query)\./, 'Synthetic SQL must not read production tables');
   const query = `WITH fixture_batches AS (
     SELECT JSON_VALUE(row, '$.batch_id') AS batch_id, JSON_VALUE(row, '$.source_id') AS source_id,
       JSON_VALUE(row, '$.source_revision') AS source_revision, JSON_VALUE(row, '$.state') AS state,
@@ -50,6 +94,10 @@ test('production road SQL uses complete published snapshots, removes missing imp
       JSON_VALUE(row, '$.source_version_id') AS source_version_id,
       JSON_VALUE(row, '$.geo_record_id') AS geo_record_id, JSON_VALUE(row, '$.version_id') AS version_id,
       JSON_VALUE(row, '$.evidence_role') AS evidence_role FROM UNNEST(JSON_QUERY_ARRAY(@links)) row
+  ), fixture_parking_memberships AS (
+    SELECT CAST(NULL AS STRING) AS batch_id, CAST(NULL AS STRING) AS source_id,
+      CAST(NULL AS STRING) AS business_source_record_id, CAST(NULL AS STRING) AS business_version_id
+    FROM UNNEST(ARRAY<BOOL>[])
   ), fixture_history AS (
     SELECT g.* FROM fixture_geo g JOIN fixture_batches b USING (batch_id, source_id)
     WHERE b.state = 'published' AND b.published_at IS NOT NULL

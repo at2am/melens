@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../agent/data/agent_models.dart';
+import '../../map/data/map_models.dart';
 
 part 'shell_providers.g.dart';
 
@@ -8,10 +9,15 @@ part 'shell_providers.g.dart';
 /// The chat is global but the map is one tab, so the shell parks the item
 /// here, switches to the map and the map takes it.
 final class CardItemRequest {
-  const CardItemRequest({required this.sequence, required this.item});
+  const CardItemRequest({
+    required this.sequence,
+    required this.item,
+    this.mapRecord,
+  });
 
   final int sequence;
   final CardItem item;
+  final MapItemResponse? mapRecord;
 }
 
 @Riverpod(keepAlive: true)
@@ -21,8 +27,8 @@ class CardItemRequests extends _$CardItemRequests {
   @override
   CardItemRequest? build() => null;
 
-  void request(CardItem item) =>
-      state = CardItemRequest(sequence: ++_sequence, item: item);
+  void request(CardItem item, {MapItemResponse? mapRecord}) => state =
+      CardItemRequest(sequence: ++_sequence, item: item, mapRecord: mapRecord);
 
   /// The map has taken the request.
   void consume(int sequence) {

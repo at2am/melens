@@ -44,7 +44,8 @@ export function createSharedFeatureReader(options: {
     const reference = sourceReferenceSchema.parse(source);
     return [reference.sourceId, reference] as const;
   }));
-  const runner = createViewQueryRunner({ config: options.config, adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
+  const runner = createViewQueryRunner({ config: options.config, adapter: options.adapter ?? createBigQueryViewAdapter(options.config),
+    currentGeoRead: 'authoritative' });
   const readCoverage = createSourceCoverageReader({ runner }).read;
   const resolveSource = (coverage: SourceCoverageSnapshot): PublicSourceResolver => (id) =>
     findPublicSource(coverage, id) === null ? null : references.get(id) ?? null;

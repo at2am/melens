@@ -31,6 +31,9 @@ class MelensApp extends ConsumerWidget {
         AppLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
+      // Keep route semantics present before tooltip overlays add siblings.
+      builder: (context, child) =>
+          Semantics(container: true, explicitChildNodes: true, child: child),
       routerConfig: ref.watch(routerProvider),
     );
   }

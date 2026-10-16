@@ -1,0 +1,141 @@
+{
+  "checkedAt": "2026-10-15T15:48:08.711Z",
+  "project": "melens-510012",
+  "location": "australia-southeast2",
+  "method": "tables.patch with If-Match",
+  "readbackIdentity": "existing local user ADC",
+  "runtimeQueryIdentityProof": false,
+  "cloudWritesByThisReadback": false,
+  "datasets": [
+    {
+      "dataset": "melens_ingest",
+      "aclUnchanged": true,
+      "aclEntryCount": 30
+    },
+    {
+      "dataset": "melens_query",
+      "aclUnchanged": true,
+      "aclEntryCount": 6
+    }
+  ],
+  "views": [
+    {
+      "name": "v_geo_records_current",
+      "type": "VIEW",
+      "appliedAt": "2026-10-15T15:45:50.865Z",
+      "etagMatchesApplyJournal": true,
+      "definitionMatchesDesired": true,
+      "definitionSha256": "34e4fbe3774e91afc5d1119a460cd0075cb2fc22aa44f746ed83696ad19cf3e2",
+      "viewIamUnchanged": true,
+      "authorizedRawViewTupleCount": 1,
+      "rawAuthorizationExpected": true,
+      "nonQueryMetadataUnchanged": true,
+      "parking_snapshot_unchanged": true,
+      "parking_predicate_unchanged": true,
+      "gtfsAmbiguityGuardPresent": true,
+      "checkedFields": [
+        {
+          "name": "version_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        }
+      ],
+      "requiredFieldsPresent": true
+    },
+    {
+      "name": "v_pedestrian_observations",
+      "type": "VIEW",
+      "appliedAt": "2026-10-15T15:46:01.121Z",
+      "etagMatchesApplyJournal": true,
+      "definitionMatchesDesired": true,
+      "definitionSha256": "d9878b7948e53b0c3bad23f934e880813843dbb4e51beec710c6cc3c36bb88a6",
+      "viewIamUnchanged": true,
+      "authorizedRawViewTupleCount": 1,
+      "rawAuthorizationExpected": true,
+      "nonQueryMetadataUnchanged": true,
+      "checkedFields": [
+        {
+          "name": "source_record_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "version_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "location_source_record_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "location_version_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "rights_evidence",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        }
+      ],
+      "requiredFieldsPresent": true
+    },
+    {
+      "name": "v_boundaries",
+      "type": "VIEW",
+      "appliedAt": "2026-10-15T15:46:10.265Z",
+      "etagMatchesApplyJournal": true,
+      "definitionMatchesDesired": true,
+      "definitionSha256": "adbf85e0e1579d30bbb48e6b3d0e6681a37dbec141615fca44ed6dacb7c993f6",
+      "viewIamUnchanged": true,
+      "authorizedRawViewTupleCount": 1,
+      "rawAuthorizationExpected": true,
+      "nonQueryMetadataUnchanged": true,
+      "checkedFields": [
+        {
+          "name": "version_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "source_record_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        },
+        {
+          "name": "rights_evidence",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        }
+      ],
+      "requiredFieldsPresent": true
+    },
+    {
+      "name": "v_transport_changes_current",
+      "type": "VIEW",
+      "appliedAt": "2026-10-15T15:46:20.944Z",
+      "etagMatchesApplyJournal": true,
+      "definitionMatchesDesired": true,
+      "definitionSha256": "6f72bf49150b658c90d3960fabfb922445c89d11b66686f276b99cff88e04a74",
+      "viewIamUnchanged": true,
+      "authorizedRawViewTupleCount": 0,
+      "rawAuthorizationExpected": false,
+      "nonQueryMetadataUnchanged": true,
+      "providerRecordStatusPreserved": true,
+      "checkedFields": [
+        {
+          "name": "version_id",
+          "type": "STRING",
+          "mode": "NULLABLE"
+        }
+      ],
+      "requiredFieldsPresent": true
+    }
+  ],
+  "parkingObjectsModified": false,
+  "sourceAdmissionModified": false,
+  "sourceHealthInputsModified": false,
+  "passed": true
+}

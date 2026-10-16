@@ -183,7 +183,9 @@ test('continuations bind the canonical presentation zoom and stored groups reche
     (error: unknown) => error instanceof MapServiceError && error.code === 'cursorMismatch');
   const group = first.layers[0]!.items[0]!;
   assert.ok(group.kind === 'aggregate');
-  f.rows[0]!.record_status = 'withdrawn';
+  const member = f.rows.find((row) => group.details.memberIds.includes(row.geo_record_id));
+  assert.ok(member);
+  member.record_status = 'withdrawn';
   await assert.rejects(f.service.getMembers(group.id, { requestId: 'members', snapshotId: first.snapshotId }),
     (error: unknown) => error instanceof MapServiceError && error.code === 'notAvailable');
 });

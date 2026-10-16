@@ -797,7 +797,11 @@ function insertIndicatorSqlite(db: DatabaseSync, ind: AreaIndicator) {
 
 test('boundary view uses source revision order and hides corrections without an order', async () => {
   const sql = await readSql('006_area_views.sql');
-  assert.match(sql, /JOIN `melens_ingest\.source_records` AS sr/);
+  assert.match(sql, /FROM `melens_ingest\.source_records` r/);
+  assert.match(sql, /JOIN published_records AS sr/);
+  assert.match(sql, /JOIN latest_record_access access/);
+  assert.match(sql, /FROM latest_boundaries AS b\s+WHERE b\.rights_status/);
+  assert.match(sql, /AND b\.latest_record_is_public/);
   assert.match(sql, /ORDER BY b\.source_updated_at DESC NULLS LAST,\s*b\.source_version_ordinal DESC NULLS LAST/);
 
   const db = createSqliteAreaDatabase();

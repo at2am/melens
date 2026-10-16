@@ -14,6 +14,7 @@ import 'package:melens/features/events/state/user_events_providers.dart';
 import 'package:melens/features/events/ui/user_event_markers.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/data/map_repository.dart';
+import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/layer_controller.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/state/selection_controller.dart';
@@ -27,7 +28,7 @@ import '../t017_test_support.dart';
 
 Future<ProviderContainer> showScreen(
   WidgetTester tester,
-  T017Repository repository, {
+  MapRepository repository, {
   MapSurfaceReadiness readiness = MapSurfaceReadiness.ready,
   MapSurfaceBuilder? builder,
   MapVisibleRegionReader? reader,
@@ -35,6 +36,7 @@ Future<ProviderContainer> showScreen(
   Object? catalogError,
   bool autoSearch = true,
   UserEventsClient? events,
+  MelbourneClock? clock,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -44,7 +46,7 @@ Future<ProviderContainer> showScreen(
       if (catalogError != null)
         mapLayerCatalogProvider.overrideWith((ref) async => throw catalogError),
       melbourneClockProvider.overrideWithValue(
-        MelbourneClock(now: () => t017Instant),
+        clock ?? MelbourneClock(now: () => t017Instant),
       ),
       envProvider.overrideWithValue(
         Env(
@@ -101,6 +103,58 @@ Future<void> pickFromList(WidgetTester tester, String title) async {
 }
 
 void main() {
+  testWidgets('sample time pill retains the fixed observation window', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var now = DateTime.utc(2026, 10, 15, 1);
+    final container = await showScreen(
+      tester,
+      const SampleMapRepository(),
+      clock: MelbourneClock(now: () => now),
+      reader: () async => t017Region,
+      autoSearch: false,
+    );
+    expect(find.text('Sample observation window'), findsOneWidget);
+    expect(find.text('Now'), findsNothing);
+    expect(find.text('Sample data — illustrative only'), findsWidgets);
+    final original = container.read(viewportControllerProvider).response!;
+    await pickFromList(tester, 'Sample sensor A');
+
+    await tester.tap(find.byKey(const ValueKey('map-time-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(CheckedPopupMenuItem<Duration>, 'Past hour'),
+    );
+    await tester.pumpAndSettle();
+    expect(container.read(viewportControllerProvider).error, isNotNull);
+    await tester.tap(find.byKey(const ValueKey('map-time-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('map-time-current')));
+    await tester.pumpAndSettle();
+    expect(container.read(viewportControllerProvider).error, isNull);
+
+    now = now.add(const Duration(days: 1));
+    await tester.tap(find.byKey(const ValueKey('map-refresh')));
+    await tester.pumpAndSettle();
+    final state = container.read(viewportControllerProvider);
+    expect(state.window.from, DateTime.utc(2026, 10, 1, 0, 59));
+    expect(state.window.to, DateTime.utc(2026, 10, 1, 1));
+    expect(state.response!.requestId, isNot(original.requestId));
+    expect(state.response!.generatedAt, DateTime.utc(2026, 10, 1, 1));
+    expect(state.response!.layers.first.state, MapLayerState.available);
+    expect(
+      state.response!.layers.first.items.map((item) => item.id),
+      contains('sample.sensor.A'),
+    );
+    expect(container.read(mapAutoSearchProvider), isFalse);
+    expect(find.text('Sample data — illustrative only'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('loading and failure keep the actual map rectangle stable', (
     tester,
   ) async {
@@ -187,7 +241,7 @@ void main() {
     );
     // One control per thing: layers are chips and the map has no switches.
     expect(find.byType(Switch), findsNothing);
-    expect(find.text('Now'), findsOneWidget);
+    expect(find.text('Sample observation window'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -332,7 +386,9 @@ void main() {
       repository.nextViewportError = const MapNetworkException();
       await tester.tap(find.byKey(const ValueKey('map-time-menu')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Past hour'));
+      await tester.tap(
+        find.widgetWithText(CheckedPopupMenuItem<Duration>, 'Past hour'),
+      );
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump();
       await tester.pumpAndSettle();

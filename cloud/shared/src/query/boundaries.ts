@@ -13,6 +13,7 @@ export type BoundarySelection = NonNullable<ViewportQuery['boundaryFilter']>;
 export type BoundaryItem = Extract<MapItem, { kind: 'boundary' }>;
 
 const boundaryRowSchema = z.object({
+  rights_evidence: z.literal('latest_published_record_v1'),
   boundary_id: z.string(), version_id: z.string(), scheme: z.string(), code: z.string(),
   name: z.string(), vintage: z.string(), geometry_geojson: z.string(),
   valid_from: z.string().nullable(), valid_to: z.string().nullable(),

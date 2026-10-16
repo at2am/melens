@@ -19,6 +19,13 @@ final class SampleMapRepository implements MapRepository {
 
   final SampleMapScenario scenario;
 
+  /// The fixed sample observation interval, independent of the device clock.
+  static TimeWindow get currentObservationWindow => const SampleMapRepository()
+      .scenarioResponse
+      .layers
+      .single
+      .observedWindow!;
+
   ViewportResponse get scenarioResponse =>
       ViewportResponse.fromJson(_fixture(_scenarioFile(scenario)));
 

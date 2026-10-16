@@ -168,9 +168,9 @@ test('suppressed and missing source values remain null, never zero', () => {
   }
 });
 
-test('an explicitly attested LGA vintage permits a unique official name mapping', () => {
+test('an attested vintage still requires an explicit crosswalk for a different official name', () => {
   assert.equal(areaNameKey('Colac-Otway'), areaNameKey('Colac Otway'));
-  const normalized = normalizeCsaStatistics(csaFixture('observed'), {
+  const evidence: AreaBoundaryEvidence = {
     sourceAreaVintage: '2025',
     boundaries: [
       {
@@ -180,6 +180,12 @@ test('an explicitly attested LGA vintage permits a unique official name mapping'
         vintage: '2025',
       },
     ],
+  };
+  const noCrosswalk = normalizeCsaStatistics(csaFixture('observed'), evidence);
+  assert.equal(noCrosswalk.mapped, 0);
+  assert.equal(noCrosswalk.indicators[0]?.boundary_id, 'CSA_LGA_NAME:colac_otway:unresolved');
+  const normalized = normalizeCsaStatistics(csaFixture('observed'), {
+    ...evidence, crosswalk: { 'Colac-Otway': 'ASGS_LGA:21750:2025' },
   });
   assert.equal(normalized.mapped, 1);
   assert.equal(normalized.indicators[0]?.boundary_id, 'ASGS_LGA:21750:2025');
@@ -496,6 +502,50 @@ test('normalizeHomesVictoriaStatistics enforces AUD/week unit, suppression prese
   assert.equal(suppInd.value, null, 'Suppressed rental rate MUST be null, never 0');
 });
 
+test('rents require an explicit alias crosswalk and reject conflicting source codes', () => {
+  const indicator = makeValidIndicator({ source_id: 'homes_victoria.rents',
+    boundary_id: 'VIC_LGA_NAME:colac_otway:unresolved', source_area_name: 'Colac-Otway',
+    source_area_code: null, source_area_vintage: '2021', unit: 'AUD/week', value: 480 });
+  const evidence: AreaBoundaryEvidence = { sourceAreaVintage: '2021', boundaries: [{
+    boundary_id: 'ASGS_LGA:21750:2021', scheme: 'ASGS_LGA', code: '21750',
+    name: 'Colac Otway', vintage: '2021',
+  }] };
+  const unresolved = normalizeHomesVictoriaStatistics([indicator], evidence);
+  assert.equal(unresolved.mapped, 0);
+  assert.equal(unresolved.indicators[0]?.value, 480);
+  assert.equal(unresolved.indicators[0]?.boundary_id, 'VIC_LGA_NAME:colac_otway:unresolved');
+
+  const mapped = normalizeHomesVictoriaStatistics([indicator], { ...evidence,
+    crosswalk: { 'lga:Colac-Otway': 'ASGS_LGA:21750:2021' } });
+  assert.equal(mapped.indicators[0]?.boundary_id, 'ASGS_LGA:21750:2021');
+  assert.equal(mapped.indicators[0]?.value, 480);
+
+  const conflicting = normalizeHomesVictoriaStatistics([{ ...indicator,
+    source_area_name: 'Colac Otway', source_area_code: '24600' }], evidence);
+  assert.equal(conflicting.mapped, 0);
+
+  const mixed = normalizeHomesVictoriaStatistics([
+    { ...indicator, source_area_name: 'Colac Otway', source_area_code: '21750' },
+    indicator,
+    { ...indicator, source_area_name: 'Colac Otway', source_area_code: '24600' },
+  ], evidence);
+  assert.equal(mixed.mapped, 1, 'A cached match must not resolve a name alias or conflicting code');
+  assert.equal(mixed.unresolved, 2);
+  assert.deepEqual(mixed.indicators.map(row => row.boundary_id), [
+    'ASGS_LGA:21750:2021', 'VIC_LGA_NAME:colac_otway:unresolved', 'VIC_LGA_NAME:colac_otway:unresolved',
+  ]);
+});
+
+test('rents reject crosswalk targets absent from the supplied official boundary evidence', () => {
+  const indicator = makeValidIndicator({ source_id: 'homes_victoria.rents',
+    boundary_id: 'VIC_LGA_NAME:melbourne:unresolved', source_area_name: 'Melbourne',
+    source_area_code: null, source_area_vintage: null, unit: 'AUD/week' });
+  assert.throws(() => normalizeHomesVictoriaStatistics([indicator], {
+    sourceAreaVintage: '2021', boundaries: [],
+    crosswalk: { 'lga:melbourne': 'ASGS_LGA:24600:2021' },
+  }), /Crosswalk target is not a unique official boundary/);
+});
+
 // ---------------------------------------------------------------------------
 // 7. Universal Dispatcher normalizeAreaIndicators
 // ---------------------------------------------------------------------------
@@ -684,7 +734,7 @@ test('G17: normalizeHomesVictoriaStatistics prevents suburb records from falling
   // Crosswalk only defines parent LGA mapping
   const evidenceParentLgaOnly: AreaBoundaryEvidence = {
     sourceAreaVintage: '2025',
-    boundaries: [],
+    boundaries: [{ boundary_id: 'ASGS_LGA:24600:2025', scheme: 'ASGS_LGA', code: '24600', name: 'Melbourne', vintage: '2025' }],
     crosswalk: {
       'lga:melbourne': 'ASGS_LGA:24600:2025',
     },
@@ -705,7 +755,8 @@ test('G17: normalizeHomesVictoriaStatistics prevents suburb records from falling
   // When suburb crosswalk is supplied, suburb maps to its own boundary
   const evidenceWithSuburb: AreaBoundaryEvidence = {
     sourceAreaVintage: '2025',
-    boundaries: [],
+    boundaries: [...evidenceParentLgaOnly.boundaries,
+      { boundary_id: 'ASGS_SAL:20534:2025', scheme: 'ASGS_SAL', code: '20534', name: 'Carlton', vintage: '2025' }],
     crosswalk: {
       'lga:melbourne': 'ASGS_LGA:24600:2025',
       'suburb:carlton': 'ASGS_SAL:20534:2025',

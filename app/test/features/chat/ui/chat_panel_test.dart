@@ -461,6 +461,49 @@ void main() {
     expect(find.textContaining('AGENT_DEV_TOKEN'), findsOneWidget);
   });
 
+  testWidgets('recreating the panel keeps draft text and unsent photos', (
+    tester,
+  ) async {
+    final client = FakeAgentClient();
+    final picker = FakePhotoPicker((
+      photos: [ChatPhoto(mimeType: 'image/png', bytes: onePixelPng)],
+      rejected: 0,
+    ));
+    await showPanel(tester, client, picker: picker);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'What is in this photo?',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-attach')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Choose photos'));
+    await tester.pumpAndSettle();
+    final app = tester.widget<UncontrolledProviderScope>(
+      find.byType(UncontrolledProviderScope),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    expect(find.text('What is in this photo?'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chat-pending-photos')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      client.lastTurn.request.input,
+      const TurnInput.text(text: 'What is in this photo?'),
+    );
+    expect(
+      client.lastTurn.request.attachments!.single.data,
+      base64Encode(onePixelPng),
+    );
+    expect(find.byKey(const ValueKey('chat-pending-photos')), findsNothing);
+    await client.lastTurn.close();
+    await tester.pump();
+  });
+
   testWidgets('a failed sign-in is explained in the panel', (tester) async {
     final client = FakeAgentClient()
       ..listError = const AgentSignInFailedException();

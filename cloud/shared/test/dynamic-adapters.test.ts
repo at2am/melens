@@ -23,7 +23,9 @@ const point = JSON.stringify({ type: 'Point', coordinates: [144.963, -37.813] })
 const line = JSON.stringify({ type: 'LineString', coordinates: [[144.96, -37.81], [144.97, -37.82]] });
 
 function observation(overrides: ViewRow = {}): ViewRow {
-  return { source_id: minuteSource.sourceId, batch_id: 'published-batch', sensor_id: '42',
+  return { rights_evidence: 'latest_published_record_v1', source_record_id: 'minute:42:2026-10-01T00:00:00Z',
+    version_id: 'observation-native-v1', location_source_record_id: 'locations:42', location_version_id: 'location-native-v1',
+    source_id: minuteSource.sourceId, batch_id: 'published-batch', sensor_id: '42',
     observed_at: '2026-10-01T00:00:00Z', direction_a_count: null, direction_b_count: 0,
     total_count: null, record_granularity: 'sensor_minute', fetched_at: '2026-10-01T00:02:00Z',
     source_last_success_at: '2026-10-01T00:02:00Z', location_source_id: locationSource.sourceId,
@@ -58,12 +60,12 @@ test('pedestrian missing counts stay null, measured direction zero stays zero, n
   assert.ok(batch.items.every((item) => mapItemSchema.safeParse(item).success));
 });
 
-test('sensor uses exact observation-effective coordinates and does not claim a historical location version', () => {
+test('sensor uses exact observation-effective coordinates and the native historical location version', () => {
   const old = adaptPedestrianRow(observation({ geometry_geojson: JSON.stringify({ type: 'Point',
     coordinates: [144.95, -37.82] }), location_valid_to: '2026-10-01T01:00:00Z' }),
   { source: minuteSource, locationSource });
   assert.deepEqual(old.geometry, { type: 'Point', coordinates: [144.95, -37.82] });
-  assert.equal(old.sources.find((source) => source.sourceId === locationSource.sourceId)?.versionRef, null);
+  assert.equal(old.sources.find((source) => source.sourceId === locationSource.sourceId)?.versionRef, 'location-native-v1');
   assert.equal(old.details.locationValidTo, '2026-10-01T01:00:00Z');
   assert.equal(old.location.role, 'sensor');
 });
@@ -285,4 +287,24 @@ test('a user event carries its description, place and attendance from the JSON s
   const plain = adaptEventRow({ ...row, summary: 'Written before the JSON summary existed' }, { source: userSource });
   assert.equal(plain.details.summary, 'Written before the JSON summary existed');
   assert.throws(() => adaptEventRow({ ...row, summary: '{not json' }, { source: userSource }), invalidRecord);
+});
+
+test('pedestrian rejects missing or obsolete permission evidence and incomplete native identities', () => {
+  const missing = observation();
+  delete missing.rights_evidence;
+  assert.throws(() => adaptPedestrianRow(missing, { source: minuteSource, locationSource }), invalidRecord);
+  for (const overrides of [{ rights_evidence: null }, { rights_evidence: 'published' },
+    { version_id: '' }, { location_version_id: null }]) {
+    assert.throws(() => adaptPedestrianRow(observation(overrides), { source: minuteSource, locationSource }), invalidRecord);
+  }
+});
+
+test('native observation and location revisions change snapshot identity even when visible values stay equal', () => {
+  const first = adaptPedestrianRow(observation(), { source: minuteSource, locationSource });
+  for (const overrides of [{ version_id: 'observation-native-v2' }, { location_version_id: 'location-native-v2' },
+    { source_record_id: 'other-native-observation' }, { location_source_record_id: 'other-native-location' }]) {
+    const changed = adaptPedestrianRow(observation(overrides), { source: minuteSource, locationSource });
+    assert.equal(changed.id, first.id);
+    assert.notEqual(changed.versionId, first.versionId);
+  }
 });
