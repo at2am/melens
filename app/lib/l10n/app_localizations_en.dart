@@ -2159,4 +2159,101 @@ class AppLocalizationsEn extends AppLocalizations {
   String mapDetailRange(String from, String to) {
     return '$from to $to';
   }
+
+  @override
+  String get chatInputHintRefine => 'What should change?';
+
+  @override
+  String chatRefiningPlan(String title) {
+    return 'Changing “$title”';
+  }
+
+  @override
+  String chatRefinedPlan(String title) {
+    return 'Change to “$title”';
+  }
+
+  @override
+  String get chatRefinedPlanUnknown => 'Change to a plan';
+
+  @override
+  String get planRefine => 'Change plan';
+
+  @override
+  String get planRefineCancel => 'Stop changing';
+
+  @override
+  String get planRefineShorter => 'Make it shorter';
+
+  @override
+  String get planRefineCheaper => 'Make it cheaper';
+
+  @override
+  String get planRefineLater => 'Start an hour later';
+
+  @override
+  String get planRefineIndoors => 'Keep it indoors';
+
+  @override
+  String get planSave => 'Save plan';
+
+  @override
+  String get planSaved => 'Saved';
+
+  @override
+  String get planSaveFailed => 'The plan could not be saved. Try again.';
+
+  @override
+  String get planSaveLimit =>
+      'You have 30 saved plans. Remove one on the Feed tab first.';
+
+  @override
+  String get plansSectionTitle => 'Saved plans';
+
+  @override
+  String get plansLoadFailed => 'Saved plans could not load.';
+
+  @override
+  String planStops(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count stops',
+      one: '1 stop',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get planPast => 'Past';
+
+  @override
+  String get planScreenTitle => 'Saved plan';
+
+  @override
+  String get planShowRoute => 'Show the route on the map';
+
+  @override
+  String planSavedOn(String date) {
+    return 'Saved $date';
+  }
+
+  @override
+  String get planMissing => 'This plan is no longer saved.';
+
+  @override
+  String get planRemove => 'Remove plan';
+
+  @override
+  String get planRemoveTitle => 'Remove this plan?';
+
+  @override
+  String get planRemoveBody =>
+      'It disappears from your Feed. The chat it came from stays.';
+
+  @override
+  String get planRemoveCancel => 'Keep';
+
+  @override
+  String get planRemoveFailed => 'The plan could not be removed. Try again.';
 }

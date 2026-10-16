@@ -58,7 +58,8 @@ export const turnRequestSchema = z.strictObject({
   input: turnInputSchema,
   context: requestContextSchema,
   attachments: z.array(attachmentInputSchema).max(ATTACHMENT_LIMITS.perTurn).optional(),
-}).refine((request) => (request.attachments ?? []).length === 0 || request.input.kind === 'text', 'Only a text turn attaches photos')
+}).refine((request) => (request.attachments ?? []).length === 0 || request.input.kind === 'text' || request.input.kind === 'refine',
+  'Only a text or refine turn attaches photos')
   .refine((request) => request.input.kind !== 'text' || request.input.text !== '' || (request.attachments ?? []).length > 0,
     'A text turn needs text or a photo');
 export type TurnRequest = z.infer<typeof turnRequestSchema>;

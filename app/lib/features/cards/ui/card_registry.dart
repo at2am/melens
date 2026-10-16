@@ -14,18 +14,21 @@ Widget buildAgentCard(
   AgentCard card, {
   CardItemCallback? onItemTap,
   ValueChanged<Uri>? onOpenSource,
+  Widget? footer,
 }) => switch (card.type) {
   CardType.areaBrief => AgentCardView(
     card: card,
     icon: Icons.explore_outlined,
     onItemTap: onItemTap,
     onOpenSource: onOpenSource,
+    footer: footer,
   ),
   CardType.anomalyAnalysis => AgentCardView(
     card: card,
     icon: Icons.insights_outlined,
     onItemTap: onItemTap,
     onOpenSource: onOpenSource,
+    footer: footer,
   ),
   CardType.plan => AgentCardView(
     card: card,
@@ -33,17 +36,20 @@ Widget buildAgentCard(
     numbered: true,
     onItemTap: onItemTap,
     onOpenSource: onOpenSource,
+    footer: footer,
   ),
   CardType.history => AgentCardView(
     card: card,
     icon: Icons.history_edu_outlined,
     onItemTap: onItemTap,
     onOpenSource: onOpenSource,
+    footer: footer,
   ),
   CardType.list => AgentCardView(
     card: card,
     icon: Icons.list_alt_outlined,
     onItemTap: onItemTap,
     onOpenSource: onOpenSource,
+    footer: footer,
   ),
 };

@@ -746,6 +746,24 @@ Map<String, dynamic> _$AnswerTurnInputToJson(AnswerTurnInput instance) =>
       'kind': instance.$type,
     };
 
+RefineTurnInput _$RefineTurnInputFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('RefineTurnInput', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['cardId', 'text']);
+      final val = RefineTurnInput(
+        cardId: $checkedConvert('cardId', (v) => v as String),
+        text: $checkedConvert('text', (v) => v as String),
+        $type: $checkedConvert('kind', (v) => v as String?),
+      );
+      return val;
+    }, fieldKeyMap: const {r'$type': 'kind'});
+
+Map<String, dynamic> _$RefineTurnInputToJson(RefineTurnInput instance) =>
+    <String, dynamic>{
+      'cardId': instance.cardId,
+      'text': instance.text,
+      'kind': instance.$type,
+    };
+
 AgentStatusEvent _$AgentStatusEventFromJson(Map<String, dynamic> json) =>
     $checkedCreate('AgentStatusEvent', json, ($checkedConvert) {
       $checkKeys(

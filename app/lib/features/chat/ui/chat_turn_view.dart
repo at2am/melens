@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../map/state/map_actions.dart';
+import '../../plans/ui/plan_card_actions.dart';
 import '../state/chat_models.dart';
 import 'chat_photo_view.dart';
 
@@ -17,6 +18,7 @@ String chatInputText(AppLocalizations strings, TurnInput input) =>
       ),
       AnalyseTurnInput(:final featureId) => strings.chatInputAnalyse(featureId),
       AnswerTurnInput(:final value) => strings.chatInputAnswer(value),
+      RefineTurnInput(:final text) => text,
     };
 
 String chatErrorText(AppLocalizations strings, ChatError error) =>
@@ -99,6 +101,7 @@ class ChatTurnView extends StatelessWidget {
     this.onRetry,
     this.onCardItemTap,
     this.onOpenSource,
+    this.refinedPlanTitle,
     super.key,
   });
 
@@ -110,12 +113,17 @@ class ChatTurnView extends StatelessWidget {
   final CardItemCallback? onCardItemTap;
   final ValueChanged<Uri>? onOpenSource;
 
+  /// For a `refine` input, the title of the plan it changes, when the
+  /// conversation still shows it.
+  final String? refinedPlanTitle;
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final question = turn.question;
+    final refines = turn.input is RefineTurnInput;
     final showOptions =
         isLast &&
         question != null &&
@@ -148,6 +156,33 @@ class ChatTurnView extends StatelessWidget {
                       expandable: true,
                     ),
                 ],
+              ),
+            ),
+          if (refines)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.tune, size: 14, color: colors.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        refinedPlanTitle == null
+                            ? strings.chatRefinedPlanUnknown
+                            : strings.chatRefinedPlan(refinedPlanTitle!),
+                        key: ValueKey('chat-refined-${turn.localId}'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           if (inputText.isNotEmpty)
@@ -205,6 +240,10 @@ class ChatTurnView extends StatelessWidget {
               card,
               onItemTap: onCardItemTap,
               onOpenSource: onOpenSource,
+              // A plan can be changed or saved once its turn has finished.
+              footer: card.type == CardType.plan && !turn.isRunning
+                  ? PlanCardActions(card: card)
+                  : null,
             ),
           if (question != null) ...[
             const SizedBox(height: 4),

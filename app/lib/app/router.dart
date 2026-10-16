@@ -7,6 +7,7 @@ import '../features/events/state/event_view_providers.dart';
 import '../features/feed/ui/feed_editor_screen.dart';
 import '../features/feed/ui/feed_screen.dart';
 import '../features/map/ui/map_screen.dart';
+import '../features/plans/ui/plan_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
 import '../features/shell/ui/app_shell.dart';
 import '../l10n/app_localizations.dart';
@@ -25,10 +26,13 @@ abstract final class AppRoutes {
   static const eventPattern = '/events/:id';
   static const newFeed = '/feeds/new';
   static const editFeedPattern = '/feeds/:id';
+  static const planPattern = '/plans/:id';
 
   static String event(String id) => '/events/${Uri.encodeComponent(id)}';
 
   static String editFeed(String id) => '/feeds/${Uri.encodeComponent(id)}';
+
+  static String plan(String id) => '/plans/${Uri.encodeComponent(id)}';
 }
 
 /// The app's router. It is a provider so that redirects can later watch app
@@ -38,7 +42,8 @@ abstract final class AppRoutes {
 /// position and the map keeps its camera while the user is elsewhere. Event
 /// links (`/events/:id`, the address an invite carries) open that event in the
 /// events panel on the Discover tab. The feed editor opens above the tabs,
-/// from the feed or from Settings, and returns to where it was opened.
+/// from the feed or from Settings, and returns to where it was opened. A
+/// saved plan (`/plans/:id`) opens above the tabs the same way.
 @Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
   final router = GoRouter(
@@ -67,6 +72,11 @@ GoRouter router(Ref ref) {
         path: AppRoutes.editFeedPattern,
         builder: (context, state) =>
             FeedEditorScreen(feedId: state.pathParameters['id']),
+      ),
+      GoRoute(
+        path: AppRoutes.planPattern,
+        builder: (context, state) =>
+            PlanScreen(planId: state.pathParameters['id']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(navigationShell: shell),

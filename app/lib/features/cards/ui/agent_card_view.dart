@@ -54,11 +54,15 @@ class AgentCardView extends ConsumerWidget {
     this.numbered = false,
     this.onItemTap,
     this.onOpenSource,
+    this.footer,
     super.key,
   });
 
   final AgentCard card;
   final IconData icon;
+
+  /// Actions under the items, for example a plan's change and save buttons.
+  final Widget? footer;
 
   /// Plans list stops in visiting order.
   final bool numbered;
@@ -125,6 +129,7 @@ class AgentCardView extends ConsumerWidget {
                 ],
               ),
             ],
+            ?footer,
           ],
         ),
       ),

@@ -115,7 +115,8 @@ final class RequestContext {
   Map<String, dynamic> toJson() => _$RequestContextToJson(this);
 }
 
-/// What the user did: typed, selected a point, tapped Analyse or answered.
+/// What the user did: typed, selected a point, tapped Analyse, answered or
+/// asked to change a plan.
 @Freezed(unionKey: 'kind', fromJson: true, toJson: true)
 sealed class TurnInput with _$TurnInput {
   @FreezedUnionValue('text')
@@ -139,6 +140,14 @@ sealed class TurnInput with _$TurnInput {
     @JsonKey(required: true) required String questionId,
     @JsonKey(required: true) required String value,
   }) = AnswerTurnInput;
+
+  /// Asks the agent to change a plan card of this session; photos may go
+  /// with it as with a text input.
+  @FreezedUnionValue('refine')
+  const factory TurnInput.refine({
+    @JsonKey(required: true) required String cardId,
+    @JsonKey(required: true) required String text,
+  }) = RefineTurnInput;
 
   factory TurnInput.fromJson(Map<String, dynamic> json) =>
       _$TurnInputFromJson(json);
@@ -226,7 +235,8 @@ final class TurnRequest {
   @JsonKey(required: true)
   final RequestContext context;
 
-  /// Photos, only with a `text` input, whose text may then be empty.
+  /// Photos, only with a `text` input (whose text may then be empty) or a
+  /// `refine` input.
   @JsonKey(includeIfNull: false)
   final List<TurnAttachment>? attachments;
 
