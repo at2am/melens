@@ -21,6 +21,11 @@ const mapRequestEnvelope = MapBounds(
   north: -37,
 );
 
+/// The map reads parking (UC-15) only from this camera zoom in, a few streets
+/// across. A wider view holds thousands of bays: its read is slow, can miss
+/// the request deadline and would only show counts.
+const parkingMinZoom = 16.0;
+
 /// Intersect the real visible region with the bounded service envelope.
 /// A completely outside view has no query, rather than invented coverage.
 MapBounds? boundedViewportRegion(MapBounds visible) {
@@ -114,6 +119,12 @@ final class ViewportState {
   );
 
   Set<MapLayerId> get blockedLayers => {
+    ...filterBlockedLayers,
+    if (parkingNeedsZoom) MapLayerId.parking,
+  };
+
+  /// Selected layers that cannot be read without a filter.
+  Set<MapLayerId> get filterBlockedLayers => {
     if (boundaryFilter == null && layers.contains(MapLayerId.boundary))
       MapLayerId.boundary,
     if (areaFilter == null)
@@ -121,6 +132,11 @@ final class ViewportState {
         (layer) => layer == MapLayerId.rent || layer == MapLayerId.census,
       ),
   };
+
+  /// Parking is selected but the searched view is wider than
+  /// [parkingMinZoom], so it is not read.
+  bool get parkingNeedsZoom =>
+      layers.contains(MapLayerId.parking) && zoom < parkingMinZoom;
 
   bool get canQuery =>
       !isCameraMoving && bbox != null && queryableLayers.isNotEmpty;

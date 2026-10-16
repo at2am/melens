@@ -727,6 +727,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Boundary or area layers need a published version and filter before querying.';
 
   @override
+  String get mapParkingZoomIn => 'Zoom in to see parking.';
+
+  @override
   String get mapScreenRegionError => 'The visible map area could not be read.';
 
   @override

@@ -1348,6 +1348,12 @@ abstract class AppLocalizations {
   /// **'Boundary or area layers need a published version and filter before querying.'**
   String get mapScreenFilterRequired;
 
+  /// The parking layer is on, but the map is zoomed out too far to read it.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in to see parking.'**
+  String get mapParkingZoomIn;
+
   /// Safe visible-region failure.
   ///
   /// In en, this message translates to:
