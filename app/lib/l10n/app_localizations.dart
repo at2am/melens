@@ -2027,6 +2027,94 @@ abstract class AppLocalizations {
   /// **'Getting there: {text}'**
   String cardItemGettingThere(String text);
 
+  /// A parking card bay whose live sensor reads vacant.
+  ///
+  /// In en, this message translates to:
+  /// **'Vacant now'**
+  String get cardParkingVacant;
+
+  /// A parking card bay whose live sensor reads occupied.
+  ///
+  /// In en, this message translates to:
+  /// **'Occupied'**
+  String get cardParkingOccupied;
+
+  /// A parking card bay whose sensor has no current reading.
+  ///
+  /// In en, this message translates to:
+  /// **'No reading'**
+  String get cardParkingNoData;
+
+  /// Badge on the parking bay the map moved to: the nearest vacant one.
+  ///
+  /// In en, this message translates to:
+  /// **'Best match'**
+  String get cardParkingBest;
+
+  /// A bay's straight-line distance to the destination the user named.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} to {destination}, about {minutes} min walk'**
+  String cardParkingDistanceTo(
+    String distance,
+    String destination,
+    int minutes,
+  );
+
+  /// A bay's straight-line distance to the destination when it has no name.
+  ///
+  /// In en, this message translates to:
+  /// **'{distance} to your destination, about {minutes} min walk'**
+  String cardParkingDistance(String distance, int minutes);
+
+  /// Label of the area's parking fee on a parking card bay.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee'**
+  String get cardParkingFee;
+
+  /// Label of the area's usual time limit on a parking card bay.
+  ///
+  /// In en, this message translates to:
+  /// **'Time limit'**
+  String get cardParkingTimeLimit;
+
+  /// Label of the days and hours the area's fee and limit apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies'**
+  String get cardParkingHours;
+
+  /// Label of how drivers pay in the area.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay by'**
+  String get cardParkingPayment;
+
+  /// Note under a parking card bay's fee and limits, which describe the area, not this bay.
+  ///
+  /// In en, this message translates to:
+  /// **'Published rules for this area. The sign at the bay decides.'**
+  String get cardParkingAreaRules;
+
+  /// Shown on a parking card bay when no source gave the area's rules.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee and time limit not published for this bay. Check the sign at the bay.'**
+  String get cardParkingRulesUnknown;
+
+  /// The parking zone number a bay sensor reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone {zone}'**
+  String cardParkingZone(int zone);
+
+  /// When a bay sensor last reported, Melbourne local time.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor reported {time}'**
+  String cardParkingReported(String time);
+
   /// A card item that cites a map feature. {id} is the feature id.
   ///
   /// In en, this message translates to:

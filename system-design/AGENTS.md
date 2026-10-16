@@ -82,7 +82,7 @@ Breaking one of these can disqualify the entry.
 - HTTP servers use `node:http` directly, as `cloud/map` does; no web framework.
 - Firestore is written only by the agent service through the Admin SDK, and client security rules deny all access. Chat sessions are stored per Firebase uid; user events (UC-09) in `userEvents`; feed subscriptions (UC-14) per uid in `userFeeds/{uid}`, through the agent service's `/v1/feeds` routes. The only other reader is the `user_events` connector in `cloud/data`, which exports user events to BigQuery read-only; no other service reaches Firestore.
 - Deployment scripts plan by default, take an immutable image digest and audit the runtime identity, following `cloud/map/infra/deploy.sh`.
-- Live parking (UC-15) is a v1 layer. The sensor job collects the whole city; readers use only `v_parking_sensor_current`, which reads only the latest-snapshot table `parking_sensor_current`, never the append-only parking history. Retention runs one query per table. Read the Notes in `use-cases/uc-15-live-parking.md` before changing the parking pipeline, view, retention or layer.
+- Live parking (UC-15) is a v1 layer. The sensor job collects the whole city; readers use only `v_parking_sensor_current`, which reads only the latest-snapshot table `parking_sensor_current`, never the append-only parking history. Retention runs one query per table. Finding parking from the chat goes through the `find_parking` workflow, which focuses the map on the nearest vacant bay and shows fees and limits only as the area's cited rules, never as one bay's. Read the Notes in `use-cases/uc-15-live-parking.md` before changing the parking pipeline, view, retention, layer or `find_parking`.
 
 ## Documentation conventions
 

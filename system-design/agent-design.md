@@ -29,7 +29,7 @@ Not every AI feature is an agent loop. The split is by who decides the next step
 | Mode | Who decides the next step | Used for | Model calls |
 | --- | --- | --- | --- |
 | Pipeline | Code, no conversation | Extraction: news to place and summary (UC-06), BYO field mapping (UC-07) | One structured-output call per item, inside ingestion jobs |
-| Workflow | Code | `area_brief` (UC-02 first card), `analyse_anomaly` (UC-04) | Parallel data fetch, one generation, then code validation |
+| Workflow | Code | `area_brief` (UC-02 first card), `analyse_anomaly` (UC-04), `find_parking` (UC-15) | Parallel data fetch, one generation, then code validation |
 | Loop | The model | Everything typed into the chat box (UC-13), including follow-ups for UC-02, UC-03, UC-08 | Up to 16 per turn |
 
 Workflows exist where the steps are known in advance: the user tapped a specific marker or point, so there is nothing for a model to decide. The loop exists for everything else. Extraction runs inside cloud/data jobs and calls Vertex AI with the job's own identity; it is not part of the agent service.
@@ -102,7 +102,7 @@ Full definitions (arguments, returns, errors, owners, cost) are in [tools.md](to
 | Group | Tools | Purpose |
 | --- | --- | --- |
 | Data | `search_features`, `get_feature`, `heritage_lookup`, `get_anomaly`, `pedestrian_pattern`, `nearby_context` | Read our own data from the published BigQuery views (heritage from its public API) |
-| Workflow | `area_brief`, `analyse_anomaly` | Run a known multi-step procedure in one call |
+| Workflow | `area_brief`, `analyse_anomaly`, `find_parking` | Run a known multi-step procedure in one call |
 | Grounding | `maps_grounding`, `search_grounding` | Answer what our data does not cover; a fallback after the data tools, or a supplement where they leave a gap, never a routine step |
 | UI action | `show_layers`, `focus_map`, `draw_route`, `highlight_features`, `show_card` | Change what the user sees; `show_card` also validates sources |
 | Conversation | `ask_user` | Ask one question when the context cannot resolve the request |
@@ -171,7 +171,14 @@ Detection runs before the workflow and involves no model: a scheduled cloud/data
 4. Items without a source are dropped, and the `area_brief` card is sent.
 5. Follow-up questions go to `map_agent`.
 
-## Models
+### `find_parking` (UC-15)
+
+Called by `map_agent` for any request to find parking; there is no app entry point for it.
+
+1. The workflow starts a Search-grounded lookup of the area's on-street rules (fee, time limit, hours, payment) and reads the parking sensors within 400 m of the destination, then 800 m when fewer than 3 read vacant.
+2. Code ranks the vacant bays by distance and sends `show_layers`, `focus_map` on the nearest vacant bay (zoom 18) and `highlight_features` for up to 5 bays, before the rules lookup ends. The user can then pan and zoom freely; the map reads the bays of whatever it shows.
+3. One generation copies the rules from the cited sources, or none. The card lists each bay with its reading, distance and walking time to the destination and the area's rules, labelled as the area's: the sign at the bay decides, because no crosswalk links a sensor to its sign.
+
 
 Gemini is the only model family in the product, and every call goes through Vertex AI with the service identity. There is no provider abstraction and no fallback to another vendor; the competition requires Google models, and one provider keeps the code small.
 

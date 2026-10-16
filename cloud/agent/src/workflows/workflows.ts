@@ -243,3 +243,169 @@ export const analyseAnomalyTool = (deps: ToolDependencies): ToolSpec<z.ZodObject
     return { card_id: cardId, summary: outcome.value.summary };
   },
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// find_parking (UC-15)
+
+/** Searched in order until enough bays read vacant: a short walk first, then a longer one. */
+const PARKING_RADII_M = [400, 800] as const;
+const PARKING_ENOUGH_VACANT = 3;
+const PARKING_PICKS = 5;
+/** Close enough that each bay is drawn on its own (zoom 17 and above) with its neighbours around it. */
+const PARKING_FOCUS_ZOOM = 18;
+/** A late reading is older than one cadence; it ranks as if this much further away. */
+const LATE_READING_PENALTY_M = 150;
+
+type ParkingItem = Extract<MapItem, { kind: 'parking' }>;
+interface AreaParkingPolicy {
+  readonly fee: string | null; readonly time_limit: string | null; readonly hours: string | null; readonly payment: string | null;
+  readonly url: string; readonly title: string;
+}
+
+const parkingPolicyOutput = z.strictObject({
+  ref: z.string().nullable().describe('The W reference that states these rules, or null when no source states them'),
+  fee: z.string().max(120).nullable().describe('The on-street fee, such as "$7.10 an hour"; null when no source states it'),
+  time_limit: z.string().max(80).nullable().describe('The usual time limit on these streets, such as "Mostly 1P to 2P"'),
+  hours: z.string().max(80).nullable().describe('When the fee and limit apply, such as "Mon to Sat, 7:30 am to 6:30 pm"'),
+  payment: z.string().max(80).nullable().describe('How drivers pay, such as "PayStay app or meter"'),
+});
+
+/**
+ * The published on-street rules for the area around a place, from one cited web source. They describe the area, never
+ * one bay: no admitted crosswalk links a sensor to its bay's sign (cloud/data/docs/source-policies/parking-join.md).
+ * Null when grounding or the workflow model is missing or no source states any rule. Shared across users for the day.
+ */
+async function areaParkingPolicy(deps: ToolDependencies, turn: TurnRegistry, place: string): Promise<AreaParkingPolicy | null> {
+  if (deps.structured === undefined || deps.structured === null || deps.grounding === null) return null;
+  const question = `City of Melbourne on-street parking near ${place}: what is the hourly fee, the usual time limit, `
+    + 'the days and hours they apply, and how do drivers pay?';
+  const key = `parking_policy:${question.toLowerCase().replace(/\s+/g, ' ')}:${melbourneDate(turn.now())}`;
+  const outcome = await cached<AreaParkingPolicy | null>(deps.cache, key, 6 * HOUR, async () => {
+    const answer = await grounded(deps, turn, 'search', question, null).catch(() => null);
+    if (answer === null || isToolError(answer)) return null;
+    const book = new SourceBook();
+    const lines = answer.sources.slice(0, 5).map((source) => `${book.addUrl(source.url, source.title)} [web] ${source.title}`);
+    if (book.size === 0) return null;
+    const output = await generate(deps, turn, 'find_parking', [
+      `On-street parking rules near ${place}, Melbourne. Take each value only from the search answer and the numbered sources; `
+      + 'use null for anything they do not state. Cite the one W reference the rules come from in "ref".', ...lines, '',
+      `Search answer: ${clip(answer.answer, 900)}`,
+    ].join('\n'), parkingPolicyOutput).catch(() => null);
+    const entry = output?.ref == null ? undefined : book.get(output.ref);
+    if (output == null || entry === undefined || !('url' in entry.source)) return null;
+    const text = (value: string | null, limit: number) => value === null || value.trim() === '' ? null : clip(value.trim(), limit);
+    const policy = { fee: text(output.fee, 120), time_limit: text(output.time_limit, 80), hours: text(output.hours, 80),
+      payment: text(output.payment, 80), url: entry.source.url, title: entry.source.title ?? entry.label };
+    return policy.fee === null && policy.time_limit === null && policy.hours === null && policy.payment === null ? null : policy;
+  }, (value) => value !== null);
+  if (outcome.value !== null) turn.urls.add(outcome.value.url);
+  return outcome.value;
+}
+
+function emitAction(turn: TurnRegistry, step: { id: string }, action: TurnRegistry['uiActions'][number]): void {
+  turn.uiActions.push(action);
+  turn.sink.emit({ event: 'ui_action', stepId: step.id, ...action });
+}
+
+/** Where the user is going when the model names no point: the selected point, the user, then the middle of the map. */
+function parkingDestination(turn: TurnRegistry, given: LatLng | undefined): LatLng {
+  const context = turn.turn.request.context;
+  if (given !== undefined) return given;
+  if (context.selected?.point != null) return context.selected.point;
+  if (context.userLocation != null) return context.userLocation;
+  const v = context.viewport;
+  return { lat: (v.north + v.south) / 2, lng: (v.east + v.west) / 2 };
+}
+
+function hhmm(instant: string): string { return toMelbourneIso(instant).slice(11, 16); }
+
+export const findParkingTool = (deps: ToolDependencies): ToolSpec<z.ZodObject> => defineTool({
+  name: 'find_parking',
+  description: 'Find free on-street parking near a destination. It searches the live bay sensors within a short walk (widening when few are free), '
+    + 'turns the parking layer on, moves the map to the nearest vacant bay, highlights the other candidates, and shows the parking card with each '
+    + "bay's distance to the destination and the area's published fee, time limit and hours. Use it for any request to find or check parking. "
+    + 'It shows the card itself: do not also call show_card, focus_map or search_grounding for the same request.',
+  status: 'Looking for free parking',
+  readOnly: false,
+  schema: z.strictObject({
+    destination: latLngSchema.optional().describe('Where the user is going; defaults to the selected point, then the user location, then the map centre'),
+    destination_name: z.string().min(1).max(80).optional().describe('The place as the user names it, such as "Melbourne Central"'),
+  }),
+  detail(args) {
+    const name = (args as { destination_name?: string }).destination_name;
+    return name === undefined ? 'near the destination' : `near ${name}`;
+  },
+  async run(args, turn, step) {
+    const { destination_name: name } = args as { destination?: LatLng; destination_name?: string };
+    const destination = parkingDestination(turn, (args as { destination?: LatLng }).destination);
+    const place = name ?? `latitude ${destination.lat.toFixed(4)}, longitude ${destination.lng.toFixed(4)}`;
+    // The area's rules come from a slow web search; ask now so the map can move as soon as the sensors are read.
+    const policyRequest = areaParkingPolicy(deps, turn, place);
+    const window = windowOf(undefined, turn.now(), { back: 24 * HOUR, ahead: 24 * HOUR })!;
+    let radius: number = PARKING_RADII_M[0];
+    let sensors: { feature: CompactFeature; item: ParkingItem }[] = [];
+    for (radius of PARKING_RADII_M) {
+      const found = await searchArea(deps, turn, { center: destination, radius_m: radius }, ['parking'], window);
+      sensors = found.features.flatMap((feature) => {
+        const item = turn.features.get(feature.id);
+        return item?.kind === 'parking' && feature.distance_m !== null ? [{ feature, item }] : [];
+      });
+      if (sensors.filter(({ item }) => item.details.state === 'vacant').length >= PARKING_ENOUGH_VACANT) break;
+    }
+    const rank = ({ feature, item }: (typeof sensors)[number]) => feature.distance_m! + (item.details.reading === 'late' ? LATE_READING_PENALTY_M : 0);
+    const picks = sensors.filter(({ item }) => item.details.state === 'vacant').sort((a, b) => rank(a) - rank(b)).slice(0, PARKING_PICKS);
+    const occupied = sensors.filter(({ item }) => item.details.state === 'occupied').length;
+    const noData = sensors.length - occupied - sensors.filter(({ item }) => item.details.state === 'vacant').length;
+    emitAction(turn, step, { action: 'show_layers', args: { layers: ['parking'], mode: 'add' } });
+    if (picks.length === 0) {
+      emitAction(turn, step, { action: 'focus_map', args: { target: { point: destination }, zoom: 17 } });
+      await policyRequest.catch(() => null);
+      return { card_id: null, summary: `No sensor reads vacant within ${radius} m of ${name ?? 'the destination'} `
+        + `(${occupied} occupied, ${noData} with no data). The map shows the parking layer there. Off-street car parks are not in the layers.` };
+    }
+    const best = picks[0]!;
+    emitAction(turn, step, { action: 'focus_map', args: { target: { point: { lat: best.feature.lat, lng: best.feature.lng }, feature_id: best.item.id }, zoom: PARKING_FOCUS_ZOOM } });
+    emitAction(turn, step, { action: 'highlight_features', args: { ids: picks.map(({ item }) => item.id), clear_previous: true, missing: [] } });
+    const policy = await policyRequest.catch(() => null);
+    const to = name ?? 'your destination';
+    const rules = policy === null ? 'Fees and time limits: not known; check the sign at the bay.'
+      : [policy.fee === null ? null : `Fee ${policy.fee}`, policy.time_limit, policy.hours === null ? null : `applies ${policy.hours}`]
+        .filter((part): part is string => part !== null).join('; ') + ' (area rules; the sign at the bay decides).';
+    const items: CardItem[] = picks.map(({ feature, item }, index) => {
+      const metres = feature.distance_m!;
+      const walk = Math.max(1, Math.round(metres / WALK_METRES_PER_MINUTE));
+      const reported = item.details.lastReportedAt;
+      return {
+        title: clip(`${index === 0 ? 'Best match: vacant' : 'Vacant'} bay, ${distanceLabel(metres)} away`, 80),
+        summary: clip(`Live sensor: vacant${reported === null ? '' : `, reported ${hhmm(reported)}`}. ${rules} `
+          + 'A vacant sensor does not mean parking is allowed now.', 240),
+        source: { feature_id: item.id },
+        location: { lat: feature.lat, lng: feature.lng },
+        ...(policy?.fee == null ? {} : { cost: clip(policy.fee, 40) }),
+        getting_there: clip(`${distanceLabel(metres)}, about ${walk} min walk to ${to}`, 80),
+        parking: {
+          state: item.details.state, recommended: index === 0, distance_m: metres, walk_min: walk,
+          destination: name ?? null, reported_at: reported === null ? null : toMelbourneIso(reported), zone: item.details.zoneNumber,
+          fee: policy?.fee ?? null, time_limit: policy?.time_limit ?? null, hours: policy?.hours ?? null, payment: policy?.payment ?? null,
+          policy_scope: policy === null ? 'unknown' : 'area', policy_url: policy?.url ?? null,
+        },
+      };
+    });
+    if (policy !== null) {
+      items.push({ title: 'Parking rules in this area', source: { url: policy.url, title: clip(policy.title, 200) },
+        summary: clip([policy.fee === null ? null : `Fee: ${policy.fee}.`, policy.time_limit === null ? null : `Limit: ${policy.time_limit}.`,
+          policy.hours === null ? null : `Applies: ${policy.hours}.`, policy.payment === null ? null : `Pay: ${policy.payment}.`,
+          'These are the area\'s rules; the sign at each bay decides.'].filter(Boolean).join(' '), 240) });
+    }
+    const card: Card = { id: turn.nextCardId(), type: 'list', title: clip(`Parking near ${name ?? 'your destination'}`, 80),
+      intro: clip(`${picks.length === 1 ? '1 bay reads' : `${picks.length} bays read`} vacant within ${radius} m `
+        + `(${occupied} occupied, ${noData} with no data). The map is on the nearest one. A vacant sensor shows no car is on the bay, `
+        + 'not that parking there is allowed now.', 300), items };
+    turn.cards.push(card);
+    turn.sink.emit({ event: 'card', stepId: step.id, card });
+    return { card_id: card.id, focused_on: best.item.id,
+      bays: picks.map(({ feature, item }) => ({ id: item.id, distance_m: feature.distance_m, reading: item.details.reading })),
+      area_rules: policy === null ? null : { fee: policy.fee, time_limit: policy.time_limit, hours: policy.hours, payment: policy.payment, url: policy.url },
+      note: 'The card and the map already show these; add at most one sentence, and say that a vacant sensor is not permission to park.' };
+  },
+});

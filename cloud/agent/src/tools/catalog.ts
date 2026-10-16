@@ -9,9 +9,9 @@ import { centroid, compactFeature, haversineMeters, matchesKeywords, type Compac
 import type { FeatureReader } from '../features/reader.js';
 import { readTurnFeatures, turnSearchTime } from '../features/turn-search.js';
 import { RouteNotFoundError, type RoutesClient } from '../routes/routes-client.js';
-import { cardItemSchema, latLngSchema, timeWindowSchema, type LatLng } from '../protocol/schemas.js';
+import { latLngSchema, modelCardItemSchema, timeWindowSchema, type LatLng } from '../protocol/schemas.js';
 import { cached, type ToolCache } from '../cache.js';
-import { analyseAnomalyTool, areaBriefTool } from '../workflows/workflows.js';
+import { analyseAnomalyTool, areaBriefTool, findParkingTool } from '../workflows/workflows.js';
 import { defineTool, isToolError, toolError, type ToolError, type ToolSpec, type TurnRegistry } from './define.js';
 
 /** The layers the agent can search: the point-feature layers of map contract v1 (tools.md, Shared types). */
@@ -365,7 +365,7 @@ const showCard = defineTool({
     type: z.enum(['plan', 'history', 'list']).describe('plan lists stops in visiting order'),
     title: z.string().min(1).max(80),
     intro: z.string().max(300).optional(),
-    items: z.array(cardItemSchema).min(1).max(13),
+    items: z.array(modelCardItemSchema).min(1).max(13),
   }),
   detail(args) { return `"${args.title}" · ${args.items.length} ${args.items.length === 1 ? 'item' : 'items'}`; },
   async run(args, turn, step) {
@@ -533,7 +533,7 @@ function groundingTool(kind: 'maps' | 'search', deps: ToolDependencies): ToolSpe
 /** The registry for one turn: every tool bound to the turn's registry and dependencies. */
 export function toolSpecs(deps: ToolDependencies): ToolSpec<z.ZodObject>[] {
   return [searchFeatures(deps), getFeature(deps), getAnomaly(deps), nearbyContext(deps), showLayers, focusMap(deps), drawRoute(deps), highlightFeatures(deps), showCard, askUser,
-    areaBriefTool(deps), analyseAnomalyTool(deps), groundingTool('maps', deps), groundingTool('search', deps)];
+    areaBriefTool(deps), analyseAnomalyTool(deps), findParkingTool(deps), groundingTool('maps', deps), groundingTool('search', deps)];
 }
 
 export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['search_features', 'get_feature', 'get_anomaly', 'nearby_context', 'maps_grounding', 'search_grounding']);

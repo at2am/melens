@@ -6,7 +6,7 @@ status: in-progress
 proposed_by: Haoyuan Tang
 trigger: query
 agents: [map_agent]
-tools: [search_features, get_feature, heritage_lookup, get_anomaly, pedestrian_pattern, nearby_context, area_brief, analyse_anomaly, maps_grounding, search_grounding, show_layers, focus_map, draw_route, highlight_features, show_card, ask_user]
+tools: [search_features, get_feature, heritage_lookup, get_anomaly, pedestrian_pattern, nearby_context, area_brief, analyse_anomaly, find_parking, maps_grounding, search_grounding, show_layers, focus_map, draw_route, highlight_features, show_card, ask_user]
 data_sources: [pedestrian-live, pedestrian-history, ptv-gtfs-realtime, road-disruptions, events-ticketmaster, heritage-vhd, news-rss, maps-grounding, search-grounding]
 source_rows: []
 ---

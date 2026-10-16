@@ -1,6 +1,6 @@
 # Tools
 
-**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. Implemented in `cloud/agent` on 2026-10-09: `search_features`, `get_feature`, `nearby_context`, `show_layers`, `focus_map`, `highlight_features`, `show_card`, `ask_user`, `maps_grounding` and `search_grounding`; on 2026-10-15: `get_anomaly`, `draw_route`, `area_brief` and `analyse_anomaly` (the Zod schemas in `cloud/agent/src/tools/catalog.ts` and `cloud/agent/src/workflows/workflows.ts` are now their source of truth); `heritage_lookup` and `pedestrian_pattern` remain this contract until they exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
+**Status:** Draft, 2026-09-28; revised 2026-10-09 so data tools read the published BigQuery views and ids follow the map contract. Implemented in `cloud/agent` on 2026-10-09: `search_features`, `get_feature`, `nearby_context`, `show_layers`, `focus_map`, `highlight_features`, `show_card`, `ask_user`, `maps_grounding` and `search_grounding`; on 2026-10-15: `get_anomaly`, `draw_route`, `area_brief` and `analyse_anomaly`; on 2026-10-16: `find_parking` (the Zod schemas in `cloud/agent/src/tools/catalog.ts` and `cloud/agent/src/workflows/workflows.ts` are now their source of truth); `heritage_lookup` and `pedestrian_pattern` remain this contract until they exist in code. After that the code schemas (Zod in `cloud/agent`, exported as JSON Schema) are the source of truth, and this file keeps the model-facing descriptions and the reasons behind them. Until then, any change to a tool's name, arguments, returns or description updates this file in the same commit.
 
 These are the tools of the chat agent `map_agent`. The two workflow tools run the same code as the app's map-tap and Analyse entry points. How the loop uses the tools is in [agent-design.md](agent-design.md); the events they send to the app are in [agent-protocol.md](agent-protocol.md).
 
@@ -16,6 +16,7 @@ These are the tools of the chat agent `map_agent`. The two workflow tools run th
 | [`nearby_context`](#nearby_context) | Data | Alex | UC-04, UC-13 |
 | [`area_brief`](#area_brief) | Workflow | Wasabii | UC-02, UC-13 |
 | [`analyse_anomaly`](#analyse_anomaly) | Workflow | Alex | UC-04, UC-13 |
+| [`find_parking`](#find_parking) | Workflow | Haoyuan | UC-15, UC-13 |
 | [`maps_grounding`](#maps_grounding) | Grounding | Haoyuan | UC-02, UC-03, UC-13 |
 | [`search_grounding`](#search_grounding) | Grounding | Haoyuan | UC-02, UC-03, UC-04, UC-08, UC-13 |
 | [`show_layers`](#show_layers) | UI action | Haoyuan | UC-01, UC-13 |
@@ -223,6 +224,35 @@ Status lines: "Looking around this area", then the lines of the tools it runs. C
 
 Returns `{ "card_id": "…", "summary": "…" }`; `card_id` is null, with no card, when nothing with a source was found. The summary is at most 500 characters and names the recommended places and activities with their ids. Sends a `card` event of type `area_brief`: the intro is the neighbourhood character, the items are places (no time) then activities (with a time), each citing a feature id or a URL from this turn. Implementation: parallel layer search and Search-grounded answer, one JSON-schema generation, then code drops every item whose numbered source reference was not fetched in this turn; cached by area cell, radius and date.
 
+### `find_parking`
+
+Status lines: "Looking for free parking", then the lines of the tools it runs. Cost: one or two parking map reads, plus one Search grounding call and one generation for the area's rules, both cached across users by question and date. The card itself is never cached: sensor readings change every 2 minutes.
+
+**Description for the model:** Find free on-street parking near a destination. It searches the live bay sensors within a short walk (widening when few are free), turns the parking layer on, moves the map to the nearest vacant bay, highlights the other candidates, and shows the parking card with each bay's distance to the destination and the area's published fee, time limit and hours. Use it for any request to find or check parking. It shows the card itself: do not also call show_card, focus_map or search_grounding for the same request.
+
+| Argument | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `destination` | `LatLng` | No | Defaults to the selected point, then the user location, then the viewport centre |
+| `destination_name` | string | No | At most 80 characters, for example `"Melbourne Central"`; shown on the card and used in the rules search |
+
+Procedure, in this order:
+
+1. Start the area-rules lookup (Search grounding, then one generation that may only copy values the sources state and must cite one W reference; nothing stated means no rules).
+2. Read the `parking` layer within 400 m of the destination; when fewer than 3 bays read vacant, read again within 800 m.
+3. Rank the vacant bays by straight-line distance to the destination; a `late` reading counts as 150 m further. Keep the first 5.
+4. Send `show_layers` (`parking`, `add`), then `focus_map` on the first bay at zoom 18 with its `feature_id`, then `highlight_features` with the 5 ids. The map moves before the rules lookup ends.
+5. Send a `card` of type `list`: one item per bay with a `parking` object (see `CardItem` under `show_card`), plus, when the rules have a source, a last item "Parking rules in this area" citing that URL.
+
+With no vacant bay it sends `show_layers` and `focus_map` on the destination at zoom 17, no card, and says so in the summary.
+
+Returns `{ "card_id": "…", "focused_on": FeatureId, "bays": [{ "id", "distance_m", "reading" }], "area_rules": { "fee", "time_limit", "hours", "payment", "url" } | null, "note": "…" }`, or `{ "card_id": null, "summary": "…" }` when nothing reads vacant.
+
+Rules it keeps (UC-15, do not change without the project owner):
+
+- Fee, time limit, hours and payment are the **area's** published rules from one cited web page, with `policy_scope: "area"`, and the app always says the sign at the bay decides. They are never presented as the rule of one bay: no admitted crosswalk links a sensor to its bay's sign (`cloud/data/docs/source-policies/parking-join.md`). Without a source every field is null, `policy_scope` is `"unknown"`, and the card says to check the sign.
+- The `parking` object is written only by this tool. `show_card` does not accept it, so the model cannot state a fee or a distance for a bay.
+- Distances are straight lines from the sensor to the destination; walking minutes are that distance at 80 m a minute.
+
 ### `analyse_anomaly`
 
 Status lines: "Analysing the pedestrian anomaly", then the lines of the tools it runs. Cost: one generation plus Search grounding; cached per anomaly for all users, because an anomaly does not change.
@@ -365,6 +395,9 @@ Status line: none. Cost: none; validation runs on the server.
 | `place_id` | string | No | For a place from `maps_grounding`; triggers its attribution |
 | `cost` | string | No | For example `"free"` or `"from $59"` |
 | `getting_there` | string | No | For example `"8 min walk"` or `"tram 96"` |
+| `parking` | `CardParking` | No | Only in cards from `find_parking`; `show_card` rejects it |
+
+`CardParking` (UC-15): `state` (`vacant`, `occupied`, `noData`), `recommended` (the bay the map moved to), `distance_m` (straight line to the destination), `walk_min`, `destination` (name or null), `reported_at` (when the sensor last reported, Melbourne time with offset, or null), `zone` (the zone number the sensor reports, or null), `fee`, `time_limit`, `hours`, `payment` (the area's rules, each nullable), `policy_scope` (`area` or `unknown`) and `policy_url` (the page the rules come from, or null). A `find_parking` item also fills `cost` and `getting_there`, so an app that ignores `parking` still shows the fee and the distance.
 
 Validation: the server checks every item's `source` against the feature ids and URLs that tools returned in this turn. If any item fails, the whole call is rejected with `unverified_sources` and the failing item indexes in `details.items`, so the model can drop or fix them and call again. On success it attaches the attribution that grounding requires, sends a `card` event and returns `{ "card_id": "…" }`.
 

@@ -1149,6 +1149,62 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cardParkingVacant => 'Vacant now';
+
+  @override
+  String get cardParkingOccupied => 'Occupied';
+
+  @override
+  String get cardParkingNoData => 'No reading';
+
+  @override
+  String get cardParkingBest => 'Best match';
+
+  @override
+  String cardParkingDistanceTo(
+    String distance,
+    String destination,
+    int minutes,
+  ) {
+    return '$distance to $destination, about $minutes min walk';
+  }
+
+  @override
+  String cardParkingDistance(String distance, int minutes) {
+    return '$distance to your destination, about $minutes min walk';
+  }
+
+  @override
+  String get cardParkingFee => 'Fee';
+
+  @override
+  String get cardParkingTimeLimit => 'Time limit';
+
+  @override
+  String get cardParkingHours => 'Applies';
+
+  @override
+  String get cardParkingPayment => 'Pay by';
+
+  @override
+  String get cardParkingAreaRules =>
+      'Published rules for this area. The sign at the bay decides.';
+
+  @override
+  String get cardParkingRulesUnknown =>
+      'Fee and time limit not published for this bay. Check the sign at the bay.';
+
+  @override
+  String cardParkingZone(int zone) {
+    return 'Zone $zone';
+  }
+
+  @override
+  String cardParkingReported(String time) {
+    return 'Sensor reported $time';
+  }
+
+  @override
   String cardSourceFeature(String id) {
     return 'Source: map feature $id';
   }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { z } from 'zod';
+import type { MapItem } from '@melens/shared/contracts/map-contract';
 
 import { createMapAgentRunner } from '../src/agent/map-agent.js';
 import type { GroundingModel } from '../src/agent/grounding.js';
@@ -202,4 +203,96 @@ test('grounded answers are shared through the cache by tool, question, place cel
   }
   assert.equal(ground.calls, 1);
   void buildTool;
+});
+
+function parkingItem(id: string, lng: number, lat: number, details: Record<string, unknown> = {}): MapItem {
+  return { id: `parking:kerbside:${id}`, versionId: `v-${id}`, layerId: 'parking', kind: 'parking', title: `Parking sensor ${id}`,
+    geometry: { type: 'Point', coordinates: [lng, lat] }, location: { precision: 'point', role: 'sensor', evidence: null },
+    assertionKind: 'observation', lifecycle: 'active',
+    time: { observedAt: null, reportedAt: null, validFrom: null, validTo: null, periodLabel: null, fetchedAt: null, sourceTimeText: null, sourceTimezone: null },
+    sources: [{ sourceId: 'melbourne.parking.sensors', url: null, attribution: 'City of Melbourne', versionRef: null }],
+    details: { sensorId: `kerbside:${id}`, state: 'vacant', noDataReason: null, reading: 'current', lastReportedAt: '2026-10-10T07:38:00.000Z',
+      statusChangedAt: '2026-10-10T07:30:00.000Z', zoneNumber: 7012, legalParking: 'unknown', mayBeObstructed: true, ...details } } as MapItem;
+}
+
+// Melbourne Central is the destination; bays sit about 60 m, 150 m, 250 m and 600 m away.
+const DESTINATION = { lat: -37.8102, lng: 144.9628 };
+const BAYS = [
+  parkingItem('near-occupied', 144.9628, -37.8098, { state: 'occupied' }),
+  parkingItem('near-stale', 144.9630, -37.8100, { state: 'noData', noDataReason: 'notReporting', reading: 'stale' }),
+  parkingItem('a', 144.9628, -37.80966),
+  parkingItem('late', 144.9628, -37.8089, { reading: 'late' }),
+  parkingItem('b', 144.9628, -37.8080),
+  parkingItem('far', 144.9628, -37.8048),
+];
+
+test('find_parking moves the map to the nearest vacant bay, highlights the candidates and shows each bay with its distance and the area rules', async () => {
+  const structured = structuredModel([{ ref: 'W1', fee: '$7.10 an hour', time_limit: 'Mostly 1P to 2P', hours: 'Mon to Sat, 7:30 am to 6:30 pm',
+    payment: 'PayStay app or meter' }]);
+  const ground = grounding([{ title: 'City of Melbourne parking fees', url: 'https://www.melbourne.vic.gov.au/parking-fees' }]);
+  const deps: ToolDependencies = { features: fakeReader(BAYS), grounding: ground, structured, cache: createMemoryCache(clock) };
+  const { turn, sink, spec } = registry(deps);
+  const result = await runTool(spec('find_parking'), turn, { destination: DESTINATION, destination_name: 'Melbourne Central' }) as
+    { card_id: string; focused_on: string; bays: { id: string }[] };
+  assert.equal(result.focused_on, 'parking:kerbside:a');
+  // Three bays read vacant within 400 m, so it does not widen; the late reading ranks after a current bay 100 m further.
+  assert.deepEqual(result.bays.map((bay) => bay.id), ['parking:kerbside:a', 'parking:kerbside:b', 'parking:kerbside:late']);
+  const actions = sink.sent.flatMap((event) => event.event === 'ui_action' ? [event] : []);
+  assert.deepEqual(actions.map((action) => action.action), ['show_layers', 'focus_map', 'highlight_features']);
+  assert.deepEqual(actions[0]?.args, { layers: ['parking'], mode: 'add' });
+  assert.deepEqual(actions[1]?.args, { target: { point: { lat: -37.80966, lng: 144.9628 }, feature_id: 'parking:kerbside:a' }, zoom: 18 });
+  assert.deepEqual((actions[2]?.args as { ids: string[] }).ids, result.bays.map((bay) => bay.id));
+  // The map moves before the card arrives, so the user sees the bay while the rules are still being looked up.
+  assert.ok(sink.sent.findIndex((event) => event.event === 'ui_action') < sink.sent.findIndex((event) => event.event === 'card'));
+  const card = turn.cards[0]!;
+  assert.equal(card.title, 'Parking near Melbourne Central');
+  assert.match(card.intro ?? '', /not that parking there is allowed now/);
+  assert.equal(card.items.length, 4, 'three bays and the rules source');
+  const best = card.items[0]!;
+  assert.equal(best.parking?.recommended, true);
+  assert.equal(best.parking?.state, 'vacant');
+  assert.equal(best.parking?.distance_m, 60);
+  assert.equal(best.parking?.walk_min, 1);
+  assert.equal(best.parking?.destination, 'Melbourne Central');
+  assert.equal(best.parking?.zone, 7012);
+  assert.equal(best.parking?.reported_at, '2026-10-10T18:38:00+11:00');
+  assert.equal(best.parking?.fee, '$7.10 an hour');
+  assert.equal(best.parking?.time_limit, 'Mostly 1P to 2P');
+  assert.equal(best.parking?.policy_scope, 'area');
+  assert.equal(best.parking?.policy_url, 'https://www.melbourne.vic.gov.au/parking-fees');
+  assert.equal(best.cost, '$7.10 an hour', 'older apps still show the fee');
+  assert.equal(best.getting_there, '60 m, about 1 min walk to Melbourne Central');
+  assert.equal(card.items.slice(1, 3).every((item) => item.parking?.recommended === false), true);
+  assert.deepEqual(card.items[3]?.source, { url: 'https://www.melbourne.vic.gov.au/parking-fees', title: 'City of Melbourne parking fees' });
+  assert.match(card.items[3]?.summary ?? '', /the sign at each bay decides/);
+  assert.match(structured.prompts[0] ?? '', /Melbourne Central/);
+});
+
+test('find_parking widens the search when few bays are free, and without rules says they are unknown instead of guessing', async () => {
+  const deps: ToolDependencies = { features: fakeReader(BAYS.filter((bay) => bay.id !== 'parking:kerbside:b')), grounding: null };
+  const reader = deps.features as ReturnType<typeof fakeReader>;
+  const { turn, spec } = registry(deps);
+  const result = await runTool(spec('find_parking'), turn, { destination: DESTINATION }) as { bays: { id: string }[]; area_rules: unknown };
+  assert.equal(reader.queries.length, 2, 'two vacant bays within 400 m, so it looked within 800 m');
+  assert.deepEqual(result.bays.map((bay) => bay.id), ['parking:kerbside:a', 'parking:kerbside:late', 'parking:kerbside:far']);
+  assert.equal(result.area_rules, null);
+  const item = turn.cards[0]!.items[0]!;
+  assert.equal(item.parking?.policy_scope, 'unknown');
+  assert.equal(item.parking?.fee, null);
+  assert.equal(item.cost, undefined);
+  assert.match(item.summary ?? '', /not known; check the sign at the bay/);
+  assert.equal(turn.cards[0]!.items.length, 3, 'no rules item without a source');
+});
+
+test('find_parking with no vacant bay shows the parking layer at the destination and makes no card', async () => {
+  const deps: ToolDependencies = { features: fakeReader([BAYS[0]!, BAYS[1]!]), grounding: null };
+  const { turn, sink, spec } = registry(deps);
+  const result = await runTool(spec('find_parking'), turn, {}) as { card_id: null; summary: string };
+  assert.equal(result.card_id, null);
+  assert.match(result.summary, /No sensor reads vacant within 800 m/);
+  const actions = sink.sent.flatMap((event) => event.event === 'ui_action' ? [event] : []);
+  assert.deepEqual(actions.map((action) => action.action), ['show_layers', 'focus_map']);
+  // No destination given: the user's location from the map context.
+  assert.deepEqual(actions[1]?.args, { target: { point: CONTEXT.userLocation }, zoom: 17 });
+  assert.equal(turn.cards.length, 0);
 });

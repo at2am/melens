@@ -183,6 +183,81 @@ AgentTimeWindow _$AgentTimeWindowFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$AgentTimeWindowToJson(AgentTimeWindow instance) =>
     <String, dynamic>{'from': ?instance.from, 'to': ?instance.to};
 
+CardParking _$CardParkingFromJson(Map<String, dynamic> json) => $checkedCreate(
+  'CardParking',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
+      json,
+      requiredKeys: const [
+        'state',
+        'recommended',
+        'distance_m',
+        'walk_min',
+        'policy_scope',
+      ],
+    );
+    final val = CardParking(
+      state: $checkedConvert(
+        'state',
+        (v) => $enumDecode(_$CardParkingStateEnumMap, v),
+      ),
+      recommended: $checkedConvert('recommended', (v) => v as bool),
+      distanceMetres: $checkedConvert('distance_m', (v) => (v as num).toInt()),
+      walkMinutes: $checkedConvert('walk_min', (v) => (v as num).toInt()),
+      policyScope: $checkedConvert(
+        'policy_scope',
+        (v) => $enumDecode(_$CardParkingPolicyScopeEnumMap, v),
+      ),
+      destination: $checkedConvert('destination', (v) => v as String?),
+      reportedAt: $checkedConvert('reported_at', (v) => v as String?),
+      zone: $checkedConvert('zone', (v) => (v as num?)?.toInt()),
+      fee: $checkedConvert('fee', (v) => v as String?),
+      timeLimit: $checkedConvert('time_limit', (v) => v as String?),
+      hours: $checkedConvert('hours', (v) => v as String?),
+      payment: $checkedConvert('payment', (v) => v as String?),
+      policyUrl: $checkedConvert('policy_url', (v) => v as String?),
+    );
+    return val;
+  },
+  fieldKeyMap: const {
+    'distanceMetres': 'distance_m',
+    'walkMinutes': 'walk_min',
+    'policyScope': 'policy_scope',
+    'reportedAt': 'reported_at',
+    'timeLimit': 'time_limit',
+    'policyUrl': 'policy_url',
+  },
+);
+
+Map<String, dynamic> _$CardParkingToJson(CardParking instance) =>
+    <String, dynamic>{
+      'state': _$CardParkingStateEnumMap[instance.state]!,
+      'recommended': instance.recommended,
+      'distance_m': instance.distanceMetres,
+      'walk_min': instance.walkMinutes,
+      'destination': instance.destination,
+      'reported_at': instance.reportedAt,
+      'zone': instance.zone,
+      'fee': instance.fee,
+      'time_limit': instance.timeLimit,
+      'hours': instance.hours,
+      'payment': instance.payment,
+      'policy_scope': _$CardParkingPolicyScopeEnumMap[instance.policyScope]!,
+      'policy_url': instance.policyUrl,
+    };
+
+const _$CardParkingStateEnumMap = {
+  CardParkingState.vacant: 'vacant',
+  CardParkingState.occupied: 'occupied',
+  CardParkingState.noData: 'noData',
+};
+
+const _$CardParkingPolicyScopeEnumMap = {
+  CardParkingPolicyScope.area: 'area',
+  CardParkingPolicyScope.unknown: 'unknown',
+};
+
 CardItem _$CardItemFromJson(Map<String, dynamic> json) => $checkedCreate(
   'CardItem',
   json,
@@ -209,6 +284,11 @@ CardItem _$CardItemFromJson(Map<String, dynamic> json) => $checkedCreate(
       placeId: $checkedConvert('place_id', (v) => v as String?),
       cost: $checkedConvert('cost', (v) => v as String?),
       gettingThere: $checkedConvert('getting_there', (v) => v as String?),
+      parking: $checkedConvert(
+        'parking',
+        (v) =>
+            v == null ? null : CardParking.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -224,6 +304,7 @@ Map<String, dynamic> _$CardItemToJson(CardItem instance) => <String, dynamic>{
   'place_id': ?instance.placeId,
   'cost': ?instance.cost,
   'getting_there': ?instance.gettingThere,
+  'parking': ?instance.parking?.toJson(),
 };
 
 AgentCard _$AgentCardFromJson(Map<String, dynamic> json) =>
