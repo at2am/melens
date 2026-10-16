@@ -2,7 +2,7 @@ import type { MapConfig } from '@melens/shared/config';
 import { parseMapLayerCatalog, sourceReferenceSchema } from '@melens/shared/contracts/map-contract';
 import type { PublicSourceReference, PublicSourceResolver } from '@melens/shared/query/adapter-common';
 import { createBigQueryViewAdapter, type BigQueryViewAdapter } from '@melens/shared/query/bigquery-adapter';
-import { createCurrentLayerCache } from '@melens/shared/query/current-layer-cache';
+import { createCurrentLayerCache, prepareStateLoad } from '@melens/shared/query/current-layer-cache';
 import { createAnomalyLayerLoader, consumeVerifiedAnomalyBatch, failSoftAnomalyLayerLoader } from '@melens/shared/query/anomalies';
 import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createUnlocatedLayerLoader, createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
@@ -12,7 +12,7 @@ import { cacheSourceCoverage, createSourceCoverageReader, findPublicSource, type
 import { aggregateLayer } from './services/aggregation.js';
 import { createDetailService } from './services/details.js';
 import { createLayerCatalogService } from './services/layer-catalog.js';
-import { createPublicRecordChecker, type PublicRecordChecker } from './services/public-records.js';
+import { createPublicRecordChecker, type CopyStateReader, type PublicRecordChecker } from './services/public-records.js';
 import { coverageRequest } from './services/viewport.js';
 import { createSnapshotStore, type SnapshotStore } from './services/snapshot-store.js';
 import { createUnlocatedService } from './services/unlocated.js';
@@ -40,6 +40,8 @@ export function createMapService(options: {
   readonly coverageStaleMs?: number;
   /** Serve current planning, disruption, event, news, parking and anomaly reads from memory per publication (default on). */
   readonly currentLayerCache?: boolean;
+  /** Prove current geo rights from the refreshed copy while it reflects every source's latest batch (default on). */
+  readonly copyRightsRead?: boolean;
 }) {
   const clock = options.clock ?? (() => new Date());
   const references = new Map((options.publicSources ?? []).map((source) => {
@@ -88,8 +90,26 @@ export function createMapService(options: {
       if (others.length > 0 && (options.checkPublicRecords === undefined || !await options.checkPublicRecords(others, snapshot, coverage, execution))) return false;
       return anomalies.length === 0 || (anomalyConfigured && await checkAnomalyRecords(anomalies, snapshot, coverage, execution));
     };
+  // Which batch the refreshed geo copy reflects; shared by requests and read again when it may be behind.
+  let copyState: { readonly at: number; readonly value: Promise<ReadonlyMap<string, string | null>> } | null = null;
+  // Shared by concurrent requests, so one caller's cancellation does not end the read.
+  const readCopyState: CopyStateReader = (_execution, maxAgeMs) => {
+    const now = clock().getTime();
+    if (copyState === null || now - copyState.at > maxAgeMs) {
+      const value = runner.runPrepared(prepareStateLoad(options.config, 1_000), { pageSize: 1_000, byteBudget: 1024 * 1024 }, {})
+        .then((result) => {
+          if (result.kind !== 'complete') throw new Error('Incomplete copy state');
+          return new Map(result.rows.map((row) => [String(row.source_id), typeof row.batch_id === 'string' ? row.batch_id : null]));
+        });
+      const entry = { at: now, value };
+      copyState = entry;
+      value.catch(() => { if (copyState === entry) copyState = null; });
+    }
+    return copyState.value;
+  };
   const checkPublicRecords = createPublicRecordChecker({ runQuery, resolveSource, external: externalChecker,
-    supplementalVerifier: options.checkPublicRecords !== undefined });
+    supplementalVerifier: options.checkPublicRecords !== undefined,
+    ...(options.copyRightsRead === false ? {} : { readCopyState }), clock });
   const loaders = { runQuery, resolveSource, clock, externalVerifier: options.checkPublicRecords !== undefined,
     resolveArea: options.resolveArea, loadAnomalyLayer };
   const shared = { store, readCoverage, clock, checkPublicRecords, maxResponseBytes: options.config.maxResponseBytes };

@@ -59,6 +59,7 @@ const queryInput = z.object({
   recordKeys: publicRecordKeysSchema.optional(), approvedScope: z.unknown().optional(),
   publicSourceIds: z.array(identifierSchema).max(1_000).optional(),
   resultBudgetBytes: z.number().int().min(2).optional(),
+  rightsRead: z.enum(['served', 'authoritative']).optional(),
 }).strict();
 
 /** Microseconds since the epoch, so BigQuery's microsecond instants compare exactly. */

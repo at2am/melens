@@ -16,6 +16,8 @@ const queryInputSchema = z.strictObject({
   approvedScope: approvedUnlocatedScopeSchema.optional(),
   publicSourceIds: z.array(identifierSchema).max(1_000).optional(),
   resultBudgetBytes: z.number().int().min(2).optional(),
+  /** Public-record proofs only: which current geo view proves the rights (see preparePublicRecordQuery). */
+  rightsRead: z.enum(['served', 'authoritative']).optional(),
 });
 const jsonRecordSchema = z.record(z.string(), z.json());
 const queryRowSchema = z.object({ record: z.string() });
@@ -161,6 +163,7 @@ export function createViewQueryRunner(options: {
         request = parsed.family === 'unlocated' ? parseUnlocatedQuery(parsed.request) : parseViewportQuery(parsed.request);
         if (parsed.family === 'unlocated' ? parsed.approvedScope === undefined || parsed.queryId === 'sourceCoverage' : parsed.approvedScope !== undefined) throw new Error();
         if (parsed.family === 'publicRecords' ? parsed.recordKeys === undefined || parsed.queryId === 'sourceCoverage' : parsed.recordKeys !== undefined) throw new Error();
+        if (parsed.rightsRead !== undefined && parsed.family !== 'publicRecords') throw new Error();
       } catch { throw new MapQueryError('invalidRequest'); }
       if (parsed.queryId !== 'sourceCoverage' && !request.layers.includes(parsed.queryId)) {
         throw new MapQueryError('invalidRequest');
@@ -191,7 +194,8 @@ export function createViewQueryRunner(options: {
       let query: ReturnType<typeof prepareViewQuery>;
       try { query = parsed.family === 'publicRecords'
         ? preparePublicRecordQuery({ queryId: parsed.queryId, request: request as ReturnType<typeof parseViewportQuery>,
-          config, pageSize, recordKeys: parsed.recordKeys! })
+          config, pageSize, recordKeys: parsed.recordKeys!,
+          ...(parsed.rightsRead === undefined ? {} : { currentGeoRead: parsed.rightsRead }) })
         : parsed.family === 'unlocated'
         ? prepareUnlocatedQuery({ queryId: parsed.queryId, request: request as ReturnType<typeof parseUnlocatedQuery>,
           config, pageSize, approvedScope: parsed.approvedScope! })

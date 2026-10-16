@@ -6,6 +6,7 @@ import type { PublicSourceReference } from '@melens/shared/query/adapter-common'
 import type { BigQueryViewAdapter, PreparedViewQuery } from '@melens/shared/query/bigquery-adapter';
 import type { ViewRow } from '@melens/shared/query/query-runner';
 import { createMapService } from '../src/map-service.js';
+import { VERIFIED_RECORD_TTL_MS } from '../src/services/public-records.js';
 
 const config = loadMapConfig({ MAP_PROJECT_ID: 'melens-testing' });
 const source: PublicSourceReference = { sourceId: 'gdelt.news', url: 'https://www.gdeltproject.org/',
@@ -82,6 +83,7 @@ test('Ticketmaster viewport and detail preserve the original event link and revi
 test('map service serves scoped news and rechecks it without an external verifier or replacing the article link', async () => {
   const queries: PreparedViewQuery[] = [];
   let publicRecord = true;
+  let now = Date.parse('2026-10-01T02:00:00Z');
   const coverage = { source_id: source.sourceId, topic: 'news', scope: 'city-of-melbourne',
     coverage_area_refs: ['com:municipal'], coverage_from: window.from, coverage_to: null,
     license_status: 'verified_open', access_status: 'active', health_state: 'current',
@@ -98,7 +100,7 @@ test('map service serves scoped news and rechecks it without an external verifie
         complete: true, hasMore: false }; }, async cancel() {} };
     } };
   const service = createMapService({ config, adapter, currentLayerCache: false,
-    publicSources: [source], clock: () => new Date('2026-10-01T02:00:00Z') });
+    publicSources: [source], clock: () => new Date(now) });
   const viewport = await service.queryViewport(request);
   assert.notEqual(viewport.layers[0]?.state, 'unavailable');
   const page = await service.queryUnlocated(unlocated);
@@ -109,6 +111,9 @@ test('map service serves scoped news and rechecks it without an external verifie
   const item = await service.getItem('news:article1', { requestId: 'details', snapshotId: page.snapshotId });
   assert.equal(item.item.id, 'news:article1');
   publicRecord = false;
+  // The proof stands for one minute within the same publication.
+  assert.equal((await service.getItem('news:article1', { requestId: 'cached', snapshotId: page.snapshotId })).item.id, 'news:article1');
+  now += VERIFIED_RECORD_TTL_MS + 1;
   await assert.rejects(service.getItem('news:article1', { requestId: 'withdrawn', snapshotId: page.snapshotId }),
     (error: unknown) => error instanceof Error && 'code' in error && error.code === 'notAvailable');
 });
