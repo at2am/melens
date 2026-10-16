@@ -461,6 +461,26 @@
   "@mapAggregateZoom": {
     "description": "Accessible action forwarding the group's supplied navigation bounds without inventing a geometry extent."
   },
+  "mapNewsAreaExplanation": "Shaded areas are places these articles name. A named place is not where a reported event happened.",
+  "@mapNewsAreaExplanation": {
+    "description": "UC-06: explains that a news area is an association with the place an article names, never an event site."
+  },
+  "mapNewsAreaLatest": "Latest articles",
+  "@mapNewsAreaLatest": {
+    "description": "UC-06: heading for the latest articles that name the selected area."
+  },
+  "mapNewsAreaShowing": "Showing {shown} of {total}",
+  "@mapNewsAreaShowing": {
+    "description": "UC-06: how many of the area's articles the list shows.",
+    "placeholders": {
+      "shown": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "mapNewsAreaOpenArticle": "Open article",
+  "@mapNewsAreaOpenArticle": {
+    "description": "UC-06: opens the original article of a listed news item."
+  },
   "mapAggregateMembersTitle": "Group members",
   "@mapAggregateMembersTitle": {
     "description": "Heading for the bounded, snapshot-bound member records list."

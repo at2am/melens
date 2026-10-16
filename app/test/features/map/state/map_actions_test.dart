@@ -22,15 +22,15 @@ void main() {
       const UiAction(
         action: UiActionName.showLayers,
         args: <String, dynamic>{
-          'layers': ['event', 'news'],
+          'layers': ['event', 'rent'],
           'mode': 'only',
         },
       ),
     );
     expect(enabled(), {MapLayerId.event});
-    // news belongs to another topic and is reported, not switched to.
+    // rent belongs to another topic and is reported, not switched to.
     expect(only.outcome, MapActionOutcome.partial);
-    expect(only.skipped, ['news']);
+    expect(only.skipped, ['rent']);
 
     final add = actions.apply(
       const UiAction(

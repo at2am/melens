@@ -227,6 +227,9 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
     }
 
     final metric = details.metric;
+    if (details.representation == AggregateRepresentation.areaMentions) {
+      return _areaMentions(context, strings, format);
+    }
     return Semantics(
       container: true,
       child: Column(
@@ -357,6 +360,108 @@ class _AggregateDetailsPanelState extends ConsumerState<AggregateDetailsPanel> {
             TextButton(
               onPressed: _busy ? null : () => unawaited(_readMembers()),
               child: Text(strings.mapAggregateMembersMore),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+extension on _AggregateDetailsPanelState {
+  /// UC-06: an area's latest articles, each with its own original link.
+  Widget _areaMentions(
+    BuildContext context,
+    AppLocalizations strings,
+    NumberFormat format,
+  ) {
+    final details = widget.aggregate.details;
+    final total = details.resultRange.totalMatching;
+    return Semantics(
+      container: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        // The record header above already shows the title and the count's
+        // definition; this section adds the articles themselves.
+        children: [
+          Text(strings.mapNewsAreaExplanation),
+          const SizedBox(height: 16),
+          Text(
+            strings.mapNewsAreaLatest,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (total != null && _members.isNotEmpty)
+            Text(
+              strings.mapNewsAreaShowing(
+                format.format(_members.length),
+                format.format(total),
+              ),
+            ),
+          if (_busy)
+            LinearProgressIndicator(
+              semanticsLabel: strings.mapAggregateMembersLoading,
+            ),
+          if (_failure != null) ...[
+            Text(
+              _snapshotExpired
+                  ? strings.mapAggregateSnapshotExpired
+                  : strings.mapStatusClientError,
+            ),
+            if (_snapshotExpired && widget.onRefreshSnapshot != null)
+              TextButton(
+                onPressed: widget.onRefreshSnapshot,
+                child: Text(strings.mapAggregateRefreshSnapshot),
+              )
+            else if (_failure!.retryable && !_busy)
+              TextButton(
+                onPressed: () => unawaited(_readMembers()),
+                child: Text(strings.mapAggregateMembersRetry),
+              ),
+          ],
+          if (_queried && _members.isEmpty && !_busy && _failure == null)
+            Text(strings.mapAggregateMembersEmpty),
+          for (final member in _members.values)
+            ListTile(
+              key: ValueKey('aggregate-member:${member.id}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(member.title),
+              // The outlet's site says more than the shared GDELT credit,
+              // which the provenance below still carries.
+              subtitle: Text(switch (Uri.tryParse(
+                member.sources.firstOrNull?.url ?? '',
+              )) {
+                Uri(:final host) when host.isNotEmpty => host.replaceFirst(
+                  RegExp(r'^www\.'),
+                  '',
+                ),
+                _ =>
+                  member.sources.isEmpty
+                      ? strings.mapSourceUnknown
+                      : strings.mapSourceAttribution(
+                          member.sources.first.attribution,
+                        ),
+              }),
+              trailing: switch (member.sources.firstOrNull?.url) {
+                final url? when widget.onOpenSource != null => IconButton(
+                  key: ValueKey('aggregate-member-open:${member.id}'),
+                  tooltip: strings.mapNewsAreaOpenArticle,
+                  icon: const Icon(Icons.open_in_new),
+                  onPressed: () => widget.onOpenSource!(Uri.parse(url)),
+                ),
+                _ => null,
+              },
+              onTap: widget.onItemSelected == null
+                  ? null
+                  : () => widget.onItemSelected!(member),
+            ),
+          if (widget.showSummary)
+            MapItemProvenance(
+              time: widget.aggregate.time,
+              sources: widget.aggregate.sources,
+              assertionKind: widget.aggregate.assertionKind,
+              mode: widget.mode,
+              dataMode: widget.dataMode,
+              onOpenSource: widget.onOpenSource,
             ),
         ],
       ),

@@ -85,6 +85,8 @@ CoreRenderPlan buildGeometryRenderPlan({
   bool selected = false,
   VoidCallback? onTap,
   BitmapDescriptor icon = BitmapDescriptor.defaultMarker,
+  double? fillAlpha,
+  int? zIndex,
 }) {
   if (!_validGeometry(geometry)) return const CoreRenderPlan.empty();
   final markers = <Marker>{};
@@ -133,10 +135,10 @@ CoreRenderPlan buildGeometryRenderPlan({
             .toList(growable: false),
         strokeColor: color,
         strokeWidth: selected ? 4 : 2,
-        fillColor: color.withValues(alpha: selected ? 0.2 : 0.1),
+        fillColor: color.withValues(alpha: fillAlpha ?? (selected ? 0.2 : 0.1)),
         consumeTapEvents: onTap != null,
         onTap: onTap,
-        zIndex: selected ? 2 : 1,
+        zIndex: zIndex ?? (selected ? 2 : 1),
       ),
     );
   }
@@ -191,9 +193,8 @@ CoreRenderPlan buildCoreRenderPlan({
   // together because each one's kerb direction comes from its neighbours.
   final bays = [
     for (final item in items)
-      if (item case ParkingMapItem(
-        geometry: GeoJsonPoint(:final coordinates),
-      ) when isDrawableMapItem(item))
+      if (item case ParkingMapItem(geometry: GeoJsonPoint(:final coordinates))
+          when isDrawableMapItem(item))
         (item: item, center: _position(coordinates)),
   ];
   final outlines = parkingBayOutlines([for (final bay in bays) bay.center]);

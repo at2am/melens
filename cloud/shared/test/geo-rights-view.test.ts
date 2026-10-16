@@ -35,3 +35,15 @@ test('historical display and rights retain the historical view and lifecycle rul
   assert.match(proof.query, /g\.record_status != 'withdrawn'/);
   assert.equal(proof.maximumBytesBilled, String(config.historicalScanBytes));
 });
+
+test('a caller that proved the copy current may read current rights from it; history keeps its view', () => {
+  const keys = [{ id: 'wanted', versionId: 'v1', sourceId: 'public.source' }];
+  const served = preparePublicRecordQuery({ queryId: 'news', request, config, pageSize: 1_000, recordKeys: keys,
+    currentGeoRead: 'served' });
+  assert.match(served.query, /`melens-testing\.melens_query\.v_geo_records_current_served`/);
+  assert.match(served.query, /requested\.version_id = g\.version_id/);
+  assert.match(served.query, /g\.record_status IN \('active', 'planned'\)/);
+  const historical = preparePublicRecordQuery({ queryId: 'news', request: { ...request, mode: 'historical' }, config,
+    pageSize: 1_000, recordKeys: keys, currentGeoRead: 'served' });
+  assert.match(historical.query, /`melens-testing\.melens_query\.v_geo_records_history`/);
+});

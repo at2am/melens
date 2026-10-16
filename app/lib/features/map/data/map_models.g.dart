@@ -1204,6 +1204,7 @@ Map<String, dynamic> _$AggregateDetailsToJson(
 const _$AggregateRepresentationEnumMap = {
   AggregateRepresentation.cluster: 'cluster',
   AggregateRepresentation.coverageGrid: 'coverageGrid',
+  AggregateRepresentation.areaMentions: 'areaMentions',
 };
 
 LayerResult _$LayerResultFromJson(Map<String, dynamic> json) =>

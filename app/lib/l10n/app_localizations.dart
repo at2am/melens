@@ -604,6 +604,30 @@ abstract class AppLocalizations {
   /// **'Zoom to group bounds'**
   String get mapAggregateZoom;
 
+  /// UC-06: explains that a news area is an association with the place an article names, never an event site.
+  ///
+  /// In en, this message translates to:
+  /// **'Shaded areas are places these articles name. A named place is not where a reported event happened.'**
+  String get mapNewsAreaExplanation;
+
+  /// UC-06: heading for the latest articles that name the selected area.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest articles'**
+  String get mapNewsAreaLatest;
+
+  /// UC-06: how many of the area's articles the list shows.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {shown} of {total}'**
+  String mapNewsAreaShowing(String shown, String total);
+
+  /// UC-06: opens the original article of a listed news item.
+  ///
+  /// In en, this message translates to:
+  /// **'Open article'**
+  String get mapNewsAreaOpenArticle;
+
   /// Heading for the bounded, snapshot-bound member records list.
   ///
   /// In en, this message translates to:

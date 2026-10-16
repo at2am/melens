@@ -105,6 +105,9 @@ reviewed = {
     # The live parking layer (UC-15), added 2026-10-15: City of Melbourne on-street sensors, CC BY 4.0. Only the
     # sensor feed is public; the static bay points and restriction rules stay unpublished references.
     'melbourne.parking.sensors': ('verified_open', 'data.melbourne.vic.gov.au'),
+    # ABS ASGS 2021/2026 boundaries (CC BY 4.0), added 2026-10-16 so UC-06 can draw the areas news articles
+    # name; it also serves the boundary layer, whose items needed this reference.
+    'abs.asgs.boundaries': ('verified_open', 'www.abs.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:

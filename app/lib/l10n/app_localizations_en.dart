@@ -320,6 +320,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapAggregateZoom => 'Zoom to group bounds';
 
   @override
+  String get mapNewsAreaExplanation =>
+      'Shaded areas are places these articles name. A named place is not where a reported event happened.';
+
+  @override
+  String get mapNewsAreaLatest => 'Latest articles';
+
+  @override
+  String mapNewsAreaShowing(String shown, String total) {
+    return 'Showing $shown of $total';
+  }
+
+  @override
+  String get mapNewsAreaOpenArticle => 'Open article';
+
+  @override
   String get mapAggregateMembersTitle => 'Group members';
 
   @override

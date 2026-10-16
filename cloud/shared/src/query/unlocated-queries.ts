@@ -3,8 +3,8 @@ import type { MapConfig } from '../config.js';
 import { identifierSchema as id, type UnlocatedQuery } from '../contracts/map-contract.js';
 import type { PreparedViewQuery } from './bigquery-adapter.js';
 import {
-  GEO_COLUMNS, GEO_ORDER, NO_BINDINGS, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER,
-  bind, geoTimeFilter, geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection,
+  GEO_COLUMNS, NO_BINDINGS, PEDESTRIAN_COLUMNS, PEDESTRIAN_OBSERVATION_END, PEDESTRIAN_ORDER,
+  bind, geoOrder, geoTimeFilter, geoView, inJsonArray, isGeoQuery, jsonArray, queryDefaults, recordProjection,
   recordStatusFilter, resultLimit, timeWindow, topicFilter, usesTimeWindow, viewPath,
 } from './sql.js';
 import type { ViewQueryId } from './view-queries.js';
@@ -61,5 +61,5 @@ export function prepareUnlocatedQuery(options: {
       AND ${topic.sql}
       AND ${recordStatusFilter(mode)}
       ${scope.areaRefs.length > 0 ? `AND EXISTS (SELECT 1 FROM UNNEST(g.area_refs) ref WHERE ${inJsonArray('ref', 'areaRefsJson')})` : ''}
-      ${windowed ? `AND ${geoTimeFilter(queryId, mode)}` : ''} ${GEO_ORDER}` };
+      ${windowed ? `AND ${geoTimeFilter(queryId, mode)}` : ''} ${geoOrder(queryId)}` };
 }

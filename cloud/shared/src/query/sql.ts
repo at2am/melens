@@ -45,7 +45,7 @@ export const geoRightsView = (mode: QueryMode): ViewName =>
 export const GEO_COLUMNS = `g.geo_record_id, g.version_id, g.source_id, g.topic, g.assertion_kind,
   g.is_prediction, g.title, g.summary, g.original_url, g.geometry_geojson,
   g.location_role, g.location_confidence, g.area_refs, g.observed_at, g.published_at,
-  g.valid_from, g.valid_to, g.fetched_at, g.freshness_state, g.record_status`;
+  g.valid_from, g.valid_to, g.fetched_at, g.source_updated_at, g.freshness_state, g.record_status`;
 export const PEDESTRIAN_COLUMNS = `p.source_id, p.batch_id, p.source_record_id, p.version_id, p.sensor_id, p.observed_at,
   p.direction_a_count, p.direction_b_count, p.total_count, p.record_granularity, p.fetched_at,
   p.source_last_success_at, p.location_source_id, p.location_source_record_id, p.location_version_id,
@@ -67,6 +67,17 @@ export const BOUNDARY_COLUMNS = `b.boundary_id, b.version_id, b.scheme, b.code, 
 export const recordProjection = (columns: string): string => `SELECT TO_JSON_STRING(STRUCT(${columns})) AS record`;
 
 export const GEO_ORDER = 'ORDER BY g.geo_record_id, g.version_id LIMIT @resultLimit';
+/**
+ * When a news row was reported, as far as the record proves. GDELT carries no article time, only
+ * when GKG processed the article (`source_updated_at`), which is after publication. That bound
+ * places a row in time for windows and order only; it is never shown as a publication time.
+ */
+export const NEWS_REPORTED_AT = 'COALESCE(g.published_at, g.observed_at, g.source_updated_at)';
+/** Current news is the reporting of the last week up to the window end, not the map's 15-minute window. */
+export const CURRENT_NEWS_LOOKBACK_DAYS = 7;
+/** Newest first, so a row limit keeps the latest reports. Every page is still returned in id order. */
+export const geoOrder = (queryId: GeoQueryId): string => queryId === 'news'
+  ? `ORDER BY ${NEWS_REPORTED_AT} DESC, g.geo_record_id, g.version_id LIMIT @resultLimit` : GEO_ORDER;
 export const PEDESTRIAN_ORDER = 'ORDER BY p.source_id, p.sensor_id, p.observed_at, p.batch_id LIMIT @resultLimit';
 export const BOUNDARY_ORDER = 'ORDER BY b.boundary_id, b.version_id LIMIT @resultLimit';
 export const PARKING_ORDER = 'ORDER BY s.sensor_id LIMIT @resultLimit';
@@ -121,9 +132,9 @@ export const usesTimeWindow = (queryId: ViewQueryId, mode: QueryMode): boolean =
  */
 export function geoTimeFilter(queryId: GeoQueryId, mode: QueryMode): string {
   if (queryId === 'news') {
-    const start = 'COALESCE(g.published_at, g.observed_at)';
-    const known = `${start} >= @from AND ${start} < @to`;
-    return mode === 'current' ? `(${start} IS NULL OR (${known}))` : known;
+    const start = NEWS_REPORTED_AT;
+    if (mode === 'historical') return `${start} >= @from AND ${start} < @to`;
+    return `(${start} IS NULL OR (${start} >= TIMESTAMP_SUB(@to, INTERVAL ${CURRENT_NEWS_LOOKBACK_DAYS} DAY) AND ${start} < @to))`;
   }
   const start = 'COALESCE(g.valid_from, g.observed_at, g.published_at)';
   const open = '(g.valid_to IS NULL OR g.valid_to > @from)';
