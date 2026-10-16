@@ -101,8 +101,11 @@ function prepare(version: StaticGtfsVersion): PreparedStatic {
   return { version, routes, stops, trips, tripStops, records, stopGeography };
 }
 
+/** Basic and extended GTFS route types: Transport Victoria publishes metro trains as 400 (urban railway). */
 function modeMatches(mode: AlertMode, routeType: number): boolean {
-  return mode === 'yarra_tram' ? routeType === 0 : routeType === 1 || routeType === 2;
+  return mode === 'yarra_tram' ? routeType === 0 || (routeType >= 900 && routeType <= 906)
+    : routeType === 1 || routeType === 2 || (routeType >= 100 && routeType <= 117)
+      || (routeType >= 400 && routeType <= 404);
 }
 
 function publisherFeedVersion(staticFeed: PreparedStatic): string | null {
@@ -177,7 +180,8 @@ function resolveSelector(
     const route = staticFeed.routes.get(routeId);
     if (!route || !modeMatches(mode, route.route_type)) return false;
     if (selector.routeType !== null && route.route_type !== selector.routeType) return false;
-    if (selector.agencyId !== null && route.agency_id !== selector.agencyId) return false;
+    // Published runtime references keep no agency; each mode feed has one agency, so an unknown one is no conflict.
+    if (selector.agencyId !== null && route.agency_id != null && route.agency_id !== selector.agencyId) return false;
     if (stop && !stop.route_ids.includes(routeId)) return false;
     if (selector.directionId !== null) {
       if (trip) return trip.direction_id === selector.directionId;

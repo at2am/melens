@@ -19,11 +19,12 @@ const timestamp = '2026-09-28T00:05:00.000Z';
 const fetchedAt = '2026-09-28T00:06:00.000Z';
 
 function realtime(feedVersion: string | null = 'PTV_GTFS_20260928_v1',
-  selector: { routeId: string | null; stopId: string | null } = { routeId: '2-FLI', stopId: '19499' }): ConnectorSuccess {
+  selector: { routeId: string | null; stopId: string | null; agencyId?: string; routeType?: number | null } =
+  { routeId: '2-FLI', stopId: '19499' }): ConnectorSuccess {
   const metro: ParsedAlertFeed = { feedVersion, feedTimestamp: timestamp, gtfsRealtimeVersion: '2.0',
     alerts: [{ id: 'M-17', activePeriods: [], communicationPeriods: [], impactPeriods: [],
       cause: null, effect: 1, header: 'Disruption', description: null, url: null,
-      selectors: [{ agencyId: null, ...selector, routeType: 2,
+      selectors: [{ agencyId: null, routeType: 2, ...selector,
         directionId: null, tripId: null, tripRouteId: null, tripStartDate: null, tripStartTime: null }] }] };
   const normalized = normalizeAlertFeeds([
     { mode: 'metro_train', resourceUrl: 'https://example.test/metro', parsed: metro, fetchedAt },
@@ -41,9 +42,12 @@ function realtime(feedVersion: string | null = 'PTV_GTFS_20260928_v1',
 
 async function references(publisherMode: 'metro_train' | 'yarra_tram' | null = null,
   official?: { routeShapes: { route_id: string; lines: [number, number][][] }[] }) {
-  const snapshot = parseGtfsSnapshot({ ...JSON.parse(await readFile(
-    new URL('../fixtures/tv_gtfs_static.json', import.meta.url), 'utf8')),
-    ...(official ? { feed_info: [], route_shapes: official.routeShapes } : {}) });
+  const fixture = JSON.parse(await readFile(new URL('../fixtures/tv_gtfs_static.json', import.meta.url), 'utf8'));
+  const snapshot = parseGtfsSnapshot({ ...fixture,
+    // The official feed types metro trains as extended GTFS 400 (urban railway).
+    ...(official ? { feed_info: [], route_shapes: official.routeShapes,
+      routes: fixture.routes.map((route: { route_type: number }) =>
+        route.route_type === 2 ? { ...route, route_type: 400 } : route) } : {}) });
   const normalized = normalizeGtfsSnapshot(snapshot, parseConnectorInput({ sourceId: STATIC_SOURCE_ID,
     window: { kind: 'snapshot', revision: 'latest' }, checkpoint: null, runId: 'published-static' }), fetchedAt,
     // The official reader: no feed_info, a version derived from the archive's HTTP validator.
@@ -131,14 +135,17 @@ test('the official archive schedule places stop alerts at the stop and route ale
     return [rows.map(reference => ({ reference: JSON.stringify(reference) }))];
   });
   // Transport Victoria's alerts carry no feed version that a schedule could be checked against.
-  const atStop = await withPublishedGtfsLocations(realtime(null), config, bq);
+  const atStop = await withPublishedGtfsLocations(realtime(null,
+    { routeId: '2-FLI', stopId: '19499', agencyId: '1', routeType: null }), config, bq);
   const point = atStop.geoRecords[0];
   assert.equal(JSON.parse(point?.summary ?? '{}').gtfs_mapping_status, 'located');
   assert.equal(JSON.parse(point?.summary ?? '{}').static_feed_version, 'archive-sha256:fixture');
   assert.equal(point?.centroid_lat, -37.8183);
   assert.equal(point?.location_confidence, 'official_join');
 
-  const onRoute = await withPublishedGtfsLocations(realtime(null, { routeId: '2-FLI', stopId: null }), config, bq);
+  // As the live feed sends them: agency "1", no route type, the route id alone.
+  const onRoute = await withPublishedGtfsLocations(realtime(null,
+    { routeId: '2-FLI', stopId: null, agencyId: '1', routeType: null }), config, bq);
   const drawn = onRoute.geoRecords[0];
   assert.ok(drawn);
   assert.equal(JSON.parse(drawn.summary ?? '{}').gtfs_mapping_status, 'route_only');
@@ -151,7 +158,8 @@ test('the official archive schedule places stop alerts at the stop and route ale
   assert.equal(onRoute.geoRecordSources.every(link => link.version_id === drawn.version_id), true);
 
   // A route with no shape in the schedule stays unlocated rather than guessed.
-  const noShape = await withPublishedGtfsLocations(realtime(null, { routeId: '2-LIL', stopId: null }), config, bq);
+  const noShape = await withPublishedGtfsLocations(realtime(null,
+    { routeId: '2-LIL', stopId: null, agencyId: '1', routeType: null }), config, bq);
   assert.equal(noShape.geoRecords[0]?.geometry_geojson, null);
   assert.equal(JSON.parse(noShape.geoRecords[0]?.summary ?? '{}').gtfs_mapping_status, 'route_only');
 });
