@@ -30,6 +30,23 @@ AnomalyMapItem _item({Map<String, Object?> details = const {}}) {
   return MapItem.fromJson(json) as AnomalyMapItem;
 }
 
+/// The whole selected-record panel, so the technical ids are present too.
+Widget _panel(AnomalyMapItem item) => MapDetails(
+  state: MapSelectionState(
+    selectedItemId: item.id,
+    item: item,
+    mode: MapQueryMode.historical,
+    dataMode: MapDataMode.sample,
+  ),
+  onClose: () {},
+);
+
+Future<void> _expandTechnical(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Technical details'));
+  await tester.tap(find.text('Technical details'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _show(
   WidgetTester tester,
   AnomalyMapItem item, {
@@ -76,35 +93,61 @@ void main() {
   testWidgets(
     'supplied baseline, delta, direction and identifiers stay exact',
     (tester) async {
-      await _show(
-        tester,
-        _item(
-          details: {
-            'baselineValue': 6.123456789,
-            'observedValue': 12.000000001,
-            'delta': 3.7654321,
-            'direction': 'lower',
-          },
-        ),
+      final item = _item(
+        details: {
+          'baselineValue': 6.123456789,
+          'observedValue': 12.000000001,
+          'delta': 3.7654321,
+          'direction': 'lower',
+        },
       );
+      await _show(tester, item, content: _panel(item));
+      expect(find.text('Usual level'), findsOneWidget);
+      expect(find.text('6.123456789'), findsOneWidget);
+      expect(find.text('12.000000001'), findsOneWidget);
+      expect(find.text('3.7654321'), findsOneWidget);
+      expect(find.text('Unusual'), findsOneWidget);
+      expect(
+        find.text('A difference from the baseline does not establish a cause.'),
+        findsOneWidget,
+      );
+      expect(find.text('Result id: sample.anomaly.A'), findsNothing);
+      await _expandTechnical(tester);
       expect(find.text('Result id: sample.anomaly.A'), findsOneWidget);
       expect(find.text('Observation id: sample.sensor.A'), findsOneWidget);
       expect(
         find.text('Baseline definition id: sample.baseline'),
         findsOneWidget,
       );
-      expect(find.text('Baseline value: 6.123456789'), findsOneWidget);
-      expect(find.text('Observed value: 12.000000001'), findsOneWidget);
-      expect(find.text('Difference from baseline: 3.7654321'), findsOneWidget);
       expect(find.text('Direction: lower than the baseline'), findsOneWidget);
       expect(find.text('Eligibility: eligible'), findsOneWidget);
       expect(find.text('Classification: anomalous'), findsOneWidget);
-      expect(
-        find.text('A difference from the baseline does not establish a cause.'),
-        findsOneWidget,
-      );
     },
   );
+
+  testWidgets('headline compares observed with usual in plain words', (
+    tester,
+  ) async {
+    await _show(
+      tester,
+      _item(
+        details: {
+          'baselineValue': 1361.57,
+          'observedValue': 154,
+          'delta': -1207.57,
+          'direction': 'lower',
+          'baselineDefinitionId': 'same-hour-prev-7d-mean-v1',
+        },
+      ),
+    );
+    expect(find.text('89% below usual'), findsOneWidget);
+    expect(find.text('1,361.57'), findsOneWidget);
+    expect(find.text('-1,207.57'), findsOneWidget);
+    expect(
+      find.text('Average for the same hour over the previous 7 days'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('source window preserves seconds and microseconds in Melbourne', (
     tester,
@@ -128,30 +171,32 @@ void main() {
   testWidgets(
     'missing baseline and observation remain unknown and unclassified',
     (tester) async {
-      await _show(
-        tester,
-        _item(
-          details: {
-            'observationId': null,
-            'baselineDefinitionId': null,
-            'baselineValue': null,
-            'observedValue': null,
-            'delta': null,
-            'direction': 'unknown',
-            'eligibility': 'ineligible',
-            'classification': 'unclassified',
-          },
-        ),
+      final item = _item(
+        details: {
+          'observationId': null,
+          'baselineDefinitionId': null,
+          'baselineValue': null,
+          'observedValue': null,
+          'delta': null,
+          'direction': 'unknown',
+          'eligibility': 'ineligible',
+          'classification': 'unclassified',
+        },
       );
-      for (final label in [
-        'Observation id',
-        'Baseline definition id',
-        'Baseline value',
-        'Observed value',
-        'Difference from baseline',
-      ]) {
-        expect(find.text('$label: Unknown'), findsOneWidget);
-      }
+      await _show(tester, item, content: _panel(item));
+      expect(find.text('Unknown'), findsNWidgets(3));
+      expect(find.textContaining('below usual'), findsNothing);
+      expect(find.textContaining('above usual'), findsNothing);
+      expect(find.text('Not classified'), findsOneWidget);
+      expect(
+        find.text(
+          'This sensor was not eligible for anomaly checks in this window.',
+        ),
+        findsOneWidget,
+      );
+      await _expandTechnical(tester);
+      expect(find.text('Observation id: Unknown'), findsOneWidget);
+      expect(find.text('Baseline definition id: Unknown'), findsOneWidget);
       expect(find.text('Direction: unknown'), findsOneWidget);
       expect(find.text('Eligibility: ineligible'), findsOneWidget);
       expect(find.text('Classification: unclassified'), findsOneWidget);
@@ -162,21 +207,21 @@ void main() {
   testWidgets(
     'known zero and producer no-change do not become unknown values',
     (tester) async {
-      await _show(
-        tester,
-        _item(
-          details: {
-            'baselineValue': 0,
-            'observedValue': 0,
-            'delta': 0,
-            'direction': 'none',
-            'classification': 'notAnomalous',
-          },
-        ),
+      final item = _item(
+        details: {
+          'baselineValue': 0,
+          'observedValue': 0,
+          'delta': 0,
+          'direction': 'none',
+          'classification': 'notAnomalous',
+        },
       );
-      expect(find.text('Baseline value: 0.0'), findsOneWidget);
-      expect(find.text('Observed value: 0.0'), findsOneWidget);
-      expect(find.text('Difference from baseline: 0.0'), findsOneWidget);
+      await _show(tester, item, content: _panel(item));
+      expect(find.text('0'), findsNWidgets(3));
+      expect(find.text('Unknown'), findsNothing);
+      expect(find.text('In line with usual'), findsOneWidget);
+      expect(find.text('Within the usual range'), findsOneWidget);
+      await _expandTechnical(tester);
       expect(
         find.text('Direction: no change from the baseline'),
         findsOneWidget,
@@ -198,9 +243,13 @@ void main() {
           },
         ),
       );
-      expect(find.text('Eligibility: unknown'), findsOneWidget);
-      expect(find.text('Classification: unclassified'), findsOneWidget);
-      expect(find.text('Direction: higher than the baseline'), findsOneWidget);
+      expect(
+        find.text(
+          'Whether this sensor was eligible for anomaly checks is not known.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('100% above usual'), findsOneWidget);
     },
   );
 
@@ -224,38 +273,24 @@ void main() {
       expect(find.textContaining('has been withdrawn'), findsOneWidget);
       expect(find.byKey(const ValueKey('map-anomaly-details')), findsNothing);
       expect(find.textContaining('sample.anomaly.A'), findsNothing);
-      expect(find.textContaining('Classification:'), findsNothing);
+      expect(find.text('Usual level'), findsNothing);
     },
   );
 
-  testWidgets(
-    'T016 replacement shows one anomaly section with shared provenance',
-    (tester) async {
-      final item = _item();
-      await _show(
-        tester,
-        item,
-        content: MapDetails(
-          state: MapSelectionState(
-            selectedItemId: item.id,
-            item: item,
-            mode: MapQueryMode.historical,
-            dataMode: MapDataMode.sample,
-          ),
-          onClose: () {},
-          typedDetailsBuilder: (item) => switch (item) {
-            AnomalyMapItem() => AnomalyDetailsSection(item: item),
-            _ => null,
-          },
-        ),
-      );
-      expect(find.byKey(const ValueKey('map-anomaly-details')), findsOneWidget);
-      expect(find.text('Baseline value: 6.0'), findsOneWidget);
-      expect(find.text('Difference from baseline: 6.0'), findsOneWidget);
-      expect(find.text('Sample data — illustrative only'), findsOneWidget);
-      expect(find.text('Historical data'), findsOneWidget);
-      expect(find.text('Source: Illustrative sample data'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('the panel shows one anomaly section with shared provenance', (
+    tester,
+  ) async {
+    final item = _item();
+    await _show(tester, item, content: _panel(item));
+    expect(find.byKey(const ValueKey('map-anomaly-details')), findsOneWidget);
+    expect(find.text('Usual level'), findsOneWidget);
+    expect(find.text('6'), findsNWidgets(2));
+    expect(find.text('Sample data — illustrative only'), findsOneWidget);
+    expect(find.text('Historical data'), findsOneWidget);
+    expect(find.text('Source: Illustrative sample data'), findsOneWidget);
+    expect(find.text('Source version: sample-v1'), findsNothing);
+    await _expandTechnical(tester);
+    expect(find.text('Source version: sample-v1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

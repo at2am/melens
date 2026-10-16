@@ -3358,6 +3358,348 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paused'**
   String get settingsFeedPaused;
+
+  /// Collapsed section holding record ids, versions and location evidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get mapDetailTechnical;
+
+  /// Fact label for the plain-language location basis.
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get mapDetailLocation;
+
+  /// Location basis: the point is the sensor itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensor position'**
+  String get mapDetailWhereSensor;
+
+  /// Location basis: the source supplies the site location.
+  ///
+  /// In en, this message translates to:
+  /// **'Site given by the source'**
+  String get mapDetailWhereSite;
+
+  /// Location basis: the drawn shape is the affected extent.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected road, route or area'**
+  String get mapDetailWhereExtent;
+
+  /// Location basis: a statistical reporting area.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistical area'**
+  String get mapDetailWhereStatisticalArea;
+
+  /// Location basis: the record is only associated with this area.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked area, not an exact location'**
+  String get mapDetailWhereAreaAssociation;
+
+  /// Location basis: a place named in a report.
+  ///
+  /// In en, this message translates to:
+  /// **'Place mentioned in the report, not where it happened'**
+  String get mapDetailWhereMention;
+
+  /// Location basis is not known.
+  ///
+  /// In en, this message translates to:
+  /// **'Location basis unknown'**
+  String get mapDetailWhereUnknown;
+
+  /// The record has no location on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'No map location'**
+  String get mapDetailWhereUnlocated;
+
+  /// Short status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get mapChipActive;
+
+  /// Short status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned'**
+  String get mapChipPlanned;
+
+  /// Short status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get mapChipCancelled;
+
+  /// Short status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get mapChipResolved;
+
+  /// Short status chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unknown'**
+  String get mapChipStatusUnknown;
+
+  /// Development Activity Monitor status mooted.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed'**
+  String get mapDevelopmentMooted;
+
+  /// Development Activity Monitor status approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get mapDevelopmentApproved;
+
+  /// Development Activity Monitor status under_construction.
+  ///
+  /// In en, this message translates to:
+  /// **'Under construction'**
+  String get mapDevelopmentUnderConstruction;
+
+  /// Development Activity Monitor status completed.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get mapDevelopmentCompleted;
+
+  /// Development project floor count.
+  ///
+  /// In en, this message translates to:
+  /// **'Floors above ground'**
+  String get mapDetailFloors;
+
+  /// Development project residential dwelling count.
+  ///
+  /// In en, this message translates to:
+  /// **'Dwellings'**
+  String get mapDetailDwellings;
+
+  /// Town planning application number.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning application'**
+  String get mapDetailApplication;
+
+  /// Development Activity Monitor project key.
+  ///
+  /// In en, this message translates to:
+  /// **'Project reference'**
+  String get mapDetailProjectRef;
+
+  /// Council running a community consultation.
+  ///
+  /// In en, this message translates to:
+  /// **'Council'**
+  String get mapDetailCouncil;
+
+  /// Categories a council lists for a consultation.
+  ///
+  /// In en, this message translates to:
+  /// **'Topics'**
+  String get mapDetailTopics;
+
+  /// Suburbs or area a consultation covers.
+  ///
+  /// In en, this message translates to:
+  /// **'Area'**
+  String get mapDetailArea;
+
+  /// A consultation that covers the whole council.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole council area'**
+  String get mapDetailCouncilWide;
+
+  /// Subtitle for a council consultation project.
+  ///
+  /// In en, this message translates to:
+  /// **'Community consultation'**
+  String get mapConsultationLabel;
+
+  /// Consultation status Open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open for feedback'**
+  String get mapConsultationOpen;
+
+  /// Consultation status Active.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get mapConsultationActive;
+
+  /// Consultation status Closed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get mapConsultationClosed;
+
+  /// Ticketmaster status onsale.
+  ///
+  /// In en, this message translates to:
+  /// **'Tickets on sale'**
+  String get mapTicketsOnSale;
+
+  /// Ticketmaster status offsale.
+  ///
+  /// In en, this message translates to:
+  /// **'Tickets not on sale'**
+  String get mapTicketsOffSale;
+
+  /// Ticketmaster status cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get mapTicketsCancelled;
+
+  /// Ticketmaster status postponed.
+  ///
+  /// In en, this message translates to:
+  /// **'Postponed'**
+  String get mapTicketsPostponed;
+
+  /// Ticketmaster status rescheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescheduled'**
+  String get mapTicketsRescheduled;
+
+  /// Fact label for an observation window.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get mapDetailTime;
+
+  /// Caption under an hourly pedestrian count.
+  ///
+  /// In en, this message translates to:
+  /// **'people counted in this hour'**
+  String get mapPeopleCountedHour;
+
+  /// Caption under a per-minute pedestrian count.
+  ///
+  /// In en, this message translates to:
+  /// **'people counted in this minute'**
+  String get mapPeopleCountedMinute;
+
+  /// Chip for an anomalous result.
+  ///
+  /// In en, this message translates to:
+  /// **'Unusual'**
+  String get mapAnomalyUnusual;
+
+  /// Chip for a not-anomalous result.
+  ///
+  /// In en, this message translates to:
+  /// **'Within the usual range'**
+  String get mapAnomalyNormal;
+
+  /// Chip for an unclassified result.
+  ///
+  /// In en, this message translates to:
+  /// **'Not classified'**
+  String get mapAnomalyNotChecked;
+
+  /// Headline when the observation equals the baseline.
+  ///
+  /// In en, this message translates to:
+  /// **'In line with usual'**
+  String get mapAnomalyInLine;
+
+  /// Caption under the observed anomaly value.
+  ///
+  /// In en, this message translates to:
+  /// **'observed'**
+  String get mapAnomalyObservedCaption;
+
+  /// Anomaly baseline value label.
+  ///
+  /// In en, this message translates to:
+  /// **'Usual level'**
+  String get mapDetailUsual;
+
+  /// Anomaly eligibility ineligible.
+  ///
+  /// In en, this message translates to:
+  /// **'This sensor was not eligible for anomaly checks in this window.'**
+  String get mapAnomalyIneligibleNote;
+
+  /// Anomaly eligibility unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether this sensor was eligible for anomaly checks is not known.'**
+  String get mapAnomalyEligibilityUnknownNote;
+
+  /// ASGS GCCSA level.
+  ///
+  /// In en, this message translates to:
+  /// **'Greater capital city area'**
+  String get mapBoundaryGccsa;
+
+  /// ASGS LGA level.
+  ///
+  /// In en, this message translates to:
+  /// **'Local government area'**
+  String get mapBoundaryLga;
+
+  /// ASGS SA2 level.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistical Area Level 2'**
+  String get mapBoundarySa2;
+
+  /// ASGS STE level.
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get mapBoundaryState;
+
+  /// CLUE block level.
+  ///
+  /// In en, this message translates to:
+  /// **'City of Melbourne CLUE block'**
+  String get mapBoundaryClueBlock;
+
+  /// Municipal boundary level.
+  ///
+  /// In en, this message translates to:
+  /// **'Municipal boundary'**
+  String get mapBoundaryMunicipal;
+
+  /// Headline: observation is lower than the baseline by a percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} below usual'**
+  String mapAnomalyBelow(String percent);
+
+  /// Headline: observation is higher than the baseline by a percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent} above usual'**
+  String mapAnomalyAbove(String percent);
+
+  /// Plain-language anomaly baseline definition.
+  ///
+  /// In en, this message translates to:
+  /// **'Average for the same hour over the previous {days} days'**
+  String mapAnomalyBaselineSameHour(String days);
+
+  /// A time range; the end is excluded.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} to {to}'**
+  String mapDetailRange(String from, String to);
 }
 
 class _AppLocalizationsDelegate
