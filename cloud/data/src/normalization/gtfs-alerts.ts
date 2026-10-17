@@ -70,6 +70,8 @@ export interface GtfsAlertMapping {
   staticFeedVersion: string | null;
   routeIds: readonly string[];
   stopIds: readonly string[];
+  /** The named routes as riders know them, from the matched schedule: "96 (East Brunswick - St Kilda Beach)". */
+  serviceNames: readonly string[];
   /**
    * The static facts that placed the alert. They belong to another source, and a batch may link
    * only its own source's records, so they travel in the alert summary rather than as links.
@@ -237,6 +239,13 @@ function staticRecord(staticFeed: PreparedStatic, kind: 'stop' | 'route', id: st
   return staticFeed.records.get(recordId) ?? null;
 }
 
+function serviceName(route: StaticGtfsVersion['snapshot']['routes'][number] | undefined): string | null {
+  const short = route?.route_short_name?.trim() || null;
+  const long = route?.route_long_name?.trim() || null;
+  if (short !== null && long !== null && short !== long) return `${short} (${long})`;
+  return short ?? long;
+}
+
 function parseSummary(row: GeoRecord): AlertSummary | null {
   if (row.source_id !== REALTIME_SOURCE_ID || row.summary === null) return null;
   try {
@@ -364,9 +373,12 @@ export function joinGtfsAlertLocations(input: {
         }
       }
     }
+    // Only routes the alert names: an agency- or mode-wide selector lists no service.
+    const serviceNames = staticFeed === null ? []
+      : routeIds.flatMap(routeId => serviceName(staticFeed!.routes.get(routeId)) ?? []);
     mappings.push({ geoRecordId: record.geo_record_id, status,
       staticFeedVersion: staticFeed?.version.normalized.feedVersion ?? null,
-      routeIds, stopIds, staticEvidence });
+      routeIds, stopIds, serviceNames, staticEvidence });
   }
   const unique = new Map<string, GeoRecordSource>();
   for (const link of geoRecordSources) {

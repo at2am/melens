@@ -35,7 +35,7 @@ Translated from the original Chinese in the Notion table:
 - [x] Polling stays within 24 calls per 60 seconds per transport mode (the shared key's limit is 20; schedules peak near 16).
 - [ ] Disruptions are available to `map_agent` and `analyse_anomaly` through `nearby_context`.
 
-**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: the GTFS-R adapter always sends `serviceNames: []` (`cloud/shared/src/query/disruptions.ts`), so a tram or train alert never names its routes, and the details test does not assert the time window or source. `analyse_anomaly` reads disruptions through `searchArea`, not `nearby_context`, and no test shows `nearby_context` returning disruptions.
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: the details test does not assert the time window or source for a disruption. Since 2026-10-17 a tram or train alert that names its routes lists them as services, "96 (East Brunswick - St Kilda Beach)": the data job joins the names from the static schedule into the alert summary (`service_names`), and the map adapter serves them; an agency- or mode-wide alert lists none. Alerts published before the data job image with this change keep an empty list until their next run. `analyse_anomaly` reads disruptions through `searchArea`, not `nearby_context`, and no test shows `nearby_context` returning disruptions.
 
 ## Notes
 

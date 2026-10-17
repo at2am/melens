@@ -153,6 +153,7 @@ test('the official archive schedule places stop alerts at the stop and route ale
   const drawn = onRoute.geoRecords[0];
   assert.ok(drawn);
   assert.equal(JSON.parse(drawn.summary ?? '{}').gtfs_mapping_status, 'route_only');
+  assert.deepEqual(JSON.parse(drawn.summary ?? '{}').service_names, ['Craigieburn (Flinders Street - Craigieburn)']);
   assert.deepEqual(JSON.parse(drawn.geometry_geojson ?? 'null'), { type: 'MultiLineString', coordinates: [line] });
   assert.equal(drawn.centroid_lat, null);
   assert.equal(drawn.location_role, 'event_site');

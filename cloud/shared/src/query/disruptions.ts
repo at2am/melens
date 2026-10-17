@@ -29,16 +29,18 @@ const detailSchema = z.object({
   duration: z.object({ start: z.string().nullish(), end: z.string().nullish() }).nullish(),
   selectors: z.array(z.object({ routeId: z.string().nullable().optional(),
     stopId: z.string().nullable().optional() })).optional(),
+  // Names of the routes the alert names, joined from the static schedule by the data job.
+  service_names: z.array(z.string()).optional(),
 });
 
 function disruptionDetail(row: ViewRow): {
   summary: string | null; impact: string | null; routeSelected: boolean; sourceTimeText: string | null;
-  sourceTimezone: string | null;
+  sourceTimezone: string | null; serviceNames: string[];
 } {
   const summary = row.summary;
   if (summary == null || (typeof summary === 'string' && !summary.trimStart().startsWith('{'))) {
     return { summary: publishedText(summary), impact: null, routeSelected: false,
-      sourceTimeText: null, sourceTimezone: null };
+      sourceTimeText: null, sourceTimezone: null, serviceNames: [] };
   }
   if (typeof summary !== 'string') throw new MapAdapterError();
   let decoded: unknown;
@@ -60,6 +62,7 @@ function disruptionDetail(row: ViewRow): {
   ].flatMap(([label, value]) => value == null ? [] : [`${label}: ${value}`]);
   return { summary: publicSummary, impact, sourceTimeText: clocks.join('; ') || null,
     sourceTimezone: publishedText(detail.source_timezone),
+    serviceNames: [...new Set((detail.service_names ?? []).flatMap((name) => publishedText(name) ?? []))],
     routeSelected: detail.selectors?.some((selector) => selector.routeId != null) ?? false };
 }
 
@@ -102,8 +105,8 @@ export function adaptDisruptionRow(row: ViewRow, options: {
       time,
       sources: [publicSourceReference(options.source, versionId, row.original_url)],
       details: { summary: detail.summary, impact: detail.impact,
-        // Selector IDs are preserved in the source; they are not service names.
-        serviceNames: [], status: lifecycle === 'withdrawn' ? 'unknown' : lifecycle, extentKind },
+        // Selector IDs are not service names; only names joined from the static schedule are.
+        serviceNames: detail.serviceNames, status: lifecycle === 'withdrawn' ? 'unknown' : lifecycle, extentKind },
     });
     if (parsed.kind !== 'disruption') throw new MapAdapterError();
     return parsed;
