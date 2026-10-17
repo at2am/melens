@@ -1350,13 +1350,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 }
               : null,
         ),
-        SizedBox(
-          height: 240,
-          child: MapObjectList(
-            items: items,
-            selectedItemId: selectedItemId,
-            onSelected: select,
-          ),
+        MapObjectList(
+          items: items,
+          selectedItemId: selectedItemId,
+          onSelected: select,
+          embedded: true,
         ),
         ExpansionTile(
           key: const ValueKey('map-data-status'),

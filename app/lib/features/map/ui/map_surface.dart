@@ -408,12 +408,27 @@ String _describeItem(AppLocalizations strings, MapItem item) {
   return description.join(' · ');
 }
 
+/// A group's own title names only its measure ("Verified anomaly results"),
+/// which reads the same on every row; the list adds its layer and count.
+String _listTitle(AppLocalizations strings, MapItem item) {
+  if (item case AggregateMapItem(:final details)) {
+    final value = details.metric.value;
+    final count = value == null
+        ? null
+        : '${NumberFormat.decimalPattern('en_AU').format(value)} '
+              '${details.metric.unit}';
+    return [layerTitle(strings, item.layerId), ?count].join(' · ');
+  }
+  return item.title;
+}
+
 /// The map's results as a list: the text alternative to the drawn shapes.
 class MapObjectList extends StatelessWidget {
   const MapObjectList({
     required this.items,
     required this.selectedItemId,
     required this.onSelected,
+    this.embedded = false,
     super.key,
   });
 
@@ -421,11 +436,17 @@ class MapObjectList extends StatelessWidget {
   final String? selectedItemId;
   final ValueChanged<MapItem>? onSelected;
 
+  /// Inside a page that scrolls (the Results sheet): the list takes its
+  /// full height and scrolls with the page instead of in a box of its own.
+  final bool embedded;
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     return ListView.builder(
       key: const ValueKey('map-surface-objects'),
+      shrinkWrap: embedded,
+      physics: embedded ? const NeverScrollableScrollPhysics() : null,
       itemCount: items.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -440,7 +461,7 @@ class MapObjectList extends StatelessWidget {
         final item = items[index - 1];
         return ListTile(
           key: ValueKey('map-object:${item.id}'),
-          title: Text(item.title),
+          title: Text(_listTitle(strings, item)),
           subtitle: Text(_describeItem(strings, item)),
           selected: item.id == selectedItemId,
           onTap: onSelected == null ? null : () => onSelected!(item),

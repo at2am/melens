@@ -279,7 +279,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapSurfaceAreaLocation => 'Reported area extent';
 
   @override
-  String get mapSurfaceObjectList => 'Map objects — keyboard accessible';
+  String get mapSurfaceObjectList => 'On the map';
 
   @override
   String mapAggregateLoadedRecords(String count) {

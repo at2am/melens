@@ -392,7 +392,7 @@
   "@mapSurfaceAreaLocation": {
     "description": "Accessible object-list location precision for a supplied area."
   },
-  "mapSurfaceObjectList": "Map objects — keyboard accessible",
+  "mapSurfaceObjectList": "On the map",
   "@mapSurfaceObjectList": {
     "description": "Object list provides exact counts and keyboard selection independently of platform-map interaction."
   },
