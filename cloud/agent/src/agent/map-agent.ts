@@ -177,7 +177,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         try {
           const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
             newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.planCard, questionsOf(turn.history),
-              turn.session.pendingQuestion),
+              turn.session.pendingQuestion, turn.memory ?? null),
             runConfig, abortSignal: turn.signal });
           for await (const event of events) {
             if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);

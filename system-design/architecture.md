@@ -19,7 +19,7 @@ flowchart TB
     Jobs["Scheduled ingestion: Cloud Run jobs, one per source, cloud/data"]
     BQ[("BigQuery: admitted published query views + history")]
     Storage[("GCS: permitted batch staging")]
-    FS[("Firestore: chat sessions, user events and feed subscriptions per user, grounding cache, rate-limit counters")]
+    FS[("Firestore: chat sessions, user events, feed subscriptions and memory per user, grounding cache, rate-limit counters")]
     Auth["Firebase Auth: anonymous uid"]
     AI["Vertex AI: Gemini, Search and Maps grounding"]
     Maps["Maps Platform: Routes API, map rendering"]
@@ -50,7 +50,7 @@ The map app does not query BigQuery directly and has no Firestore map listener. 
 | Ingestion | Cloud Run jobs, Cloud Scheduler, cloud/data | Source admission, normalization, publication and provenance |
 | BigQuery | Google Cloud | Published query views and historical facts; the anomaly detector (a cloud/data job) publishes anomaly results here |
 | GCS | Google Cloud | Permitted NDJSON batch staging; not the client wire format |
-| Firestore | Google Cloud | Agent-only store, reached only by the agent service: chat sessions per user, user events (`userEvents`), feed subscriptions per user (`userFeeds/{uid}`), grounding cache and rate-limit counters. Not a map data store |
+| Firestore | Google Cloud | Agent-only store, reached only by the agent service: chat sessions per user, user events (`userEvents`), feed subscriptions per user (`userFeeds/{uid}`), the assistant's memory per user (`userMemory/{uid}`, UC-16), grounding cache and rate-limit counters. Not a map data store |
 | Firebase Auth | Google Cloud | Anonymous uid for every user; the agent service verifies the ID token |
 | Vertex AI | Google Cloud | Gemini models and Search/Maps grounding, called with the agent service identity |
 | Maps Platform | Google Cloud | Routes API for `draw_route`; map rendering and grounding attribution in the app |
@@ -87,7 +87,7 @@ Agent tools and cards use the same identity: a `featureId` in [tools.md](tools.m
 
 The Web origin and both services' CORS allowlists must agree; the agent service additionally allows the `Authorization` header. Only admitted public fields are exposed by the public prototype; no caller SQL, raw/staging records or private admission evidence. Neither service identity has an ingestion write role. Build-time Maps/API configuration is documented in app/README.md; the app carries two base URLs, `MAP_BASE_URL` and `AGENT_BASE_URL`.
 
-Agent streaming calls Cloud Run directly rather than relying on Firebase Hosting rewrite duration. The agent service allows unauthenticated invocation at the Cloud Run level, because a browser cannot obtain an IAM token; it verifies the Firebase ID token on every request and rate-limits per uid. Its request timeout covers a full turn of 16 model calls (300 seconds; the turn itself times out at 270 seconds so it is stored before the stream is cut). Sessions live in Firestore, so the service may run several instances; it and the map service keep one instance warm (min-instances=1) to avoid cold starts. The Firestore database `(default)` is in `australia-southeast2` (Native mode, delete protection, created on 2026-10-09 by `cloud/agent/infra/bootstrap.sh`) with TTL policies on `expiresAtTs` for the `sessions`, `turns` and `attachments` collection groups. Its identity, `melens-ENV-agent`, holds `melens_query` READER, project `bigquery.jobUser`, `aiplatform.user`, `datastore.user` and, once the Routes API tool reads it, `secretAccessor` on the Maps Platform key only.
+Agent streaming calls Cloud Run directly rather than relying on Firebase Hosting rewrite duration. The agent service allows unauthenticated invocation at the Cloud Run level, because a browser cannot obtain an IAM token; it verifies the Firebase ID token on every request and rate-limits per uid. Its request timeout covers a full turn of 16 model calls (300 seconds; the turn itself times out at 270 seconds so it is stored before the stream is cut). Sessions live in Firestore, so the service may run several instances; it and the map service keep one instance warm (min-instances=1) to avoid cold starts. The Firestore database `(default)` is in `australia-southeast2` (Native mode, delete protection, created on 2026-10-09 by `cloud/agent/infra/bootstrap.sh`) with TTL policies on `expiresAtTs` for the `sessions`, `turns` and `attachments` collection groups (and `userMemory` once `bootstrap.sh --apply` runs again after 2026-10-17). Its identity, `melens-ENV-agent`, holds `melens_query` READER, project `bigquery.jobUser`, `aiplatform.user`, `datastore.user` and, once the Routes API tool reads it, `secretAccessor` on the Maps Platform key only.
 
 Cloud Run, BigQuery, GCS and Firestore stay in `australia-southeast2`. Gemini and both grounding tools are served from the `global` Vertex AI location (`AGENT_VERTEX_LOCATION=global`): on 2026-10-09 `gemini-3.8-flash` answered plain, Search-grounded and Maps-grounded requests there and was not found in `australia-southeast1` ([cloud/agent/infra/README.md](../cloud/agent/infra/README.md)).
 

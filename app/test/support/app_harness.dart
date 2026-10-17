@@ -16,6 +16,7 @@ import 'package:melens/features/map/data/sample_map_repository.dart';
 import 'package:melens/features/map/state/layer_controller.dart';
 import 'package:melens/features/map/state/map_providers.dart';
 import 'package:melens/features/map/ui/map_surface.dart';
+import 'package:melens/features/memory/state/memory_providers.dart';
 import 'package:melens/features/plans/state/plans_providers.dart';
 
 import '../features/agent/fake_agent_client.dart';
@@ -23,6 +24,7 @@ import '../features/events/fake_user_events_client.dart';
 import '../features/feed/fake_feeds_cache.dart';
 import '../features/feed/fake_feeds_client.dart';
 import '../features/map/fake_layer_memory.dart';
+import '../features/memory/fake_memory_client.dart';
 import '../features/plans/fake_plans_client.dart';
 
 /// 18 Oct 2026, 11:00 Melbourne time, a Sunday.
@@ -59,14 +61,15 @@ List<UserEvent> harnessEvents() => [
   ),
 ];
 
-/// The whole app on sample data, a fake agent, fake events, feeds and plans
-/// services and a fixed clock.
+/// The whole app on sample data, a fake agent, fake events, feeds, plans and
+/// memory services and a fixed clock.
 ProviderContainer appContainer({
   FakeAgentClient? agent,
   FakeUserEventsClient? events,
   FakeFeedsClient? feeds,
   FakeFeedsCache? feedsCache,
   FakePlansClient? plans,
+  FakeMemoryClient? memory,
   FakeLayerMemory? layerMemory,
   MapSurfaceReadiness readiness = MapSurfaceReadiness.missingKey,
   bool sampleData = true,
@@ -92,6 +95,7 @@ ProviderContainer appContainer({
     feedsClientProvider.overrideWithValue(feeds ?? FakeFeedsClient()),
     feedsCacheProvider.overrideWithValue(feedsCache ?? FakeFeedsCache()),
     plansClientProvider.overrideWithValue(plans ?? FakePlansClient()),
+    memoryClientProvider.overrideWithValue(memory ?? FakeMemoryClient()),
     layerMemoryProvider.overrideWithValue(layerMemory ?? FakeLayerMemory()),
     melbourneClockProvider.overrideWithValue(
       MelbourneClock(now: () => harnessNow),

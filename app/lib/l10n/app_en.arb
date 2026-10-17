@@ -1974,6 +1974,58 @@
   "@settingsThemeDark": {
     "description": "Theme option."
   },
+  "settingsMemory": "Memory",
+  "@settingsMemory": {
+    "description": "Settings section for what the assistant remembers about the user."
+  },
+  "settingsMemorySwitch": "Let the assistant remember me",
+  "@settingsMemorySwitch": {
+    "description": "Switch that turns the assistant's memory of the user on or off."
+  },
+  "settingsMemoryOn": "It learns from what you tell it and what you browse, to tailor its answers.",
+  "@settingsMemoryOn": {
+    "description": "Subtitle of the memory switch while it is on."
+  },
+  "settingsMemoryOff": "It neither uses nor adds to what it remembers.",
+  "@settingsMemoryOff": {
+    "description": "Subtitle of the memory switch while it is off."
+  },
+  "settingsMemoryEmpty": "Nothing remembered yet.",
+  "@settingsMemoryEmpty": {
+    "description": "Shown when the assistant remembers nothing about the user."
+  },
+  "settingsMemoryBrowses": "Often browses",
+  "@settingsMemoryBrowses": {
+    "description": "Title of the line listing the map layers and event categories the user browses most."
+  },
+  "settingsMemoryForget": "Forget this",
+  "@settingsMemoryForget": {
+    "description": "Tooltip of the button that deletes one remembered fact."
+  },
+  "settingsMemoryClear": "Forget everything",
+  "@settingsMemoryClear": {
+    "description": "Button that deletes everything the assistant remembers."
+  },
+  "settingsMemoryClearTitle": "Forget everything?",
+  "@settingsMemoryClearTitle": {
+    "description": "Title of the dialog confirming that the assistant forgets everything."
+  },
+  "settingsMemoryClearBody": "The assistant forgets what it learned from your chats and what you browse. Your conversations stay.",
+  "@settingsMemoryClearBody": {
+    "description": "Body of the dialog confirming that the assistant forgets everything."
+  },
+  "settingsMemoryClearConfirm": "Forget",
+  "@settingsMemoryClearConfirm": {
+    "description": "Confirm button of the dialog that makes the assistant forget everything."
+  },
+  "settingsMemoryError": "What the assistant remembers could not load.",
+  "@settingsMemoryError": {
+    "description": "Shown when the memory could not be loaded."
+  },
+  "settingsMemorySaveFailed": "The change could not be saved. Try again.",
+  "@settingsMemorySaveFailed": {
+    "description": "Snack bar when a memory change failed."
+  },
   "settingsAbout": "About",
   "@settingsAbout": {
     "description": "Settings section."

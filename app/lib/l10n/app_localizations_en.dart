@@ -1445,6 +1445,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsThemeDark => 'Dark';
 
   @override
+  String get settingsMemory => 'Memory';
+
+  @override
+  String get settingsMemorySwitch => 'Let the assistant remember me';
+
+  @override
+  String get settingsMemoryOn =>
+      'It learns from what you tell it and what you browse, to tailor its answers.';
+
+  @override
+  String get settingsMemoryOff =>
+      'It neither uses nor adds to what it remembers.';
+
+  @override
+  String get settingsMemoryEmpty => 'Nothing remembered yet.';
+
+  @override
+  String get settingsMemoryBrowses => 'Often browses';
+
+  @override
+  String get settingsMemoryForget => 'Forget this';
+
+  @override
+  String get settingsMemoryClear => 'Forget everything';
+
+  @override
+  String get settingsMemoryClearTitle => 'Forget everything?';
+
+  @override
+  String get settingsMemoryClearBody =>
+      'The assistant forgets what it learned from your chats and what you browse. Your conversations stay.';
+
+  @override
+  String get settingsMemoryClearConfirm => 'Forget';
+
+  @override
+  String get settingsMemoryError =>
+      'What the assistant remembers could not load.';
+
+  @override
+  String get settingsMemorySaveFailed =>
+      'The change could not be saved. Try again.';
+
+  @override
   String get settingsAbout => 'About';
 
   @override

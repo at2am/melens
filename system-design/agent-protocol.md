@@ -292,6 +292,39 @@ Rules:
 | --- | --- |
 | `userPlans/{uid}/plans/{planId}` | The saved plan above. A document that no longer parses is left out of the list |
 
+## Memory
+
+What the assistant remembers about the caller (UC-16), on `/v1/memory`: lasting facts the agent service learns from the chat, and what the user browses on the map. The agent reads it at the start of every turn.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /v1/memory` | `{ "memory": … }`, below; a uid with none reads as on and empty, `updatedAt` null |
+| `PATCH /v1/memory` | Switch it, body `{ "enabled": false }`; `200` with `{ "memory": … }` |
+| `DELETE /v1/memory` | Forget every fact and all browsing; the switch stays. `204` |
+| `DELETE /v1/memory/facts/{factId}` | Forget one fact; `204`, or `404 notFound` |
+| `POST /v1/memory/signals` | Browsing, body `{ "signals": [{ "kind": "open", "layer": "event", "category": "music" }] }` (1 to 50); `204` |
+
+```json
+{
+  "enabled": true,
+  "facts": [{ "id": "m_4Qx…", "kind": "travel", "text": "Drives into the city", "updatedAt": "2026-10-17T07:00:00.000Z" }],
+  "browsing": { "layers": [{ "layer": "parking", "share": 0.6 }, { "layer": "event", "share": 0.3 }], "categories": ["music"] },
+  "updatedAt": "2026-10-17T07:00:00.000Z"
+}
+```
+
+Rules:
+
+1. **Facts.** `kind` is `travel`, `interest`, `routine`, `preference` or `other`; `text` is one short English sentence. After each stored turn whose input has the user's own words (`text` with text, `answer`, `answers`, `refine`), the service reads the exchange with Gemini and adds, updates or removes facts. It runs after the turn's `done` or `error`, so the turn's `usage` does not count it; the call is logged as `memoryLearned` with its tokens. A failure is logged and changes nothing. At most 24 facts.
+2. **Browsing.** A signal is `show` (a layer turned on, weight 1) or `open` (a record opened, weight 2), for a map layer id or `community`, with an optional event `category` (at most 40 characters, kept lower case). It carries no place, record id or time; any other field answers `400`. Weights halve every 14 days. `browsing` lists up to four layers with weight 3 or more, heaviest first, with their share of all layer weight, and up to five categories with weight 2 or more.
+3. **Off.** While `enabled` is false the agent neither reads nor adds to the memory, and signals are accepted and dropped.
+4. **Limits.** Signal batches, switches and deletions count against a per-uid limit of 240 per hour (`429 rateLimited`); reads and the updates after turns do not.
+5. **Lifetime.** The memory is deleted 180 days after its last change; deleting sessions does not delete it.
+
+| Document | Fields |
+| --- | --- |
+| `userMemory/{uid}` | `enabled`, `facts`, the weights `layers` and `categories` with `browsedAt`, `updatedAt`, and `expiresAtTs` (TTL). A document that no longer parses reads as none |
+
 ## Authentication
 
 Firebase Anonymous Auth gives every user, judges included, a uid without a sign-in screen. Requests carry the Firebase ID token in the `Authorization` header. The Cloud Run service allows unauthenticated invocation at the platform level, because a browser cannot obtain an IAM token; the service itself verifies the Firebase ID token on every request and rejects a missing or invalid token before any model or tool call. This ties sessions to users and allows per-uid rate limiting, with counters in Firestore, which protects the per-call grounding budget. Adding data sources (UC-07) and publishing events (UC-09) may need a full account; see the open questions in those use cases.

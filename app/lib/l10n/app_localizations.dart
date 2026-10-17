@@ -2565,6 +2565,84 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsThemeDark;
 
+  /// Settings section for what the assistant remembers about the user.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get settingsMemory;
+
+  /// Switch that turns the assistant's memory of the user on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant remember me'**
+  String get settingsMemorySwitch;
+
+  /// Subtitle of the memory switch while it is on.
+  ///
+  /// In en, this message translates to:
+  /// **'It learns from what you tell it and what you browse, to tailor its answers.'**
+  String get settingsMemoryOn;
+
+  /// Subtitle of the memory switch while it is off.
+  ///
+  /// In en, this message translates to:
+  /// **'It neither uses nor adds to what it remembers.'**
+  String get settingsMemoryOff;
+
+  /// Shown when the assistant remembers nothing about the user.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing remembered yet.'**
+  String get settingsMemoryEmpty;
+
+  /// Title of the line listing the map layers and event categories the user browses most.
+  ///
+  /// In en, this message translates to:
+  /// **'Often browses'**
+  String get settingsMemoryBrowses;
+
+  /// Tooltip of the button that deletes one remembered fact.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget this'**
+  String get settingsMemoryForget;
+
+  /// Button that deletes everything the assistant remembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget everything'**
+  String get settingsMemoryClear;
+
+  /// Title of the dialog confirming that the assistant forgets everything.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget everything?'**
+  String get settingsMemoryClearTitle;
+
+  /// Body of the dialog confirming that the assistant forgets everything.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant forgets what it learned from your chats and what you browse. Your conversations stay.'**
+  String get settingsMemoryClearBody;
+
+  /// Confirm button of the dialog that makes the assistant forget everything.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get settingsMemoryClearConfirm;
+
+  /// Shown when the memory could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'What the assistant remembers could not load.'**
+  String get settingsMemoryError;
+
+  /// Snack bar when a memory change failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The change could not be saved. Try again.'**
+  String get settingsMemorySaveFailed;
+
   /// Settings section.
   ///
   /// In en, this message translates to:

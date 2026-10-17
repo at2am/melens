@@ -22,6 +22,10 @@ import { FEED_LIMITS } from './feeds/schemas.js';
 import { FeedService } from './feeds/service.js';
 import { InMemoryFeedStore } from './feeds/store.js';
 import { createSharedFeatureReader } from './features/reader.js';
+import { createFirestoreMemoryStore } from './memory/firestore-store.js';
+import { MEMORY_LIMITS } from './memory/schemas.js';
+import { MemoryService } from './memory/service.js';
+import { InMemoryMemoryStore } from './memory/store.js';
 import { createFirestorePlanStore } from './plans/firestore-store.js';
 import { PLAN_LIMITS } from './plans/schemas.js';
 import { PlanService } from './plans/service.js';
@@ -74,7 +78,11 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     refreshParking: (request) => refreshStopParking(tools, request), routes: tools.routes,
     store: development ? new InMemoryPlanStore()
       : createFirestorePlanStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
-  const server = createAgentHttpServer({ store, verifier, runner, events, feeds, plans, rateLimiter: createRateLimiter(config.turnsPerHour),
+  // The user's memory (UC-16) likewise; the same model reads each finished exchange for lasting facts.
+  const memory = new MemoryService({ writeLimiter: createRateLimiter(MEMORY_LIMITS.writesPerHour), structured: tools.structured ?? null, log,
+    store: development ? new InMemoryMemoryStore()
+      : createFirestoreMemoryStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
+  const server = createAgentHttpServer({ store, verifier, runner, events, feeds, plans, memory, rateLimiter: createRateLimiter(config.turnsPerHour),
     allowedOrigins: config.allowedOrigins, turnTimeoutMs: config.turnTimeoutMs });
   server.on('error', (error: NodeJS.ErrnoException) => {
     log({ severity: 'ERROR', event: 'agentServerFailed', reason: error.code ?? error.message, port });
