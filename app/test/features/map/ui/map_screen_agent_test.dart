@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:melens/core/config/env.dart';
 import 'package:melens/core/time/melbourne_time.dart';
@@ -17,6 +18,15 @@ import 'package:melens/l10n/app_localizations.dart';
 import '../../agent/fake_agent_client.dart';
 import '../t017_test_support.dart';
 
+/// What the map was last asked to draw.
+MapSurfaceConfiguration? _drawn;
+
+/// The markers the map was last asked to draw, by id.
+Map<String, Marker> _markers() => {
+  for (final marker in _drawn!.renderPlan.markers)
+    marker.markerId.value: marker,
+};
+
 /// [visible] stands for the map's tab being on screen; without it, it is.
 Future<ProviderContainer> showScreen(
   WidgetTester tester,
@@ -25,8 +35,10 @@ Future<ProviderContainer> showScreen(
   ValueListenable<bool>? visible,
 }) async {
   final screen = MapScreen(
-    mapBuilder: (context, configuration) =>
-        const SizedBox(key: ValueKey('fake-map')),
+    mapBuilder: (context, configuration) {
+      _drawn = configuration;
+      return const SizedBox(key: ValueKey('fake-map'));
+    },
     visibleRegionReader: () async => t017Region,
     onFocusRequest: focused.add,
   );
@@ -254,9 +266,39 @@ void main() {
       findsOneWidget,
     );
     expect(container.read(selectionControllerProvider).hasSelection, isFalse);
+    // A pin of its own, named, marks where the place is.
+    final pin = _markers()[cardItemMarkerId];
+    expect(pin?.position, const LatLng(-37.8098, 144.9652));
+    expect(pin?.infoWindow.title, 'State Library');
 
     await tester.tap(find.byKey(const ValueKey('card-item-details-close')));
     await tester.pump();
     expect(find.byKey(const ValueKey('card-item-details')), findsNothing);
+    expect(_markers(), isNot(contains(cardItemMarkerId)));
+
+    // A located record is pinned too, also when its layer is not drawn,
+    // until another record is opened.
+    requests.request(
+      const CardItem(
+        title: 'Unlocated sensor',
+        source: FeatureCardSource(featureId: 'sample.sensor.C'),
+        location: AgentLatLng(lat: -37.81, lng: 144.96),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(
+      container.read(selectionControllerProvider).selectedItemId,
+      'sample.sensor.C',
+    );
+    expect(
+      _markers()[cardItemMarkerId]?.position,
+      const LatLng(-37.81, 144.96),
+    );
+    await tester.tap(find.byKey(const ValueKey('map-details-close')));
+    await tester.pump();
+    expect(_markers(), isNot(contains(cardItemMarkerId)));
+    await tester.pump(const Duration(seconds: 1));
   });
 }

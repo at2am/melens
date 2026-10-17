@@ -71,6 +71,21 @@ class SavedPlans extends _$SavedPlans {
     return plan;
   }
 
+  /// Marks the first [count] stops of plan [id] as visited, at once and
+  /// then on the service; a failure puts the old progress back and
+  /// rethrows the [AgentClientException] family.
+  Future<void> setVisited(String id, int count) async {
+    final previous = state.value?.where((plan) => plan.id == id).firstOrNull;
+    if (previous == null) return;
+    _keep(previous.withVisited(count));
+    try {
+      _keep(await ref.read(plansClientProvider).edit(id, done: count));
+    } on Object {
+      _keep(previous);
+      rethrow;
+    }
+  }
+
   /// Reads the live parking around stop [index] of plan [id] again and
   /// keeps the plan the service returns. Throws the [AgentClientException]
   /// family for the caller to report.

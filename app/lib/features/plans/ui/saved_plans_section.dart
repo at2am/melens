@@ -91,8 +91,12 @@ class SavedPlanTile extends ConsumerWidget {
     final colors = theme.colorScheme;
     final clock = ref.watch(melbourneClockProvider);
     final start = plan.span?.$1;
+    final visited = plan.visited;
     final meta = [
-      strings.planStops(plan.card.items.length),
+      if (visited > 0 && !past)
+        strings.planProgress(visited, plan.card.items.length)
+      else
+        strings.planStops(plan.card.items.length),
       if (start != null)
         '${DateFormat('EEE d MMM', 'en_AU').format(clock.toMelbourne(start))}, '
             '${DateFormat('h:mm a', 'en_AU').format(clock.toMelbourne(start))}',

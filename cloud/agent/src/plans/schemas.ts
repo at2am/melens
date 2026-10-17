@@ -15,7 +15,8 @@ export const PLAN_LIMITS = {
  * A plan card the user kept: a copy of the stored card, so it outlives the 30-day chat session. Its id is the
  * card's id, which makes saving the same card twice one plan. `route` is the `draw_route` action of the same
  * turn, when the agent drew one, so the app can draw it again. `updatedAt` is the last edit or replacement;
- * `savedAt` stays the first save, so the plan keeps its place in the list.
+ * `savedAt` stays the first save, so the plan keeps its place in the list. `done` is how many stops, from the first,
+ * the user marked as visited while following the plan; absent until they mark one.
  */
 export const savedPlanSchema = z.strictObject({
   id: identifierSchema,
@@ -25,6 +26,7 @@ export const savedPlanSchema = z.strictObject({
   updatedAt: z.iso.datetime().optional(),
   card: cardSchema,
   route: z.record(z.string(), z.unknown()).optional(),
+  done: z.number().int().min(1).max(13).optional(),
 });
 export type SavedPlan = z.infer<typeof savedPlanSchema>;
 
@@ -36,13 +38,14 @@ export const savePlanBodySchema = z.strictObject({ sessionId: identifierSchema, 
 
 /**
  * The body of `PATCH /v1/plans/{planId}`: the user's own edits. `stops` lists the indices (from 0) of the stops to keep,
- * in their new order; at least one field.
+ * in their new order; `done` is how many stops, from the first, the user has visited (0 for none); at least one field.
  */
 export const editPlanBodySchema = z.strictObject({
   title: z.string().trim().min(1).max(80).optional(),
   stops: z.array(z.number().int().min(0).max(12)).min(1).max(13)
     .refine((stops) => new Set(stops).size === stops.length, 'Each stop once').optional(),
-}).refine((body) => body.title !== undefined || body.stops !== undefined, 'Nothing to change');
+  done: z.number().int().min(0).max(13).optional(),
+}).refine((body) => body.title !== undefined || body.stops !== undefined || body.done !== undefined, 'Nothing to change');
 
 /** The body of `POST /v1/plans/{planId}/stops/{index}/refresh`: which live part of the stop to read again. */
 export const refreshStopBodySchema = z.strictObject({ part: z.enum(['parking']) });

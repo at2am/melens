@@ -20,6 +20,7 @@ final class MapMarkerIcons {
     required this.routeStart,
     required this.routeEnd,
     required this.routeStop,
+    required this.focus,
     required this.userLocation,
     required this.userLocationAnchor,
   });
@@ -30,10 +31,14 @@ final class MapMarkerIcons {
   final BitmapDescriptor routeStart;
   final BitmapDescriptor routeEnd;
   final BitmapDescriptor routeStop;
+
+  /// The place opened from a card or a plan stop.
+  final BitmapDescriptor focus;
   final BitmapDescriptor userLocation;
   final Offset userLocationAnchor;
 
-  /// The pin for a point of [layer]; a selected one is larger and ringed.
+  /// The pin for a point of [layer]; a selected one is larger, ringed and
+  /// haloed.
   BitmapDescriptor layer(MapLayerId layer, {bool selected = false}) =>
       (selected ? _selectedLayers : _layers)[layer] ??
       BitmapDescriptor.defaultMarker;
@@ -55,6 +60,7 @@ final class MapMarkerIcons {
       routeStart: tinted(routeStartStyle),
       routeEnd: tinted(routeEndStyle),
       routeStop: tinted(routeStopStyle),
+      focus: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
       userLocation: BitmapDescriptor.defaultMarkerWithHue(
         BitmapDescriptor.hueAzure,
       ),
@@ -81,6 +87,13 @@ Future<MapMarkerIcons> mapMarkerIcons(Ref ref, double pixelRatio) async {
     routeStart: await _pinBitmap(routeStartStyle, pixelRatio),
     routeEnd: await _pinBitmap(routeEndStyle, pixelRatio),
     routeStop: await _pinBitmap(routeStopStyle, pixelRatio),
+    focus: await _pinBitmap(
+      focusStyle,
+      pixelRatio,
+      selected: true,
+      scale: 1.7,
+      halo: focusHaloColor,
+    ),
     userLocation: await _userDotBitmap(pixelRatio),
     userLocationAnchor: const Offset(0.5, 0.5),
   );
@@ -92,16 +105,23 @@ double markerPixelRatio(BuildContext context) =>
     (MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0) * 2).round() / 2;
 
 /// A round badge with the style's glyph over a short tail whose tip marks
-/// the point; a selected pin is larger and carries a dark ring.
+/// the point; a selected pin is larger, carries a dark ring and sits in a
+/// halo of its colour, or of [halo]. The halo widens the bitmap at the top
+/// and sides only, so the tip stays at the bottom like every other pin.
 Future<BitmapDescriptor> _pinBitmap(
   MapMarkerStyle style,
   double ratio, {
   bool selected = false,
+  double scale = 1.5,
+  Color? halo,
 }) {
-  final scale = selected ? 1.25 : 1.0;
-  final size = Size(36 * scale, 46 * scale);
+  if (!selected) scale = 1.0;
+  final pad = selected ? 7.0 : 0.0;
+  final size = Size((36 + 2 * pad) * scale, (46 + pad) * scale);
   return _rasterize(size, ratio, (canvas) {
-    canvas.scale(scale);
+    canvas
+      ..scale(scale)
+      ..translate(pad, pad);
     const center = Offset(18, 18);
     const radius = 15.0;
     final tail = Path()
@@ -109,6 +129,13 @@ Future<BitmapDescriptor> _pinBitmap(
       ..lineTo(18, 44)
       ..lineTo(25, 28)
       ..close();
+    if (selected) {
+      canvas.drawCircle(
+        center,
+        radius + 2 + pad,
+        Paint()..color = (halo ?? style.color).withValues(alpha: 0.35),
+      );
+    }
     final shadow = Paint()
       ..color = Colors.black.withValues(alpha: 0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);

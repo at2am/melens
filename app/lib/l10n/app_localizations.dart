@@ -4101,6 +4101,54 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 stop} other{{count} stops}}'**
   String planStops(int count);
 
+  /// How far the user has got through a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} visited'**
+  String planProgress(int done, int total);
+
+  /// A saved plan whose every stop the user marked as visited.
+  ///
+  /// In en, this message translates to:
+  /// **'All stops visited'**
+  String get planProgressAllDone;
+
+  /// The stop the user visits next in a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {stop}'**
+  String planProgressNext(String stop);
+
+  /// Button that clears which stops of a saved plan are visited.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over'**
+  String get planProgressReset;
+
+  /// Tooltip of a saved plan stop's circle that marks it, and every stop before it, as visited.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as visited'**
+  String get planStopMarkVisited;
+
+  /// Tooltip of a visited stop's tick that marks it, and every stop after it, as not visited.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as not visited'**
+  String get planStopUnmark;
+
+  /// Button on the next stop of a saved plan that marks it as visited.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m here'**
+  String get planStopArrived;
+
+  /// Shown when marking a stop as visited failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress could not be saved. Try again.'**
+  String get planProgressFailed;
+
   /// Label on a saved plan whose stops are all over.
   ///
   /// In en, this message translates to:

@@ -88,7 +88,7 @@ final class SavedPlansProvider
   SavedPlans create() => SavedPlans();
 }
 
-String _$savedPlansHash() => r'18772a9e46e8478532078c3d027c322a62384728';
+String _$savedPlansHash() => r'ea82905c01c0e15d7f5f45c2dedff574014fc71c';
 
 /// The plans the user saved from the chat, newest first, as the agent
 /// service stores them. They show on the Home tab until the user removes

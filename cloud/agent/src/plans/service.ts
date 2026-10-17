@@ -81,16 +81,18 @@ export class PlanService {
    * The user's own edits of a saved plan: a new title, or some of its stops in a new order. No model runs and every
    * kept stop keeps its source. A stop whose stop before it changed loses its getting_there, which described the old
    * leg. A plan with a route gets it computed again through its located stops in their new order, and each leg gives
-   * the stop it reaches its time; a route that cannot be computed is dropped rather than left wrong. Counts as a write.
+   * the stop it reaches its time; a route that cannot be computed is dropped rather than left wrong. `done` marks how far
+   * the user has got; stops that move or go start the progress again, unless the same edit gives `done`. Counts as a write.
    */
   async edit(uid: string, planId: string, body: unknown, signal: AbortSignal): Promise<SavedPlan> {
     const parsed = editPlanBodySchema.safeParse(body);
     if (!parsed.success) throw new AgentServiceError('invalidRequest');
     const plan = await this.store.get(uid, planId);
     if (plan === null) throw new AgentServiceError('notFound');
-    const { title, stops } = parsed.data;
+    const { title, stops, done } = parsed.data;
     const items = plan.card.items;
     if (stops?.some((index) => index >= items.length) === true) throw new AgentServiceError('invalidRequest', 'no_stop');
+    if (done !== undefined && done > (stops ?? items).length) throw new AgentServiceError('invalidRequest', 'no_stop');
     const now = this.clock();
     if (!this.writeLimiter.allow(uid, now)) throw new AgentServiceError('rateLimited');
     const moved = stops !== undefined && (stops.length !== items.length || stops.some((index, position) => index !== position));
@@ -108,9 +110,11 @@ export class PlanService {
     }
     // The plan may have been removed while the route was computed; an edit never brings it back.
     if (await this.store.get(uid, planId) === null) throw new AgentServiceError('notFound');
-    const { route: _route, ...rest } = plan;
+    const { route: _route, done: previousDone, ...rest } = plan;
+    const progress = done ?? (moved ? undefined : previousDone);
     const updated: SavedPlan = { ...rest, updatedAt: now.toISOString(),
-      card: { ...plan.card, ...(title === undefined ? {} : { title }), items: edited }, ...(route === undefined ? {} : { route }) };
+      card: { ...plan.card, ...(title === undefined ? {} : { title }), items: edited }, ...(route === undefined ? {} : { route }),
+      ...(progress === undefined || progress === 0 ? {} : { done: progress }) };
     await this.store.put(uid, updated);
     return updated;
   }

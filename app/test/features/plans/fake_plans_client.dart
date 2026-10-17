@@ -6,7 +6,8 @@ import 'package:melens/features/plans/data/saved_plan.dart';
 /// the user's sessions hold, by card id: a save copies one, as the service
 /// copies it from the stored turn. [failure] makes the next calls throw.
 /// A stop refresh puts [parking] on the stop, as the service reads it. An
-/// edit keeps the named stops in their order and drops the route.
+/// edit keeps the named stops in their order and drops the route and the
+/// progress, unless it gives the progress.
 final class FakePlansClient implements PlansClient {
   FakePlansClient({List<SavedPlan>? stored, Map<String, AgentCard>? cards})
     : stored = stored ?? [],
@@ -57,8 +58,15 @@ final class FakePlansClient implements PlansClient {
   }
 
   @override
-  Future<SavedPlan> edit(String id, {String? title, List<int>? stops}) async {
-    calls.add('edit:$id ${title ?? '-'} ${stops ?? '-'}');
+  Future<SavedPlan> edit(
+    String id, {
+    String? title,
+    List<int>? stops,
+    int? done,
+  }) async {
+    calls.add(
+      'edit:$id ${title ?? '-'} ${stops ?? '-'}${done == null ? '' : ' done $done'}',
+    );
     if (failure case final error?) throw error;
     final position = stored.indexWhere((plan) => plan.id == id);
     final plan = stored[position];
@@ -79,6 +87,7 @@ final class FakePlansClient implements PlansClient {
             : [for (final index in stops) items[index]],
       ),
       route: stops == null ? plan.route : null,
+      done: done ?? (stops == null ? plan.done : null),
     );
     stored[position] = edited;
     return edited;
