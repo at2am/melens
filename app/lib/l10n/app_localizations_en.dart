@@ -244,7 +244,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String mapSurfaceCountLegend(String area) {
-    return 'Circle area represents sensor passages: $area m² per passage. Compare only the same observation window. This display scale does not represent population density.';
+    return 'Bigger circles mean more people passing a sensor ($area m² per passage). Compare circles from the same time only; this is not crowd density.';
   }
 
   @override
@@ -287,9 +287,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get mapAggregateBadgeRecords => 'records';
-
-  @override
   String get mapAggregateLoadedOnly =>
       'Loaded scope only (*) — the complete matching population may be larger';
 
@@ -305,7 +302,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapAggregateScopeExplanation =>
-      'This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.';
+      'The records grouped here on the map: not a city-wide total, and not a count of people.';
 
   @override
   String mapAggregateGroupTotal(String count) {

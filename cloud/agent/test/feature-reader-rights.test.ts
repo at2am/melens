@@ -105,3 +105,12 @@ test('historical searches retain eligible records from the history view', async 
   assert.deepEqual(ids(layers), ['event:withdrawn']);
   assert.ok(f.dataQueries().some((query) => /`melens-testing\.melens_query\.v_geo_records_history`/.test(query.query)));
 });
+
+test('warming loads the shared layers, so a later search reads them from memory', async () => {
+  const f = fixture();
+  await f.reader.warm?.();
+  const loads = f.dataQueries().length;
+  assert.ok(loads > 0);
+  assert.deepEqual(ids(await f.reader.search({ ...search, signal: new AbortController().signal })), ['event:withdrawn']);
+  assert.equal(f.dataQueries().length, loads, 'The event layer was already loaded');
+});

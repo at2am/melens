@@ -346,7 +346,7 @@
   "@mapSurfaceGeometryLegend": {
     "description": "2D map legend explaining that rendered geometry retains source precision."
   },
-  "mapSurfaceCountLegend": "Circle area represents sensor passages: {area} m² per passage. Compare only the same observation window. This display scale does not represent population density.",
+  "mapSurfaceCountLegend": "Bigger circles mean more people passing a sensor ({area} m² per passage). Compare circles from the same time only; this is not crowd density.",
   "@mapSurfaceCountLegend": {
     "description": "Fixed circle-area scale and same-window comparison limitation. A zero or missing count never receives a positive-sized circle.",
     "placeholders": {
@@ -405,10 +405,6 @@
       }
     }
   },
-  "mapAggregateBadgeRecords": "records",
-  "@mapAggregateBadgeRecords": {
-    "description": "Unit shown below a cluster bitmap's actual loaded member-record count."
-  },
   "mapAggregateLoadedOnly": "Loaded scope only (*) — the complete matching population may be larger",
   "@mapAggregateLoadedOnly": {
     "description": "Explains the asterisk on incomplete or unknown-total cluster symbols without inventing a full total."
@@ -440,7 +436,7 @@
       }
     }
   },
-  "mapAggregateScopeExplanation": "This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.",
+  "mapAggregateScopeExplanation": "The records grouped here on the map: not a city-wide total, and not a count of people.",
   "@mapAggregateScopeExplanation": {
     "description": "Explains the scope and count semantics of an aggregate independently of colour or map zoom."
   },
