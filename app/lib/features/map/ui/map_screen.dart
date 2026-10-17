@@ -22,6 +22,7 @@ import '../../events/ui/user_event_text.dart';
 import '../../events/ui/user_events_panel.dart';
 import '../../location/data/device_location.dart';
 import '../../location/state/user_location.dart';
+import '../../memory/state/memory_providers.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/map_models.dart';
 import '../state/layer_controller.dart';
@@ -287,10 +288,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  void _selectItem(MapItem item) {
+  /// Selects [item]. One the user opened, rather than one the map selects
+  /// again, counts as browsing for the assistant's memory.
+  void _selectItem(MapItem item, {bool byUser = true}) {
     final viewport = ref.read(viewportControllerProvider);
     final response = viewport.response;
     if (response == null) return;
+    if (byUser) ref.read(browsingTrackerProvider.notifier).opened(item);
     _selectedWindow = viewport.responseQuery?.window;
     _selectedFilters = _filters(
       viewport.responseQuery?.areaFilter,
@@ -414,7 +418,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         .expand((layer) => layer.items)
         .whereType<AggregateMapItem>()
         .where((item) => item.id == selected.selectedItemId);
-    if (groups.isNotEmpty) _selectItem(groups.first);
+    if (groups.isNotEmpty) _selectItem(groups.first, byUser: false);
   }
 
   /// Fits the camera to [bounds], such as a cluster's members. It runs after
@@ -1073,8 +1077,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// The community layer switch also decides whether the nearby events load
   /// while the panel is closed, so their pins stay on the map.
-  void _setCommunity(bool on) =>
-      ref.read(communityLayerEnabledProvider.notifier).set(enabled: on);
+  void _setCommunity(bool on) {
+    ref.read(communityLayerEnabledProvider.notifier).set(enabled: on);
+    if (on) ref.read(browsingTrackerProvider.notifier).layerShown('community');
+  }
 
   void _syncNearbyLoading(bool on) {
     if (on == _holdingNearby) return;
@@ -1271,7 +1277,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 label: layerTitle(strings, layer),
                 style: layerStyle(layer),
                 on: layers.isLayerEnabled(layer),
-                onChanged: (on) => controller.setLayerEnabled(layer, on),
+                onChanged: (on) {
+                  controller.setLayerEnabled(layer, on);
+                  if (on) {
+                    ref
+                        .read(browsingTrackerProvider.notifier)
+                        .layerShown(layer.name);
+                  }
+                },
               ),
           chip(
             key: const ValueKey('map-chip-community'),

@@ -80,6 +80,8 @@ lib/
   features/location/    the user's position, only on request (My location)
   features/chat/        the chat panel: controller, session list, turn views (the agent's simple Markdown
                         in chat_markdown.dart, no package), the Change plan mode
+  features/memory/      the assistant's memory (UC-16): the service client, the browsing tracker the map
+                        reports to, the Settings section
   features/plans/       saved plans (UC-03): the service client, the Change plan and Save plan buttons, the Home tab section, the plan page with each driven stop's Refresh parking
   features/cards/       the card registry, one widget per card type
   l10n/                 app_en.arb and the generated AppLocalizations

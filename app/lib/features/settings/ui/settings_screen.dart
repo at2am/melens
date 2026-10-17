@@ -14,10 +14,11 @@ import '../../feed/ui/feed_labels.dart';
 import '../../location/data/device_location.dart';
 import '../../location/state/user_location.dart';
 import '../../map/state/viewport_controller.dart';
+import '../../memory/ui/memory_section.dart';
 import '../../shell/state/shell_providers.dart';
 
-/// The third tab: who you are, the feeds you follow, how the app looks and what
-/// data it is showing.
+/// The third tab: who you are, the feeds you follow, what the assistant
+/// remembers, how the app looks and what data it is showing.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -65,6 +66,9 @@ class SettingsScreen extends ConsumerWidget {
             _Section(strings.settingsLocation),
             _LocationSwitch(),
           ],
+          const SizedBox(height: 16),
+          _Section(strings.settingsMemory),
+          const MemorySection(),
           const SizedBox(height: 16),
           _Section(strings.settingsMap),
           SwitchListTile(

@@ -9,6 +9,7 @@ import '../../agent/data/agent_client.dart';
 import '../../agent/data/agent_models.dart';
 import '../../agent/state/agent_providers.dart';
 import '../../map/state/map_actions.dart';
+import '../../memory/state/memory_providers.dart';
 import '../data/chat_photos.dart';
 import 'chat_models.dart';
 import 'request_context.dart';
@@ -102,6 +103,9 @@ class ChatController extends _$ChatController {
     }
     // A change to a plan needs words; photos alone cannot say what to change.
     if (normalised case RefineTurnInput(:final text) when text.isEmpty) return;
+    // What the user browsed since the last batch reaches the memory with the
+    // message.
+    unawaited(ref.read(browsingTrackerProvider.notifier).flush());
     if (state.isRunning) {
       _generation++;
       _abortRun();

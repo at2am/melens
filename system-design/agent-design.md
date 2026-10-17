@@ -17,6 +17,7 @@ AI does three jobs: it turns messy data into map features (extraction), answers 
 | Data access | Fixed parameterized queries over the published `melens_query` views with a read-only identity and `maximumBytesBilled`, the same rules as the map service's query runner |
 | Sessions | Persisted per Firebase uid in Firestore as stored turns ([agent-protocol.md](agent-protocol.md#sessions)); each turn rebuilds the ADK session in memory from the last 20 stored turns, so no raw tool results are persisted. Instances hold no conversation state, so the service can scale out; min-instances=1 keeps one warm |
 | Cache and quota | Firestore, in agent-only collections: grounding cache and per-uid rate-limit counters |
+| Memory | Per uid in Firestore (`userMemory/{uid}`, UC-16): lasting facts learned from the chat and what the user browses. Each turn's message carries it as a User memory block after the map context, never the instruction, so the cached prefix stays the same for every user ([agent-protocol.md](agent-protocol.md#memory)) |
 | Usage | Every model call's `usageMetadata` goes to the app as a `usage` event and is stored with the turn ([agent-protocol.md](agent-protocol.md#token-usage)); see Token accounting below |
 | Secrets | The Maps Platform key for the Routes API, from Secret Manager. Nothing else |
 | Timeouts | Cloud Run request timeout 300 seconds for a turn of at most 16 model calls; the deployed turn timeout is 270 seconds, so the turn is stored before the stream is cut |
@@ -145,6 +146,7 @@ The agent acts first and states its assumptions. It asks only when acting would 
 - Counts are Gemini's, never estimated. Input is `promptTokenCount` with `cachedContentTokenCount` broken out; output is `candidatesTokenCount` with `thoughtsTokenCount` broken out, because thinking is billed as output; `toolUsePromptTokenCount` covers the built-in grounding tools; `totalTokenCount` is copied. Grounding sub-agent calls and workflow generations report like any other call, under their own `agent` name.
 - The turn's totals are the sum of its calls. They are stored with the turn in Firestore and logged as one structured line per call (`turnId`, `agent`, `model`, counts) so Cloud Logging can sum tokens per model and per day. The service warns when a call's `total` differs from `input + output + thoughts` by more than `toolUseInput` (Gemini documents the total as prompt, thoughts and candidates), or when the configured model returns no `thoughtsTokenCount`, which some preview models have omitted.
 - A cancelled or failed call reports no usage; `done.usage.complete` is then `false`. Nothing is backfilled.
+- The memory update after a turn (UC-16) is one structured Gemini call that runs after `done` or `error`, so it is not part of the turn's usage. It is logged as one `memoryLearned` line with its counts and the number of changes.
 
 ## Source rules
 

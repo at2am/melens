@@ -3,8 +3,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { IdTokenVerifier } from './auth/verifier.js';
 import type { UserEventService } from './events/service.js';
 import type { FeedService } from './feeds/service.js';
+import { userWords } from './memory/prompt.js';
+import type { MemoryService } from './memory/service.js';
 import { attachmentRefOf, decodeImages, type TurnImage } from './protocol/attachments.js';
-import { askedIn } from './agent/prompts.js';
+import { askedIn, questionsOf } from './agent/prompts.js';
 import type { PlanService } from './plans/service.js';
 import { turnIdOfCard } from './plans/schemas.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
@@ -48,6 +50,8 @@ export interface TurnContext {
    * about when the input may answer it (an `answer`, `answers` or `text` input).
    */
   readonly planCard?: Card;
+  /** The user memory block for the message (`memoryBlock`); absent when memory is off, empty or unavailable. */
+  readonly memory?: string;
   readonly sink: EventSink;
   readonly signal: AbortSignal;
   readonly startedAt: Date;
@@ -76,7 +80,10 @@ type Route =
   | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' }
   | { readonly kind: 'plans'; readonly method: 'GET' | 'POST' }
   | { readonly kind: 'plan'; readonly method: 'PATCH' | 'DELETE'; readonly planId: string }
-  | { readonly kind: 'planStopRefresh'; readonly planId: string; readonly index: number };
+  | { readonly kind: 'planStopRefresh'; readonly planId: string; readonly index: number }
+  | { readonly kind: 'memory'; readonly method: 'GET' | 'PATCH' | 'DELETE' }
+  | { readonly kind: 'memoryFact'; readonly factId: string }
+  | { readonly kind: 'memorySignals' };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -106,6 +113,10 @@ function matchRoute(method: string, pathname: string): Route | null {
   if (pathname.startsWith('/v1/events')) return matchEventRoute(method, pathname);
   if (pathname === '/v1/feeds' && (method === 'GET' || method === 'PUT')) return { kind: 'feeds', method };
   if (pathname === '/v1/plans' && (method === 'GET' || method === 'POST')) return { kind: 'plans', method };
+  if (pathname === '/v1/memory' && (method === 'GET' || method === 'PATCH' || method === 'DELETE')) return { kind: 'memory', method };
+  if (pathname === '/v1/memory/signals' && method === 'POST') return { kind: 'memorySignals' };
+  const fact = /^\/v1\/memory\/facts\/([^/]+)$/.exec(pathname);
+  if (fact !== null && ID.test(fact[1]!) && method === 'DELETE') return { kind: 'memoryFact', factId: fact[1]! };
   const plan = /^\/v1\/plans\/([^/]+)$/.exec(pathname);
   if (plan !== null && ID.test(plan[1]!) && (method === 'PATCH' || method === 'DELETE')) return { kind: 'plan', method, planId: plan[1]! };
   const stop = /^\/v1\/plans\/([^/]+)\/stops\/(\d{1,2})\/refresh$/.exec(pathname);
@@ -192,6 +203,8 @@ export interface AgentServerOptions {
   readonly feeds: FeedService;
   /** Saved plans (UC-03), with their own write limit. */
   readonly plans: PlanService;
+  /** The user's memory (UC-16), with its own write limit; without it the agent remembers nothing and the memory routes answer `notFound`. */
+  readonly memory?: MemoryService;
   /** Exact origins the Web app is served from; the agent additionally allows the Authorization header. */
   readonly allowedOrigins: readonly string[];
   readonly turnTimeoutMs: number;
@@ -324,6 +337,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     let session: SessionRecord;
     let history: StoredTurn[];
     let historyImages: Map<string, TurnImage>;
+    let memory: string | null = null;
     try {
       await acquireLease(uid, sessionId, turnId);
     } catch (error) {
@@ -350,7 +364,9 @@ export function createAgentHttpServer(options: AgentServerOptions) {
         const savedPlan = asking?.kind === 'refine' && asking.cardId === aboutPlan ? asking.planId : undefined;
         planCard = await storedPlanCard(uid, sessionId, aboutPlan, savedPlan).catch(() => undefined);
       }
-      historyImages = await loadHistoryImages(uid, sessionId, history);
+      // A memory that cannot be read leaves the turn unpersonalised, never failed.
+      [historyImages, memory] = await Promise.all([loadHistoryImages(uid, sessionId, history),
+        options.memory?.promptBlock(uid).catch(() => null) ?? null]);
     } catch (error) {
       response.off('close', onClose);
       await options.store.releaseTurn(uid, sessionId, turnId);
@@ -378,7 +394,7 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     let turn: StoredTurn;
     try {
       turn = await options.runner.run({ uid, session, ...context, history, historyImages, sink: stream, signal: controller.signal,
-        ...(planCard === undefined ? {} : { planCard }) });
+        ...(planCard === undefined ? {} : { planCard }), ...(memory === null ? {} : { memory }) });
     } catch (error) {
       const failure = controller.signal.aborted ? null : { message: 'The agent could not finish this turn', retryable: true };
       if (!stream.sent.some((event) => event.event === 'done' || event.event === 'error')) {
@@ -390,6 +406,9 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     }
     try {
       await options.store.completeTurn(uid, sessionId, turn, clock(), images);
+      // What the user said may be worth remembering; the update runs after the turn and never delays or fails it.
+      const said = userWords(input, questionsOf(history));
+      if (options.memory !== undefined && said !== null) void options.memory.learn(uid, { turnId, said, answer: turn.text });
     } catch (error) {
       if (!stream.sent.some((event) => event.event === 'done' || event.event === 'error')) {
         stream.emit({ event: 'error', message: 'The agent could not finish this turn', retryable: true, usage: { ...zeroUsage(), complete: false } });
@@ -539,6 +558,23 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           } finally { response.off('close', onClose); }
           return;
         }
+        case 'memory': {
+          if (options.memory === undefined) throw new AgentServiceError('notFound');
+          if (route.method === 'GET') writeJson(response, 200, { memory: await options.memory.view(uid) });
+          else if (route.method === 'PATCH') writeJson(response, 200, { memory: await options.memory.configure(uid, await readJsonBody(request)) });
+          else { await options.memory.clear(uid); writeNoContent(response); }
+          return;
+        }
+        case 'memoryFact':
+          if (options.memory === undefined) throw new AgentServiceError('notFound');
+          await options.memory.removeFact(uid, route.factId);
+          writeNoContent(response);
+          return;
+        case 'memorySignals':
+          if (options.memory === undefined) throw new AgentServiceError('notFound');
+          await options.memory.recordSignals(uid, await readJsonBody(request));
+          writeNoContent(response);
+          return;
         case 'planStopRefresh': {
           // The read stops when the caller leaves, and after a minute in any case.
           const controller = new AbortController();

@@ -55,15 +55,14 @@ void main() {
     expect(container.read(userEventDisplayNameProvider), isNull);
   });
 
-  testWidgets('location sharing and map search are the app switches', (
-    tester,
-  ) async {
+  testWidgets('location sharing, memory and map search are the app '
+      'switches', (tester) async {
     final container = appContainer();
     addTearDown(container.dispose);
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
 
-    expect(find.byType(SwitchListTile), findsNWidgets(2));
+    expect(find.byType(SwitchListTile), findsNWidgets(3));
   });
 
   testWidgets('a build that cannot locate the device offers no location '
@@ -73,7 +72,7 @@ void main() {
     await pumpApp(tester, container, size: const Size(390, 1600));
     await openSettings(tester);
     expect(key('settings-location'), findsNothing);
-    expect(find.byType(SwitchListTile), findsOneWidget);
+    expect(find.byType(SwitchListTile), findsNWidgets(2));
 
     await tester.tap(key('tab-discover'));
     await tester.pumpAndSettle();
