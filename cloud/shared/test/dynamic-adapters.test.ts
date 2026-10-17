@@ -185,6 +185,14 @@ test('a transit alert as the connector writes it: numeric GTFS effect, drawn alo
   assert.equal(item.details.extentKind, 'route');
   assert.equal(item.details.impact, 'No service');
   assert.equal(item.details.summary, 'Buses replace trains');
+  assert.deepEqual(item.details.serviceNames, []);
+  const named = adaptDisruptionRow(geo({ source_id: transitSource.sourceId, topic: 'transport',
+    geometry_geojson: routes, location_confidence: 'official_join',
+    summary: JSON.stringify({ effect: 1, selectors: [{ routeId: 'aus:vic:vic-02-CGB:', stopId: null }],
+      service_names: ['Craigieburn (Flinders Street - Craigieburn)', ' ', 'Craigieburn (Flinders Street - Craigieburn)'] }) }),
+  { source: transitSource });
+  // The data job's names from the static schedule are served, blank and repeated ones dropped.
+  assert.deepEqual(named.details.serviceNames, ['Craigieburn (Flinders Street - Craigieburn)']);
   // An effect number outside the enum is no text rather than a guess.
   const unknown = adaptDisruptionRow(geo({ source_id: transitSource.sourceId, topic: 'transport',
     geometry_geojson: routes, location_confidence: 'official_join',

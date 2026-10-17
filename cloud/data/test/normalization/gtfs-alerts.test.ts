@@ -61,6 +61,7 @@ test('an exact stop, route, trip and static feed version yields a sourced point'
   assert.equal(joined.mappings[0]?.status, 'located');
   assert.deepEqual(joined.mappings[0]?.stopIds, ['19499']);
   assert.deepEqual(joined.mappings[0]?.routeIds, ['2-FLI']);
+  assert.deepEqual(joined.mappings[0]?.serviceNames, ['Craigieburn (Flinders Street - Craigieburn)']);
   const point = joined.geoRecords[0];
   assert.ok(point);
   assert.equal(point.location_confidence, 'official_join');
@@ -73,6 +74,16 @@ test('an exact stop, route, trip and static feed version yields a sourced point'
       && item.source_record_id === `${STATIC_SOURCE_ID}:stop:19499`), true);
   assert.equal(joined.geoRecordSources.every(link => link.version_id === point.version_id), true);
   assert.equal(joined.geoRecordSources.every(link => link.source_record_id.startsWith(REALTIME_SOURCE_ID)), true);
+});
+
+test('a mode-wide alert names no services', async () => {
+  const version = await staticVersion();
+  const alerts = normalizedAlerts(feed(version.normalized.feedVersion, [{ ...selector,
+    routeId: null, stopId: null, directionId: null, tripId: null, tripRouteId: null }]));
+  const joined = joinGtfsAlertLocations({ alerts: alerts.geoRecords,
+    alertSources: alerts.geoRecordSources, staticVersions: [version] });
+  assert.deepEqual(joined.mappings[0]?.routeIds, []);
+  assert.deepEqual(joined.mappings[0]?.serviceNames, []);
 });
 
 test('version mismatch and unknown stop keep the alert without invented coordinates', async () => {

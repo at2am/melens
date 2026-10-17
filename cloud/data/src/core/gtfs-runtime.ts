@@ -297,7 +297,7 @@ export async function withPublishedGtfsLocations(result: ConnectorSuccess, confi
     const originalSummary: unknown = row.summary === null ? null : JSON.parse(row.summary);
     const summary = JSON.stringify({ ...z.record(z.string(), z.unknown()).parse(originalSummary),
       gtfs_mapping_status: mapping.status, static_feed_version: mapping.staticFeedVersion,
-      static_evidence: mapping.staticEvidence });
+      static_evidence: mapping.staticEvidence, service_names: mapping.serviceNames });
     return { ...row, summary, version_id: sourceVersionId(row.source_updated_at,
       { joinedVersionId: row.version_id, summary }) };
   });
