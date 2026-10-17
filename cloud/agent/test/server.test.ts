@@ -36,14 +36,15 @@ function scriptedRunner(script: (turn: Parameters<TurnRunner['run']>[0]) => Prom
   } };
 }
 
-async function start(runner: TurnRunner, options: { turnsPerHour?: number; turnTimeoutMs?: number; supersedeWaitMs?: number } = {}) {
+async function start(runner: TurnRunner, options: { turnsPerHour?: number; turnTimeoutMs?: number; supersedeWaitMs?: number;
+  resumeGraceMs?: number } = {}) {
   const store = new InMemorySessionStore();
   const events = new UserEventService({ store: new InMemoryUserEventStore(), writeLimiter: createRateLimiter(100) });
   const feeds = new FeedService({ store: new InMemoryFeedStore(), writeLimiter: createRateLimiter(100) });
   const plans = new PlanService({ store: new InMemoryPlanStore(), sessions: store, writeLimiter: createRateLimiter(100) });
   const server = createAgentHttpServer({ store, runner, events, feeds, plans, verifier: staticVerifier({ 'token-a': 'uid-a', 'token-b': 'uid-b' }),
     rateLimiter: createRateLimiter(options.turnsPerHour ?? 100), allowedOrigins: [ORIGIN], turnTimeoutMs: options.turnTimeoutMs ?? 5_000,
-    supersedeWaitMs: options.supersedeWaitMs ?? 2_000 });
+    supersedeWaitMs: options.supersedeWaitMs ?? 2_000, resumeGraceMs: options.resumeGraceMs ?? 2_000 });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const call = (path: string, init: RequestInit = {}, token = 'token-a') => fetch(`${base}${path}`, { ...init,
@@ -193,11 +194,11 @@ test('the stop route cancels the running turn and frees the session at once', as
   } finally { await close(); }
 });
 
-test('a failed runner frees the lease and stores nothing', async () => {
+test('a failed runner frees the lease and stores the turn as failed, with what it produced', async () => {
   let calls = 0;
   const runner: TurnRunner = { async run(turn) {
     calls += 1;
-    if (calls === 1) throw new Error('model unavailable');
+    if (calls === 1) { turn.sink.emit({ event: 'text', delta: 'Looking' }); throw new Error('model unavailable'); }
     turn.sink.emit({ event: 'done', stop: 'end', usage: { ...zeroUsage(), complete: true } });
     return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input, attachments: [], text: '', cards: [],
       uiActions: [], question: null, questions: [], stop: 'end', trace: [], usage: { ...zeroUsage(), complete: true, perCall: [] } };
@@ -213,8 +214,75 @@ test('a failed runner frees the lease and stores nothing', async () => {
     assert.equal(second.status, 200);
     assert.ok(Date.now() - started < 1_000, 'the failed turn left no lease to wait for');
     assert.equal(parseSse(await second.text()).at(-1)?.event, 'done');
-    const detail = await (await call(`/v1/sessions/${session.id}`)).json() as { session: { turnCount: number } };
-    assert.equal(detail.session.turnCount, 1, 'the failed turn was not stored');
+    const detail = await (await call(`/v1/sessions/${session.id}`)).json() as { session: { turnCount: number };
+      turns: Array<{ text: string; stop: string; failure?: { retryable: boolean } }> };
+    assert.equal(detail.session.turnCount, 2, 'the failed turn was stored');
+    assert.deepEqual([detail.turns[0]?.text, detail.turns[0]?.stop, detail.turns[0]?.failure?.retryable], ['Looking', 'end', true]);
+    assert.equal(detail.turns[1]?.failure, undefined);
+  } finally { await close(); }
+});
+
+/** Reads a streamed turn until its first event, then drops the connection as a phone losing signal would. */
+async function firstEventThenDrop(response: Response, abort: AbortController): Promise<AgentEvent> {
+  const reader = response.body!.getReader();
+  let text = '';
+  while (!text.includes('\n\n')) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    text += new TextDecoder().decode(value);
+  }
+  abort.abort();
+  return parseSse(text)[0]!;
+}
+
+test('a client that loses the stream resumes the turn after the last event it read, and the turn keeps running', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const { call, close } = await start(scriptedRunner(async (turn) => {
+    turn.sink.emit({ event: 'text', delta: 'one' });
+    await gate;
+    turn.sink.emit({ event: 'text', delta: ' two' });
+  }));
+  try {
+    const { session } = await (await call('/v1/sessions', { method: 'POST' })).json() as { session: { id: string } };
+    const abort = new AbortController();
+    const first = await call(`/v1/sessions/${session.id}/turns`, { method: 'POST', body: textTurn('first'), signal: abort.signal });
+    const read = await firstEventThenDrop(first, abort);
+    assert.deepEqual([read.event, read.seq], ['text', 0]);
+    const running = await (await call(`/v1/sessions/${session.id}`)).json() as { runningTurnId: string | null };
+    assert.equal(running.runningTurnId, read.turnId, 'the session says which turn still runs');
+    const events = `/v1/sessions/${session.id}/turns/${read.turnId}/events`;
+    assert.equal((await call(`${events}?after=0`, {}, 'token-b')).status, 404, 'only the owner resumes');
+    assert.equal((await call(`/v1/sessions/${session.id}/turns/t_missing/events`)).status, 404);
+    const resumed = await call(`${events}?after=0`);
+    assert.equal(resumed.status, 200);
+    release();
+    const rest = parseSse(await resumed.text());
+    assert.deepEqual(rest.map((event) => [event.event, event.seq]), [['text', 1], ['done', 2]]);
+    const done = rest.at(-1);
+    assert.equal(done?.event === 'done' ? done.stop : null, 'end', 'the drop did not stop the turn');
+    const late = parseSse(await (await call(`${events}?after=1`)).text());
+    assert.deepEqual(late.map((event) => event.event), ['done'], 'a finished turn still answers a late resume');
+    const detail = await (await call(`/v1/sessions/${session.id}`)).json() as SessionDetail & { runningTurnId: string | null };
+    assert.equal(detail.runningTurnId, null);
+    assert.equal(detail.turns[0]?.text, 'one two');
+  } finally { await close(); }
+});
+
+test('a turn no client comes back for stops after the resume grace and is stored as cancelled', async () => {
+  const { call, close, store } = await start(scriptedRunner(async (turn) => {
+    turn.sink.emit({ event: 'text', delta: 'Looking' });
+    await untilAborted(turn.signal);
+  }), { resumeGraceMs: 50 });
+  try {
+    const { session } = await (await call('/v1/sessions', { method: 'POST' })).json() as { session: { id: string } };
+    const abort = new AbortController();
+    await firstEventThenDrop(await call(`/v1/sessions/${session.id}/turns`, { method: 'POST', body: textTurn('first'), signal: abort.signal }), abort);
+    for (let waited = 0; waited < 2_000 && (await store.listTurns('uid-a', session.id)).length === 0; waited += 20) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const turns = await store.listTurns('uid-a', session.id);
+    assert.deepEqual(turns.map((turn) => [turn.stop, turn.text]), [['cancelled', 'Looking']]);
   } finally { await close(); }
 });
 

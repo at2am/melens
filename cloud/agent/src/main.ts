@@ -5,7 +5,9 @@ import { Gemini } from '@google/adk';
 import { sourceReferenceSchema } from '@melens/shared/contracts/map-contract';
 import { z } from 'zod';
 
+import { createVertexContextCache } from './agent/context-cache.js';
 import { createMapAgentRunner } from './agent/map-agent.js';
+import { RetryingLlm } from './agent/retrying-llm.js';
 import { createVertexGrounding } from './agent/grounding.js';
 import { createVertexStructuredModel } from './agent/structured.js';
 import { createFirestoreCache, createMemoryCache } from './cache.js';
@@ -42,7 +44,8 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     : z.array(sourceReferenceSchema).parse(JSON.parse(await readFile(config.publicSourcesFile, 'utf8')));
   // Local development may keep sessions in memory and trust a fixed token; Cloud Run never does.
   const development = env.AGENT_DEVELOPMENT_MODE === 'true';
-  const model = new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation });
+  // A model call that fails with a passing 429 or 503 before it streamed anything is made again.
+  const model = new RetryingLlm(new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation }), { log });
   const tools: ToolDependencies = {
     features: createSharedFeatureReader({ config: config.query, publicSources }),
     grounding: createVertexGrounding({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
@@ -51,7 +54,9 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     routes: createRoutesClient(env.AGENT_ROUTES_QUOTA_PROJECT === undefined ? {} : { quotaProject: env.AGENT_ROUTES_QUOTA_PROJECT }),
     cache: development ? createMemoryCache() : createFirestoreCache({ projectId: config.projectId, databaseId: config.firestoreDatabase }),
   };
-  const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools });
+  const contextCache = config.contextCache
+    ? createVertexContextCache({ projectId: config.projectId, location: config.vertexLocation, model: config.model, log }) : undefined;
+  const runner = createMapAgentRunner({ model, maxModelCalls: config.maxModelCalls, log, tools, ...(contextCache === undefined ? {} : { contextCache }) });
   const store = development ? new InMemorySessionStore()
     : createFirestoreSessionStore({ projectId: config.projectId, databaseId: config.firestoreDatabase });
   const verifier = development && env.AGENT_DEVELOPMENT_TOKEN !== undefined

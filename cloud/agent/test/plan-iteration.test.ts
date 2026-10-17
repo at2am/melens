@@ -6,7 +6,7 @@ import type { LlmResponse } from '@google/adk';
 
 import { createMapAgentRunner } from '../src/agent/map-agent.js';
 import type { GroundingModel } from '../src/agent/grounding.js';
-import { historyContents, instructionFor } from '../src/agent/prompts.js';
+import { historyContents, pendingBlock } from '../src/agent/prompts.js';
 import type { StructuredModel } from '../src/agent/structured.js';
 import { createMemoryCache } from '../src/cache.js';
 import type { Card, Question, StopParking, StoredTurn } from '../src/protocol/schemas.js';
@@ -157,7 +157,7 @@ test('before a plan the agent asks up to three questions for it, and the answers
     [['q_t_test_1', undefined, true], ['q_t_test_2', undefined, true], ['q_t_test_3', undefined, true]]);
   assert.equal((results[3] as { error: { code: string } }).error.code, 'invalid_arguments');
 
-  const pending = (question: Question) => instructionFor(question).split('Pending question')[1] ?? '';
+  const pending = (question: Question) => pendingBlock(question);
   assert.match(pending(turn.questions[0]!), /make the plan now \(Answers before a plan\)/);
   assert.match(pending({ ...turn.questions[0]!, planCardId: 'c_t_0_1' }), /revise that plan once for all the answers/);
   assert.doesNotMatch(pending({ id: 'q_1', text: 'Which gardens?', options: ['Fitzroy', 'Carlton'], allowFreeText: true }), /plan now|revise that plan/);
@@ -249,7 +249,8 @@ test('answers about a plan reach the model with their questions and the whole pl
   assert.match(parts[1]?.text ?? '', /^Current plan/);
   assert.match(parts[1]?.text ?? '', /"travel_mode":"walk"/);
   assert.doesNotMatch(parts[1]?.text ?? '', /stop_parking/);
-  assert.equal(parts[2]?.text, 'Answers to your questions:\n- "How will you get there?": Drive\n- "When will you leave?": In an hour');
+  assert.match(parts[2]?.text ?? '', /^Pending question/);
+  assert.equal(parts[3]?.text, 'Answers to your questions:\n- "How will you get there?": Drive\n- "When will you leave?": In an hour');
 });
 
 test('refreshing a stop reads the sensors again and keeps the area rules it already had', async () => {

@@ -23,6 +23,12 @@ export const requestContextSchema = z.strictObject({
   layers: z.array(layerIdSchema).max(9).default([]),
   openCardId: identifierSchema.nullable().optional(),
   localTime,
+  /**
+   * The map actions of the previous turn that the app could not fully apply (agent-protocol.md, Rules 2): the action,
+   * what happened to it and the layer names or feature ids it skipped. Applied actions are not reported.
+   */
+  actionReports: z.array(z.strictObject({ action: z.enum(['show_layers', 'focus_map', 'draw_route', 'highlight_features']),
+    outcome: z.enum(['partial', 'ignored']), skipped: z.array(z.string().min(1).max(100)).max(20).default([]) })).max(8).optional(),
 });
 export type RequestContext = z.infer<typeof requestContextSchema>;
 
@@ -245,6 +251,9 @@ export const traceEntrySchema = z.strictObject({
 });
 export type TraceEntry = z.infer<typeof traceEntrySchema>;
 
+export const turnFailureSchema = z.strictObject({ message: z.string().min(1).max(300), retryable: z.boolean() });
+export type TurnFailure = z.infer<typeof turnFailureSchema>;
+
 /** The turn document: what the app needs to redraw and what the model needs next time. */
 export const storedTurnSchema = z.strictObject({
   id: identifierSchema,
@@ -261,6 +270,8 @@ export const storedTurnSchema = z.strictObject({
   /** Every question, in order; turns stored before several questions existed have none here. */
   questions: z.array(questionSchema).max(QUESTION_LIMITS.perPlanTurn).default([]),
   stop: stopReasonSchema,
+  /** Set when the turn failed before it finished: the error the app showed. Whatever it produced first is kept. */
+  failure: turnFailureSchema.optional(),
   trace: z.array(traceEntrySchema).max(200),
   usage: finalUsageSchema.extend({ perCall: z.array(callUsageSchema).max(64) }),
 });

@@ -15,7 +15,7 @@ Rules
 5. "Here", "now" and "this one" come from the map context: the viewport, the user's location, the selected feature and the local time.
 6. Label predictions as predictions. When explaining causes, give possible causes with a confidence level (low, medium or high) and never state a cause as fact.
 7. Show your work on the map: focus_map before describing something off screen, highlight_features for the features you talk about, show_layers when the user asks to see or hide something.
-8. Keep text short: two or three sentences, then the card. Write in English. Give times in Melbourne local time.
+8. Keep text short: two or three sentences, then the card. Write in English. Give times in Melbourne local time. The app renders simple Markdown: use **bold** and short "- " lists where they help, never headings or tables.
 9. The user may attach photos: a street, a building, a sign, a poster, a menu, a screenshot. Use what they show. When you name a place or event from a photo, say how sure you are (low, medium or high) and confirm it with the map tools or grounding before you recommend anything. A photo is never a card source: card items still cite a feature id or a URL a tool returned.
 10. When the user stopped your previous answer, follow their new message; do not resume the stopped answer unless they ask.
 
@@ -36,12 +36,15 @@ const NO_TOOLS = 'Note from the system: no tools are available any more. Answer 
 
 export const BUDGET_NOTES = { wrapUp: WRAP_UP, noTools: NO_TOOLS } as const;
 
-export function instructionFor(pending: Question | null): string {
-  if (pending === null) return INSTRUCTION;
+/**
+ * The question the previous turn left open, for the new message. It goes with the message rather than the instruction,
+ * so the instruction and the tools stay the same for every turn and Gemini serves them from the context cache.
+ */
+export function pendingBlock(pending: Question): string {
   const about = pending.planCardId !== undefined
     ? ` It was about the plan ${pending.planCardId}, which the message carries as JSON: when the user answers, revise that plan once for all the answers (Answers about a plan).`
     : pending.forPlan === true ? ' It gathered what you need to make a plan: when the user answers, make the plan now (Answers before a plan).' : '';
-  return `${INSTRUCTION}\n\nPending question\nYour previous turn asked: "${pending.text}" with the options ${JSON.stringify(pending.options)}.${about} `
+  return `Pending question\nYour previous turn asked: "${pending.text}" with the options ${JSON.stringify(pending.options)}.${about} `
     + 'If the user\'s message answers it, continue with that answer. Otherwise treat the message as a new request and drop the question.';
 }
 
@@ -91,6 +94,8 @@ export function contextBlock(context: RequestContext): string {
     `visible layers: ${context.layers.length === 0 ? 'none' : context.layers.join(', ')}`,
     `local time: ${context.localTime}`,
     ...(context.openCardId == null ? [] : [`open card: ${context.openCardId}`]),
+    ...(context.actionReports ?? []).map((report) => `your last ${report.action} was ${report.outcome === 'ignored' ? 'not applied' : 'applied in part'} by the map`
+      + `${report.skipped.length === 0 ? '' : ` (could not use: ${report.skipped.join(', ')})`}`),
   ];
   return `Map context (do not repeat it to the user)\n${lines.join('\n')}`;
 }
@@ -111,12 +116,13 @@ export function planBlock(card: Card): string {
 }
 
 /**
- * The new user message: the map context, the plan being changed, what the user did (an answer with the question it
+ * The new user message: the map context, the plan being changed, the question left open, what the user did (an answer with the question it
  * answers), then the photos they attached.
  */
 export function turnMessage(input: TurnInput, context: RequestContext, images: readonly TurnImage[] = [], planCard?: Card,
-  questions: QuestionLookup = new Map()): Content {
+  questions: QuestionLookup = new Map(), pending: Question | null = null): Content {
   return { role: 'user', parts: [{ text: contextBlock(context) }, ...(planCard === undefined ? [] : [{ text: planBlock(planCard) }]),
+    ...(pending === null ? [] : [{ text: pendingBlock(pending) }]),
     { text: describeInput(input, images.length, questions) }, ...images.map(imagePart)] };
 }
 
@@ -145,6 +151,7 @@ export function historyContents(turns: readonly StoredTurn[], images: ReadonlyMa
       summary.push(`[asked: "${question.text}" options ${JSON.stringify(question.options)}${about}]`);
     }
     if (turn.stop === 'cancelled') summary.push('[the user stopped this answer before it finished]');
+    else if (turn.failure !== undefined) summary.push('[this answer failed before it finished; the user may send the request again]');
     const text = summary.filter(Boolean).join('\n');
     contents.push({ role: 'model', parts: [{ text: text === '' ? '(no answer)' : text }] });
   }

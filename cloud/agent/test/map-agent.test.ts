@@ -205,7 +205,9 @@ test('the pending question and stored history reach the model', async () => {
   const contents = llm.seen[0]!.contents;
   assert.equal(contents.length, 3, 'history user + model, then the new message');
   assert.match(contents[1]?.parts?.[0]?.text ?? '', /asked: "Which gardens\?"/);
-  assert.match(contents[2]?.parts?.[1]?.text ?? '', /Answer to your question "Which gardens\?": Fitzroy Gardens/);
+  // The question goes with the message, so the instruction stays the same for every turn and is served from the cache.
+  assert.match(contents[2]?.parts?.[1]?.text ?? '', /^Pending question\nYour previous turn asked: "Which gardens\?"/);
+  assert.match(contents[2]?.parts?.[2]?.text ?? '', /Answer to your question "Which gardens\?": Fitzroy Gardens/);
 });
 
 test('photos reach the model with the message, recent history photos go back, older ones are named and a stopped answer is marked', async () => {
@@ -233,17 +235,21 @@ test('photos reach the model with the message, recent history photos go back, ol
 test('a photo Gemini cannot decode fails the turn with an error that says so and offers no retry', async () => {
   const llm = new ScriptedLlm([() => { throw new Error('{"error":{"code":400,"message":"The provided file is malformed or corrupted and could not be decoded.","status":"INVALID_ARGUMENT"}}'); }]);
   const turn = turnContext('', { images: [{ id: 'a_1', mimeType: 'image/jpeg', data: Buffer.from([0xff, 0xd8, 0xff, 0x00]) }] });
-  await assert.rejects(runner(llm).runner.run(turn), { name: 'ModelCallError' });
+  const stored = await runner(llm).runner.run(turn);
   const error = turn.sink.sent.at(-1);
   assert.equal(error?.event, 'error');
   assert.deepEqual(error?.event === 'error' ? [error.message, error.retryable] : null, ['A photo could not be read. Send a different one.', false]);
+  assert.deepEqual(stored.failure, { message: 'A photo could not be read. Send a different one.', retryable: false });
+  assert.equal(stored.attachments.length, 1, 'the failed turn keeps its photo');
 });
 
-test('a failed model call ends the turn with an error event rather than a silent done', async () => {
+test('a failed model call ends the turn with an error event rather than a silent done, and is stored as failed', async () => {
   const llm = new ScriptedLlm([() => { throw new Error('Could not load the default credentials'); }]);
   const turn = turnContext('hi');
-  await assert.rejects(runner(llm).runner.run(turn), { name: 'ModelCallError' });
+  const stored = await runner(llm).runner.run(turn);
   assert.deepEqual(kinds(turn.sink.sent), ['error']);
+  assert.deepEqual([stored.stop, stored.failure], ['end', { message: 'The agent could not finish this turn', retryable: true }]);
+  assert.equal(stored.question, null);
   const error = turn.sink.sent[0];
   assert.equal(error?.event, 'error');
   if (error?.event === 'error') { assert.equal(error.retryable, true); assert.equal(error.usage.complete, false); }
