@@ -94,22 +94,29 @@ class _AppShellState extends ConsumerState<AppShell> {
         isScrollControlled: true,
         useSafeArea: true,
         builder: (sheetContext) => PointerInterceptor(
-          // useSafeArea keeps the sheet below the status bar only; the input
-          // must also clear the home indicator.
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: math.min(
-                760,
-                MediaQuery.sizeOf(sheetContext).height * 0.9,
-              ),
-              child: _chat(
-                onClose: () => Navigator.of(sheetContext).pop(),
-                // The sheet covers the page, so a tapped item closes it.
-                onItem: (item) {
-                  Navigator.of(sheetContext).pop();
-                  _openItem(item);
-                },
+          // The sheet does not avoid the keyboard by itself: lift the input
+          // above it. The fixed height below then shrinks to what is left.
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+            ),
+            // useSafeArea keeps the sheet below the status bar only; the
+            // input must also clear the home indicator.
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: math.min(
+                  760,
+                  MediaQuery.sizeOf(sheetContext).height * 0.9,
+                ),
+                child: _chat(
+                  onClose: () => Navigator.of(sheetContext).pop(),
+                  // The sheet covers the page, so a tapped item closes it.
+                  onItem: (item) {
+                    Navigator.of(sheetContext).pop();
+                    _openItem(item);
+                  },
+                ),
               ),
             ),
           ),

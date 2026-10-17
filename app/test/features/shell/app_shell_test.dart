@@ -97,6 +97,25 @@ void main() {
     expect(find.text('What is on tonight?'), findsOneWidget);
   });
 
+  testWidgets('on a phone the chat input stays above the keyboard', (
+    tester,
+  ) async {
+    final container = appContainer();
+    addTearDown(container.dispose);
+    await pumpApp(tester, container);
+
+    await tester.tap(find.byKey(const ValueKey('chat-fab')));
+    await tester.pumpAndSettle();
+    const keyboard = 336.0;
+    tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    final input = tester.getRect(find.byKey(const ValueKey('chat-input')));
+    expect(input.bottom, lessThanOrEqualTo(844 - keyboard));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('on a wide screen the chat docks beside the page', (
     tester,
   ) async {
