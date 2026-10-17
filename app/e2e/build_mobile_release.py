@@ -72,8 +72,12 @@ def build_ios(versions):
                     f"-authenticationKeyIssuerID={key['ASC_ISSUER_ID']}"]
     elif any(key.values()):
         raise ValueError("Set all of ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID, or none.")
+    # The Swift packages the workflow resolved into build/ios/SourcePackages; without this the archive
+    # resolves again into DerivedData and fetches every package from GitHub.
+    packages = ["-clonedSourcePackagesDirPath", str(APP / "build" / "ios" / "SourcePackages"),
+                "-skipPackageUpdates", "-onlyUsePackageVersionsFromResolvedFile"]
     subprocess.run(["xcodebuild", "-workspace", "Runner.xcworkspace", "-scheme", "Runner", "-configuration", "Release",
-                    "-destination", "generic/platform=iOS", "-archivePath", str(ARCHIVE), *signing,
+                    "-destination", "generic/platform=iOS", "-archivePath", str(ARCHIVE), *packages, *signing,
                     f"DEVELOPMENT_TEAM={TEAM}", "archive"], cwd=APP / "ios", check=True)
     return ARCHIVE
 
