@@ -546,4 +546,195 @@ void main() {
     );
     expect(find.text('Checked 7:15 pm'), findsOneWidget, reason: 'kept');
   });
+
+  testWidgets('questions before a plan say the answers make it, and go back '
+      'together', (tester) async {
+    final client = FakeAgentClient();
+    await _showChat(tester, client, FakePlansClient());
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Plan something fun tonight',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    AgentQuestion question(int n, String text, List<String> options) =>
+        AgentQuestion(
+          id: 'q_t_1_$n',
+          text: text,
+          options: options,
+          allowFreeText: true,
+          forPlan: true,
+        );
+    client.lastTurn
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          question: question(1, 'How long do you have?', [
+            '1 hour',
+            'All evening',
+          ]),
+        ),
+      )
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 1,
+          stepId: 's_2',
+          question: question(2, 'How will you get around?', ['Walk', 'Drive']),
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_1',
+          seq: 2,
+          stop: StopReason.asked,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('A few questions before I make your plan. Answer any of them.'),
+      findsOneWidget,
+    );
+    expect(find.text('Make the plan'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('chat-question-q_t_1_1-All evening')),
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-question-q_t_1_2-Drive')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('chat-questions-send')));
+    await tester.pump();
+    await tester.pump();
+    expect(client.lastTurn.request.input.toJson(), {
+      'kind': 'answers',
+      'answers': [
+        {'questionId': 'q_t_1_1', 'value': 'All evening'},
+        {'questionId': 'q_t_1_2', 'value': 'Drive'},
+      ],
+    });
+  });
+
+  testWidgets('a saved plan is edited by hand: renamed, a stop removed, and '
+      'the route the service dropped no longer offered', (tester) async {
+    final plans = FakePlansClient(stored: [_saved(_plan, route: _route)]);
+    final container = appContainer(plans: plans);
+    await pumpApp(tester, container);
+    await tester.tap(find.byKey(ValueKey('saved-plan-${_plan.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('plan-edit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit plan'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('plan-edit-name')),
+      'Gardens at dusk',
+    );
+    await tester.tap(find.byKey(const ValueKey('plan-edit-remove-0')));
+    await tester.pump();
+    expect(find.text('Fitzroy Gardens'), findsNothing);
+    // A plan keeps at least one stop.
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('plan-edit-remove-1')))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('plan-edit-save')));
+    await tester.pumpAndSettle();
+
+    expect(plans.calls, contains('edit:${_plan.id} Gardens at dusk [1]'));
+    expect(find.text('Saved plan'), findsOneWidget, reason: 'back on its page');
+    expect(find.text('Gardens at dusk'), findsOneWidget);
+    expect(find.text('Fitzroy Gardens'), findsNothing);
+    expect(find.byKey(const ValueKey('plan-show-route')), findsNothing);
+    expect(find.text('Updated Sat 10 Oct, 6:55 pm'), findsOneWidget);
+    expect(
+      container.read(savedPlansProvider).value?.single.card.title,
+      'Gardens at dusk',
+    );
+  });
+
+  testWidgets('Change with Melens opens the chat on the saved plan; its '
+      'revision updates the saved plan in its place', (tester) async {
+    const revised = AgentCard(
+      id: 'c_t_2_1',
+      type: CardType.plan,
+      title: 'A later evening walk',
+      revises: 'c_t_1_1',
+      items: [
+        CardItem(
+          title: 'Treasury Gardens',
+          source: LinkCardSource(url: 'https://example.org/treasury'),
+        ),
+      ],
+    );
+    final client = FakeAgentClient();
+    final plans = FakePlansClient(
+      stored: [_saved(_plan, route: _route)],
+      cards: {revised.id: revised},
+    );
+    final container = appContainer(agent: client, plans: plans);
+    await pumpApp(tester, container);
+    await tester.tap(find.byKey(ValueKey('saved-plan-${_plan.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('plan-change-with-agent')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Changing “A quiet evening walk”'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Start an hour later',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      client.lastTurn.request.input,
+      TurnInput.refine(
+        cardId: _plan.id,
+        text: 'Start an hour later',
+        planId: _plan.id,
+      ),
+    );
+    expect(find.text('Change to “A quiet evening walk”'), findsOneWidget);
+
+    client.lastTurn
+      ..emit(
+        const AgentEvent.card(
+          turnId: 't_2',
+          seq: 0,
+          stepId: 's_1',
+          card: revised,
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_2',
+          seq: 1,
+          stop: StopReason.end,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    final update = find.byKey(ValueKey('plan-update-${revised.id}'));
+    await tester.ensureVisible(update);
+    expect(find.text('Update saved plan'), findsOneWidget);
+    await tester.tap(update);
+    await tester.pumpAndSettle();
+    expect(
+      plans.calls,
+      contains('save:s_1/${revised.id} replacing ${_plan.id}'),
+    );
+    expect(find.byKey(ValueKey('plan-saved-${revised.id}')), findsOneWidget);
+    expect(container.read(savedPlansProvider).value?.map((plan) => plan.id), [
+      revised.id,
+    ]);
+  });
 }

@@ -12,13 +12,16 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_client.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/agent_card_view.dart';
+import '../../chat/state/chat_controller.dart';
 import '../../map/state/map_actions.dart';
 import '../../shell/state/shell_providers.dart';
 import '../data/saved_plan.dart';
 import '../state/plans_providers.dart';
 
 /// One saved plan, opened from the Home tab: the card as the agent made it,
-/// its route on the map, and a remove button. A stop opens on the map.
+/// its route on the map, and a remove button. A stop opens on the map. The
+/// user edits the plan themselves (name, which stops, their order) or has the
+/// agent change it in the chat.
 class PlanScreen extends ConsumerWidget {
   const PlanScreen({required this.planId, super.key});
 
@@ -31,6 +34,16 @@ class PlanScreen extends ConsumerWidget {
         .read(mapActionsControllerProvider.notifier)
         .apply(UiAction(action: UiActionName.drawRoute, args: route));
     context.go(AppRoutes.discover);
+  }
+
+  /// Opens the chat, ready for what the agent should change; the revised
+  /// plan offers to update this one.
+  void _changeWithAgent(BuildContext context, WidgetRef ref, SavedPlan plan) {
+    ref
+        .read(chatControllerProvider.notifier)
+        .startRefine(plan.card, planId: plan.id);
+    context.go(AppRoutes.discover);
+    ref.read(chatOpenRequestsProvider.notifier).request();
   }
 
   Future<void> _remove(BuildContext context, WidgetRef ref) async {
@@ -70,10 +83,21 @@ class PlanScreen extends ConsumerWidget {
     final clock = ref.watch(melbourneClockProvider);
     final plans = ref.watch(savedPlansProvider);
     final plan = plans.value?.where((plan) => plan.id == planId).firstOrNull;
+    final canChat = ref.watch(
+      chatControllerProvider.select((chat) => chat.canSend),
+    );
+    final changed = DateTime.tryParse(plan?.updatedAt ?? '');
     return Scaffold(
       appBar: AppBar(
         title: Text(strings.planScreenTitle),
         actions: [
+          if (plan != null)
+            IconButton(
+              key: const ValueKey('plan-edit'),
+              tooltip: strings.planEdit,
+              onPressed: () => context.push(AppRoutes.editPlan(plan.id)),
+              icon: const Icon(Icons.edit_outlined),
+            ),
           if (plan != null)
             IconButton(
               key: const ValueKey('plan-remove'),
@@ -134,14 +158,25 @@ class PlanScreen extends ConsumerWidget {
                     label: Text(strings.planShowRoute),
                   ),
                 ],
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('plan-change-with-agent'),
+                  onPressed: canChat
+                      ? () => _changeWithAgent(context, ref, plan)
+                      : null,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: Text(strings.planChangeWithAgent),
+                ),
                 const SizedBox(height: 16),
-                if (DateTime.tryParse(plan.savedAt) case final saved?)
+                if (changed ?? DateTime.tryParse(plan.savedAt) case final date?)
                   Text(
-                    strings.planSavedOn(
+                    (changed == null
+                        ? strings.planSavedOn
+                        : strings.planUpdatedOn)(
                       DateFormat(
                         'EEE d MMM, h:mm a',
                         'en_AU',
-                      ).format(clock.toMelbourne(saved)),
+                      ).format(clock.toMelbourne(date)),
                     ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,

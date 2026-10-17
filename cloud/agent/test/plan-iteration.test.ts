@@ -6,10 +6,10 @@ import type { LlmResponse } from '@google/adk';
 
 import { createMapAgentRunner } from '../src/agent/map-agent.js';
 import type { GroundingModel } from '../src/agent/grounding.js';
-import { historyContents } from '../src/agent/prompts.js';
+import { historyContents, instructionFor } from '../src/agent/prompts.js';
 import type { StructuredModel } from '../src/agent/structured.js';
 import { createMemoryCache } from '../src/cache.js';
-import type { Card, StopParking, StoredTurn } from '../src/protocol/schemas.js';
+import type { Card, Question, StopParking, StoredTurn } from '../src/protocol/schemas.js';
 import { collectingSink } from '../src/protocol/sse.js';
 import { toolSpecs, type ToolDependencies } from '../src/tools/catalog.js';
 import { TurnRegistry, runTool } from '../src/tools/define.js';
@@ -144,6 +144,63 @@ test('after a plan the agent may ask up to three questions about it; otherwise o
   assert.equal((results[3] as { error: { code: string } }).error.code, 'invalid_arguments');
   const sent = planned.sink.sent.flatMap((event) => event.event === 'question' ? [event.question.text] : []);
   assert.deepEqual(sent, ['When will you leave?', 'How long do you have?', 'How will you get there?']);
+});
+
+test('before a plan the agent asks up to three questions for it, and the answers ask for the plan at once', async () => {
+  const deps: ToolDependencies = { features: fakeReader([]), grounding: null };
+  const { turn, spec } = registry(deps);
+  const asks = [['When will you leave?', ['Now', 'In an hour']], ['How long do you have?', ['1 hour', '2 to 3 hours']],
+    ['How will you get around?', ['Walk', 'Drive']], ['Anything else?', ['No', 'Yes']]] as const;
+  const results = [];
+  for (const [question, options] of asks) results.push(await runTool(spec('ask_user'), turn, { question, options, for_plan: true }));
+  assert.deepEqual(turn.questions.map((question) => [question.id, question.planCardId, question.forPlan]),
+    [['q_t_test_1', undefined, true], ['q_t_test_2', undefined, true], ['q_t_test_3', undefined, true]]);
+  assert.equal((results[3] as { error: { code: string } }).error.code, 'invalid_arguments');
+
+  const pending = (question: Question) => instructionFor(question).split('Pending question')[1] ?? '';
+  assert.match(pending(turn.questions[0]!), /make the plan now \(Answers before a plan\)/);
+  assert.match(pending({ ...turn.questions[0]!, planCardId: 'c_t_0_1' }), /revise that plan once for all the answers/);
+  assert.doesNotMatch(pending({ id: 'q_1', text: 'Which gardens?', options: ['Fitzroy', 'Carlton'], allowFreeText: true }), /plan now|revise that plan/);
+});
+
+test('a plan turn may only ask: its questions come together, without a card, and the history says they are for a plan', async () => {
+  const llm = new ScriptedLlm([
+    () => calls([['ask_user', { question: 'How long do you have?', options: ['1 hour', '2 to 3 hours'], for_plan: true }],
+      ['ask_user', { question: 'How will you get around?', options: ['Walk', 'Public transport', 'Drive'], for_plan: true }]]),
+    () => streamedText('never sent', usage(1, 1)),
+  ]);
+  const runner = createMapAgentRunner({ model: llm, maxModelCalls: 8, tools: { features: fakeReader(STOPS), grounding: null }, clock });
+  const stored = await runner.run(turnContext('Plan something fun for tonight'));
+  assert.equal(stored.stop, 'asked');
+  assert.equal(llm.seen.length, 1, 'asking ends the turn');
+  assert.deepEqual(stored.cards, []);
+  assert.deepEqual(stored.questions.map((question) => [question.text, question.forPlan, question.planCardId]),
+    [['How long do you have?', true, undefined], ['How will you get around?', true, undefined]]);
+  const history = historyContents([stored]);
+  assert.match(history[1]?.parts?.[0]?.text ?? '', /asked: "How will you get around\?" options \["Walk","Public transport","Drive"\] for a plan/);
+});
+
+test('while a turn changes a plan, its questions are about that plan and the plan card it shows revises it', async () => {
+  const deps: ToolDependencies = { features: fakeReader([]), grounding: null };
+  const base: Card = { id: 'c_t_0_1', type: 'plan', title: 'Your evening', items: [planItems[1]!] };
+  const changing = registry(deps);
+  changing.turn.rememberCard(base);
+  changing.turn.basePlan = base;
+  await runTool(changing.spec('ask_user'), changing.turn, { question: 'Later by how much?', options: ['An hour', 'Two hours'] });
+  await runTool(changing.spec('ask_user'), changing.turn, { question: 'Still on foot?', options: ['Yes', 'No'] });
+  assert.deepEqual(changing.turn.questions.map((question) => [question.planCardId, question.forPlan]), [['c_t_0_1', true], ['c_t_0_1', true]]);
+
+  const revising = registry(deps);
+  revising.turn.rememberCard(base);
+  revising.turn.basePlan = base;
+  await runTool(revising.spec('show_card'), revising.turn, { type: 'plan', title: 'Later evening', items: base.items });
+  await runTool(revising.spec('show_card'), revising.turn, { type: 'list', title: 'Also nearby', items: base.items });
+  assert.deepEqual(revising.turn.cards.map((card) => [card.type, card.revises]), [['plan', 'c_t_0_1'], ['list', undefined]]);
+
+  const fresh = registry(deps);
+  fresh.turn.rememberCard(base);
+  await runTool(fresh.spec('show_card'), fresh.turn, { type: 'plan', title: 'New evening', items: base.items });
+  assert.equal(fresh.turn.cards[0]!.revises, undefined, 'a new plan revises nothing');
 });
 
 /** One model response that calls several tools, as Gemini does for parallel calls. */

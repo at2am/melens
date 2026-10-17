@@ -3903,6 +3903,12 @@ abstract class AppLocalizations {
   /// **'You have 30 saved plans. Remove one on the Home tab first.'**
   String get planSaveLimit;
 
+  /// Button under a revised plan card that replaces the saved plan it revises.
+  ///
+  /// In en, this message translates to:
+  /// **'Update saved plan'**
+  String get planUpdateSaved;
+
   /// Heading of the saved plans on the Home tab.
   ///
   /// In en, this message translates to:
@@ -3944,6 +3950,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved {date}'**
   String planSavedOn(String date);
+
+  /// When a saved plan was last edited or replaced. {date} is a Melbourne date and time.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {date}'**
+  String planUpdatedOn(String date);
+
+  /// Button on a saved plan that opens the chat to have the agent change the plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Change with Melens'**
+  String get planChangeWithAgent;
+
+  /// Tooltip of the button on a saved plan, and title of the page, where the user renames it and removes or reorders its stops.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit plan'**
+  String get planEdit;
+
+  /// Label of the plan name field when editing a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get planEditName;
+
+  /// Hint above the stops when editing a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder the stops, or remove one. The route is drawn again for the new order.'**
+  String get planEditStops;
+
+  /// Tooltip of the button that removes one stop while editing a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove stop'**
+  String get planEditRemoveStop;
+
+  /// Button that keeps the edits of a saved plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get planEditSave;
+
+  /// Shown when saving the edits of a saved plan failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes could not be saved. Try again.'**
+  String get planEditFailed;
 
   /// Shown when a saved plan page opens for a plan that was removed.
   ///
@@ -3998,6 +4052,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update the plan'**
   String get chatQuestionsSend;
+
+  /// Above several questions the agent asked before it makes a plan.
+  ///
+  /// In en, this message translates to:
+  /// **'A few questions before I make your plan. Answer any of them.'**
+  String get chatQuestionsBeforePlan;
+
+  /// Sends the answers chosen under several questions the agent asked before it makes a plan.
+  ///
+  /// In en, this message translates to:
+  /// **'Make the plan'**
+  String get chatQuestionsMakePlan;
 
   /// Under several questions: the user may type instead of choosing.
   ///

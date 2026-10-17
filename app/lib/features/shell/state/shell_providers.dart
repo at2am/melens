@@ -36,6 +36,16 @@ class CardItemRequests extends _$CardItemRequests {
   }
 }
 
+/// Asks the shell to open the agent chat, for a page above the tabs such as
+/// a saved plan; each request has a new sequence.
+@Riverpod(keepAlive: true)
+class ChatOpenRequests extends _$ChatOpenRequests {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+}
+
 /// The user's choice of light, dark or the device setting.
 enum AppThemeChoice { system, light, dark }
 

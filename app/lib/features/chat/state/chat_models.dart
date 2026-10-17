@@ -247,6 +247,7 @@ final class ChatState {
     this.isRestoring = false,
     this.pendingQuestion,
     this.refining,
+    this.refiningPlanId,
     this.error,
   });
 
@@ -270,6 +271,10 @@ final class ChatState {
   /// The plan card the next message asks to change; the input box says so.
   final AgentCard? refining;
 
+  /// The saved plan [refining] is the card of, when the user changes a plan
+  /// they kept rather than one of this conversation.
+  final String? refiningPlanId;
+
   /// A failed session operation (list, create, open, delete).
   final ChatError? error;
 
@@ -291,6 +296,7 @@ final class ChatState {
     AgentQuestion? pendingQuestion,
     bool clearPendingQuestion = false,
     AgentCard? refining,
+    String? refiningPlanId,
     bool clearRefining = false,
     ChatError? error,
     bool clearError = false,
@@ -306,6 +312,12 @@ final class ChatState {
         ? null
         : pendingQuestion ?? this.pendingQuestion,
     refining: clearRefining ? null : refining ?? this.refining,
+    // A new card to change starts without the saved plan of the last one.
+    refiningPlanId: clearRefining
+        ? null
+        : refining != null
+        ? refiningPlanId
+        : this.refiningPlanId,
     error: clearError ? null : error ?? this.error,
   );
 }

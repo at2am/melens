@@ -14,6 +14,7 @@ import { PlanService } from '../src/plans/service.js';
 import { InMemoryPlanStore } from '../src/plans/store.js';
 import { type Card, type Question, type StopParking, type StoredTurn, zeroUsage } from '../src/protocol/schemas.js';
 import { createRateLimiter } from '../src/rate-limit.js';
+import { RouteNotFoundError, type RoutesClient } from '../src/routes/routes-client.js';
 import { createAgentHttpServer, type TurnContext, type TurnRunner } from '../src/server.js';
 import { InMemorySessionStore } from '../src/sessions/store.js';
 import { ScriptedLlm, eventItem, fakeReader, functionCall, streamedText, turnContext, usage } from './support.js';
@@ -46,10 +47,12 @@ function cardRunner(seen: TurnContext[], queue: { cards: (turnId: string) => Car
   } };
 }
 
-async function start(runner: TurnRunner, options: { writesPerHour?: number; refreshParking?: ConstructorParameters<typeof PlanService>[0]['refreshParking'] } = {}) {
+async function start(runner: TurnRunner, options: { writesPerHour?: number; refreshParking?: ConstructorParameters<typeof PlanService>[0]['refreshParking'];
+  routes?: RoutesClient; clock?: () => Date } = {}) {
   const sessions = new InMemorySessionStore();
-  const plans = new PlanService({ store: new InMemoryPlanStore(), sessions, writeLimiter: createRateLimiter(options.writesPerHour ?? 100), clock: () => NOW,
-    ...(options.refreshParking === undefined ? {} : { refreshParking: options.refreshParking }) });
+  const plans = new PlanService({ store: new InMemoryPlanStore(), sessions, writeLimiter: createRateLimiter(options.writesPerHour ?? 100),
+    clock: options.clock ?? (() => NOW), ...(options.refreshParking === undefined ? {} : { refreshParking: options.refreshParking }),
+    ...(options.routes === undefined ? {} : { routes: options.routes }) });
   const server = createAgentHttpServer({ store: sessions, runner, plans,
     events: new UserEventService({ store: new InMemoryUserEventStore(), writeLimiter: createRateLimiter(100) }),
     feeds: new FeedService({ store: new InMemoryFeedStore(), writeLimiter: createRateLimiter(100) }),
@@ -66,8 +69,8 @@ async function start(runner: TurnRunner, options: { writesPerHour?: number; refr
     return { status: response.status, body };
   };
   const lastTurnId = (sessionId: string, uid = 'uid-a') => sessions.listTurns(uid, sessionId).then((turns) => turns.at(-1)!.id);
-  const save = (sessionId: string, cardId: string, token = 'token-a') =>
-    call('/v1/plans', { method: 'POST', body: JSON.stringify({ sessionId, cardId }) }, token);
+  const save = (sessionId: string, cardId: string, token = 'token-a', replaces?: string) =>
+    call('/v1/plans', { method: 'POST', body: JSON.stringify({ sessionId, cardId, ...(replaces === undefined ? {} : { replaces }) }) }, token);
   const close = () => new Promise<void>((resolve) => { server.closeAllConnections(); server.close(() => resolve()); });
   return { call, newSession, turn, lastTurnId, save, close };
 }
@@ -292,4 +295,137 @@ test('a saved plan refreshes the live parking of one stop, keeps it, and refuses
     const response = await without.call(`/v1/plans/${cardId}/stops/0/refresh`, { method: 'POST', body: JSON.stringify({ part: 'parking' }) });
     assert.equal(response.status, 503);
   } finally { await without.close(); }
+});
+
+test('a revised plan replaces the saved plan it revises in its place, even at the limit', async () => {
+  const seen: TurnContext[] = [];
+  let now = NOW;
+  const queue = Array.from({ length: PLAN_LIMITS.maxPlans + 1 }, () => ({ cards: (id: string) => [planCard(id)] }));
+  const { call, newSession, turn, lastTurnId, save, close } = await start(cardRunner(seen, queue), { writesPerHour: 1_000, clock: () => now });
+  try {
+    const sessionId = await newSession();
+    const ids: string[] = [];
+    for (let index = 0; index < PLAN_LIMITS.maxPlans; index += 1) {
+      now = new Date(NOW.getTime() + index * 60_000);
+      await turn(sessionId, { kind: 'text', text: `Plan ${index}` });
+      ids.push(`c_${await lastTurnId(sessionId)}_1`);
+      assert.equal((await save(sessionId, ids.at(-1)!)).status, 201);
+    }
+    await turn(sessionId, { kind: 'text', text: 'Revise plan 3' });
+    const revised = `c_${await lastTurnId(sessionId)}_1`;
+    now = new Date('2026-10-17T01:00:00.000Z');
+    const response = await save(sessionId, revised, 'token-a', ids[3]);
+    assert.equal(response.status, 201, 'a replacement does not count against the limit');
+    const { plan } = await response.json() as { plan: SavedPlan };
+    assert.equal(plan.id, revised);
+    assert.equal(plan.savedAt, new Date(NOW.getTime() + 3 * 60_000).toISOString(), 'it keeps the place of the plan it replaces');
+    assert.equal(plan.updatedAt, now.toISOString());
+    const listed = ((await (await call('/v1/plans')).json()) as { plans: SavedPlan[] }).plans.map((kept) => kept.id);
+    assert.equal(listed.length, PLAN_LIMITS.maxPlans);
+    assert.equal(listed.includes(ids[3]!), false);
+    assert.equal(listed[PLAN_LIMITS.maxPlans - 4], revised);
+  } finally { await close(); }
+});
+
+function located(turnId: string): Card {
+  return { id: `c_${turnId}_1`, type: 'plan', title: 'Three stops', items: [
+    { title: 'Gallery', source: { feature_id: 'event:1' }, location: { lat: -37.81, lng: 144.96 }, getting_there: 'Start here' },
+    { title: 'Jazz', source: { url: 'https://example.org/jazz' }, location: { lat: -37.811, lng: 144.962 }, getting_there: 'Tram 86, 6 min' },
+    { title: 'Late show', source: { feature_id: 'event:3' }, location: { lat: -37.812, lng: 144.965 }, getting_there: '9 min walk' },
+  ] };
+}
+
+test('the user edits a saved plan: a new title, stops dropped and reordered, and the route drawn again', async () => {
+  const computed: { waypoints: readonly unknown[]; mode: string }[] = [];
+  let fail = false;
+  const routes: RoutesClient = { async compute({ waypoints, mode }) {
+    computed.push({ waypoints, mode });
+    if (fail) throw new RouteNotFoundError();
+    return { polyline: 'new', distance_m: 900, duration_min: 12, legs: [{ from: 0, to: 1, duration_min: 12, distance_m: 900 }] };
+  } };
+  const { call, newSession, turn, lastTurnId, save, close } = await start(cardRunner([], [
+    { cards: (id) => [located(id)], uiActions: [{ action: 'draw_route', args: ROUTE }] },
+  ]), { routes });
+  try {
+    const sessionId = await newSession();
+    await turn(sessionId, { kind: 'text', text: 'Plan my evening' });
+    const turnId = await lastTurnId(sessionId);
+    const planId = `c_${turnId}_1`;
+    await save(sessionId, planId);
+    const edit = (body: unknown, token = 'token-a', id = planId) => call(`/v1/plans/${id}`, { method: 'PATCH', body: JSON.stringify(body) }, token);
+
+    const renamed = await edit({ title: '  Our evening  ' });
+    assert.equal(renamed.status, 200);
+    const { plan: titled } = await renamed.json() as { plan: SavedPlan };
+    assert.equal(titled.card.title, 'Our evening');
+    assert.deepEqual(titled.card.items, located(turnId).items);
+    assert.deepEqual(titled.route, ROUTE, 'a new title keeps the route');
+    assert.equal(computed.length, 0);
+
+    // Drop the jazz and visit the late show before the gallery.
+    const moved = await edit({ stops: [2, 0] });
+    assert.equal(moved.status, 200);
+    const { plan } = await moved.json() as { plan: SavedPlan };
+    assert.equal(plan.id, planId);
+    assert.equal(plan.card.title, 'Our evening');
+    assert.deepEqual(plan.card.items.map((item) => [item.title, item.source, item.getting_there]),
+      [['Late show', { feature_id: 'event:3' }, undefined], ['Gallery', { feature_id: 'event:1' }, '12 min walk']]);
+    assert.deepEqual(computed, [{ waypoints: [{ lat: -37.812, lng: 144.965 }, { lat: -37.81, lng: 144.96 }], mode: 'walk' }]);
+    assert.deepEqual(plan.route, { polyline: 'new', mode: 'walk', distance_m: 900, duration_min: 12,
+      waypoints: [{ lat: -37.812, lng: 144.965, label: 'Late show' }, { lat: -37.81, lng: 144.96, label: 'Gallery' }] });
+    assert.equal(plan.savedAt, NOW.toISOString());
+    assert.equal(plan.updatedAt, NOW.toISOString());
+    assert.deepEqual(((await (await call('/v1/plans')).json()) as { plans: SavedPlan[] }).plans, [plan], 'the edit is kept');
+
+    // A route that cannot be computed is dropped, not left through the old stops.
+    fail = true;
+    const { plan: unrouted } = await (await edit({ stops: [1, 0] })).json() as { plan: SavedPlan };
+    assert.deepEqual(unrouted.card.items.map((item) => item.title), ['Gallery', 'Late show']);
+    assert.equal(unrouted.route, undefined);
+    // Without a route nothing is computed.
+    await edit({ stops: [1, 0] });
+    assert.equal(computed.length, 2);
+
+    for (const body of [{}, { stops: [] }, { stops: [0, 0] }, { title: ' ' }, { stops: [0], colour: 'red' }]) {
+      assert.equal((await edit(body)).status, 400, JSON.stringify(body));
+    }
+    const missing = await edit({ stops: [0, 5] });
+    assert.equal(missing.status, 400);
+    assert.equal(((await missing.json()) as { error: { messageKey: string } }).error.messageKey, 'agent.error.invalidRequest.no_stop');
+    assert.equal((await edit({ title: 'Mine' }, 'token-b')).status, 404, 'another uid cannot edit it');
+    assert.equal((await edit({ title: 'Mine' }, 'token-a', 'c_t_nope_1')).status, 404);
+  } finally { await close(); }
+});
+
+test('a saved plan is changed from any session: the refine turn and the answers to its questions get the saved card', async () => {
+  const seen: TurnContext[] = [];
+  // The jazz alone: first now, so it no longer says how to get there from the stop before.
+  const edited = (turnId: string): Card => ({ ...planCard(turnId), title: 'Edited by hand', items: [{ title: 'Jazz on the lane', source: { url: 'https://example.org/jazz' } }] });
+  const { call, newSession, turn, lastTurnId, save, close } = await start(cardRunner(seen, [
+    { cards: (id) => [planCard(id)] },
+    // The refine turn asks first, about the plan it changes.
+    { cards: () => [], questions: (id) => planQuestions(id, seen.at(-1)?.planCard?.id) },
+    { cards: () => [] },
+  ]));
+  try {
+    const first = await newSession();
+    await turn(first, { kind: 'text', text: 'Plan my evening' });
+    const turnId = await lastTurnId(first);
+    const planId = `c_${turnId}_1`;
+    await save(first, planId);
+    await call(`/v1/plans/${planId}`, { method: 'PATCH', body: JSON.stringify({ title: 'Edited by hand', stops: [1] }) });
+
+    const other = await newSession();
+    const refined = await turn(other, { kind: 'refine', cardId: planId, planId, text: 'Make it later' });
+    assert.equal(refined.status, 200);
+    assert.deepEqual(seen.at(-1)?.planCard, edited(turnId), 'the saved, edited card, though this session never showed it');
+    const askedIn = await lastTurnId(other);
+    await turn(other, { kind: 'answers', answers: [{ questionId: `q_${askedIn}_1`, value: 'In an hour' }] });
+    assert.equal(seen.at(-1)?.planCard?.title, 'Edited by hand', 'the answers bring the saved card back');
+
+    const runs = seen.length;
+    assert.equal((await turn(other, { kind: 'refine', cardId: 'c_t_other_1', planId, text: 'Later' })).status, 404, 'the card must be the plan\'s');
+    assert.equal((await turn(other, { kind: 'refine', cardId: planId, planId, text: 'Later' }, 'token-b')).status, 404, 'another uid has no such plan');
+    assert.equal(seen.length, runs);
+  } finally { await close(); }
 });

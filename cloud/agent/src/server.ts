@@ -4,6 +4,7 @@ import type { IdTokenVerifier } from './auth/verifier.js';
 import type { UserEventService } from './events/service.js';
 import type { FeedService } from './feeds/service.js';
 import { decodeImages, type TurnImage } from './protocol/attachments.js';
+import { askedIn } from './agent/prompts.js';
 import type { PlanService } from './plans/service.js';
 import { turnIdOfCard } from './plans/schemas.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
@@ -18,7 +19,7 @@ export const MAX_REQUEST_BYTES = 64 * 1024 + ATTACHMENT_LIMITS.perTurn * Math.ce
 /** How long a new message waits for the running turn it interrupts to stop and store itself before taking its lease. */
 export const SUPERSEDE_WAIT_MS = 5_000;
 
-/** The longest a saved plan's stop refresh may read the sensors and the area's rules. */
+/** The longest a saved plan's stop refresh may read the sensors and the area's rules, or an edit compute its route. */
 const STOP_REFRESH_TIMEOUT_MS = 60_000;
 
 export interface TurnContext {
@@ -64,7 +65,7 @@ type Route =
   | { readonly kind: 'eventMember'; readonly eventId: string; readonly memberId: string }
   | { readonly kind: 'feeds'; readonly method: 'GET' | 'PUT' }
   | { readonly kind: 'plans'; readonly method: 'GET' | 'POST' }
-  | { readonly kind: 'plan'; readonly planId: string }
+  | { readonly kind: 'plan'; readonly method: 'PATCH' | 'DELETE'; readonly planId: string }
   | { readonly kind: 'planStopRefresh'; readonly planId: string; readonly index: number };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -96,7 +97,7 @@ function matchRoute(method: string, pathname: string): Route | null {
   if (pathname === '/v1/feeds' && (method === 'GET' || method === 'PUT')) return { kind: 'feeds', method };
   if (pathname === '/v1/plans' && (method === 'GET' || method === 'POST')) return { kind: 'plans', method };
   const plan = /^\/v1\/plans\/([^/]+)$/.exec(pathname);
-  if (plan !== null && ID.test(plan[1]!) && method === 'DELETE') return { kind: 'plan', planId: plan[1]! };
+  if (plan !== null && ID.test(plan[1]!) && (method === 'PATCH' || method === 'DELETE')) return { kind: 'plan', method, planId: plan[1]! };
   const stop = /^\/v1\/plans\/([^/]+)\/stops\/(\d{1,2})\/refresh$/.exec(pathname);
   if (stop !== null && ID.test(stop[1]!) && method === 'POST') return { kind: 'planStopRefresh', planId: stop[1]!, index: Number(stop[2]) };
   if (pathname === '/v1/sessions' && (method === 'GET' || method === 'POST')) return { kind: 'sessions', method };
@@ -250,12 +251,20 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     return new Map(images.filter((image) => image !== null).map((image) => [image.id, image]));
   }
 
-  /** The plan card a `refine` turn changes, read from the session's stored turn, never from the request. */
-  async function storedPlanCard(uid: string, sessionId: string, cardId: string): Promise<Card> {
-    const turnId = turnIdOfCard(cardId);
-    const turn = turnId === null ? null : await options.store.getTurn(uid, sessionId, turnId);
-    const card = turn?.cards.find((candidate) => candidate.id === cardId);
-    if (card === undefined) throw new AgentServiceError('notFound');
+  /**
+   * The plan card a `refine` turn changes, read from the session's stored turn, or from the uid's saved plan `planId`
+   * when the user changes a plan they kept; never from the request.
+   */
+  async function storedPlanCard(uid: string, sessionId: string, cardId: string, planId?: string): Promise<Card> {
+    let card: Card | undefined;
+    if (planId === undefined) {
+      const turnId = turnIdOfCard(cardId);
+      const turn = turnId === null ? null : await options.store.getTurn(uid, sessionId, turnId);
+      card = turn?.cards.find((candidate) => candidate.id === cardId);
+    } else {
+      card = (await options.plans.card(uid, planId)) ?? undefined;
+    }
+    if (card?.id !== cardId) throw new AgentServiceError('notFound');
     if (card.type !== 'plan') throw new AgentServiceError('invalidRequest', 'not_a_plan');
     return card;
   }
@@ -266,8 +275,8 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     if (!parsed.success) throw new AgentServiceError('invalidRequest');
     const images = decodeImages(parsed.data.attachments ?? [], ATTACHMENT_LIMITS.bytes);
     if (!options.rateLimiter.allow(uid, clock())) throw new AgentServiceError('rateLimited');
-    const refineCard = parsed.data.input.kind === 'refine' ? await storedPlanCard(uid, sessionId, parsed.data.input.cardId) : undefined;
-    let planCard = refineCard;
+    const input = parsed.data.input;
+    let planCard = input.kind === 'refine' ? await storedPlanCard(uid, sessionId, input.cardId, input.planId) : undefined;
 
     // The client leaving, the stop button, a newer message or the Cloud Run deadline cancels the run, so it
     // stops spending tokens. The client may already leave while this request waits for an interrupted turn.
@@ -294,12 +303,16 @@ export function createAgentHttpServer(options: AgentServerOptions) {
       const record = await options.store.get(uid, sessionId);
       if (record === null) throw new AgentServiceError('notFound');
       session = record;
-      // An answer to a question about a plan changes that plan, so the model gets the whole card, as for a refine turn.
-      const aboutPlan = record.pendingQuestion?.planCardId;
-      if (planCard === undefined && aboutPlan !== undefined && ['answer', 'answers', 'text'].includes(parsed.data.input.kind)) {
-        planCard = await storedPlanCard(uid, sessionId, aboutPlan).catch(() => undefined);
-      }
       history = await options.store.listTurns(uid, sessionId, SESSION_LIMITS.promptTurns);
+      // An answer to a question about a plan changes that plan, so the model gets the whole card, as for a refine turn.
+      // A question asked while changing a saved plan is about the plan's card, which the refine input named.
+      const pending = record.pendingQuestion;
+      const aboutPlan = pending?.planCardId;
+      if (planCard === undefined && aboutPlan !== undefined && ['answer', 'answers', 'text'].includes(input.kind)) {
+        const asking = history.findLast((turn) => askedIn(turn).some((question) => question.id === pending!.id))?.input;
+        const savedPlan = asking?.kind === 'refine' && asking.cardId === aboutPlan ? asking.planId : undefined;
+        planCard = await storedPlanCard(uid, sessionId, aboutPlan, savedPlan).catch(() => undefined);
+      }
       historyImages = await loadHistoryImages(uid, sessionId, history);
     } catch (error) {
       response.off('close', onClose);
@@ -434,10 +447,23 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           else writeJson(response, 200, { plans: await options.plans.list(uid) });
           return;
         }
-        case 'plan':
-          await options.plans.remove(uid, route.planId);
-          writeNoContent(response);
+        case 'plan': {
+          if (route.method === 'DELETE') {
+            await options.plans.remove(uid, route.planId);
+            writeNoContent(response);
+            return;
+          }
+          // An edit that computes the route again stops when the caller leaves, and after a minute in any case.
+          const controller = new AbortController();
+          const onClose = () => { if (!response.writableEnded) controller.abort(); };
+          response.on('close', onClose);
+          try {
+            const body = await readJsonBody(request);
+            const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(STOP_REFRESH_TIMEOUT_MS)]);
+            writeJson(response, 200, { plan: await options.plans.edit(uid, route.planId, body, signal) });
+          } finally { response.off('close', onClose); }
           return;
+        }
         case 'planStopRefresh': {
           // The read stops when the caller leaves, and after a minute in any case.
           const controller = new AbortController();

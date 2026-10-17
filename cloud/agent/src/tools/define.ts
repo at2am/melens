@@ -46,6 +46,11 @@ export class TurnRegistry {
   budgetForced = false;
   /** The questions `ask_user` asked, in order; asking ends the turn. */
   readonly questions: Question[] = [];
+  /**
+   * The plan this turn changes (a `refine` card, or the plan the pending question was about), or null: a plan card shown
+   * revises it, and questions asked before revising it are about it.
+   */
+  basePlan: Card | null = null;
   private steps = 0;
 
   constructor(readonly turn: {

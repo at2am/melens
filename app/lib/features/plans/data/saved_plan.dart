@@ -7,7 +7,7 @@ part 'saved_plan.g.dart';
 /// A plan card the user kept (agent-protocol.md, Saved plans): a copy of the
 /// card as the agent service stored it, so it outlives the chat session.
 /// Its id is the card's id. [route] is the `draw_route` action of the same
-/// turn, when the agent drew one.
+/// turn, when the agent drew one; an edit draws it again or drops it.
 @JsonSerializable(checked: true, explicitToJson: true)
 final class SavedPlan {
   const SavedPlan({
@@ -16,6 +16,7 @@ final class SavedPlan {
     required this.turnId,
     required this.savedAt,
     required this.card,
+    this.updatedAt,
     this.route,
   });
 
@@ -31,6 +32,10 @@ final class SavedPlan {
   /// ISO 8601, as sent.
   @JsonKey(required: true)
   final String savedAt;
+
+  /// The last edit or replacement, ISO 8601; null when never changed.
+  @JsonKey(includeIfNull: false)
+  final String? updatedAt;
 
   @JsonKey(required: true)
   final AgentCard card;

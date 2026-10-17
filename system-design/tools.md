@@ -405,6 +405,8 @@ Status line: none. Cost: none; validation runs on the server.
 
 Validation: the server checks every item's `source` against the feature ids and URLs that tools returned in this turn. If any item fails, the whole call is rejected with `unverified_sources` and the failing item indexes in `details.items`, so the model can drop or fix them and call again. On success it attaches the attribution that grounding requires, sends a `card` event and returns `{ "card_id": "…" }`.
 
+**Revised plans.** A `plan` card shown in a turn that changes a plan (a `refine` turn, or the answers to questions about a plan) carries `revises`, that plan's card id, written by code. The app offers to update a saved plan with its revision.
+
 **Driven plans.** For a `plan` with `travel_mode` `drive`, after validation and before the card is sent, the server reads the parking around each stop it can place (the item's `location`, else the centroid of the feature it cites; at most 6 stops) in a step of its own, `plan_parking` ("Checking parking at each stop"), which the model cannot call. Each stop reads the sensors as `find_parking` does (400 m, then 800 m) and gets the area's rules from the same cached lookup; stops in the same 0.01° cell share one lookup, because the rules are published per area and each lookup is a billed web search. A stop placed from its feature keeps that point as its `location`. The result adds `parking` (each stop's title, vacant count and nearest vacant distance) and a note to mention parking in one sentence at most. A saved plan reads one stop's parking again on request ([agent-protocol.md](agent-protocol.md#saved-plans)), without a model call.
 
 ## Conversation tools
@@ -413,15 +415,16 @@ Validation: the server checks every item's `source` against the feature ids and 
 
 Status line: none; the question itself is the event.
 
-**Description for the model:** Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. After you showed a plan card in this turn you may ask up to three questions about it (when they leave, how long they have, how they travel), all in the same response. Calling this ends your turn.
+**Description for the model:** Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. A plan is the exception: before you make or change a plan you may ask up to three questions about what it leaves open (when they leave, how long they have, how they travel, what they enjoy), with for_plan true, all in the same response; you plan once from the answers. Calling this ends your turn.
 
 | Argument | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `question` | string | Yes | At most 200 characters |
 | `options` | string[] | Yes | 2–4 options, each at most 40 characters |
 | `allow_free_text` | boolean | No | Default `true`; the user may type an answer instead |
+| `for_plan` | boolean | No | `true` when the question gathers what the agent needs to make or change a plan |
 
-Sends a `question` event; the server then ends the turn with `done` and stop `asked` ([agent-protocol.md](agent-protocol.md#rules)). Other tool calls in the same step run first, in order, so a model response may show a plan and then ask about it. A turn asks one question; a turn that showed a `plan` card may ask up to three, each carrying `planCardId` (that card), and a call over the limit returns `invalid_arguments`. The server keeps the pending question in the session and puts it in the next turn's prompt, so the model can tell an answer from a change of topic. Returns `{ "question_id": "…" }` for the trace.
+Sends a `question` event; the server then ends the turn with `done` and stop `asked` ([agent-protocol.md](agent-protocol.md#rules)). Other tool calls in the same step run first, in order. A turn asks one question. Questions for a plan may be up to three: those with `for_plan`, those of a turn that changes a plan (a `refine` turn, or the answers to earlier questions about a plan) and those after a `plan` card of the same turn. Each carries `forPlan`, and `planCardId` when there is a plan: the card the turn showed, else the plan it changes. A call over the limit returns `invalid_arguments`. The server keeps the pending question in the session and puts it in the next turn's prompt, so the model can tell an answer from a change of topic. Returns `{ "question_id": "…" }` for the trace.
 
 ## Open questions
 

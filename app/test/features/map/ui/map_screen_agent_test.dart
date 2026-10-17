@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,11 +17,19 @@ import 'package:melens/l10n/app_localizations.dart';
 import '../../agent/fake_agent_client.dart';
 import '../t017_test_support.dart';
 
+/// [visible] stands for the map's tab being on screen; without it, it is.
 Future<ProviderContainer> showScreen(
   WidgetTester tester,
   FakeAgentClient client, {
   required List<MapFocusRequest> focused,
+  ValueListenable<bool>? visible,
 }) async {
+  final screen = MapScreen(
+    mapBuilder: (context, configuration) =>
+        const SizedBox(key: ValueKey('fake-map')),
+    visibleRegionReader: () async => t017Region,
+    onFocusRequest: focused.add,
+  );
   final container = ProviderContainer(
     overrides: [
       mapRepositoryProvider.overrideWithValue(
@@ -54,12 +63,14 @@ Future<ProviderContainer> showScreen(
           AppLocalizations.delegate,
           ...GlobalMaterialLocalizations.delegates,
         ],
-        home: MapScreen(
-          mapBuilder: (context, configuration) =>
-              const SizedBox(key: ValueKey('fake-map')),
-          visibleRegionReader: () async => t017Region,
-          onFocusRequest: focused.add,
-        ),
+        home: visible == null
+            ? screen
+            : ValueListenableBuilder<bool>(
+                valueListenable: visible,
+                builder: (context, on, child) =>
+                    TickerMode(enabled: on, child: child!),
+                child: screen,
+              ),
       ),
     ),
   );
@@ -134,6 +145,57 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('map-highlights-clear')));
     await tester.pump();
     expect(find.text('Highlighted by the agent'), findsNothing);
+  });
+
+  testWidgets('a route drawn while the map is hidden is fitted once it shows', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final focused = <MapFocusRequest>[];
+    final visible = ValueNotifier(true);
+    addTearDown(visible.dispose);
+    final container = await showScreen(
+      tester,
+      FakeAgentClient(),
+      focused: focused,
+      visible: visible,
+    );
+    // The user leaves the map for Home and opens a saved plan.
+    visible.value = false;
+    await tester.pump();
+
+    // Show route on the plan draws it while the plan page covers the map:
+    // a fit to a hidden map has no size to fit to, so it waits.
+    container
+        .read(mapActionsControllerProvider.notifier)
+        .apply(
+          const UiAction(
+            action: UiActionName.drawRoute,
+            args: <String, dynamic>{
+              'polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+              'mode': 'walk',
+              'distance_m': 3400,
+              'duration_min': 46,
+            },
+          ),
+        );
+    await tester.pump();
+    expect(focused, isEmpty);
+    expect(container.read(mapActionsControllerProvider).route, isNotNull);
+
+    visible.value = true;
+    await tester.pump();
+    expect(focused.single.bounds?.north, closeTo(43.2525, 0.001));
+
+    // Hiding and showing the map again does not fit the route again.
+    visible.value = false;
+    await tester.pump();
+    visible.value = true;
+    await tester.pump();
+    expect(focused, hasLength(1));
   });
 
   testWidgets('a requested card item opens its details beside the map', (

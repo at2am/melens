@@ -2210,6 +2210,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'You have 30 saved plans. Remove one on the Home tab first.';
 
   @override
+  String get planUpdateSaved => 'Update saved plan';
+
+  @override
   String get plansSectionTitle => 'Saved plans';
 
   @override
@@ -2241,6 +2244,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String planUpdatedOn(String date) {
+    return 'Updated $date';
+  }
+
+  @override
+  String get planChangeWithAgent => 'Change with Melens';
+
+  @override
+  String get planEdit => 'Edit plan';
+
+  @override
+  String get planEditName => 'Name';
+
+  @override
+  String get planEditStops =>
+      'Drag to reorder the stops, or remove one. The route is drawn again for the new order.';
+
+  @override
+  String get planEditRemoveStop => 'Remove stop';
+
+  @override
+  String get planEditSave => 'Save';
+
+  @override
+  String get planEditFailed => 'Your changes could not be saved. Try again.';
+
+  @override
   String get planMissing => 'This plan is no longer saved.';
 
   @override
@@ -2270,6 +2300,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatQuestionsSend => 'Update the plan';
+
+  @override
+  String get chatQuestionsBeforePlan =>
+      'A few questions before I make your plan. Answer any of them.';
+
+  @override
+  String get chatQuestionsMakePlan => 'Make the plan';
 
   @override
   String get chatQuestionsFreeText => 'Or type what you have in mind below.';

@@ -6,6 +6,8 @@ export interface PlanStore {
   list(uid: string, limit: number): Promise<SavedPlan[]>;
   get(uid: string, planId: string): Promise<SavedPlan | null>;
   put(uid: string, plan: SavedPlan): Promise<void>;
+  /** Puts `plan` and removes `replacedId` together. */
+  replace(uid: string, replacedId: string, plan: SavedPlan): Promise<void>;
   /** False when there was nothing to delete. */
   delete(uid: string, planId: string): Promise<boolean>;
 }
@@ -29,6 +31,11 @@ export class InMemoryPlanStore implements PlanStore {
   }
 
   async put(uid: string, plan: SavedPlan): Promise<void> {
+    this.user(uid).set(plan.id, plan);
+  }
+
+  async replace(uid: string, replacedId: string, plan: SavedPlan): Promise<void> {
+    this.user(uid).delete(replacedId);
     this.user(uid).set(plan.id, plan);
   }
 

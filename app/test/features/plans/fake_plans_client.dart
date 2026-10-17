@@ -5,7 +5,8 @@ import 'package:melens/features/plans/data/saved_plan.dart';
 /// The agent service's plan store for one user. [cards] are the plan cards
 /// the user's sessions hold, by card id: a save copies one, as the service
 /// copies it from the stored turn. [failure] makes the next calls throw.
-/// A stop refresh puts [parking] on the stop, as the service reads it.
+/// A stop refresh puts [parking] on the stop, as the service reads it. An
+/// edit keeps the named stops in their order and drops the route.
 final class FakePlansClient implements PlansClient {
   FakePlansClient({List<SavedPlan>? stored, Map<String, AgentCard>? cards})
     : stored = stored ?? [],
@@ -28,20 +29,59 @@ final class FakePlansClient implements PlansClient {
   Future<SavedPlan> save({
     required String sessionId,
     required String cardId,
+    String? replaces,
   }) async {
-    calls.add('save:$sessionId/$cardId');
+    calls.add(
+      'save:$sessionId/$cardId${replaces == null ? '' : ' replacing $replaces'}',
+    );
     if (failure case final error?) throw error;
     final existing = stored.where((plan) => plan.id == cardId).firstOrNull;
     if (existing != null) return existing;
+    final replaced = stored.indexWhere((plan) => plan.id == replaces);
     final plan = SavedPlan(
       id: cardId,
       sessionId: sessionId,
       turnId: 't_saved',
-      savedAt: '2026-10-10T07:45:00.000Z',
+      savedAt: replaced < 0
+          ? '2026-10-10T07:45:00.000Z'
+          : stored[replaced].savedAt,
+      updatedAt: replaced < 0 ? null : '2026-10-10T07:50:00.000Z',
       card: cards[cardId]!,
     );
-    stored.insert(0, plan);
+    if (replaced < 0) {
+      stored.insert(0, plan);
+    } else {
+      stored[replaced] = plan;
+    }
     return plan;
+  }
+
+  @override
+  Future<SavedPlan> edit(String id, {String? title, List<int>? stops}) async {
+    calls.add('edit:$id ${title ?? '-'} ${stops ?? '-'}');
+    if (failure case final error?) throw error;
+    final position = stored.indexWhere((plan) => plan.id == id);
+    final plan = stored[position];
+    final items = plan.card.items;
+    final edited = SavedPlan(
+      id: plan.id,
+      sessionId: plan.sessionId,
+      turnId: plan.turnId,
+      savedAt: plan.savedAt,
+      updatedAt: '2026-10-10T07:55:00.000Z',
+      card: AgentCard(
+        id: plan.card.id,
+        type: plan.card.type,
+        title: title ?? plan.card.title,
+        travelMode: plan.card.travelMode,
+        items: stops == null
+            ? items
+            : [for (final index in stops) items[index]],
+      ),
+      route: stops == null ? plan.route : null,
+    );
+    stored[position] = edited;
+    return edited;
   }
 
   @override

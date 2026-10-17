@@ -36,6 +36,13 @@ export function createFirestorePlanStore(options: { readonly projectId: string; 
     async put(uid, plan) {
       await plans(await load(), uid).doc(plan.id).set(JSON.parse(JSON.stringify(plan)) as Record<string, unknown>);
     },
+    async replace(uid, replacedId, plan) {
+      const db = await load();
+      const batch = db.batch();
+      batch.delete(plans(db, uid).doc(replacedId));
+      batch.set(plans(db, uid).doc(plan.id), JSON.parse(JSON.stringify(plan)) as Record<string, unknown>);
+      await batch.commit();
+    },
     async delete(uid, planId) {
       const ref = plans(await load(), uid).doc(planId);
       if (!(await ref.get()).exists) return false;
