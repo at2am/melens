@@ -170,9 +170,11 @@ export class PedestrianMinuteConnector implements Connector {
         where,
         orderBy: 'sensing_datetime ASC, location_id ASC',
       });
-      const sourceRecords: SourceRecord[] = [];
-      const pedestrianObservations: PedestrianObservation[] = [];
-      const seen = new Map<string, string>();
+      // The feed sometimes carries a sensor-minute twice: a partial reading and then a fuller one (on
+      // 2026-10-17, 7 and then 32 at one sensor). A reading at least as large in both directions
+      // replaces the other; two readings that each exceed the other in a direction still fail closed.
+      const readings = new Map<string, { row: z.infer<typeof rowSchema>; versionId: string; observedAt: string; sensorId: string }>();
+      let superseded = 0;
       for (const unknownRow of response.records) {
         const row = rowSchema.parse(unknownRow);
         if (!validateMelbourneSensingDateTime(row)) {
@@ -193,14 +195,25 @@ export class PedestrianMinuteConnector implements Connector {
           sourceTime: observedAt,
         });
         const versionId = sourceVersionId(observedAt, row);
-        const earlier = seen.get(recordId);
+        const earlier = readings.get(recordId);
         if (earlier !== undefined) {
-          if (earlier !== versionId) {
-            return failure(input, 'validation_failed', 'Conflicting duplicate sensor-minute readings');
+          if (earlier.versionId === versionId) continue;
+          if (dominates(row, earlier.row)) {
+            readings.set(recordId, { row, versionId, observedAt, sensorId });
+            superseded += 1;
+            continue;
           }
-          continue;
+          if (dominates(earlier.row, row)) {
+            superseded += 1;
+            continue;
+          }
+          return failure(input, 'validation_failed', 'Conflicting duplicate sensor-minute readings');
         }
-        seen.set(recordId, versionId);
+        readings.set(recordId, { row, versionId, observedAt, sensorId });
+      }
+      const sourceRecords: SourceRecord[] = [];
+      const pedestrianObservations: PedestrianObservation[] = [];
+      for (const [recordId, { row, versionId, observedAt, sensorId }] of readings) {
         sourceRecords.push({
           batch_id: input.runId,
           source_id: SOURCE_ID,
@@ -282,6 +295,14 @@ export class PedestrianMinuteConnector implements Connector {
       );
     }
   }
+}
+
+/** Whether [a] counts at least as many passages as [b] in each direction (so [b] is a partial [a]). */
+function dominates(a: { direction_1?: number | null | undefined; direction_2?: number | null | undefined },
+  b: { direction_1?: number | null | undefined; direction_2?: number | null | undefined }): boolean {
+  const counts = [a.direction_1, a.direction_2, b.direction_1, b.direction_2];
+  if (counts.some((count) => count === null || count === undefined)) return false;
+  return a.direction_1! >= b.direction_1! && a.direction_2! >= b.direction_2!;
 }
 
 export function createConnector(options: PedestrianMinuteConnectorOptions = {}): Connector {
