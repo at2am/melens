@@ -199,9 +199,11 @@ CoreRenderPlan buildCoreRenderPlan({
   ];
   final outlines = parkingBayOutlines([for (final bay in bays) bay.center]);
   final bayPolygons = <Polygon>{};
-  for (final (index, (:item, center: _)) in bays.indexed) {
+  final bayPins = <Marker>{};
+  for (final (index, (:item, :center)) in bays.indexed) {
     final selected = item.id == selectedItemId;
     final fill = parkingStateColor(item.details.state, colors);
+    final onTap = onSelected == null ? null : () => onSelected(item);
     bayPolygons.add(
       Polygon(
         polygonId: PolygonId('${item.id}:bay'),
@@ -211,11 +213,29 @@ CoreRenderPlan buildCoreRenderPlan({
         // clear; the selected bay keeps its size and gains one.
         strokeColor: selected ? colors.secondary : fill,
         strokeWidth: selected ? 3 : 0,
-        consumeTapEvents: onSelected != null,
-        onTap: onSelected == null ? null : () => onSelected(item),
+        consumeTapEvents: onTap != null,
+        onTap: onTap,
         zIndex: selected ? 2 : 1,
       ),
     );
+    // A bay is only a few pixels across until zoom 18, too small for its
+    // outline to show which one is selected, so the selected bay also
+    // carries the selected parking pin, its tip on the sensor.
+    if (selected) {
+      bayPins.add(
+        Marker(
+          markerId: MarkerId('${item.id}:bay-pin'),
+          position: center,
+          icon: pins.layer(item.layerId, selected: true),
+          infoWindow: InfoWindow(
+            title: item.title,
+            snippet: describeItem?.call(item),
+          ),
+          onTap: onTap,
+          zIndexInt: 2,
+        ),
+      );
+    }
   }
   for (final item in items) {
     if (item is AggregateMapItem || !isDrawableMapItem(item)) continue;
@@ -260,5 +280,5 @@ CoreRenderPlan buildCoreRenderPlan({
       );
     }
   }
-  return plan.merge(CoreRenderPlan(polygons: bayPolygons));
+  return plan.merge(CoreRenderPlan(markers: bayPins, polygons: bayPolygons));
 }
