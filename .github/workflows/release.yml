@@ -1,5 +1,6 @@
-# Release the Cloud Run services (map, agent) and the Firebase Hosting Web app on a version tag.
-# The mobile apps are not released here. One-time setup and the release steps: .github/release/README.md.
+# Release the Cloud Run services (map, agent), the Firebase Hosting Web app and the mobile apps
+# (TestFlight, and Google Play internal testing once enabled) on a version tag. The mobile jobs run on the self-hosted
+# release Mac. One-time setup and the release steps: .github/release/README.md.
 name: Release
 
 on:
@@ -10,7 +11,7 @@ on:
       target:
         description: What to release
         type: choice
-        options: [all, cloud, web]
+        options: [all, cloud, web, mobile]
         default: all
 
 # One release at a time; a queued release waits instead of cancelling a running deployment.
@@ -28,6 +29,7 @@ env:
   WIF_PROVIDER: projects/401001961508/locations/global/workloadIdentityPools/github/providers/melens
   DEPLOYER: melens-github-release@melens-510012.iam.gserviceaccount.com
   WEB_CONFIG_SECRET: melens-web-release-config
+  MOBILE_CONFIG_SECRET: melens-mobile-release-config
   # The reviewed values the services run with today (cloud/map/infra/README.md, app/README.md).
   ALLOWED_ORIGINS: http://localhost:8000 https://melens-510012.web.app
   DYNAMIC_SCAN_BYTES: '1000000000'
@@ -40,6 +42,7 @@ jobs:
     outputs:
       cloud: ${{ steps.targets.outputs.cloud }}
       web: ${{ steps.targets.outputs.web }}
+      mobile: ${{ steps.targets.outputs.mobile }}
       version: ${{ steps.targets.outputs.version }}
     steps:
       - id: targets
@@ -49,9 +52,10 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: |
           case "$TARGET" in
-            all) cloud=true; web=true ;;
-            cloud) cloud=true; web=false ;;
-            web) cloud=false; web=true ;;
+            all) cloud=true; web=true; mobile=true ;;
+            cloud) cloud=true; web=false; mobile=false ;;
+            web) cloud=false; web=true; mobile=false ;;
+            mobile) cloud=false; web=false; mobile=true ;;
             *) echo "Unknown target: $TARGET" >&2; exit 1 ;;
           esac
           if [[ $REF_TYPE == tag ]]; then
@@ -63,9 +67,10 @@ jobs:
           {
             echo "cloud=$cloud"
             echo "web=$web"
+            echo "mobile=$mobile"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
-          echo "Release $version: cloud=$cloud web=$web" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release $version: cloud=$cloud web=$web mobile=$mobile" >> "$GITHUB_STEP_SUMMARY"
 
   test-cloud:
     needs: plan
@@ -85,9 +90,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  test-web:
+  test-app:
     needs: plan
-    if: needs.plan.outputs.web == 'true'
+    if: needs.plan.outputs.web == 'true' || needs.plan.outputs.mobile == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -195,10 +200,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-web:
-    needs: [plan, test-web, deploy-cloud]
+    needs: [plan, test-app, deploy-cloud]
     # Runs after a successful cloud release, or alone when only the Web app is released.
     if: >-
-      always() && needs.plan.outputs.web == 'true' && needs.test-web.result == 'success'
+      always() && needs.plan.outputs.web == 'true' && needs.test-app.result == 'success'
       && (needs.deploy-cloud.result == 'success' || needs.deploy-cloud.result == 'skipped')
     runs-on: ubuntu-latest
     environment:
@@ -257,7 +262,7 @@ jobs:
           AGENT_URL: ${{ steps.backends.outputs.agent-url }}
         run: |
           gcloud secrets versions access latest --secret="$WEB_CONFIG_SECRET" --project="$PROJECT_ID" \
-            | python3 .github/release/web_config.py --map-base-url "$MAP_URL" --agent-base-url "$AGENT_URL" \
+            | python3 .github/release/release_config.py --platform web --map-base-url "$MAP_URL" --agent-base-url "$AGENT_URL" \
                 --output app/config/cloud-release.json
 
       - name: Build the Web release
@@ -303,3 +308,143 @@ jobs:
       - name: Remove the release configuration
         if: always()
         run: rm -f app/config/cloud-release.json
+
+  deploy-mobile:
+    needs: [plan, test-app, deploy-cloud]
+    # Like the Web app: after a successful cloud release, or alone when only the mobile apps are released.
+    if: >-
+      always() && needs.plan.outputs.mobile == 'true' && needs.test-app.result == 'success'
+      && (needs.deploy-cloud.result == 'success' || needs.deploy-cloud.result == 'skipped')
+    # The release Mac (.github/release/README.md, Mobile apps): Xcode and both signing keys live there.
+    runs-on: [self-hosted, macOS, ARM64]
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      # An iOS failure should not cancel an Android upload in flight, or the other way round.
+      fail-fast: false
+      matrix:
+        # iOS only until the Play Console app exists; then set the repository variable
+        # MOBILE_PLATFORMS to ["android", "ios"] (.github/release/README.md, Mobile apps).
+        platform: ${{ fromJSON(vars.MOBILE_PLATFORMS || '["ios"]') }}
+    env:
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The keys stay on the release Mac, outside the repository and outside GitHub. gcloud gets a
+      # configuration of its own so the release never changes the Mac user's account or project.
+      - name: Find the signing keys
+        run: |
+          keys="$HOME/.melens-release"
+          echo "CLOUDSDK_CONFIG=$RUNNER_TEMP/gcloud" >> "$GITHUB_ENV"
+          if [[ $PLATFORM == android ]]; then
+            [[ -f $keys/android/key.properties ]] || { echo "Missing $keys/android/key.properties" >&2; exit 1; }
+            echo "MELENS_ANDROID_KEY_PROPERTIES=$keys/android/key.properties" >> "$GITHUB_ENV"
+          else
+            settings="$keys/ios/app-store-connect.env"
+            [[ -f $settings ]] || { echo "Missing $settings" >&2; exit 1; }
+            key_id=$(sed -n 's/^ASC_KEY_ID=//p' "$settings")
+            issuer_id=$(sed -n 's/^ASC_ISSUER_ID=//p' "$settings")
+            [[ $key_id =~ ^[A-Z0-9]{10}$ && $issuer_id =~ ^[0-9a-f-]{36}$ ]] \
+              || { echo "$settings needs ASC_KEY_ID and ASC_ISSUER_ID" >&2; exit 1; }
+            [[ -f $keys/ios/AuthKey_$key_id.p8 ]] || { echo "Missing $keys/ios/AuthKey_$key_id.p8" >&2; exit 1; }
+            {
+              echo "ASC_KEY_ID=$key_id"
+              echo "ASC_ISSUER_ID=$issuer_id"
+              echo "ASC_KEY_PATH=$keys/ios/AuthKey_$key_id.p8"
+            } >> "$GITHUB_ENV"
+          fi
+
+      # Tag v1.2.0 builds 1.2.0; a run on main keeps the pubspec version name. The run number only grows,
+      # as both stores require; rerunning a failed job keeps it, so an upload that never happened can be retried.
+      - name: Choose the version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          if [[ $REF_TYPE == tag && $REF_NAME =~ ^v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            name=${BASH_REMATCH[1]}
+          else
+            name=$(sed -n 's/^version: *\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' app/pubspec.yaml)
+          fi
+          {
+            echo "name=$name"
+            echo "number=$RUN_NUMBER"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+
+      # The apps bind to what Cloud Run serves now: the revisions just deployed, or the current ones.
+      - name: Write the release configuration
+        run: |
+          for service in map agent; do
+            url=$(gcloud run services describe "melens-dev-$service" --project="$PROJECT_ID" --region="$REGION" \
+              --format='value(status.url)')
+            declare "${service}_url=$url"
+          done
+          gcloud secrets versions access latest --secret="$MOBILE_CONFIG_SECRET" --project="$PROJECT_ID" \
+            | python3 .github/release/release_config.py --platform mobile \
+                --map-base-url "$map_url" --agent-base-url "$agent_url" --output app/config/mobile-release.json
+
+      # fvm on the release Mac installs the SDK pinned in .fvmrc once and reuses it.
+      - name: Build
+        working-directory: app
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          fvm install
+          fvm flutter pub get
+          python3 e2e/build_mobile_release.py --platform "$PLATFORM" \
+            --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+
+      - name: Upload to TestFlight
+        if: matrix.platform == 'ios'
+        run: |
+          xcodebuild -exportArchive -archivePath app/build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist app/ios/ExportOptions.plist -exportPath "$RUNNER_TEMP/ios-export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Get a Google Play token
+        if: matrix.platform == 'android'
+        id: play
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Upload to Google Play internal testing
+        if: matrix.platform == 'android'
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.play.outputs.access_token }}
+          # draft until the app's first release has been rolled out in the Play Console.
+          PLAY_RELEASE_STATUS: ${{ vars.PLAY_RELEASE_STATUS || 'completed' }}
+          RELEASE_NAME: ${{ steps.version.outputs.name }} (${{ steps.version.outputs.number }})
+        run: |
+          python3 .github/release/play_upload.py --bundle app/build/app/outputs/bundle/release/app-release.aab \
+            --track internal --status "$PLAY_RELEASE_STATUS" --release-name "$RELEASE_NAME"
+
+      - name: Summary
+        env:
+          BUILD_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.number }}
+        run: |
+          case $PLATFORM in
+            ios) target='TestFlight' ;;
+            android) target='Google Play internal testing' ;;
+          esac
+          echo "### $PLATFORM: $BUILD_NAME ($BUILD_NUMBER) uploaded to $target" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the release configuration
+        if: always()
+        run: rm -rf app/config/mobile-release.json "$RUNNER_TEMP/gcloud" "$RUNNER_TEMP/ios-export"

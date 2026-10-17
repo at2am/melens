@@ -47,6 +47,9 @@
 			</array>
 		</dict>
 	</dict>
+	<!-- Only standard HTTPS, which is exempt; without this every TestFlight build waits for the export compliance question. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Melens uses the camera when you take a photo to ask the agent about it.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

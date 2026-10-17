@@ -4,8 +4,9 @@ umask 077
 
 # Plan by default. Prepares what .github/workflows/release.yml needs in melens-510012:
 # Workload Identity Federation for this repository (no service account key), the release
-# identity and its roles, and the Secret Manager secret that holds the Web build's browser keys.
-# It deploys nothing and prints resource names, never key values.
+# identity and its roles, and the Secret Manager secrets that hold the Web and mobile builds' keys.
+# It deploys nothing and prints resource names, never key values. Play Console access and the
+# Apple and Android signing keys are set up by hand (README.md, Mobile apps).
 readonly PROJECT="melens-510012"
 readonly PROJECT_NUMBER="401001961508"
 readonly REPOSITORY="at2am/melens"
@@ -15,6 +16,7 @@ readonly PROVIDER="melens"
 readonly ACCOUNT="melens-github-release"
 readonly EMAIL="${ACCOUNT}@${PROJECT}.iam.gserviceaccount.com"
 readonly SECRET="melens-web-release-config"
+readonly MOBILE_SECRET="melens-mobile-release-config"
 readonly SECRET_LOCATION="australia-southeast2"
 readonly BUILD_BUCKET="${PROJECT}_cloudbuild"
 readonly QUERY_DATASET="melens_query"
@@ -35,18 +37,22 @@ readonly ACT_AS=(
   "melens-dev-agent@${PROJECT}.iam.gserviceaccount.com"
   "${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 )
-readonly APIS=(sts.googleapis.com iamcredentials.googleapis.com iam.googleapis.com secretmanager.googleapis.com)
+# androidpublisher: the Android release uploads to Google Play with this identity's token.
+readonly APIS=(sts.googleapis.com iamcredentials.googleapis.com iam.googleapis.com secretmanager.googleapis.com
+  androidpublisher.googleapis.com)
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 gcloud_bin=${GCLOUD_BIN:-gcloud}
 bq_bin=${BQ_BIN:-bq}
 
 usage() {
   cat <<'EOF'
-Usage: bootstrap.sh [--verify | --apply --confirm-project melens-510012] [--web-config FILE]
+Usage: bootstrap.sh [--verify | --apply --confirm-project melens-510012] [--web-config FILE] [--mobile-config FILE]
   --verify                       Read-only audit of everything below
   --apply --confirm-project ID   Create what is missing, then verify
   --web-config FILE              With --apply: store the browser keys of FILE (an app/config/*.json)
                                  as a new version of the Web release secret
+  --mobile-config FILE           With --apply: store the Android and iOS keys of FILE as a new
+                                 version of the mobile release secret
 Without --verify or --apply, prints the plan only.
 EOF
 }
@@ -56,13 +62,15 @@ apply=false
 verify=false
 confirm_project=''
 web_config=''
+mobile_config=''
 while (($#)); do
   case "$1" in
-    --confirm-project|--web-config)
+    --confirm-project|--web-config|--mobile-config)
       (($# >= 2)) || fail "Missing value for $1"
       case "$1" in
         --confirm-project) confirm_project=$2 ;;
         --web-config) web_config=$2 ;;
+        --mobile-config) mobile_config=$2 ;;
       esac
       shift 2 ;;
     --verify) verify=true; shift ;;
@@ -73,10 +81,11 @@ while (($#)); do
 done
 if $apply; then
   [[ $confirm_project == "$PROJECT" ]] || fail "--apply requires --confirm-project $PROJECT"
-elif [[ -n $confirm_project || -n $web_config ]]; then
-  fail '--confirm-project and --web-config require --apply'
+elif [[ -n $confirm_project || -n $web_config || -n $mobile_config ]]; then
+  fail '--confirm-project, --web-config and --mobile-config require --apply'
 fi
 [[ -z $web_config || -f $web_config ]] || fail "No such file: $web_config"
+[[ -z $mobile_config || -f $mobile_config ]] || fail "No such file: $mobile_config"
 
 cat <<EOF
 Plan for ${PROJECT}:
@@ -90,6 +99,7 @@ Plan for ${PROJECT}:
   gs://${BUILD_BUCKET}: roles/storage.objectAdmin, roles/storage.legacyBucketReader
   ${QUERY_DATASET} dataset: READER
   secret ${SECRET} (${SECRET_LOCATION}): roles/secretmanager.secretAccessor${web_config:+, new version from $web_config}
+  secret ${MOBILE_SECRET} (${SECRET_LOCATION}): roles/secretmanager.secretAccessor${mobile_config:+, new version from $mobile_config}
 EOF
 if ! $verify; then
   echo "Plan only. No cloud resources were changed."
@@ -164,20 +174,25 @@ if $apply; then
       --role="$role" >/dev/null
   done
   grant_dataset_reader
-  if ! "$gcloud_bin" secrets describe "$SECRET" --project="$PROJECT" >/dev/null 2>&1; then
-    "$gcloud_bin" secrets create "$SECRET" --project="$PROJECT" \
-      --replication-policy=user-managed --locations="$SECRET_LOCATION"
-  fi
-  "$gcloud_bin" secrets add-iam-policy-binding "$SECRET" --project="$PROJECT" \
-    --role=roles/secretmanager.secretAccessor --member="$member" --condition=None >/dev/null
-  if [[ -n $web_config ]]; then
-    keys_file=$(mktemp)
-    trap 'rm -f -- "$keys_file"' EXIT
-    python3 "$script_dir/web_config.py" --keys-only --output "$keys_file" <"$web_config"
-    "$gcloud_bin" secrets versions add "$SECRET" --project="$PROJECT" --data-file="$keys_file" >/dev/null
-    rm -f -- "$keys_file"
-    echo "Stored a new version of ${SECRET} from ${web_config}."
-  fi
+  keys_file=$(mktemp)
+  trap 'rm -f -- "$keys_file"' EXIT
+  # secret platform config: create the secret, let the release read it, store a new version from config.
+  for entry in "${SECRET} web ${web_config}" "${MOBILE_SECRET} mobile ${mobile_config}"; do
+    read -r secret platform config <<<"$entry"
+    if ! "$gcloud_bin" secrets describe "$secret" --project="$PROJECT" >/dev/null 2>&1; then
+      "$gcloud_bin" secrets create "$secret" --project="$PROJECT" \
+        --replication-policy=user-managed --locations="$SECRET_LOCATION"
+    fi
+    "$gcloud_bin" secrets add-iam-policy-binding "$secret" --project="$PROJECT" \
+      --role=roles/secretmanager.secretAccessor --member="$member" --condition=None >/dev/null
+    if [[ -n ${config:-} ]]; then
+      python3 "$script_dir/release_config.py" --platform "$platform" --keys-only --output "$keys_file" <"$config"
+      "$gcloud_bin" secrets versions add "$secret" --project="$PROJECT" --data-file="$keys_file" >/dev/null
+      : >"$keys_file"
+      echo "Stored a new version of ${secret} from ${config}."
+    fi
+  done
+  rm -f -- "$keys_file"
 fi
 
 problems=0
@@ -242,13 +257,16 @@ import json, sys
 print(" ".join(sorted(e.get("role") for e in json.load(sys.stdin).get("access", []) if e.get("userByEmail") == sys.argv[1])))' "$EMAIL")
 [[ $dataset_roles == READER ]] || problem "${QUERY_DATASET} access is '${dataset_roles}', expected READER"
 report "${QUERY_DATASET} dataset: ${dataset_roles:-none}"
-secret_versions=$("$gcloud_bin" secrets versions list "$SECRET" --project="$PROJECT" --filter='state=ENABLED' \
-  --format='value(name)' 2>/dev/null | wc -l | tr -d ' ' || true)
-"$gcloud_bin" secrets get-iam-policy "$SECRET" --project="$PROJECT" --flatten='bindings[].members' \
-  --filter="bindings.members:${member}" --format='value(bindings.role)' 2>/dev/null \
-  | grep -qx roles/secretmanager.secretAccessor || problem "cannot read secret ${SECRET}"
-((secret_versions > 0)) || problem "secret ${SECRET} has no enabled version; rerun --apply with --web-config"
-report "secret ${SECRET}: ${secret_versions} enabled version(s)"
+for entry in "${SECRET} --web-config" "${MOBILE_SECRET} --mobile-config"; do
+  read -r secret option <<<"$entry"
+  secret_versions=$("$gcloud_bin" secrets versions list "$secret" --project="$PROJECT" --filter='state=ENABLED' \
+    --format='value(name)' 2>/dev/null | wc -l | tr -d ' ' || true)
+  "$gcloud_bin" secrets get-iam-policy "$secret" --project="$PROJECT" --flatten='bindings[].members' \
+    --filter="bindings.members:${member}" --format='value(bindings.role)' 2>/dev/null \
+    | grep -qx roles/secretmanager.secretAccessor || problem "cannot read secret ${secret}"
+  ((secret_versions > 0)) || problem "secret ${secret} has no enabled version; rerun --apply with ${option}"
+  report "secret ${secret}: ${secret_versions} enabled version(s)"
+done
 
 if ((problems > 0)); then
   fail "${problems} problem(s) found."
