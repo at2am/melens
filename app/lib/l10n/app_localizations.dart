@@ -487,7 +487,7 @@ abstract class AppLocalizations {
   /// Fixed circle-area scale and same-window comparison limitation. A zero or missing count never receives a positive-sized circle.
   ///
   /// In en, this message translates to:
-  /// **'Circle area represents sensor passages: {area} m² per passage. Compare only the same observation window. This display scale does not represent population density.'**
+  /// **'Bigger circles mean more people passing a sensor ({area} m² per passage). Compare circles from the same time only; this is not crowd density.'**
   String mapSurfaceCountLegend(String area);
 
   /// Missing Web key state; sample data must not imply a working base map.
@@ -556,12 +556,6 @@ abstract class AppLocalizations {
   /// **'Group: {count} loaded records'**
   String mapAggregateLoadedRecords(String count);
 
-  /// Unit shown below a cluster bitmap's actual loaded member-record count.
-  ///
-  /// In en, this message translates to:
-  /// **'records'**
-  String get mapAggregateBadgeRecords;
-
   /// Explains the asterisk on incomplete or unknown-total cluster symbols without inventing a full total.
   ///
   /// In en, this message translates to:
@@ -583,7 +577,7 @@ abstract class AppLocalizations {
   /// Explains the scope and count semantics of an aggregate independently of colour or map zoom.
   ///
   /// In en, this message translates to:
-  /// **'This group represents the supplied records in this map result. Its count is not a city-wide total or a count of unique people.'**
+  /// **'The records grouped here on the map: not a city-wide total, and not a count of people.'**
   String get mapAggregateScopeExplanation;
 
   /// An explicit exact group/member-query total from the server, never derived from a partial list or inferred as a viewport-wide total.

@@ -216,7 +216,6 @@ class _AggregateRenderLayerState extends State<AggregateRenderLayer> {
   Future<void> _prepare() async {
     final generation = ++_generation;
     final colors = Theme.of(context).colorScheme;
-    final strings = AppLocalizations.of(context);
     final ratio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
     final style = Theme.of(context).textTheme.labelLarge ?? const TextStyle();
     final symbols = <String, BitmapDescriptor>{};
@@ -240,7 +239,6 @@ class _AggregateRenderLayerState extends State<AggregateRenderLayer> {
       try {
         symbols[key] = await _countBitmap(
           count: '$count${aggregateHasUnknownTotal(item) ? '*' : ''}',
-          unit: strings.mapAggregateBadgeRecords,
           ratio: ratio,
           style: style,
           background: selected ? colors.primary : colors.primaryContainer,
@@ -278,19 +276,22 @@ class _AggregateRenderLayerState extends State<AggregateRenderLayer> {
 
 Future<BitmapDescriptor> _countBitmap({
   required String count,
-  required String unit,
   required double ratio,
   required TextStyle style,
   required Color background,
   required Color foreground,
   required Color border,
 }) async {
-  const size = Size(88, 52);
+  // A round badge smaller than the 64 px aggregation cell, so the badges of
+  // neighbouring cells sit side by side instead of on top of each other (an
+  // 88 px "N records" pill overlapped its neighbours, 2026-10-17). The count
+  // alone is drawn; its unit is in the info window and the details.
+  const size = Size(46, 46);
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder)..scale(ratio);
   final shape = RRect.fromRectAndRadius(
-    const Rect.fromLTWH(1, 1, 86, 50),
-    const Radius.circular(24),
+    const Rect.fromLTWH(1, 1, 44, 44),
+    const Radius.circular(22),
   );
   canvas.drawRRect(shape, Paint()..color = background);
   canvas.drawRRect(
@@ -302,25 +303,17 @@ Future<BitmapDescriptor> _countBitmap({
   );
   final text = TextPainter(
     text: TextSpan(
-      children: [
-        TextSpan(
-          text: '$count\n',
-          style: style.copyWith(
-            color: foreground,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        TextSpan(
-          text: unit,
-          style: style.copyWith(color: foreground, fontSize: 11),
-        ),
-      ],
+      text: count,
+      style: style.copyWith(
+        color: foreground,
+        fontSize: count.length <= 3 ? 17 : 12,
+        fontWeight: FontWeight.w700,
+      ),
     ),
     textDirection: ui.TextDirection.ltr,
     textAlign: TextAlign.center,
-    maxLines: 2,
-  )..layout(maxWidth: 78);
+    maxLines: 1,
+  )..layout(maxWidth: 40);
   text.paint(
     canvas,
     Offset((size.width - text.width) / 2, (size.height - text.height) / 2),
