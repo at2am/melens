@@ -199,7 +199,7 @@ test('connector successfully collects bounded minute window with 15-minute overl
 
   assert.equal(result.pedestrianObservations.length, 2);
   assert.equal(result.sourceRecords.length, 2);
-  assert.equal(result.sourceRecords[0]?.rights_status, 'review_required');
+  assert.equal(result.sourceRecords[0]?.rights_status, 'verified_open');
   assert.equal(result.sourceRecords[0]?.assertion_kind, 'observation');
   assert.equal(result.sourceRecords[0]?.record_status, 'active');
   assert.equal(result.completeness.complete, true);

@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
+import { parseSourceManifest } from '../../core/registry.js';
 import { HttpFailure } from '../../core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient } from '../../core/opendatasoft.js';
 import {
@@ -132,6 +134,9 @@ export class PedestrianLocationsConnector implements Connector {
     if (input.window.kind !== 'snapshot') {
       return failure(input, 'validation_failed', 'Pedestrian locations require a complete snapshot');
     }
+    // Records carry the source's reviewed licence, as the parking connectors do; review_required
+    // until admission, after which the serving views can publish them.
+    const rights = await reviewedRights();
 
     let previousLocations = this.initialLocations;
     if (input.checkpoint && /^[\s]*[\[{]/.test(input.checkpoint)) {
@@ -202,7 +207,7 @@ export class PedestrianLocationsConnector implements Connector {
           published_at: null, observed_at: null, first_accessible_at: null,
           time_missing_reason: reason, valid_from: previous.valid_from, valid_to: validTo,
           source_updated_at: sourceUpdatedAt, source_version_ordinal: null,
-          record_status: 'corrected', assertion_kind: 'observation', rights_status: 'review_required',
+          record_status: 'corrected', assertion_kind: 'observation', rights_status: rights,
         });
       };
 
@@ -319,7 +324,7 @@ export class PedestrianLocationsConnector implements Connector {
           source_version_ordinal: null,
           record_status: 'active',
           assertion_kind: 'observation',
-          rights_status: 'review_required',
+          rights_status: rights,
         });
 
         const currentLocation: SensorLocation = {
@@ -371,8 +376,8 @@ export class PedestrianLocationsConnector implements Connector {
           source_version_ordinal: null,
           freshness_state: 'unknown',
           record_status: isRemoved ? 'resolved' : 'active',
-          rights_status: 'review_required',
-          public_query_allowed: false,
+          rights_status: rights,
+          public_query_allowed: rights !== 'review_required',
         };
 
         const geoValidation = validateGeoRecordGeography(geoRecord);
@@ -460,3 +465,9 @@ export class PedestrianLocationsConnector implements Connector {
 }
 
 export const connector: Connector = new PedestrianLocationsConnector();
+
+/** The licence the reviewed manifest declares, read beside the compiled connector. */
+async function reviewedRights() {
+  return parseSourceManifest(JSON.parse(await readFile(new URL('./source.json', import.meta.url), 'utf8'))).license_status;
+}
+

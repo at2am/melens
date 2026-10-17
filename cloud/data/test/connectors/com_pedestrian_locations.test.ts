@@ -91,8 +91,8 @@ test('collect parses fixture records into canonical sensorLocations, sourceRecor
   assert.equal(geo3.title, 'Melbourne Central');
   assert.equal(geo3.location_role, 'sensor_site');
   assert.equal(geo3.location_confidence, 'source_coordinate');
-  assert.equal(geo3.rights_status, 'review_required');
-  assert.equal(geo3.public_query_allowed, false);
+  assert.equal(geo3.rights_status, 'verified_open');
+  assert.equal(geo3.public_query_allowed, true);
   assert.equal(geo3.record_status, 'active');
 
   const geo3Validation = validateGeoRecordGeography(geo3);
@@ -138,7 +138,7 @@ test('collect parses fixture records into canonical sensorLocations, sourceRecor
 
   // All source records maintain review_required rights status and provenance
   for (const src of result.sourceRecords) {
-    assert.equal(src.rights_status, 'review_required');
+    assert.equal(src.rights_status, 'verified_open');
     assert.equal(src.assertion_kind, 'observation');
     assert.equal(src.source_id, SOURCE_ID);
     assert.ok(src.time_missing_reason, 'Snapshot-only coordinate history must explain the missing official start time');
