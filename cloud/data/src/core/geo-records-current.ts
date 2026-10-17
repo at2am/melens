@@ -271,9 +271,36 @@ async function snapshotFetchedFloor(config: DataConfig, bigquery: Query, sourceI
  * Refresh one source after it published. Append sources apply their new batches and fall back to
  * a rebuild when no state is recorded yet; every other map source rebuilds its own rows.
  */
+/**
+ * Waits between attempts when another source's refresh holds the copy. Sources publish on overlapping
+ * schedules (GDELT every 15 minutes, GTFS-R every 10, unplanned roads every 20), and BigQuery aborts the
+ * second transaction on geo_records_current: on 2026-10-17, 6 of 8 GDELT refreshes failed that way, so
+ * new articles reached the map only now and then. The other refresh finishes within seconds.
+ */
+export const CONCURRENT_REFRESH_RETRY_MS: readonly number[] = [5_000, 15_000, 30_000];
+
+const isConcurrentUpdate = (error: unknown) =>
+  error instanceof Error && /concurrent update/i.test(error.message);
+
 export async function refreshGeoRecordsCurrent(config: DataConfig, bigquery: Query, sourceId: string,
-  viewSql?: string): Promise<'incremental' | 'rebuild'> {
+  viewSql?: string, options: { readonly retryDelaysMs?: readonly number[]; readonly sleep?: (ms: number) => Promise<void> } = {},
+): Promise<'incremental' | 'rebuild'> {
   if (!GEO_CURRENT_SOURCES.has(sourceId)) throw new Error('Not a map geo source');
+  const delays = options.retryDelaysMs ?? CONCURRENT_REFRESH_RETRY_MS;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); }));
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await refreshOnce(config, bigquery, sourceId, viewSql);
+    } catch (error) {
+      const delay = delays[attempt];
+      if (!isConcurrentUpdate(error) || delay === undefined) throw error;
+      await sleep(delay);
+    }
+  }
+}
+
+async function refreshOnce(config: DataConfig, bigquery: Query, sourceId: string,
+  viewSql?: string): Promise<'incremental' | 'rebuild'> {
   if (INCREMENTAL_GEO_SOURCES.has(sourceId)) {
     try {
       await bigquery.query(queryOptions(config, applyGeoRecordsCurrentBatchesSql(config), { sourceId }));
