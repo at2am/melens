@@ -45,6 +45,7 @@ Translated from the original Chinese in the Notion table:
 ## Notes
 
 - Live counts carry no coordinates; join them with the sensor locations table (134 sensors). Live data lags by about 15–30 minutes.
+- **Live counts are ingested since 2026-10-17.** `melbourne.pedestrian.minute` (every 15 minutes) and `melbourne.pedestrian.locations` (daily) are admitted as CC BY 4.0 and run under dedicated identities. Measured that day, the minute feed published 35 to 45 minutes after counting, so its schedule reads the window that ended 50 minutes ago (`lag_seconds` in `cloud/data/infra/schedules.json`), and a current map read of the pedestrian layer shows the latest published window of the same length instead of the last 15 minutes (`latestPublishedRequest`, `cloud/shared/src/query/layer-loaders.ts`). Each count keeps its own observation time. Until then the layer had no source, and the app showed its chip as "no data yet". The anomaly layer still shows the labelled replay.
 - News arrives without coordinates; it is placed by the UC-06 extraction pipeline, which this use case shares.
 - The biggest demo risk is having no real anomaly on the day, so replay mode is part of P0.
 
