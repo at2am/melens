@@ -6,8 +6,8 @@ import { ADAPTED_LAYERS, EXTERNALLY_VERIFIED_LAYERS, UNLOCATED_LAYERS, adaptCont
   from './layer-adapters.js';
 import type { NewsAreaLoader } from './news-areas.js';
 import type { ViewQueryResult } from './query-runner.js';
-import { assessLayerCoverage, finalizeLayerResult, sourceBelongsToLayer, type CoverageAreaResolver,
-  type SourceCoverageSnapshot } from './source-coverage.js';
+import { assessLayerCoverage, compareSourceInstants, finalizeLayerResult, sourceBelongsToLayer,
+  type CoverageAreaResolver, type SourceCoverageSnapshot } from './source-coverage.js';
 import type { ApprovedUnlocatedScope } from './unlocated-queries.js';
 
 /** Members of one aggregate, kept with the layer so a detail read can list them without a second query. */
@@ -49,12 +49,33 @@ export function publicSourceIds(coverage: SourceCoverageSnapshot, layerId: Layer
     .map((source) => source.sourceId);
 }
 
+/** Layers whose sources publish well after the moment they describe. */
+const LATE_LAYERS: ReadonlySet<LayerId> = new Set(['pedestrian']);
+
+/**
+ * A current read of a late layer: the window of the same length that ends at its latest published
+ * window. City of Melbourne pedestrian minutes are published 35 to 45 minutes after they are counted,
+ * so "the last 15 minutes" holds no count yet; the latest counts are shown with their own times.
+ */
+export function latestPublishedRequest(request: ViewportQuery, layerId: LayerId,
+  coverage: SourceCoverageSnapshot): ViewportQuery {
+  if (request.mode !== 'current' || !LATE_LAYERS.has(layerId)) return request;
+  const ends = coverage.sources.filter((source) => source.admitted && sourceBelongsToLayer(source, layerId))
+    .flatMap((source) => source.publishedWindow === null ? [] : [source.publishedWindow.to]);
+  const end = ends.sort(compareSourceInstants).at(-1);
+  if (end === undefined || compareSourceInstants(end, request.window.to) >= 0) return request;
+  const length = Date.parse(request.window.to) - Date.parse(request.window.from);
+  const from = new Date(Date.parse(end) - length).toISOString().replace('.000Z', 'Z');
+  return { ...request, window: { from, to: end } };
+}
+
 /** Bounded viewport reads: one fixed query per layer, denied rather than guessed when anything is unproven. */
 export function createViewportLayerLoader(deps: LayerLoaderDependencies): ViewportLayerLoader {
-  return async (request, layerId, coverage, execution) => {
+  return async (originalRequest, layerId, coverage, execution) => {
     if (layerId === 'anomaly' && deps.loadAnomalyLayer !== undefined) {
-      return deps.loadAnomalyLayer(request, layerId, coverage, execution);
+      return deps.loadAnomalyLayer(originalRequest, layerId, coverage, execution);
     }
+    const request = latestPublishedRequest(originalRequest, layerId, coverage);
     const assessment = assessLayerCoverage({ snapshot: coverage, layerId, request,
       ...(deps.resolveArea === undefined ? {} : { resolveArea: deps.resolveArea }) });
     const denied = () => ({ result: finalizeLayerResult({ layerId, assessment, items: [], completeness: 'partial',

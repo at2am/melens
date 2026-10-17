@@ -32,7 +32,7 @@ async function loadFixture(): Promise<{ total_count: number; results: unknown[] 
   return JSON.parse(content) as { total_count: number; results: unknown[] };
 }
 
-test('manifest registers source with review_required status and candidate access', async () => {
+test('manifest registers the admitted source: CC BY 4.0 open data and active', async () => {
   const manifestUrl = new URL('../../src/connectors/com_pedestrian_locations/source.json', import.meta.url);
   const manifest = JSON.parse(await readFile(fileURLToPath(manifestUrl), 'utf8'));
   const dataSource = parseSourceManifest(manifest);
@@ -40,8 +40,8 @@ test('manifest registers source with review_required status and candidate access
   assert.equal(dataSource.source_id, SOURCE_ID);
   assert.equal(dataSource.topic, 'pedestrian');
   assert.equal(dataSource.scope, 'city');
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.equal(dataSource.access_status, 'active');
   assert.equal(dataSource.record_granularity, 'sensor_location_version');
   assert.equal(dataSource.admission_evidence.native_record_key, 'location_id');
 });

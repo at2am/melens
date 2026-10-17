@@ -60,15 +60,16 @@ class FakeOdsClient extends OpenDataSoftClient {
   }
 }
 
-test('manifest registers source with review_required license and candidate access status', async () => {
+test('manifest registers the admitted source: CC BY 4.0 open data, active, with its reviewed quota', async () => {
   const manifest = await loadManifest();
   const dataSource = parseSourceManifest(manifest);
 
   assert.equal(dataSource.source_id, SOURCE_ID);
   assert.equal(dataSource.topic, 'pedestrian');
   assert.equal(dataSource.scope, 'city');
-  assert.equal(dataSource.license_status, 'review_required');
-  assert.equal(dataSource.access_status, 'candidate');
+  assert.equal(dataSource.license_status, 'verified_open');
+  assert.equal(dataSource.access_status, 'active');
+  assert.equal(dataSource.admission_evidence.quota_requests_per_day, 10000);
   assert.equal(dataSource.record_granularity, 'sensor_minute');
   assert.equal(dataSource.admission_evidence.native_record_key, 'location_id + sensing_datetime');
   assert.ok(dataSource.admission_evidence.allowed_fields?.includes('location_id'));

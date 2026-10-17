@@ -7,15 +7,17 @@
   "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-sensor-locations/records",
   "topic": "pedestrian",
   "scope": "city",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": [
+    "com_municipal:1:2008-07-01"
+  ],
+  "coverage_from": "2026-10-17T00:00:00Z",
   "coverage_to": null,
   "cadence_seconds": 86400,
   "check_interval_seconds": 86400,
   "requires_monitoring": true,
-  "license_status": "review_required",
+  "license_status": "verified_open",
   "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
-  "access_status": "candidate",
+  "access_status": "active",
   "record_granularity": "sensor_location_version",
   "connector_owner": "melens integration",
   "admission_evidence": {
@@ -38,12 +40,16 @@
       "location"
     ],
     "staging_retention_days": 1,
-    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/"
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-sensor-locations",
+    "quota_requests_per_day": 10000,
+    "raw_retention_days": 0,
+    "reviewed_at": "2026-10-17T02:45:00Z"
   },
   "invariants": {
     "cold_start_relocation_protection": "When relocation is detected on cold start without upstream migration moment, valid_from reflects snapshot observation time rather than backdating new coordinates to installation date",
     "transition_gap_preservation": "Upstream absence of relocation moment preserves the unknown interval between versions without fabricating an effective start date",
     "baseline_evidence_requirement": "Without an explicit official validity timestamp, coordinates start at their first observed published snapshot; installation dates and text notes do not establish past coordinate validity",
     "closed_interval_output": "Closed historical versions are emitted in output bundle alongside current location versions to maintain downstream historical observation joins"
-  }
+  },
+  "notes": "Admission 2026-10-17: the publisher's dataset metadata states CC BY 4.0 (license_url creativecommons.org/licenses/by/4.0/legalcode), as for the admitted parking sensors on the same City of Melbourne portal. "
 }

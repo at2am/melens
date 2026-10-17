@@ -20,6 +20,7 @@ const jobConfig = z.discriminatedUnion('mode', [
     sourceId,
     intervalSeconds: positiveSeconds,
     overlapSeconds: nonnegativeSeconds,
+    lagSeconds: nonnegativeSeconds,
     dailyRequestCap: positiveRequests,
     executionRequestCap: positiveRequests,
   }),
@@ -34,15 +35,21 @@ const jobConfig = z.discriminatedUnion('mode', [
 
 export type ScheduledJobConfig = z.infer<typeof jobConfig>;
 
-/** Cloud Scheduler can retry a trigger. Aligning the window makes retries idempotent. */
+/**
+ * Cloud Scheduler can retry a trigger. Aligning the window makes retries idempotent. A source that
+ * publishes late (the City of Melbourne pedestrian minutes arrive about 35 minutes after they are
+ * counted) reads the window that ended [lagSeconds] ago, so the window is complete when it is read.
+ */
 export function scheduledWindow(
   now: Date,
   intervalSeconds: number,
   overlapSeconds: number,
+  lagSeconds = 0,
 ): { from: string; to: string } {
   positiveSeconds.parse(intervalSeconds);
   nonnegativeSeconds.parse(overlapSeconds);
-  const nowMs = now.getTime();
+  nonnegativeSeconds.parse(lagSeconds);
+  const nowMs = now.getTime() - lagSeconds * 1000;
   if (!Number.isFinite(nowMs)) throw new Error('Invalid schedule clock');
   const intervalMs = intervalSeconds * 1000;
   const endMs = Math.floor(nowMs / intervalMs) * intervalMs;
@@ -61,6 +68,7 @@ export function parseScheduledJobConfig(env: NodeJS.ProcessEnv): ScheduledJobCon
       sourceId: env.MELENS_SOURCE_ID,
       intervalSeconds: env.MELENS_INTERVAL_SECONDS,
       overlapSeconds: env.MELENS_OVERLAP_SECONDS ?? 0,
+      lagSeconds: env.MELENS_LAG_SECONDS ?? 0,
       dailyRequestCap: env.MELENS_REQUEST_CAP_PER_DAY,
       executionRequestCap: env.MELENS_MAX_REQUESTS_PER_EXECUTION,
     });
@@ -123,7 +131,7 @@ async function runWindow(config: ScheduledJobConfig, coverageFrom: string | null
     if (coverageFrom === null) {
       throw new Error(`Time source requires a reviewed initial cursor: ${config.sourceId}`);
     }
-    const window = scheduledWindow(now, config.intervalSeconds, config.overlapSeconds);
+    const window = scheduledWindow(now, config.intervalSeconds, config.overlapSeconds, config.lagSeconds);
     await run(['--source', config.sourceId, '--from', window.from, '--to', window.to]);
   } else {
     await run(['--source', config.sourceId, '--revision', config.revision]);

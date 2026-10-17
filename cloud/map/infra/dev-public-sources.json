@@ -70,5 +70,17 @@
     "url": "https://opendata.transport.vic.gov.au/dataset/gtfs-realtime",
     "attribution": "Transport Victoria — Metro Trains and Yarra Trams service alerts (CC BY 4.0)",
     "versionRef": null
+  },
+  {
+    "sourceId": "melbourne.pedestrian.minute",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/",
+    "attribution": "City of Melbourne — Pedestrian Counting System, counts per minute (CC BY 4.0)",
+    "versionRef": null
+  },
+  {
+    "sourceId": "melbourne.pedestrian.locations",
+    "url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-sensor-locations/",
+    "attribution": "City of Melbourne — Pedestrian Counting System, sensor locations (CC BY 4.0)",
+    "versionRef": null
   }
 ]
