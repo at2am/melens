@@ -43,6 +43,7 @@ Future<ProviderContainer> showPanel(
   FakeAgentClient client, {
   List<CardItem> tapped = const [],
   PhotoPicker? picker,
+  DateTime Function()? now,
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -63,7 +64,7 @@ Future<ProviderContainer> showPanel(
         ),
       ),
       melbourneClockProvider.overrideWithValue(
-        MelbourneClock(now: () => DateTime.utc(2026, 10, 10, 7, 40)),
+        MelbourneClock(now: now ?? () => DateTime.utc(2026, 10, 10, 7, 40)),
       ),
     ],
   );
@@ -511,5 +512,243 @@ void main() {
 
     expect(find.byKey(const ValueKey('chat-error')), findsOneWidget);
     expect(find.textContaining('Could not sign in'), findsOneWidget);
+  });
+
+  testWidgets('an empty conversation offers first messages for the time of '
+      'day, and one sends at a tap', (tester) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    expect(find.text('Try asking'), findsOneWidget);
+    // 18:40 in Melbourne: the evening.
+    expect(find.text('Plan my evening'), findsOneWidget);
+    expect(find.text('Find parking nearby'), findsOneWidget);
+
+    await tester.tap(find.text('Plan my evening'));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      client.lastTurn.request.input,
+      const TurnInput.text(text: 'Plan my evening'),
+    );
+    await client.lastTurn.close();
+    await tester.pump();
+  });
+
+  testWidgets('an answer in Markdown shows bold text and a list, without the '
+      'marks', (tester) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), 'Trams?');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    client.lastTurn
+      ..emit(
+        const AgentEvent.text(
+          turnId: 't_1',
+          seq: 0,
+          delta: 'The **Free Tram Zone** runs:\n- every day\n- until late',
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_1',
+          seq: 1,
+          stop: StopReason.end,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    final rich = tester
+        .widgetList<SelectableText>(find.byType(SelectableText))
+        .map((text) => text.textSpan?.toPlainText() ?? text.data)
+        .toList();
+    expect(rich, contains('The Free Tram Zone runs:'));
+    expect(rich, containsAll(['every day', 'until late']));
+    expect(rich.any((text) => text?.contains('**') ?? false), isFalse);
+    expect(find.text('•'), findsNWidgets(2));
+  });
+
+  testWidgets('a question that takes free text can be answered in the '
+      "user's own words; skipped ones go as no preference", (tester) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Plan my evening',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    AgentQuestion question(int index, String text) => AgentQuestion(
+      id: 'q_$index',
+      text: text,
+      options: const ['Now', 'Later'],
+      allowFreeText: true,
+      forPlan: true,
+    );
+    client.lastTurn
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          question: question(1, 'When will you leave?'),
+        ),
+      )
+      ..emit(
+        AgentEvent.question(
+          turnId: 't_1',
+          seq: 1,
+          stepId: 's_2',
+          question: question(2, 'How long do you have?'),
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_1',
+          seq: 2,
+          stop: StopReason.asked,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    final other = find.byKey(const ValueKey('chat-question-q_1-other'));
+    await Scrollable.ensureVisible(tester.element(other), alignment: 0.5);
+    await tester.pump();
+    await tester.tap(other);
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-question-q_1-text')),
+      'After 9 pm',
+    );
+    await tester.pump();
+    final send = find.byKey(const ValueKey('chat-questions-send'));
+    await Scrollable.ensureVisible(tester.element(send), alignment: 0.5);
+    await tester.pump();
+    await tester.tap(send);
+    await tester.pump();
+    await tester.pump();
+
+    expect(client.lastTurn.request.input.toJson(), {
+      'kind': 'answers',
+      'answers': [
+        {'questionId': 'q_1', 'value': 'After 9 pm'},
+        {'questionId': 'q_2', 'value': 'No preference'},
+      ],
+    });
+    await client.lastTurn.close();
+    await tester.pump();
+  });
+
+  testWidgets('a slow step shows how long it has run and that its source can '
+      'take a while', (tester) async {
+    var now = DateTime.utc(2026, 10, 10, 7, 40);
+    final client = FakeAgentClient();
+    await showPanel(tester, client, now: () => now);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Is the library worth it?',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    client.lastTurn.emit(
+      const AgentEvent.status(
+        turnId: 't_1',
+        seq: 0,
+        stepId: 's_1',
+        state: AgentStepState.running,
+        tool: 'search_grounding',
+        text: 'Searching Google',
+      ),
+    );
+    await tester.pump();
+    expect(find.text('This source can take up to a minute.'), findsNothing);
+
+    now = now.add(const Duration(seconds: 20));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('20 s'), findsOneWidget);
+    expect(find.text('This source can take up to a minute.'), findsOneWidget);
+    await client.lastTurn.close();
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('the map changes of the last answer can be undone', (
+    tester,
+  ) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    await tester.enterText(
+      find.byKey(const ValueKey('chat-input')),
+      'Highlight the market',
+    );
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    client.lastTurn
+      ..emit(
+        const AgentEvent.uiAction(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          action: UiActionName.highlightFeatures,
+          args: <String, dynamic>{
+            'ids': ['event:1'],
+          },
+        ),
+      )
+      ..emit(
+        const AgentEvent.done(
+          turnId: 't_1',
+          seq: 1,
+          stop: StopReason.end,
+          usage: fakeFinalUsage,
+        ),
+      );
+    await client.lastTurn.close();
+    await tester.pumpAndSettle();
+
+    final undo = find.text('Undo map changes');
+    expect(undo, findsOneWidget);
+    await tester.tap(undo);
+    await tester.pump();
+    expect(find.text('Map changes undone'), findsOneWidget);
+    expect(undo, findsNothing);
+  });
+
+  testWidgets('a long answer that arrives at once is revealed over a moment', (
+    tester,
+  ) async {
+    final client = FakeAgentClient();
+    await showPanel(tester, client);
+    await tester.enterText(find.byKey(const ValueKey('chat-input')), 'Tell me');
+    await tester.tap(find.byKey(const ValueKey('chat-send')));
+    await tester.pump();
+    await tester.pump();
+    final long = List.filled(40, 'word').join(' ');
+    client.lastTurn.emit(AgentEvent.text(turnId: 't_1', seq: 0, delta: long));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    String shown() =>
+        tester.widget<SelectableText>(find.byType(SelectableText).last).data!;
+    expect(shown().length, inExclusiveRange(0, long.length));
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(shown(), long);
+    client.lastTurn.emit(
+      const AgentEvent.done(
+        turnId: 't_1',
+        seq: 1,
+        stop: StopReason.end,
+        usage: fakeFinalUsage,
+      ),
+    );
+    await client.lastTurn.close();
+    await tester.pump();
   });
 }

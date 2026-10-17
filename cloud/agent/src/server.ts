@@ -3,21 +3,30 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { IdTokenVerifier } from './auth/verifier.js';
 import type { UserEventService } from './events/service.js';
 import type { FeedService } from './feeds/service.js';
-import { decodeImages, type TurnImage } from './protocol/attachments.js';
+import { attachmentRefOf, decodeImages, type TurnImage } from './protocol/attachments.js';
 import { askedIn } from './agent/prompts.js';
 import type { PlanService } from './plans/service.js';
 import { turnIdOfCard } from './plans/schemas.js';
 import { AGENT_ERROR_CODES, ATTACHMENT_LIMITS, AgentServiceError, errorResponseSchema, turnRequestSchema, zeroUsage,
-  type AgentErrorCode, type Card, type StoredTurn, type TurnRequest } from './protocol/schemas.js';
-import { openSseStream, type EventSink } from './protocol/sse.js';
+  type AgentErrorCode, type AgentEvent, type Card, type StoredTurn, type TurnFailure, type TurnRequest } from './protocol/schemas.js';
+import { createTurnStream, type EventSink, type TurnStream } from './protocol/sse.js';
 import type { RateLimiter } from './rate-limit.js';
-import { SESSION_LIMITS, newId, summaryOf, type SessionRecord, type SessionStore } from './sessions/store.js';
+import { SESSION_LIMITS, leaseHeld, newId, summaryOf, type SessionRecord, type SessionStore } from './sessions/store.js';
 
 /** A turn request is the user's text, the map context (64 KiB is far above any real one) and up to four photos in base64. */
 export const MAX_REQUEST_BYTES = 64 * 1024 + ATTACHMENT_LIMITS.perTurn * Math.ceil(ATTACHMENT_LIMITS.bytes / 3) * 4;
 
 /** How long a new message waits for the running turn it interrupts to stop and store itself before taking its lease. */
 export const SUPERSEDE_WAIT_MS = 5_000;
+
+/**
+ * How long a turn keeps running after its last client left, waiting for the app to resume it after a dropped
+ * connection. The stop button and a newer message still stop it at once.
+ */
+export const RESUME_GRACE_MS = 20_000;
+
+/** How long a finished turn's events stay on the instance for a client that resumes late. */
+export const RESUME_KEEP_MS = 60_000;
 
 /** The longest a saved plan's stop refresh may read the sensors and the area's rules, or an edit compute its route. */
 const STOP_REFRESH_TIMEOUT_MS = 60_000;
@@ -54,6 +63,7 @@ type Route =
   | { readonly kind: 'sessions'; readonly method: 'GET' | 'POST' }
   | { readonly kind: 'session'; readonly method: 'GET' | 'DELETE'; readonly sessionId: string }
   | { readonly kind: 'turn'; readonly sessionId: string }
+  | { readonly kind: 'turnEvents'; readonly sessionId: string; readonly turnId: string }
   | { readonly kind: 'cancel'; readonly sessionId: string }
   | { readonly kind: 'attachment'; readonly sessionId: string; readonly attachmentId: string }
   | { readonly kind: 'events'; readonly method: 'GET' | 'POST' }
@@ -107,6 +117,10 @@ function matchRoute(method: string, pathname: string): Route | null {
   }
   const turn = /^\/v1\/sessions\/([^/]+)\/turns$/.exec(pathname);
   if (turn !== null && ID.test(turn[1]!) && method === 'POST') return { kind: 'turn', sessionId: turn[1]! };
+  const events = /^\/v1\/sessions\/([^/]+)\/turns\/([^/]+)\/events$/.exec(pathname);
+  if (events !== null && ID.test(events[1]!) && ID.test(events[2]!) && method === 'GET') {
+    return { kind: 'turnEvents', sessionId: events[1]!, turnId: events[2]! };
+  }
   const cancel = /^\/v1\/sessions\/([^/]+)\/cancel$/.exec(pathname);
   if (cancel !== null && ID.test(cancel[1]!) && method === 'POST') return { kind: 'cancel', sessionId: cancel[1]! };
   const attachment = /^\/v1\/sessions\/([^/]+)\/attachments\/([^/]+)$/.exec(pathname);
@@ -183,13 +197,35 @@ export interface AgentServerOptions {
   readonly turnTimeoutMs: number;
   /** Defaults to `SUPERSEDE_WAIT_MS`. */
   readonly supersedeWaitMs?: number;
+  /** Defaults to `RESUME_GRACE_MS`. */
+  readonly resumeGraceMs?: number;
+  /** Defaults to `RESUME_KEEP_MS`. */
+  readonly resumeKeepMs?: number;
   readonly clock?: () => Date;
+}
+
+/**
+ * What a turn that threw had produced, from the events it sent: the input, text, cards and map actions survive, so the
+ * conversation and the model's history keep the turn. A turn the stop button, a newer message or the deadline ended
+ * is stored as cancelled; any other as failed.
+ */
+export function partialTurnOf(turn: { readonly turnId: string; readonly seq: number; readonly startedAt: Date; readonly request: TurnRequest;
+  readonly images: readonly TurnImage[] }, events: readonly AgentEvent[], failure: TurnFailure | null): StoredTurn {
+  const text = events.flatMap((event) => event.event === 'text' ? [event.delta] : []).join('');
+  const cards = events.flatMap((event) => event.event === 'card' ? [event.card] : []);
+  const uiActions = events.flatMap((event) => event.event === 'ui_action' ? [{ action: event.action, args: event.args }] : []);
+  return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input,
+    attachments: turn.images.map(attachmentRefOf), text, cards, uiActions, question: null, questions: [],
+    stop: failure === null ? 'cancelled' : 'end', ...(failure === null ? {} : { failure }), trace: [],
+    usage: { ...zeroUsage(), complete: false, perCall: [] } };
 }
 
 /** Frozen protocol transport: Firebase-authenticated session routes and the SSE turn route. */
 export function createAgentHttpServer(options: AgentServerOptions) {
   const clock = options.clock ?? (() => new Date());
   const allowed = new Set(options.allowedOrigins);
+  /** The turns this instance runs, and those that ended within `resumeKeepMs`, for a client that resumes. */
+  const live = new Map<string, { readonly uid: string; readonly sessionId: string; readonly stream: TurnStream }>();
 
   function cors(request: IncomingMessage, response: ServerResponse): boolean {
     const origin = request.headers.origin;
@@ -278,8 +314,9 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     const input = parsed.data.input;
     let planCard = input.kind === 'refine' ? await storedPlanCard(uid, sessionId, input.cardId, input.planId) : undefined;
 
-    // The client leaving, the stop button, a newer message or the Cloud Run deadline cancels the run, so it
-    // stops spending tokens. The client may already leave while this request waits for an interrupted turn.
+    // The stop button, a newer message or the Cloud Run deadline cancels the run, so it stops spending tokens, and so
+    // does the client leaving for longer than the resume grace. The client may already leave while this request waits
+    // for an interrupted turn.
     const controller = new AbortController();
     const onClose = () => controller.abort();
     response.on('close', onClose);
@@ -327,24 +364,57 @@ export function createAgentHttpServer(options: AgentServerOptions) {
     });
     const startedAt = clock();
     const timer = setTimeout(() => controller.abort(), options.turnTimeoutMs);
-    const sink = openSseStream(response, turnId);
+    const stream = createTurnStream(turnId);
+    live.set(turnId, { uid, sessionId, stream });
+    // From here a dropped connection is not the end of the turn: the app may resume it within the grace.
+    response.off('close', onClose);
+    let grace: NodeJS.Timeout | null = null;
+    stream.onClientsChanged((clients) => {
+      if (grace !== null) { clearTimeout(grace); grace = null; }
+      if (clients === 0 && !stream.finished) grace = setTimeout(() => controller.abort(), options.resumeGraceMs ?? RESUME_GRACE_MS);
+    });
+    stream.attach(response);
+    const context = { turnId, seq: session.turnCount + 1, request: parsed.data, images, startedAt };
+    let turn: StoredTurn;
     try {
-      const turn = await options.runner.run({ uid, session, turnId, seq: session.turnCount + 1, request: parsed.data, images,
-        history, historyImages, sink, signal: controller.signal, startedAt, ...(planCard === undefined ? {} : { planCard }) });
-      await options.store.completeTurn(uid, sessionId, turn, clock(), images);
+      turn = await options.runner.run({ uid, session, ...context, history, historyImages, sink: stream, signal: controller.signal,
+        ...(planCard === undefined ? {} : { planCard }) });
     } catch (error) {
-      if (!sink.sent.some((event) => event.event === 'done' || event.event === 'error')) {
-        sink.emit({ event: 'error', message: controller.signal.aborted ? 'The turn was cancelled or timed out' : 'The agent could not finish this turn',
+      const failure = controller.signal.aborted ? null : { message: 'The agent could not finish this turn', retryable: true };
+      if (!stream.sent.some((event) => event.event === 'done' || event.event === 'error')) {
+        stream.emit({ event: 'error', message: failure?.message ?? 'The turn was cancelled or timed out',
           retryable: true, usage: { ...zeroUsage(), complete: false } });
       }
-      await options.store.releaseTurn(uid, sessionId, turnId);
+      turn = partialTurnOf(context, stream.sent, failure);
       process.stderr.write(`${JSON.stringify({ severity: 'ERROR', event: 'turnFailed', turnId, reason: error instanceof Error ? error.name : 'unknown' })}\n`);
+    }
+    try {
+      await options.store.completeTurn(uid, sessionId, turn, clock(), images);
+    } catch (error) {
+      if (!stream.sent.some((event) => event.event === 'done' || event.event === 'error')) {
+        stream.emit({ event: 'error', message: 'The agent could not finish this turn', retryable: true, usage: { ...zeroUsage(), complete: false } });
+      }
+      await options.store.releaseTurn(uid, sessionId, turnId);
+      process.stderr.write(`${JSON.stringify({ severity: 'ERROR', event: 'turnNotStored', turnId, reason: error instanceof Error ? error.name : 'unknown' })}\n`);
     } finally {
       clearTimeout(timer);
+      if (grace !== null) clearTimeout(grace);
       unwatch();
-      response.off('close', onClose);
-      sink.close();
+      stream.close();
+      setTimeout(() => { if (live.get(turnId)?.stream === stream) live.delete(turnId); }, options.resumeKeepMs ?? RESUME_KEEP_MS).unref();
     }
+  }
+
+  /**
+   * A client that lost the stream of its turn follows it again from the event after `after`. Only the instance that runs
+   * the turn has its events; any other answers `notFound`, and the app reads the stored turn once the session is idle.
+   */
+  function resumeTurn(uid: string, sessionId: string, turnId: string, url: URL, response: ServerResponse): void {
+    const entry = live.get(turnId);
+    if (entry === undefined || entry.uid !== uid || entry.sessionId !== sessionId) throw new AgentServiceError('notFound');
+    const after = url.searchParams.get('after');
+    if (after !== null && !/^\d{1,6}$/.test(after)) throw new AgentServiceError('invalidRequest');
+    entry.stream.attach(response, after === null ? -1 : Number(after));
   }
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -383,11 +453,16 @@ export function createAgentHttpServer(options: AgentServerOptions) {
           const session = await options.store.get(uid, route.sessionId);
           if (session === null) throw new AgentServiceError('notFound');
           const turns = await options.store.listTurns(uid, route.sessionId);
-          writeJson(response, 200, { session: summaryOf(session), pendingQuestion: session.pendingQuestion, turns });
+          // The turn still running, if any: an app that lost its stream waits for it to be stored.
+          const runningTurnId = leaseHeld(session.activeTurn, clock()) ? session.activeTurn.turnId : null;
+          writeJson(response, 200, { session: summaryOf(session), pendingQuestion: session.pendingQuestion, runningTurnId, turns });
           return;
         }
         case 'turn':
           await runTurn(uid, route.sessionId, request, response);
+          return;
+        case 'turnEvents':
+          resumeTurn(uid, route.sessionId, route.turnId, url, response);
           return;
         case 'cancel': {
           // The stop button: the running turn stops wherever it runs and is stored as cancelled.

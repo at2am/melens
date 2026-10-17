@@ -114,6 +114,12 @@ final class FakeAgentClient implements AgentClient {
   Object? turnError;
   Object? cancelError;
 
+  /// What each resume answers, in order: an error to throw, or null to
+  /// stream events the test feeds through [resumes]. With none queued a
+  /// resume answers `notFound`, as another server instance would.
+  final resumeErrors = <Object?>[];
+  final resumes = <FakeResume>[];
+
   /// Stored photo bytes by attachment id.
   final attachments = <String, Uint8List>{};
 
@@ -202,4 +208,46 @@ final class FakeAgentClient implements AgentClient {
     );
     return events.stream;
   }
+
+  @override
+  Stream<AgentEvent> resumeTurn(
+    String sessionId,
+    String turnId, {
+    required int afterSeq,
+    Future<void>? abortTrigger,
+  }) {
+    calls.add('resume:$sessionId/$turnId@$afterSeq');
+    final error = resumeErrors.isEmpty
+        ? const AgentHttpException(
+            statusCode: 404,
+            retryable: false,
+            code: AgentErrorCode.notFound,
+          )
+        : resumeErrors.removeAt(0);
+    if (error != null) return Stream<AgentEvent>.error(error);
+    final events = StreamController<AgentEvent>();
+    resumes.add(FakeResume(turnId, afterSeq, events));
+    unawaited(
+      abortTrigger?.then((_) {
+        if (!events.isClosed) {
+          events.addError(const AgentTurnAborted());
+          unawaited(events.close());
+        }
+      }),
+    );
+    return events.stream;
+  }
+}
+
+/// One resume the fake received; the test feeds its events.
+final class FakeResume {
+  FakeResume(this.turnId, this.afterSeq, this._events);
+
+  final String turnId;
+  final int afterSeq;
+  final StreamController<AgentEvent> _events;
+
+  void emit(AgentEvent event) => _events.add(event);
+
+  Future<void> close() => _events.close();
 }

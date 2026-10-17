@@ -6,9 +6,11 @@ import '../../agent/data/agent_models.dart';
 /// The questions a turn asked. One question shows a button per option and a
 /// tap answers it. Several questions (the agent asks up to three before it
 /// makes or changes a plan: when, how long, how) show their options as
-/// choices; the user picks for any of them and sends the picks together, so
-/// the next turn makes or revises the plan once for all of them. While the
-/// questions are not pending, only their text shows.
+/// choices, and a question that takes free text also offers "Other…" with a
+/// box for the user's own words. The user answers any of them and sends the
+/// answers together, so the next turn makes or revises the plan once for all
+/// of them; a skipped question goes as "No preference" and the agent assumes
+/// a default. While the questions are not pending, only their text shows.
 class ChatQuestionsView extends StatefulWidget {
   const ChatQuestionsView({
     required this.questions,
@@ -34,13 +36,53 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
   /// The option picked for each question id.
   final Map<String, String> _picked = {};
 
-  void _send() {
+  /// The user's own words for each question whose "Other…" is chosen.
+  final Map<String, TextEditingController> _other = {};
+
+  @override
+  void dispose() {
+    for (final controller in _other.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  String? _answerOf(AgentQuestion question) {
+    if (_other[question.id] case final controller?) {
+      final text = controller.text.trim();
+      return text.isEmpty ? null : text.substring(0, text.length.clamp(0, 200));
+    }
+    return _picked[question.id];
+  }
+
+  void _send(String noPreference) {
     widget.onAnswers?.call([
       for (final question in widget.questions)
-        if (_picked[question.id] case final value?)
-          QuestionAnswer(questionId: question.id, value: value),
+        QuestionAnswer(
+          questionId: question.id,
+          value: _answerOf(question) ?? noPreference,
+        ),
     ]);
   }
+
+  void _pick(AgentQuestion question, String option, bool selected) =>
+      setState(() {
+        _other.remove(question.id)?.dispose();
+        if (selected) {
+          _picked[question.id] = option;
+        } else {
+          _picked.remove(question.id);
+        }
+      });
+
+  void _pickOther(AgentQuestion question, bool selected) => setState(() {
+    _picked.remove(question.id);
+    if (selected) {
+      _other[question.id] ??= TextEditingController();
+    } else {
+      _other.remove(question.id)?.dispose();
+    }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -115,15 +157,34 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
                       key: ValueKey('chat-question-${question.id}-$option'),
                       label: Text(option),
                       selected: _picked[question.id] == option,
-                      onSelected: (selected) => setState(() {
-                        if (selected) {
-                          _picked[question.id] = option;
-                        } else {
-                          _picked.remove(question.id);
-                        }
-                      }),
+                      onSelected: (selected) =>
+                          _pick(question, option, selected),
+                    ),
+                  if (question.allowFreeText)
+                    ChoiceChip(
+                      key: ValueKey('chat-question-${question.id}-other'),
+                      label: Text(strings.chatQuestionOther),
+                      selected: _other.containsKey(question.id),
+                      onSelected: (selected) => _pickOther(question, selected),
                     ),
                 ],
+              ),
+            ),
+          if (canAnswer && _other[question.id] != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                key: ValueKey('chat-question-${question.id}-text'),
+                controller: _other[question.id],
+                autofocus: true,
+                maxLength: 200,
+                decoration: InputDecoration(
+                  hintText: strings.chatQuestionOtherHint,
+                  isDense: true,
+                  counterText: '',
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (_) => setState(() {}),
               ),
             ),
         ],
@@ -132,7 +193,7 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
             alignment: Alignment.centerLeft,
             child: FilledButton.icon(
               key: const ValueKey('chat-questions-send'),
-              onPressed: _picked.isEmpty ? null : _send,
+              onPressed: () => _send(strings.chatQuestionNoPreference),
               icon: const Icon(Icons.auto_fix_high, size: 18),
               label: Text(
                 beforePlan
@@ -141,6 +202,15 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
               ),
             ),
           ),
+          if (questions.any((question) => _answerOf(question) == null))
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                strings.chatQuestionsDefaults,
+                key: const ValueKey('chat-questions-defaults'),
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
           if (questions.any((question) => question.allowFreeText))
             Padding(
               padding: const EdgeInsets.only(top: 4),

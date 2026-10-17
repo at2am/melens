@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/time/melbourne_time.dart';
 import '../../agent/data/agent_client.dart';
 import '../../agent/data/agent_models.dart';
 import '../../agent/state/agent_providers.dart';
@@ -13,6 +14,31 @@ import 'chat_models.dart';
 import 'request_context.dart';
 
 part 'chat_controller.g.dart';
+
+/// How the chat follows a turn again after its stream dropped: resume
+/// attempts and their waits, then, when another server instance runs the
+/// turn, polls of the session until the turn is stored.
+final class ChatRecoveryTiming {
+  const ChatRecoveryTiming({
+    this.resumeDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 4),
+    ],
+    this.storedPollInterval = const Duration(seconds: 3),
+    this.storedPolls = 110,
+  });
+
+  final List<Duration> resumeDelays;
+  final Duration storedPollInterval;
+
+  /// Enough polls to outlast the server's 300 s turn deadline.
+  final int storedPolls;
+}
+
+/// Tests override this to recover without waiting.
+@Riverpod(keepAlive: true)
+ChatRecoveryTiming chatRecoveryTiming(Ref ref) => const ChatRecoveryTiming();
 
 /// Conversation state: the open session, its turns, the turn in progress,
 /// any pending question and the session list (agent-protocol.md, Flutter
@@ -102,6 +128,7 @@ class ChatController extends _$ChatController {
     final generation = ++_generation;
     final abort = Completer<void>();
     _abort = abort;
+    final reports = _actionReports(state.turns.lastOrNull);
     state = state.copyWith(
       turns: [
         ...state.turns,
@@ -110,18 +137,21 @@ class ChatController extends _$ChatController {
           input: normalised,
           photos: sent,
           phase: ChatTurnPhase.running,
+          startedAt: ref.read(melbourneClockProvider).now(),
         ),
       ],
       clearPendingQuestion: true,
       clearRefining: true,
       clearError: true,
     );
-    final context = ref.read(requestContextBuilderProvider)(
-      openCardId: switch (normalised) {
-        RefineTurnInput(:final cardId) => cardId,
-        _ => aboutPlan ?? _openCardId(),
-      },
-    );
+    final context = ref
+        .read(requestContextBuilderProvider)(
+          openCardId: switch (normalised) {
+            RefineTurnInput(:final cardId) => cardId,
+            _ => aboutPlan ?? _openCardId(),
+          },
+        )
+        .withActionReports(reports);
     try {
       final events = _client.runTurn(
         sessionId,
@@ -140,16 +170,16 @@ class ChatController extends _$ChatController {
         ),
         abortTrigger: abort.future,
       );
-      await for (final event in events) {
-        if (!ref.mounted || generation != _generation) return;
-        _handle(event);
+      var ended = false;
+      try {
+        ended = await _follow(events, generation);
+      } on AgentNetworkException {
+        // A connection that dropped before the turn began has nothing to
+        // resume.
+        if (state.turns.last.turnId == null) rethrow;
       }
       if (!ref.mounted || generation != _generation) return;
-      if (state.turns.last.isRunning) {
-        _finish(
-          const ChatError(kind: ChatErrorKind.streamEnded, retryable: true),
-        );
-      }
+      if (!ended) await _recover(sessionId, generation, abort.future);
     } on AgentTurnAborted {
       if (ref.mounted && generation == _generation) _markCancelled();
     } on AgentClientException catch (error) {
@@ -169,6 +199,166 @@ class ChatController extends _$ChatController {
         unawaited(_refreshSessions(quiet: true));
       }
     }
+  }
+
+  /// Handles the events of [events] until it ends; true when the turn ended
+  /// with `done` or `error`, or another turn took over.
+  Future<bool> _follow(Stream<AgentEvent> events, int generation) async {
+    await for (final event in events) {
+      if (!ref.mounted || generation != _generation) return true;
+      _handle(event);
+    }
+    if (!ref.mounted || generation != _generation) return true;
+    return !state.turns.last.isRunning;
+  }
+
+  /// The stream of the running turn dropped: follow it again after the last
+  /// event, a few times. When this server instance does not run the turn,
+  /// wait for it to be stored and show it as stored.
+  Future<void> _recover(
+    String sessionId,
+    int generation,
+    Future<void> abortTrigger,
+  ) async {
+    final timing = ref.read(chatRecoveryTimingProvider);
+    final turnId = state.turns.last.turnId;
+    if (turnId != null) {
+      _replaceLast((turn) => turn.copyWith(reconnecting: true));
+      for (final delay in timing.resumeDelays) {
+        await Future.any([Future<void>.delayed(delay), abortTrigger]);
+        if (!ref.mounted || generation != _generation) return;
+        try {
+          final ended = await _follow(
+            _client.resumeTurn(
+              sessionId,
+              turnId,
+              afterSeq: state.turns.last.lastSeq,
+              abortTrigger: abortTrigger,
+            ),
+            generation,
+          );
+          if (!ref.mounted || generation != _generation) return;
+          if (ended) {
+            _replaceLast((turn) => turn.copyWith(reconnecting: false));
+            return;
+          }
+        } on AgentHttpException catch (error) {
+          if (error.code != AgentErrorCode.notFound) rethrow;
+          await _awaitStored(sessionId, turnId, generation, timing);
+          return;
+        } on AgentNetworkException {
+          // Still offline; the next attempt waits longer.
+        } on AgentTimeoutException {
+          // Likewise.
+        }
+      }
+    }
+    if (!ref.mounted || generation != _generation) return;
+    _replaceLast((turn) => turn.copyWith(reconnecting: false));
+    _finish(const ChatError(kind: ChatErrorKind.streamEnded, retryable: true));
+  }
+
+  /// Another instance runs [turnId]: reads the session until it no longer
+  /// names the turn as running, then shows the turn as stored.
+  Future<void> _awaitStored(
+    String sessionId,
+    String turnId,
+    int generation,
+    ChatRecoveryTiming timing,
+  ) async {
+    for (var poll = 0; poll < timing.storedPolls; poll++) {
+      if (poll > 0) await Future<void>.delayed(timing.storedPollInterval);
+      if (!ref.mounted || generation != _generation) return;
+      final SessionDetail detail;
+      try {
+        detail = await _client.getSession(sessionId);
+      } on AgentNetworkException {
+        continue;
+      } on AgentTimeoutException {
+        continue;
+      }
+      if (!ref.mounted || generation != _generation) return;
+      final stored = detail.turns
+          .where((turn) => turn.id == turnId)
+          .firstOrNull;
+      if (stored != null) {
+        _adoptStored(sessionId, stored, detail.pendingQuestion);
+        return;
+      }
+      if (detail.runningTurnId != turnId) break;
+    }
+    if (!ref.mounted || generation != _generation) return;
+    _replaceLast((turn) => turn.copyWith(reconnecting: false));
+    _finish(const ChatError(kind: ChatErrorKind.streamEnded, retryable: true));
+  }
+
+  /// The live turn becomes its stored version; map actions the stream did not
+  /// deliver are applied now.
+  void _adoptStored(
+    String sessionId,
+    StoredTurn stored,
+    AgentQuestion? pendingQuestion,
+  ) {
+    final live = state.turns.last;
+    final mapActions = ref.read(mapActionsControllerProvider.notifier);
+    var mapBefore = live.mapBefore;
+    for (final action in stored.uiActions.skip(live.actions.length)) {
+      mapBefore ??= mapActions.capture();
+      mapActions.apply(action);
+    }
+    final restored = _fromStored(sessionId, stored);
+    _replaceLast(
+      (_) => ChatTurn(
+        localId: live.localId,
+        input: live.input,
+        photos: live.photos,
+        phase: restored.phase,
+        turnId: stored.id,
+        steps: restored.steps,
+        text: restored.text,
+        actions: restored.actions,
+        cards: restored.cards,
+        questions: restored.questions,
+        usage: restored.usage,
+        stop: restored.stop,
+        error: restored.error,
+        lastSeq: live.lastSeq,
+        startedAt: live.startedAt,
+        mapBefore: mapBefore,
+      ),
+    );
+    state = state.copyWith(
+      pendingQuestion: pendingQuestion,
+      clearPendingQuestion: pendingQuestion == null,
+    );
+  }
+
+  /// The map actions of [turn] the app could not fully apply, for the next
+  /// request to report.
+  static List<ActionReport> _actionReports(ChatTurn? turn) => [
+    for (final record in turn?.actions ?? const <ChatActionRecord>[])
+      if (record.report.outcome
+          case MapActionOutcome.partial || MapActionOutcome.ignored)
+        ActionReport(
+          action: record.action.action,
+          outcome: record.report.outcome.name,
+          skipped: record.report.skipped.take(20).toList(growable: false),
+        ),
+  ].take(8).toList(growable: false);
+
+  /// Puts back the map as it was before [turn] changed it.
+  void undoMapChanges(ChatTurn turn) {
+    final before = turn.mapBefore;
+    if (before == null || turn.mapUndone) return;
+    ref.read(mapActionsControllerProvider.notifier).restore(before);
+    state = state.copyWith(
+      turns: [
+        for (final candidate in state.turns)
+          candidate.localId == turn.localId
+              ? candidate.copyWith(mapUndone: true)
+              : candidate,
+      ],
+    );
   }
 
   /// The next message asks the agent to change [card], a plan of this
@@ -256,7 +446,9 @@ class ChatController extends _$ChatController {
     }
   }
 
-  Future<void> openSession(String sessionId) async {
+  /// Opens a stored session. [restoreMap] draws its last route and
+  /// highlights again, for a conversation the user picked from the list.
+  Future<void> openSession(String sessionId, {bool restoreMap = false}) async {
     if (state.isRunning) cancel();
     final generation = ++_generation;
     state = state.copyWith(isRestoring: true, clearError: true);
@@ -276,6 +468,11 @@ class ChatController extends _$ChatController {
         pendingQuestion: detail.pendingQuestion,
         clearPendingQuestion: detail.pendingQuestion == null,
       );
+      if (restoreMap) {
+        ref.read(mapActionsControllerProvider.notifier).restoreConversation([
+          for (final turn in detail.turns) ...turn.uiActions,
+        ]);
+      }
     } on AgentClientException catch (error) {
       if (!ref.mounted || generation != _generation) return;
       state = state.copyWith(isRestoring: false, error: ChatError.from(error));
@@ -348,16 +545,24 @@ class ChatController extends _$ChatController {
     AgentQuestion? pending;
     switch (event) {
       case AgentStatusEvent():
-        next = next.copyWith(steps: _mergeStep(next, event));
+        next = next.copyWith(
+          steps: _mergeStep(
+            next,
+            event,
+            ref.read(melbourneClockProvider).now(),
+          ),
+        );
       case AgentTextEvent(:final delta):
         next = next.copyWith(text: next.text + delta);
       case AgentUiActionEvent(:final stepId, :final action, :final args):
         final uiAction = UiAction(action: action, args: args);
-        final report = ref
-            .read(mapActionsControllerProvider.notifier)
-            .apply(uiAction);
+        final mapActions = ref.read(mapActionsControllerProvider.notifier);
+        // The map as the turn found it, so its changes can be undone.
+        final before = next.mapBefore ?? mapActions.capture();
+        final report = mapActions.apply(uiAction);
         final record = ChatActionRecord(action: uiAction, report: report);
         next = next.copyWith(
+          mapBefore: before,
           actions: [...next.actions, record],
           steps: _attachAction(next.steps, stepId, record),
         );
@@ -395,7 +600,11 @@ class ChatController extends _$ChatController {
 
   /// The running step with this id takes the finished event's fields; a new
   /// id starts a step at the current text length, so the view can place it.
-  static List<ChatStep> _mergeStep(ChatTurn turn, AgentStatusEvent event) {
+  static List<ChatStep> _mergeStep(
+    ChatTurn turn,
+    AgentStatusEvent event,
+    DateTime now,
+  ) {
     final index = turn.steps.indexWhere((step) => step.id == event.stepId);
     final existing = index < 0 ? null : turn.steps[index];
     final step = ChatStep(
@@ -410,6 +619,8 @@ class ChatController extends _$ChatController {
       memo: event.memo,
       textOffset: existing?.textOffset ?? turn.text.length,
       action: existing?.action,
+      startedAt: existing?.startedAt ?? now,
+      finishedAt: event.state == AgentStepState.running ? null : now,
     );
     if (existing == null) return [...turn.steps, step];
     return [...turn.steps]..[index] = step;
@@ -535,6 +746,7 @@ class ChatController extends _$ChatController {
         ),
       );
     }
+    final failure = turn.failure;
     return ChatTurn(
       localId: ++_nextLocalId,
       input: turn.input,
@@ -547,9 +759,18 @@ class ChatController extends _$ChatController {
           ),
       ],
       turnId: turn.id,
-      phase: turn.stop == StopReason.cancelled
+      phase: failure != null
+          ? ChatTurnPhase.failed
+          : turn.stop == StopReason.cancelled
           ? ChatTurnPhase.cancelled
           : ChatTurnPhase.done,
+      error: failure == null
+          ? null
+          : ChatError(
+              kind: ChatErrorKind.server,
+              retryable: failure.retryable,
+              serverMessage: failure.message,
+            ),
       steps: steps,
       text: turn.text,
       actions: actions,

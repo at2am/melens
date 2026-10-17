@@ -35,6 +35,18 @@ abstract interface class AgentClient {
     Future<void>? abortTrigger,
   });
 
+  /// Follows a turn again after its stream dropped, from the event after
+  /// [afterSeq] (agent-protocol.md, Resuming a turn). The server keeps the
+  /// turn running for a short grace after a drop. Only the instance that runs
+  /// the turn can resume it; any other answers `notFound`, and the app reads
+  /// the stored turn once the session no longer names it as running.
+  Stream<AgentEvent> resumeTurn(
+    String sessionId,
+    String turnId, {
+    required int afterSeq,
+    Future<void>? abortTrigger,
+  });
+
   /// Stops the session's running turn wherever it runs, even when the
   /// disconnect of an aborted request does not reach the server.
   Future<void> cancelTurn(String sessionId);
@@ -288,6 +300,40 @@ final class HttpAgentClient implements AgentClient {
           ..headers.addAll(headers)
           ..headers['content-type'] = 'application/json'
           ..bodyBytes = utf8.encode(body);
+    yield* _events(httpRequest);
+  }
+
+  @override
+  Stream<AgentEvent> resumeTurn(
+    String sessionId,
+    String turnId, {
+    required int afterSeq,
+    Future<void>? abortTrigger,
+  }) async* {
+    _validateId(sessionId);
+    _validateId(turnId);
+    final headers = await _headers(accept: 'text/event-stream');
+    final endpoint = _endpoint([
+      'v1',
+      'sessions',
+      sessionId,
+      'turns',
+      turnId,
+      'events',
+    ]);
+    final httpRequest =
+        http.AbortableRequest(
+            'GET',
+            endpoint.replace(queryParameters: {'after': '$afterSeq'}),
+            abortTrigger: abortTrigger,
+          )
+          ..followRedirects = false
+          ..headers.addAll(headers);
+    yield* _events(httpRequest);
+  }
+
+  /// Sends a streamed turn request and decodes its events.
+  Stream<AgentEvent> _events(http.BaseRequest httpRequest) async* {
     final http.StreamedResponse response;
     try {
       response = await client.send(httpRequest);

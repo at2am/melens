@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
@@ -192,6 +193,22 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     _inputFocus.requestFocus();
   }
 
+  /// First messages for an empty conversation: what is around, a plan for
+  /// the time of day, parking and disruptions. Each is sent as it reads.
+  List<String> _starters(AppLocalizations strings) {
+    final hour = ref.read(melbourneClockProvider).now().hour;
+    return [
+      strings.chatStarterAround,
+      hour < 11
+          ? strings.chatStarterMorning
+          : hour < 16
+          ? strings.chatStarterAfternoon
+          : strings.chatStarterEvening,
+      strings.chatStarterParking,
+      strings.chatStarterDisruptions,
+    ];
+  }
+
   void _scrollToEnd(ChatState chat) {
     final last = chat.turns.isEmpty ? null : chat.turns.last;
     // Every change that adds a row to the last turn moves the scroll: text,
@@ -295,14 +312,46 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   )
                 : chat.turns.isEmpty
                 ? Center(
-                    child: Padding(
+                    child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
-                      child: Text(
-                        strings.chatEmpty,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            strings.chatEmpty,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            strings.chatStartersTitle,
+                            style: theme.textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final (index, starter) in _starters(
+                                strings,
+                              ).indexed)
+                                ActionChip(
+                                  key: ValueKey('chat-starter-$index'),
+                                  label: Text(starter),
+                                  onPressed: chat.canSend
+                                      ? () => unawaited(
+                                          controller.send(
+                                            TurnInput.text(text: starter),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   )
@@ -332,6 +381,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                         onRetry: chat.canSend && !chat.isRunning
                             ? () => unawaited(controller.retryLast())
                             : null,
+                        onUndoMap: chat.isRunning
+                            ? null
+                            : () => controller.undoMapChanges(turn),
                         onCardItemTap: widget.onCardItemTap,
                         onOpenSource: widget.onOpenSource,
                         refinedPlanTitle: switch (turn.input) {

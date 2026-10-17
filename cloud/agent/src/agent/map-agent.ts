@@ -2,15 +2,42 @@ import { InMemorySessionService, LlmAgent, Runner, StreamingMode, createEvent, t
 import type { Part } from '@google/genai';
 
 import { attachmentRefOf } from '../protocol/attachments.js';
-import type { StopReason, StoredTurn } from '../protocol/schemas.js';
+import type { StopReason, StoredTurn, TurnFailure } from '../protocol/schemas.js';
 import type { TurnContext, TurnRunner } from '../server.js';
 import { TurnRegistry, buildTool, isToolError, runTool } from '../tools/define.js';
 import { analyseAnomalyTool, areaBriefTool } from '../workflows/workflows.js';
 import { toolSpecs, type ToolDependencies } from '../tools/catalog.js';
-import { AGENT_NAME, BUDGET_NOTES, historyContents, instructionFor, questionsOf, turnMessage } from './prompts.js';
+import { compactOldToolResults } from './compaction.js';
+import { isCacheMiss, useContextCache, type ContextCache } from './context-cache.js';
+import { AGENT_NAME, BUDGET_NOTES, INSTRUCTION, historyContents, questionsOf, turnMessage } from './prompts.js';
 import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
+/**
+ * Text that reaches the loop without partial chunks: ADK's streaming aggregator holds back text that arrives in the same
+ * chunk as a function call, and hands it over whole. It goes to the app in pieces of about this many characters, over
+ * at most `FALLBACK_STREAM.totalMs`, so it reads as streamed rather than appearing in one jump. The pieces are awaited
+ * so the step that follows still comes after its text. (ADK's experimental progressive streaming would stream it, but
+ * ADK runs the function calls of partial events too, so each call would run twice.)
+ */
+export const FALLBACK_STREAM = { minChars: 120, pieceChars: 40, totalMs: 300 } as const;
+
+/** Splits `text` at spaces into pieces of about `size` characters; joined, they are `text`. */
+export function textPieces(text: string, size: number): string[] {
+  const pieces: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + size);
+    if (end < text.length) {
+      const space = text.indexOf(' ', end);
+      end = space === -1 ? text.length : space + 1;
+    }
+    pieces.push(text.slice(start, end));
+    start = end;
+  }
+  return pieces;
+}
+
 /** Vertex AI's 400 for an attached file it cannot decode. */
 const UNREADABLE_FILE = /could not be decoded|malformed or corrupted/i;
 
@@ -27,6 +54,10 @@ export interface MapAgentOptions {
   readonly model: BaseLlm;
   readonly tools: ToolDependencies;
   readonly maxModelCalls: number;
+  /** Serves the instruction and the tool declarations from a Gemini context cache; without it they go with every call. */
+  readonly contextCache?: ContextCache;
+  /** How long held-back text takes to reach the app in pieces; tests pass 0. Defaults to `FALLBACK_STREAM.totalMs`. */
+  readonly fallbackStreamMs?: number;
   readonly clock?: () => Date;
   readonly log?: (line: Record<string, unknown>) => void;
 }
@@ -71,7 +102,15 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         turn.sink.emit({ event: 'usage', call: usage, turn: registry.usage.turn });
       };
 
-      let failed = false;
+      let failure: TurnFailure | undefined;
+      const emitInPieces = async (text: string): Promise<void> => {
+        const pieces = text.length < FALLBACK_STREAM.minChars ? [text] : textPieces(text, FALLBACK_STREAM.pieceChars);
+        const pause = (options.fallbackStreamMs ?? FALLBACK_STREAM.totalMs) / pieces.length;
+        for (const [index, piece] of pieces.entries()) {
+          if (index > 0 && pause > 0 && !turn.signal.aborted) await new Promise((resolve) => setTimeout(resolve, pause));
+          turn.sink.emit({ event: 'text', delta: piece });
+        }
+      };
       // The map's own entry points already say what to do, so code, not the model, picks the workflow (agent-design.md, Entry routing).
       // A workflow that produces no card (nothing found, a model or data failure) falls through to the loop with the explicit prompt.
       let handledByWorkflow = false;
@@ -91,14 +130,15 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
         const agent = new LlmAgent({
           name: AGENT_NAME,
           model: options.model,
-          instruction: instructionFor(turn.session.pendingQuestion),
+          instruction: INSTRUCTION,
           tools,
-          beforeModelCallback: ({ request }): LlmResponse | undefined => {
+          beforeModelCallback: async ({ request }): Promise<LlmResponse | undefined> => {
             closeCall();
             streamedText = false;
             // ask_user ends the turn: the step after its answer gets an empty final response instead of a model call.
             if (registry.asked !== null) return { content: { role: 'model', parts: [{ text: '' }] }, partial: false };
-            openCall = { startedAt: clock().getTime(), finishedAt: null };
+            const call: { startedAt: number; finishedAt: number | null } = { startedAt: clock().getTime(), finishedAt: null };
+            openCall = call;
             const index = registry.usage.calls + 1;
             if (registry.toolsDisabled || index >= options.maxModelCalls) {
               stripTools(request);
@@ -106,6 +146,13 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
               request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.noTools }] });
             } else if (index === options.maxModelCalls - 1) {
               request.contents.push({ role: 'user', parts: [{ text: BUDGET_NOTES.wrapUp }] });
+            }
+            const compacted = compactOldToolResults(request.contents);
+            if (compacted > 0) options.log?.({ severity: 'INFO', event: 'toolResultsCompacted', turnId: turn.turnId, call: index, results: compacted });
+            if (options.contextCache !== undefined) {
+              await useContextCache(options.contextCache, request, turn.signal);
+              // The call starts once the cache is ready, so its duration is the model's own.
+              call.startedAt = clock().getTime();
             }
             return undefined;
           },
@@ -129,7 +176,8 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
 
         try {
           const events = runner.runAsync({ userId: turn.uid, sessionId: session.id,
-            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.planCard, questionsOf(turn.history)),
+            newMessage: turnMessage(turn.request.input, turn.request.context, turn.images, turn.planCard, questionsOf(turn.history),
+              turn.session.pendingQuestion),
             runConfig, abortSignal: turn.signal });
           for await (const event of events) {
             if (event.errorCode !== undefined || event.errorMessage !== undefined) throw new ModelCallError(event.errorCode, event.errorMessage);
@@ -141,32 +189,37 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
               if (text !== '') { streamedText = true; answer += text; turn.sink.emit({ event: 'text', delta: text }); }
             } else if (!streamedText && text.trim() !== '') {
               answer += text;
-              turn.sink.emit({ event: 'text', delta: text });
+              await emitInPieces(text);
             }
           }
           closeCall();
         } catch (error) {
           openCall = null; // a failed call reports no usage of its own; the error event carries the totals
           if (!turn.signal.aborted) {
-            failed = true;
             options.log?.({ severity: 'ERROR', event: 'modelLoopFailed', turnId: turn.turnId, reason: error instanceof Error ? error.name : 'unknown',
               detail: error instanceof Error ? error.message.slice(0, 300) : undefined });
+            // A cache that expired or was deleted under the call is made again by the next turn.
+            if (isCacheMiss(error)) options.contextCache?.invalidate();
             // Gemini refuses a photo it cannot decode; sending the same turn again cannot help.
             const unreadablePhoto = error instanceof ModelCallError && turn.images.length > 0 && UNREADABLE_FILE.test(error.message);
-            turn.sink.emit({ event: 'error', message: unreadablePhoto ? 'A photo could not be read. Send a different one.' : 'The agent could not finish this turn',
-              retryable: !unreadablePhoto, usage: registry.usage.final(false) });
-            throw error;
+            failure = { message: unreadablePhoto ? 'A photo could not be read. Send a different one.' : 'The agent could not finish this turn',
+              retryable: !unreadablePhoto };
           }
         }
 
       }
 
-      const stop: StopReason = registry.asked !== null ? 'asked' : turn.signal.aborted ? 'cancelled' : registry.budgetForced ? 'budget' : 'end';
-      const usage = registry.usage.final(!turn.signal.aborted && !failed);
-      turn.sink.emit({ event: 'done', stop, usage });
+      const stop: StopReason = failure !== undefined ? 'end' : registry.asked !== null ? 'asked' : turn.signal.aborted ? 'cancelled'
+        : registry.budgetForced ? 'budget' : 'end';
+      const usage = registry.usage.final(!turn.signal.aborted && failure === undefined);
+      // A failed turn ends with `error` and is stored with what it produced, so the conversation and the model keep it.
+      if (failure === undefined) turn.sink.emit({ event: 'done', stop, usage });
+      else turn.sink.emit({ event: 'error', ...failure, usage });
+      const asked = failure === undefined ? registry.asked : null;
       return { id: turn.turnId, seq: turn.seq, createdAt: turn.startedAt.toISOString(), input: turn.request.input,
-        attachments: turn.images.map(attachmentRefOf), text: answer,
-        cards: registry.cards, uiActions: registry.uiActions, question: registry.asked, questions: registry.questions, stop, trace: registry.trace.slice(0, 200),
+        attachments: turn.images.map(attachmentRefOf), text: answer, cards: registry.cards, uiActions: registry.uiActions,
+        question: asked, questions: asked === null ? [] : registry.questions, stop, ...(failure === undefined ? {} : { failure }),
+        trace: registry.trace.slice(0, 200),
         usage: { ...usage, perCall: registry.usage.perCall.slice(0, 64) } };
     },
   };

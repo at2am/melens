@@ -8,14 +8,16 @@ import { collectingSink } from '../src/protocol/sse.js';
 import type { TurnContext } from '../src/server.js';
 import type { SessionRecord } from '../src/sessions/store.js';
 
-export interface SeenRequest { readonly contents: Content[]; readonly tools: ToolListUnion | undefined; readonly stream: boolean }
+export interface SeenRequest { readonly contents: Content[]; readonly tools: ToolListUnion | undefined; readonly stream: boolean;
+  readonly cachedContent?: string | undefined; readonly systemInstruction?: unknown }
 
 /** A Gemini stand-in that answers each model call from a script and records what it was asked. */
 export class ScriptedLlm extends BaseLlm {
   readonly seen: SeenRequest[] = [];
   constructor(private readonly steps: Array<(request: LlmRequest) => LlmResponse[]>) { super({ model: 'gemini-test' }); }
   async *generateContentAsync(request: LlmRequest, stream?: boolean): AsyncGenerator<LlmResponse, void> {
-    this.seen.push({ contents: request.contents.map((content) => ({ ...content })), tools: request.config?.tools, stream: stream === true });
+    this.seen.push({ contents: request.contents.map((content) => ({ ...content })), tools: request.config?.tools, stream: stream === true,
+      cachedContent: request.config?.cachedContent, systemInstruction: request.config?.systemInstruction });
     const step = this.steps.shift();
     if (step === undefined) throw new Error(`Unscripted model call ${this.seen.length}`);
     for (const response of step(request)) yield response;

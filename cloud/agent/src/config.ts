@@ -19,6 +19,8 @@ const configSchema = z.strictObject({
   /** How long one grounding call may take before the tool gives up and the model answers from the map data. */
   groundingTimeoutMs: positiveInteger.max(300_000),
   turnsPerHour: positiveInteger.max(10_000),
+  /** Serve the chat instruction and tool declarations from a Gemini context cache (`AGENT_CONTEXT_CACHE=false` turns it off). */
+  contextCache: z.boolean(),
 });
 
 export type AgentConfig = Readonly<z.infer<typeof configSchema>> & { readonly query: MapConfig };
@@ -49,6 +51,8 @@ export function loadAgentConfig(env: Readonly<Record<string, string | undefined>
     turnTimeoutMs: integerSetting(env.AGENT_TURN_TIMEOUT_MS, 300_000),
     groundingTimeoutMs: integerSetting(env.AGENT_GROUNDING_TIMEOUT_MS, 40_000),
     turnsPerHour: integerSetting(env.AGENT_TURNS_PER_HOUR, 120),
+    contextCache: env.AGENT_CONTEXT_CACHE === undefined ? true : env.AGENT_CONTEXT_CACHE === 'true' ? true
+      : env.AGENT_CONTEXT_CACHE === 'false' ? false : 'invalid',
   });
   if (!parsed.success) {
     throw new AgentConfigurationError([...new Set(parsed.error.issues.map((issue) =>

@@ -1,12 +1,17 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/time/melbourne_time.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../map/state/map_actions.dart';
 import '../../plans/ui/plan_card_actions.dart';
 import '../state/chat_models.dart';
+import 'chat_markdown.dart';
 import 'chat_photo_view.dart';
 import 'chat_questions_view.dart';
 
@@ -104,6 +109,7 @@ class ChatTurnView extends StatelessWidget {
     this.onAnswer,
     this.onAnswers,
     this.onRetry,
+    this.onUndoMap,
     this.onCardItemTap,
     this.onOpenSource,
     this.refinedPlanTitle,
@@ -118,6 +124,9 @@ class ChatTurnView extends StatelessWidget {
   /// Answers several questions of this turn at once.
   final ValueChanged<List<QuestionAnswer>>? onAnswers;
   final VoidCallback? onRetry;
+
+  /// Puts the map back as it was before this turn changed it.
+  final VoidCallback? onUndoMap;
   final CardItemCallback? onCardItemTap;
   final ValueChanged<Uri>? onOpenSource;
 
@@ -296,6 +305,28 @@ class ChatTurnView extends StatelessWidget {
                 label: Text(strings.chatRetry),
               ),
             ),
+          if (turn.mapBefore != null && !turn.isRunning)
+            if (turn.mapUndone)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  strings.chatMapUndone,
+                  key: ValueKey('chat-map-undone-${turn.localId}'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else if (isLast && onUndoMap != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: ValueKey('chat-undo-map-${turn.localId}'),
+                  onPressed: onUndoMap,
+                  icon: const Icon(Icons.undo, size: 18),
+                  label: Text(strings.chatUndoMap),
+                ),
+              ),
           if (usage != null) ...[
             const SizedBox(height: 4),
             Align(
@@ -353,7 +384,13 @@ class ChatTurnView extends StatelessWidget {
     if (text.length > cursor) {
       widgets.add(_answer(text.substring(cursor), cursor));
     }
-    if (turn.isThinking) {
+    if (turn.reconnecting || turn.isThinking) {
+      final since = turn.thinkingSince;
+      final label = turn.reconnecting
+          ? strings.chatReconnecting
+          : turn.isWriting
+          ? strings.chatWriting
+          : strings.chatThinking;
       widgets.add(
         Padding(
           key: ValueKey('chat-progress-${turn.localId}'),
@@ -366,10 +403,26 @@ class ChatTurnView extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: 8),
-              Text(
-                turn.isWriting ? strings.chatWriting : strings.chatThinking,
-                style: theme.textTheme.bodySmall,
+              Flexible(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              // How long the model has worked with nothing to show yet.
+              if (since != null && !turn.reconnecting && !turn.isWriting)
+                _Elapsed(
+                  since: since,
+                  builder: (elapsed) => elapsed.inSeconds < 3
+                      ? const SizedBox.shrink()
+                      : Text(
+                          ' · ${strings.chatElapsed(elapsed.inSeconds)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                ),
             ],
           ),
         ),
@@ -380,8 +433,10 @@ class ChatTurnView extends StatelessWidget {
 
   Widget _answer(String text, int offset) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
-    child: SelectableText(
-      text,
+    child: _AnswerText(
+      text: text,
+      reveal: turn.isRunning,
+      onOpenLink: onOpenSource,
       key: ValueKey('chat-answer-${turn.localId}-$offset'),
     ),
   );
@@ -431,6 +486,7 @@ class _StepRow extends StatelessWidget {
         color: colors.error,
       ),
     };
+    final startedAt = step.startedAt;
     final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -446,22 +502,57 @@ class _StepRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(text: step.text),
-                  if (step.detail case final detail?)
-                    TextSpan(
-                      text: ' · $detail',
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                ],
-              ),
-              style: theme.textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: step.text),
+                      if (step.detail case final detail?)
+                        TextSpan(
+                          text: ' · $detail',
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                // A slow source (Google grounding takes up to a minute)
+                // says so rather than looking stuck.
+                if (step.isRunning && startedAt != null)
+                  _Elapsed(
+                    since: startedAt,
+                    builder: (elapsed) => elapsed < _slowStep
+                        ? const SizedBox.shrink()
+                        : Text(
+                            strings.chatStepSlow,
+                            key: ValueKey('chat-step-slow-${step.id}'),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                  ),
+              ],
             ),
           ),
+          if (step.isRunning && startedAt != null)
+            _Elapsed(
+              since: startedAt,
+              builder: (elapsed) => elapsed.inSeconds < 3
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        strings.chatElapsed(elapsed.inSeconds),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+            ),
           if (results.isNotEmpty) ...[
             const SizedBox(width: 8),
             Text(
@@ -479,5 +570,125 @@ class _StepRow extends StatelessWidget {
       message: strings.chatActionSkipped(action.report.skipped.join(', ')),
       child: row,
     );
+  }
+}
+
+/// A running step slower than this says that its source can take a while.
+const _slowStep = Duration(seconds: 12);
+
+/// Rebuilds once a second with the time since [since], while it is shown.
+class _Elapsed extends ConsumerStatefulWidget {
+  const _Elapsed({required this.since, required this.builder});
+
+  final DateTime since;
+  final Widget Function(Duration elapsed) builder;
+
+  @override
+  ConsumerState<_Elapsed> createState() => _ElapsedState();
+}
+
+class _ElapsedState extends ConsumerState<_Elapsed> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = ref
+        .read(melbourneClockProvider)
+        .now()
+        .difference(widget.since);
+    return widget.builder(elapsed.isNegative ? Duration.zero : elapsed);
+  }
+}
+
+/// Answer text, as Markdown when it uses any. While the turn runs, a long
+/// piece that arrives at once (a model call that streamed no partial text)
+/// is revealed over a moment instead of appearing in one jump.
+class _AnswerText extends StatefulWidget {
+  const _AnswerText({
+    required this.text,
+    required this.reveal,
+    this.onOpenLink,
+    super.key,
+  });
+
+  final String text;
+  final bool reveal;
+  final ValueChanged<Uri>? onOpenLink;
+
+  @override
+  State<_AnswerText> createState() => _AnswerTextState();
+}
+
+class _AnswerTextState extends State<_AnswerText>
+    with SingleTickerProviderStateMixin {
+  /// Arrivals shorter than this show at once, as streamed text does.
+  static const _revealFrom = 120;
+
+  /// Characters a second while revealing; a piece never takes longer than
+  /// [_longestReveal].
+  static const _charsPerSecond = 900;
+  static const _longestReveal = Duration(milliseconds: 700);
+
+  late final AnimationController _reveal = AnimationController(vsync: this)
+    ..addListener(() => setState(() {}));
+  int _from = 0;
+  int _to = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _revealTo(widget.text.length, from: 0);
+  }
+
+  @override
+  void didUpdateWidget(_AnswerText old) {
+    super.didUpdateWidget(old);
+    if (widget.text.length != old.text.length) {
+      _revealTo(widget.text.length, from: _shown);
+    }
+  }
+
+  int get _shown => _reveal.isAnimating
+      ? (_from + (_to - _from) * _reveal.value).round()
+      : _to;
+
+  void _revealTo(int length, {required int from}) {
+    _reveal.stop();
+    _from = from.clamp(0, length);
+    _to = length;
+    if (!widget.reveal || length - _from < _revealFrom) return;
+    final millis = ((length - _from) * 1000 / _charsPerSecond).round();
+    _reveal.duration = Duration(
+      milliseconds: millis.clamp(0, _longestReveal.inMilliseconds),
+    );
+    unawaited(_reveal.forward(from: 0));
+  }
+
+  @override
+  void dispose() {
+    _reveal.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.text.substring(0, _shown.clamp(0, widget.text.length));
+    return hasChatMarkdown(text)
+        ? ChatMarkdown(text, onOpenLink: widget.onOpenLink)
+        : SelectableText(text);
   }
 }

@@ -89,6 +89,12 @@ RequestContext _$RequestContextFromJson(Map<String, dynamic> json) =>
               : SelectedContext.fromJson(v as Map<String, dynamic>),
         ),
         openCardId: $checkedConvert('openCardId', (v) => v as String?),
+        actionReports: $checkedConvert(
+          'actionReports',
+          (v) => (v as List<dynamic>?)
+              ?.map((e) => ActionReport.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
       );
       return val;
     });
@@ -102,7 +108,39 @@ Map<String, dynamic> _$RequestContextToJson(RequestContext instance) =>
       'layers': instance.layers,
       'openCardId': ?instance.openCardId,
       'localTime': instance.localTime,
+      'actionReports': ?instance.actionReports?.map((e) => e.toJson()).toList(),
     };
+
+ActionReport _$ActionReportFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('ActionReport', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['action', 'outcome']);
+      final val = ActionReport(
+        action: $checkedConvert(
+          'action',
+          (v) => $enumDecode(_$UiActionNameEnumMap, v),
+        ),
+        outcome: $checkedConvert('outcome', (v) => v as String),
+        skipped: $checkedConvert(
+          'skipped',
+          (v) => (v as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
+        ),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$ActionReportToJson(ActionReport instance) =>
+    <String, dynamic>{
+      'action': _$UiActionNameEnumMap[instance.action]!,
+      'outcome': instance.outcome,
+      'skipped': instance.skipped,
+    };
+
+const _$UiActionNameEnumMap = {
+  UiActionName.showLayers: 'show_layers',
+  UiActionName.focusMap: 'focus_map',
+  UiActionName.drawRoute: 'draw_route',
+  UiActionName.highlightFeatures: 'highlight_features',
+};
 
 QuestionAnswer _$QuestionAnswerFromJson(Map<String, dynamic> json) =>
     $checkedCreate('QuestionAnswer', json, ($checkedConvert) {
@@ -513,13 +551,6 @@ Map<String, dynamic> _$UiActionToJson(UiAction instance) => <String, dynamic>{
   'args': instance.args,
 };
 
-const _$UiActionNameEnumMap = {
-  UiActionName.showLayers: 'show_layers',
-  UiActionName.focusMap: 'focus_map',
-  UiActionName.drawRoute: 'draw_route',
-  UiActionName.highlightFeatures: 'highlight_features',
-};
-
 CallUsage _$CallUsageFromJson(Map<String, dynamic> json) => $checkedCreate(
   'CallUsage',
   json,
@@ -684,6 +715,22 @@ Map<String, dynamic> _$TraceEntryToJson(TraceEntry instance) =>
       'memo': instance.memo,
     };
 
+TurnFailure _$TurnFailureFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('TurnFailure', json, ($checkedConvert) {
+      $checkKeys(json, requiredKeys: const ['message', 'retryable']);
+      final val = TurnFailure(
+        message: $checkedConvert('message', (v) => v as String),
+        retryable: $checkedConvert('retryable', (v) => v as bool),
+      );
+      return val;
+    });
+
+Map<String, dynamic> _$TurnFailureToJson(TurnFailure instance) =>
+    <String, dynamic>{
+      'message': instance.message,
+      'retryable': instance.retryable,
+    };
+
 StoredTurn _$StoredTurnFromJson(
   Map<String, dynamic> json,
 ) => $checkedCreate('StoredTurn', json, ($checkedConvert) {
@@ -756,6 +803,10 @@ StoredTurn _$StoredTurnFromJson(
               .toList() ??
           [],
     ),
+    failure: $checkedConvert(
+      'failure',
+      (v) => v == null ? null : TurnFailure.fromJson(v as Map<String, dynamic>),
+    ),
   );
   return val;
 });
@@ -773,6 +824,7 @@ Map<String, dynamic> _$StoredTurnToJson(StoredTurn instance) =>
       'question': instance.question?.toJson(),
       'questions': instance.questions.map((e) => e.toJson()).toList(),
       'stop': _$StopReasonEnumMap[instance.stop]!,
+      'failure': ?instance.failure?.toJson(),
       'trace': instance.trace.map((e) => e.toJson()).toList(),
       'usage': instance.usage.toJson(),
     };
@@ -835,6 +887,7 @@ SessionDetail _$SessionDetailFromJson(
           .map((e) => StoredTurn.fromJson(e as Map<String, dynamic>))
           .toList(),
     ),
+    runningTurnId: $checkedConvert('runningTurnId', (v) => v as String?),
   );
   return val;
 });
@@ -842,6 +895,7 @@ SessionDetail _$SessionDetailFromJson(
 Map<String, dynamic> _$SessionDetailToJson(SessionDetail instance) =>
     <String, dynamic>{
       'session': instance.session.toJson(),
+      'runningTurnId': instance.runningTurnId,
       'pendingQuestion': instance.pendingQuestion?.toJson(),
       'turns': instance.turns.map((e) => e.toJson()).toList(),
     };

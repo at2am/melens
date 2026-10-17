@@ -40,8 +40,16 @@ ProviderContainer makeContainer(FakeAgentClient client) =>
         melbourneClockProvider.overrideWithValue(
           MelbourneClock(now: () => DateTime.utc(2026, 10, 10, 7, 40)),
         ),
+        chatRecoveryTimingProvider.overrideWithValue(instantRecovery),
       ],
     );
+
+/// Resumes and polls without waiting.
+const instantRecovery = ChatRecoveryTiming(
+  resumeDelays: [Duration.zero, Duration.zero],
+  storedPollInterval: Duration.zero,
+  storedPolls: 3,
+);
 
 ChatState stateOf(ProviderContainer container) =>
     container.read(chatControllerProvider);
@@ -700,4 +708,328 @@ void main() {
       expect(container.read(mapActionsControllerProvider).route, isNull);
     },
   );
+
+  const done = AgentEvent.done(
+    turnId: 't_1',
+    seq: 2,
+    stop: StopReason.end,
+    usage: fakeFinalUsage,
+  );
+
+  StoredTurn storedTurn({
+    String id = 't_1',
+    String text = 'Stored answer.',
+    List<UiAction> uiActions = const [],
+    TurnFailure? failure,
+  }) => StoredTurn(
+    id: id,
+    seq: 1,
+    createdAt: fakeStamp,
+    input: const TurnInput.text(text: 'Hi'),
+    text: text,
+    cards: const [],
+    uiActions: uiActions,
+    question: null,
+    stop: StopReason.end,
+    failure: failure,
+    trace: const [],
+    usage: fakeFinalUsage,
+  );
+
+  test(
+    'a dropped stream resumes the turn after the last event it read',
+    () async {
+      final client = FakeAgentClient()..resumeErrors.add(null);
+      final container = makeContainer(client);
+      final chat = container.read(chatControllerProvider.notifier);
+
+      final sending = chat.send(const TurnInput.text(text: 'Hi'));
+      await pumpEventQueue();
+      client.lastTurn.emit(
+        const AgentEvent.text(turnId: 't_1', seq: 0, delta: 'Near '),
+      );
+      await pumpEventQueue();
+      await client.lastTurn.fail(const AgentNetworkException());
+      await pumpEventQueue();
+
+      expect(client.calls, contains('resume:s_1/t_1@0'));
+      expect(stateOf(container).turns.single.reconnecting, isTrue);
+      client.resumes.single
+        ..emit(const AgentEvent.text(turnId: 't_1', seq: 1, delta: 'you.'))
+        ..emit(done);
+      await client.resumes.single.close();
+      await sending;
+
+      final turn = stateOf(container).turns.single;
+      expect(turn.text, 'Near you.');
+      expect(turn.phase, ChatTurnPhase.done);
+      expect(turn.reconnecting, isFalse);
+    },
+  );
+
+  test('a turn another instance runs is read back once it is stored, with its '
+      'map actions and question', () async {
+    final client = FakeAgentClient();
+    final container = makeContainer(client);
+    container.listen(mapActionsControllerProvider, (_, _) {});
+    final chat = container.read(chatControllerProvider.notifier);
+
+    final sending = chat.send(const TurnInput.text(text: 'Hi'));
+    await pumpEventQueue();
+    client.lastTurn.emit(
+      const AgentEvent.text(turnId: 't_1', seq: 0, delta: 'Looking'),
+    );
+    client.details['s_1'] = SessionDetail(
+      session: fakeSession('s_1'),
+      pendingQuestion: null,
+      turns: [
+        storedTurn(
+          uiActions: const [
+            UiAction(
+              action: UiActionName.highlightFeatures,
+              args: <String, dynamic>{
+                'ids': ['event:1'],
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+    await client.lastTurn.close();
+    await sending;
+
+    expect(
+      client.calls.where((call) => call.startsWith('resume:')),
+      isNotEmpty,
+    );
+    final turn = stateOf(container).turns.single;
+    expect(turn.text, 'Stored answer.');
+    expect(turn.phase, ChatTurnPhase.done);
+    expect(turn.mapBefore, isNotNull);
+    expect(container.read(mapActionsControllerProvider).highlightedIds, [
+      'event:1',
+    ]);
+  });
+
+  test('a turn still running elsewhere is waited for; one that is gone '
+      'ends as cut short', () async {
+    final client = FakeAgentClient();
+    final container = makeContainer(client);
+    final chat = container.read(chatControllerProvider.notifier);
+
+    final sending = chat.send(const TurnInput.text(text: 'Hi'));
+    await pumpEventQueue();
+    client.lastTurn.emit(
+      const AgentEvent.text(turnId: 't_1', seq: 0, delta: 'Looking'),
+    );
+    client.details['s_1'] = SessionDetail(
+      session: fakeSession('s_1'),
+      pendingQuestion: null,
+      runningTurnId: 't_1',
+      turns: const [],
+    );
+    await client.lastTurn.close();
+    await sending;
+
+    // Every poll found the turn still running; the polls ran out.
+    expect(
+      client.calls.where((call) => call == 'get:s_1'),
+      hasLength(instantRecovery.storedPolls),
+    );
+    final turn = stateOf(container).turns.single;
+    expect(turn.phase, ChatTurnPhase.failed);
+    expect(turn.error?.kind, ChatErrorKind.streamEnded);
+    expect(turn.reconnecting, isFalse);
+  });
+
+  test('a stored failed turn reopens as failed with its message, and can be '
+      'sent again', () async {
+    final client = FakeAgentClient()..sessions.add(fakeSession('s_9'));
+    client.details['s_9'] = SessionDetail(
+      session: fakeSession('s_9'),
+      pendingQuestion: null,
+      turns: [
+        storedTurn(
+          text: 'Looking',
+          failure: const TurnFailure(
+            message: 'The agent could not finish this turn',
+            retryable: true,
+          ),
+        ),
+      ],
+    );
+    final container = makeContainer(client);
+    final chat = container.read(chatControllerProvider.notifier);
+
+    await chat.openSession('s_9');
+
+    final turn = stateOf(container).turns.single;
+    expect(turn.phase, ChatTurnPhase.failed);
+    expect(turn.error?.serverMessage, 'The agent could not finish this turn');
+    expect(turn.error?.retryable, isTrue);
+    unawaited(chat.retryLast());
+    await pumpEventQueue();
+    expect(client.lastTurn.request.input, const TurnInput.text(text: 'Hi'));
+  });
+
+  test('map actions the app could not fully apply are reported with the next '
+      'message', () async {
+    final client = FakeAgentClient();
+    final container = makeContainer(client);
+    container.listen(mapActionsControllerProvider, (_, _) {});
+    final chat = container.read(chatControllerProvider.notifier);
+
+    final first = chat.send(const TurnInput.text(text: 'Show the market'));
+    await pumpEventQueue();
+    expect(client.lastTurn.request.context.actionReports, isNull);
+    client.lastTurn
+      ..emit(
+        const AgentEvent.uiAction(
+          turnId: 't_1',
+          seq: 0,
+          stepId: 's_1',
+          action: UiActionName.highlightFeatures,
+          args: <String, dynamic>{
+            'ids': ['event:1'],
+            'missing': ['event:9'],
+          },
+        ),
+      )
+      ..emit(
+        const AgentEvent.uiAction(
+          turnId: 't_1',
+          seq: 1,
+          stepId: 's_2',
+          action: UiActionName.focusMap,
+          args: <String, dynamic>{
+            'target': {
+              'point': {'lat': -37.81, 'lng': 144.96},
+            },
+          },
+        ),
+      )
+      ..emit(done);
+    await client.lastTurn.close();
+    await first;
+
+    final second = chat.send(const TurnInput.text(text: 'And now?'));
+    await pumpEventQueue();
+    final json = client.lastTurn.request.context.toJson();
+    expect(json['actionReports'], [
+      {
+        'action': 'highlight_features',
+        'outcome': 'partial',
+        'skipped': ['event:9'],
+      },
+    ]);
+    client.lastTurn.emit(done.copyWithTurn('t_2'));
+    await client.lastTurn.close();
+    await second;
+  });
+
+  test(
+    'undoing a turn puts the route and highlights back as they were before it',
+    () async {
+      final client = FakeAgentClient();
+      final container = makeContainer(client);
+      container.listen(mapActionsControllerProvider, (_, _) {});
+      final chat = container.read(chatControllerProvider.notifier);
+      final map = container.read(mapActionsControllerProvider.notifier);
+      map.apply(
+        const UiAction(
+          action: UiActionName.highlightFeatures,
+          args: <String, dynamic>{
+            'ids': ['event:0'],
+          },
+        ),
+      );
+
+      final sending = chat.send(const TurnInput.text(text: 'Take me there'));
+      await pumpEventQueue();
+      client.lastTurn
+        ..emit(
+          const AgentEvent.uiAction(
+            turnId: 't_1',
+            seq: 0,
+            stepId: 's_1',
+            action: UiActionName.drawRoute,
+            args: <String, dynamic>{'polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@'},
+          ),
+        )
+        ..emit(
+          const AgentEvent.uiAction(
+            turnId: 't_1',
+            seq: 1,
+            stepId: 's_2',
+            action: UiActionName.highlightFeatures,
+            args: <String, dynamic>{
+              'ids': ['event:1'],
+            },
+          ),
+        )
+        ..emit(done);
+      await client.lastTurn.close();
+      await sending;
+      expect(container.read(mapActionsControllerProvider).route, isNotNull);
+
+      chat.undoMapChanges(stateOf(container).turns.single);
+
+      final after = container.read(mapActionsControllerProvider);
+      expect(after.route, isNull);
+      expect(after.highlightedIds, ['event:0']);
+      expect(stateOf(container).turns.single.mapUndone, isTrue);
+    },
+  );
+
+  test('a conversation reopened from the list draws its last route and '
+      'highlights again; the automatic reopen at start does not', () async {
+    final client = FakeAgentClient()..sessions.add(fakeSession('s_9'));
+    client.details['s_9'] = SessionDetail(
+      session: fakeSession('s_9'),
+      pendingQuestion: null,
+      turns: [
+        storedTurn(
+          uiActions: const [
+            UiAction(
+              action: UiActionName.drawRoute,
+              args: <String, dynamic>{
+                'polyline': '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+              },
+            ),
+            UiAction(
+              action: UiActionName.highlightFeatures,
+              args: <String, dynamic>{
+                'ids': ['event:1', 'event:2'],
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+    final container = makeContainer(client);
+    container.listen(mapActionsControllerProvider, (_, _) {});
+    final chat = container.read(chatControllerProvider.notifier);
+
+    await chat.start();
+    expect(stateOf(container).sessionId, 's_9');
+    expect(container.read(mapActionsControllerProvider).route, isNull);
+
+    await chat.openSession('s_9', restoreMap: true);
+    final map = container.read(mapActionsControllerProvider);
+    expect(map.route, isNotNull);
+    expect(map.highlightedIds, ['event:1', 'event:2']);
+  });
+}
+
+extension on AgentEvent {
+  /// The same `done` for another turn.
+  AgentEvent copyWithTurn(String turnId) => switch (this) {
+    AgentDoneEvent(:final seq, :final stop, :final usage) => AgentEvent.done(
+      turnId: turnId,
+      seq: seq,
+      stop: stop,
+      usage: usage,
+    ),
+    _ => this,
+  };
 }

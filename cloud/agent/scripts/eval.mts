@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { Gemini } from '@google/adk';
 import { sourceReferenceSchema } from '@melens/shared/contracts/map-contract';
 
+import { createVertexContextCache } from '../dist/src/agent/context-cache.js';
 import { createMapAgentRunner } from '../dist/src/agent/map-agent.js';
+import { RetryingLlm } from '../dist/src/agent/retrying-llm.js';
 import { createVertexGrounding } from '../dist/src/agent/grounding.js';
 import { createVertexStructuredModel } from '../dist/src/agent/structured.js';
 import { createMemoryCache } from '../dist/src/cache.js';
@@ -86,9 +88,12 @@ const args = process.argv.slice(2);
 const only = args.includes('--only') ? Number(args[args.indexOf('--only') + 1]) : null;
 const outPath = args.includes('--out') ? args[args.indexOf('--out') + 1] : null;
 
+// The same model and cache as the service: retries for a passing 429 or 503, the instruction and tools from the cache.
 const runner = createMapAgentRunner({
-  model: new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation }),
+  model: new RetryingLlm(new Gemini({ model: config.model, vertexai: true, project: config.projectId, location: config.vertexLocation })),
   maxModelCalls: config.maxModelCalls,
+  ...(config.contextCache ? { contextCache: createVertexContextCache({ projectId: config.projectId, location: config.vertexLocation, model: config.model,
+    log: (line) => process.stderr.write(`${JSON.stringify(line)}\n`) }) } : {}),
   tools: {
     features: createSharedFeatureReader({ config: config.query, publicSources }),
     grounding: createVertexGrounding({ projectId: config.projectId, location: config.vertexLocation, model: config.model }),
@@ -112,6 +117,7 @@ for (const testCase of CASES) {
   let tools: string[] = [];
   let usageTotal = 0;
   let calls = 0;
+  let cached = 0;
   let cards = 0;
   let text = '';
   const runTurn = (id: string, seq: number, input: Case['input'], history: StoredTurn[], pendingQuestion: StoredTurn['question']) =>
@@ -135,6 +141,7 @@ for (const testCase of CASES) {
     tools = stored.trace.map((entry) => entry.tool);
     usageTotal = stored.usage.total;
     calls = stored.usage.calls;
+    cached = stored.usage.cachedInput;
     cards = stored.cards.length;
     text = stored.text;
     if (args.includes('--show')) for (const card of stored.cards) console.log(JSON.stringify(card, null, 1));
@@ -154,11 +161,11 @@ for (const testCase of CASES) {
   if (verdict.length > 0) failures += 1;
   const last = testCase.input.kind === 'text' ? testCase.input.text : testCase.input.kind === 'analyse' ? `Analyse ${testCase.input.featureId}` : `map tap at ${testCase.input.lat}, ${testCase.input.lng}`;
   const input = [...(testCase.before ?? []).map((earlier) => `${earlier} ⟶`), last].join(' ');
-  rows.push(`| ${testCase.id} | ${testCase.use} | ${input.replace(/\|/g, '/')} | ${tools.join(' → ') || 'none'} | ${cards} | ${calls} / ${usageTotal} | ${Math.round((Date.now() - startedAt) / 1000)} s | ${verdict.length === 0 ? 'pass' : `**FAIL** ${verdict.join('; ')}`} |`);
+  rows.push(`| ${testCase.id} | ${testCase.use} | ${input.replace(/\|/g, '/')} | ${tools.join(' → ') || 'none'} | ${cards} | ${calls} / ${usageTotal} (${cached} cached) | ${Math.round((Date.now() - startedAt) / 1000)} s | ${verdict.length === 0 ? 'pass' : `**FAIL** ${verdict.join('; ')}`} |`);
   console.log(`#${testCase.id} ${verdict.length === 0 ? 'pass' : `FAIL ${verdict.join('; ')}`} | ${tools.join(' → ')} | cards ${cards} | ${text.slice(0, 100).replace(/\n/g, ' ')}`);
 }
 
-const report = ['| # | Use case | Query | Tool trace | Cards | Model calls / tokens | Time | Result |', '| --- | --- | --- | --- | --- | --- | --- | --- |', ...rows].join('\n');
+const report = ['| # | Use case | Query | Tool trace | Cards | Model calls / tokens (cached input) | Time | Result |', '| --- | --- | --- | --- | --- | --- | --- | --- |', ...rows].join('\n');
 console.log(`\n${report}\n\n${ran - failures}/${ran} passed`);
 if (outPath !== null) await writeFile(outPath, `${report}\n`);
 process.exitCode = failures === 0 ? 0 : 1;

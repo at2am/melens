@@ -1216,6 +1216,75 @@
   "@chatStop": {
     "description": "Tooltip of the button that cancels the turn in progress."
   },
+  "chatReconnecting": "Connection lost. Reconnecting…",
+  "@chatReconnecting": {
+    "description": "Progress line under a running turn whose stream dropped while the app follows it again."
+  },
+  "chatStepSlow": "This source can take up to a minute.",
+  "@chatStepSlow": {
+    "description": "Under a step that has run for a while, such as a Google grounding call."
+  },
+  "chatUndoMap": "Undo map changes",
+  "@chatUndoMap": {
+    "description": "Button under the last answer that puts the layers, highlights, route and camera back as they were before it."
+  },
+  "chatMapUndone": "Map changes undone",
+  "@chatMapUndone": {
+    "description": "Shown under an answer whose map changes the user undid."
+  },
+  "chatQuestionNoPreference": "No preference",
+  "@chatQuestionNoPreference": {
+    "description": "The answer sent for a question the user skipped when sending answers to several questions."
+  },
+  "chatQuestionsDefaults": "Questions you skip use sensible defaults.",
+  "@chatQuestionsDefaults": {
+    "description": "Under several questions: the user may send without answering all of them."
+  },
+  "chatQuestionOther": "Other…",
+  "@chatQuestionOther": {
+    "description": "Choice under a question that lets the user type their own answer."
+  },
+  "chatQuestionOtherHint": "Your answer",
+  "@chatQuestionOtherHint": {
+    "description": "Placeholder of the box for the user's own answer to one question."
+  },
+  "chatStartersTitle": "Try asking",
+  "@chatStartersTitle": {
+    "description": "Heading above the suggested first messages of an empty conversation."
+  },
+  "chatStarterAround": "What's interesting around here?",
+  "@chatStarterAround": {
+    "description": "Suggested first message: what is around the map's centre or the user."
+  },
+  "chatStarterMorning": "Plan my morning",
+  "@chatStarterMorning": {
+    "description": "Suggested first message before 11 am."
+  },
+  "chatStarterAfternoon": "Plan a walk this afternoon",
+  "@chatStarterAfternoon": {
+    "description": "Suggested first message from 11 am to 4 pm."
+  },
+  "chatStarterEvening": "Plan my evening",
+  "@chatStarterEvening": {
+    "description": "Suggested first message from 4 pm."
+  },
+  "chatStarterParking": "Find parking nearby",
+  "@chatStarterParking": {
+    "description": "Suggested first message: on-street parking near the user or the map centre."
+  },
+  "chatStarterDisruptions": "Any disruptions around here?",
+  "@chatStarterDisruptions": {
+    "description": "Suggested first message: roadworks, closures and transport disruptions nearby."
+  },
+  "chatElapsed": "{seconds} s",
+  "@chatElapsed": {
+    "description": "How long a running step or the model's thinking has taken so far, in whole seconds.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "chatRetry": "Retry",
   "@chatRetry": {
     "description": "Button that sends the failed input or request again."

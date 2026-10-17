@@ -391,14 +391,26 @@ void main() {
     expect(find.text('How will you get there?'), findsOneWidget);
     final send = find.byKey(const ValueKey('chat-questions-send'));
     await tester.ensureVisible(send);
-    expect(tester.widget<FilledButton>(send).onPressed, isNull);
-
-    await tester.tap(
-      find.byKey(const ValueKey('chat-question-q_t_1_1-In an hour')),
+    // Nothing picked yet: sending leaves every question to the defaults.
+    expect(tester.widget<FilledButton>(send).onPressed, isNotNull);
+    expect(
+      find.byKey(const ValueKey('chat-questions-defaults')),
+      findsOneWidget,
     );
-    await tester.tap(find.byKey(const ValueKey('chat-question-q_t_1_3-Walk')));
+
+    // Each choice is centred first, so the chat header does not cover it.
+    Future<void> pick(String key) async {
+      final chip = find.byKey(ValueKey(key));
+      await Scrollable.ensureVisible(tester.element(chip), alignment: 0.5);
+      await tester.pump();
+      await tester.tap(chip);
+    }
+
+    await pick('chat-question-q_t_1_1-In an hour');
+    await pick('chat-question-q_t_1_3-Walk');
     // A second pick for the same question replaces the first.
-    await tester.tap(find.byKey(const ValueKey('chat-question-q_t_1_3-Drive')));
+    await pick('chat-question-q_t_1_3-Drive');
+    await tester.ensureVisible(send);
     await tester.pump();
     await tester.tap(send);
     await tester.pump();
@@ -409,11 +421,15 @@ void main() {
       'kind': 'answers',
       'answers': [
         {'questionId': 'q_t_1_1', 'value': 'In an hour'},
+        {'questionId': 'q_t_1_2', 'value': 'No preference'},
         {'questionId': 'q_t_1_3', 'value': 'Drive'},
       ],
     });
     expect(request.context.openCardId, _plan.id);
-    expect(find.text('Answers: In an hour, Drive'), findsOneWidget);
+    expect(
+      find.text('Answers: In an hour, No preference, Drive'),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('chat-questions-send')), findsNothing);
   });
 

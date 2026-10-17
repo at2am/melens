@@ -7,6 +7,7 @@ import '../../../core/geo/polyline.dart';
 import '../../agent/data/agent_models.dart';
 import '../data/map_models.dart';
 import 'layer_controller.dart';
+import 'viewport_controller.dart';
 
 part 'map_actions.g.dart';
 
@@ -124,6 +125,25 @@ final class MapActionsState {
   );
 }
 
+/// The map as a turn found it before its first UI action: the layers, what
+/// was highlighted, the route and the camera. Undoing the turn's map changes
+/// puts these back.
+final class MapSnapshot {
+  const MapSnapshot({
+    required this.topic,
+    required this.layers,
+    required this.actions,
+    this.viewport,
+  });
+
+  final MapTopic topic;
+  final Set<MapLayerId> layers;
+  final MapActionsState actions;
+
+  /// The visible region, once the map has reported one.
+  final AgentViewport? viewport;
+}
+
 /// Applies the agent's one-way UI actions to the map (agent-protocol.md,
 /// Rules). The server never waits for a result; the next request context
 /// reports the real state.
@@ -174,6 +194,62 @@ class MapActionsController extends _$MapActionsController {
         bounds: _boundsOf(points),
       ),
     );
+  }
+
+  /// What the map shows now, so a turn's changes can be undone.
+  MapSnapshot capture() {
+    final layers = ref.read(layerControllerProvider);
+    final bbox = ref.read(viewportControllerProvider).bbox;
+    return MapSnapshot(
+      topic: layers.topic,
+      layers: Set.unmodifiable(layers.enabledLayers),
+      actions: state,
+      viewport: bbox == null
+          ? null
+          : AgentViewport(
+              north: bbox.north,
+              south: bbox.south,
+              east: bbox.east,
+              west: bbox.west,
+            ),
+    );
+  }
+
+  /// Puts the layers, highlights, route and camera of [snapshot] back.
+  void restore(MapSnapshot snapshot) {
+    final controller = ref.read(layerControllerProvider.notifier);
+    controller.selectTopic(snapshot.topic);
+    for (final layer in ref.read(layerControllerProvider).availableLayers) {
+      controller.setLayerEnabled(layer, snapshot.layers.contains(layer));
+    }
+    final before = snapshot.actions;
+    state = MapActionsState(
+      highlightedIds: before.highlightedIds,
+      highlightTitles: before.highlightTitles,
+      missingIds: before.missingIds,
+      route: before.route,
+      focus: snapshot.viewport == null
+          ? state.focus
+          : MapFocusRequest(
+              sequence: ++_focusSequence,
+              bounds: snapshot.viewport,
+            ),
+    );
+    _log.fine('Restored the map of an earlier turn');
+  }
+
+  /// Draws the conversation's last route and highlights again when the user
+  /// reopens it from the session list. The layers and camera moves of old
+  /// turns are not replayed: the map has moved on since.
+  void restoreConversation(List<UiAction> actions) {
+    clearRoute();
+    clearHighlights();
+    UiAction? last(UiActionName name) =>
+        actions.reversed.where((action) => action.action == name).firstOrNull;
+    final route = last(UiActionName.drawRoute);
+    final highlight = last(UiActionName.highlightFeatures);
+    if (highlight != null) apply(highlight);
+    if (route != null) apply(route);
   }
 
   /// Removes the drawn route, for the dismiss chip and a new conversation.
