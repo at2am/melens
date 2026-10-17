@@ -114,6 +114,10 @@ reviewed = {
     # Metro train and Yarra Trams service alerts (UC-05), CC BY 4.0, admitted 2026-10-16. The static schedule
     # that places them is reference data and is not itself a map source.
     'victoria.transport.gtfs_realtime': ('verified_open', 'opendata.transport.vic.gov.au'),
+    # City of Melbourne pedestrian counts per minute and their sensor locations (UC-04), CC BY 4.0 per the
+    # publisher's metadata, admitted 2026-10-17 for the pedestrian layer; the counts are placed by the locations.
+    'melbourne.pedestrian.minute': ('verified_open', 'data.melbourne.vic.gov.au'),
+    'melbourne.pedestrian.locations': ('verified_open', 'data.melbourne.vic.gov.au'),
 }
 expected = set(reviewed)
 if not isinstance(registry, list) or len(registry) != len(expected) or {item.get('sourceId') for item in registry} != expected:
