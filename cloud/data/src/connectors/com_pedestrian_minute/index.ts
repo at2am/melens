@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { readFile } from 'node:fs/promises';
 
 import type { Connector, ConnectorInput, ConnectorResult } from '../../core/connector.js';
+import { parseSourceManifest } from '../../core/registry.js';
 import { HttpClient, HttpFailure } from '../../core/http.js';
 import { OdsIncompleteWindow, OpenDataSoftClient } from '../../core/opendatasoft.js';
 import type { PedestrianObservation, SourceRecord } from '../../core/types.js';
@@ -126,6 +128,9 @@ export class PedestrianMinuteConnector implements Connector {
     if (input.sourceId !== SOURCE_ID || input.window.kind !== 'time') {
       return failure(input, 'validation_failed', 'A canonical source ID and UTC time window are required');
     }
+    // Records carry the source's reviewed licence, as the parking connectors do; review_required
+    // until admission, after which the serving views can publish them.
+    const rights = await reviewedRights();
     try {
       const latestUrl = new URL(`/api/explore/v2.1/catalog/datasets/${DATASET_ID}/records`, this.portalUrl);
       latestUrl.searchParams.set('order_by', 'sensing_datetime DESC');
@@ -233,7 +238,7 @@ export class PedestrianMinuteConnector implements Connector {
           source_version_ordinal: null,
           record_status: 'active',
           assertion_kind: 'observation',
-          rights_status: 'review_required',
+          rights_status: rights,
         });
         pedestrianObservations.push({
           batch_id: input.runId,
@@ -303,6 +308,11 @@ function dominates(a: { direction_1?: number | null | undefined; direction_2?: n
   const counts = [a.direction_1, a.direction_2, b.direction_1, b.direction_2];
   if (counts.some((count) => count === null || count === undefined)) return false;
   return a.direction_1! >= b.direction_1! && a.direction_2! >= b.direction_2!;
+}
+
+/** The licence the reviewed manifest declares, read beside the compiled connector. */
+async function reviewedRights() {
+  return parseSourceManifest(JSON.parse(await readFile(new URL('./source.json', import.meta.url), 'utf8'))).license_status;
 }
 
 export function createConnector(options: PedestrianMinuteConnectorOptions = {}): Connector {
