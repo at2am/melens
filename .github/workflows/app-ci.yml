@@ -67,6 +67,18 @@ jobs:
           mkdir -p "$packages" build/ios
           rm -rf build/ios/SourcePackages
           ln -s "$packages" build/ios/SourcePackages
+          # Check the packages out from those clones without asking GitHub for updates: with empty
+          # checkouts, xcodebuild otherwise fetches every package repository, and one dropped connection
+          # on this Mac's link fails the build. Only a Package.resolved commit the clones lack is fetched,
+          # with retries.
+          xcodebuild -resolvePackageDependencies -skipPackageUpdates -onlyUsePackageVersionsFromResolvedFile \
+            -workspace ios/Runner.xcworkspace -scheme Runner -clonedSourcePackagesDirPath build/ios/SourcePackages ||
+            for attempt in 1 2 3; do
+              xcodebuild -resolvePackageDependencies -workspace ios/Runner.xcworkspace -scheme Runner \
+                -clonedSourcePackagesDirPath build/ios/SourcePackages && break
+              [[ $attempt == 3 ]] && exit 1
+              sleep 30
+            done
       - name: Build iOS
         if: matrix.platform == 'ios'
         run: fvm flutter build ios --release --no-codesign --dart-define-from-file=config/example.json
