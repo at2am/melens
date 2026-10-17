@@ -393,6 +393,17 @@ jobs:
             | python3 .github/release/release_config.py --platform mobile \
                 --map-base-url "$map_url" --agent-base-url "$agent_url" --output app/config/mobile-release.json
 
+      # The Swift package clones (firebase-ios-sdk alone is over 1 GB) live outside the workspace, which
+      # checkout empties, so each iOS build reuses them instead of cloning again from GitHub.
+      - name: Reuse the Swift package clones
+        if: matrix.platform == 'ios'
+        working-directory: app
+        run: |
+          packages="$HOME/Library/Caches/melens-release/SourcePackages"
+          mkdir -p "$packages" build/ios
+          rm -rf build/ios/SourcePackages
+          ln -s "$packages" build/ios/SourcePackages
+
       # fvm on the release Mac installs the SDK pinned in .fvmrc once and reuses it.
       - name: Build
         working-directory: app

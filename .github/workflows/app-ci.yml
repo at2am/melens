@@ -58,6 +58,15 @@ jobs:
         env:
           MELENS_ANDROID_KEY_PROPERTIES: ''
         run: fvm flutter build appbundle --release --dart-define-from-file=config/example.json
+      # The Swift package clones (firebase-ios-sdk alone is over 1 GB) live outside the workspace, which
+      # checkout empties, so each iOS build reuses them instead of cloning again from GitHub.
+      - name: Reuse the Swift package clones
+        if: matrix.platform == 'ios'
+        run: |
+          packages="$HOME/Library/Caches/melens-release/SourcePackages"
+          mkdir -p "$packages" build/ios
+          rm -rf build/ios/SourcePackages
+          ln -s "$packages" build/ios/SourcePackages
       - name: Build iOS
         if: matrix.platform == 'ios'
         run: fvm flutter build ios --release --no-codesign --dart-define-from-file=config/example.json
