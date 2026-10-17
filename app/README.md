@@ -152,7 +152,7 @@ Against the deployed service, set `AGENT_BASE_URL` to its Cloud Run URL (`https:
 
 ## Deploying the Web app
 
-A `v*` tag releases the services and the Web app through GitHub Actions ([.github/release/README.md](../.github/release/README.md)); the steps below are the manual path.
+A `v*` tag releases the services, the Web app and the mobile apps through GitHub Actions ([.github/release/README.md](../.github/release/README.md)); the steps below are the manual path for the Web app.
 
 The Web build is served by Firebase Hosting at `https://melens-510012.web.app` (`firebase.json` rewrites every path to `index.html`, so deep links such as `/discover` work). Build against the deployed services and release:
 
@@ -172,6 +172,10 @@ A new origin needs three things before the app works there, none of them done by
 3. The Maps JavaScript API key lists the origin among its allowed referrers (Google Cloud console, Credentials). This is not done by a script.
 
 The site is public and so is the agent behind it: anyone with the link can start anonymous sessions, and only the per-uid rate limit applies.
+
+## Releasing the mobile apps
+
+The release workflow builds Android and iOS on a self-hosted Mac with `e2e/build_mobile_release.py` and uploads them to Google Play internal testing and TestFlight ([.github/release/README.md](../.github/release/README.md#mobile-apps)). The build reads the ignored `config/mobile-release.json` (production, live data, the Cloud Run URLs and the mobile keys) and refuses anything else. Android release builds are signed with the upload key named by `MELENS_ANDROID_KEY_PROPERTIES` (`android/app/build.gradle.kts`); without it they fall back to the debug key, which is enough for `flutter run --release` and which the release script rejects. iOS uses automatic signing for team `ZF5UMMPVX9` and `ios/ExportOptions.plist`. `Info.plist` declares `ITSAppUsesNonExemptEncryption` false (HTTPS only), so TestFlight builds do not wait for the export compliance question. The main `AndroidManifest.xml` requests `INTERNET`; until 2026-10-17 only the debug and profile manifests did, so a release build could not reach the services.
 
 ## Web
 

@@ -1,0 +1,63 @@
+# Check the Flutter app on pull requests and on main: analyze, tests, and a release compile for Android
+# and iOS. Runs on the self-hosted release Mac (.github/release/README.md, Mobile apps). Nothing is
+# signed, uploaded or deployed, and no cloud credentials are used.
+name: App CI
+
+on:
+  pull_request:
+    paths: ['app/**', '.github/workflows/app-ci.yml']
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/app-ci.yml']
+  workflow_dispatch:
+
+# A new push to a branch replaces its running check; the Mac has one runner for this repository.
+concurrency:
+  group: app-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Code from a fork never runs on the self-hosted runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, ARM64]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - run: fvm install
+      - run: fvm flutter pub get
+      - run: fvm flutter analyze
+      - run: fvm flutter test
+      - name: Release script tests
+        working-directory: app/e2e
+        run: python3 -m unittest -q test_provenance
+
+  build:
+    needs: test
+    runs-on: [self-hosted, macOS, ARM64]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [android, ios]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - run: fvm install
+      - run: fvm flutter pub get
+      # The committed example configuration: a compile check only. The Android build is debug-signed
+      # because no upload key is named here.
+      - name: Build Android
+        if: matrix.platform == 'android'
+        env:
+          MELENS_ANDROID_KEY_PROPERTIES: ''
+        run: fvm flutter build appbundle --release --dart-define-from-file=config/example.json
+      - name: Build iOS
+        if: matrix.platform == 'ios'
+        run: fvm flutter build ios --release --no-codesign --dart-define-from-file=config/example.json

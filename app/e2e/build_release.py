@@ -42,8 +42,8 @@ def cloud_url(value):
     return value
 
 
-def release_settings():
-    config = APP / "config" / "cloud-release.json"
+def production_settings(config):
+    """Check a release configuration (Web or mobile) and return its values."""
     ignored = subprocess.run(["git", "check-ignore", "--quiet", str(config)], cwd=APP.parent,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
     if ignored.returncode != 0:
@@ -57,6 +57,12 @@ def release_settings():
         raise ValueError("The release configuration must use the fixed Firebase project.")
     cloud_url(settings.get("MAP_BASE_URL"))
     cloud_url(settings.get("AGENT_BASE_URL"))
+    return settings
+
+
+def release_settings():
+    config = APP / "config" / "cloud-release.json"
+    settings = production_settings(config)
     project = json.loads((APP / ".firebaserc").read_text())
     projects = project.get("projects") if isinstance(project, dict) else None
     if not isinstance(projects, dict) or projects.get("default") != PROJECT:

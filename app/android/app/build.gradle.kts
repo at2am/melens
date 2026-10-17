@@ -1,8 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// The release upload key stays outside the repository. MELENS_ANDROID_KEY_PROPERTIES names a
+// key.properties with storeFile (relative to that file), storePassword, keyAlias and keyPassword
+// (.github/release/README.md). Without it a release build is signed with the debug key, so
+// `flutter run --release` still works; app/e2e/build_mobile_release.py refuses such a bundle.
+val uploadKey = Properties()
+System.getenv("MELENS_ANDROID_KEY_PROPERTIES")?.takeIf { it.isNotEmpty() }?.let { path ->
+    val keyFile = file(path)
+    keyFile.inputStream().use { uploadKey.load(it) }
+    uploadKey.setProperty("storeFile", keyFile.parentFile.resolve(uploadKey.getProperty("storeFile")).path)
+}
+val hasUploadKey = !uploadKey.isEmpty
 
 android {
     namespace = "com.at2am.melens"
@@ -29,11 +43,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("upload") {
+                storeFile = file(uploadKey.getProperty("storeFile"))
+                storePassword = uploadKey.getProperty("storePassword")
+                keyAlias = uploadKey.getProperty("keyAlias")
+                keyPassword = uploadKey.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasUploadKey) "upload" else "debug")
         }
     }
 }

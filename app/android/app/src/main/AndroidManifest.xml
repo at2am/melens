@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The map and agent services; the debug and profile manifests alone left release builds offline. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Melens"
         android:name="${applicationName}"

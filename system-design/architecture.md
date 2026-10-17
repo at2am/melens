@@ -81,6 +81,7 @@ Agent tools and cards use the same identity: a `featureId` in [tools.md](tools.m
 - **Web first.** Firebase Hosting is the submission target. Shared data/state does not prove identical native rendering or 3D support; acceptance is recorded per platform.
 - **P0 first.** G0 preparation, G1 development preview, G2 real P0 map, G3 full project P0 acceptance are separate. News/area expansion and optional H3/3D follow the documented gates; counts alone do not prove anomaly acceptance, and roads alone do not prove all transit acceptance.
 - **Supporting services.** Secret Manager supplies restricted keys; Cloud Build deploys; Cloud Scheduler triggers ingestion. No real secret enters committed configuration.
+- **Releases.** A `v*` tag releases the services, the Web app and the mobile apps through GitHub Actions ([.github/release/README.md](../.github/release/README.md)). The Android and iOS builds run on a self-hosted Mac that keeps the signing keys out of GitHub, and go to Google Play internal testing and TestFlight; their Firebase and Maps keys come from Secret Manager.
 
 ## Deployment constraints
 
