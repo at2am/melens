@@ -85,6 +85,39 @@ Future<void> _show(
 }
 
 void main() {
+  testWidgets('the embedded results list shows every row, and a group row '
+      'names its layer and count', (tester) async {
+    final items = _itemVariants();
+    final aggregate = items.whereType<AggregateMapItem>().first;
+    await _show(
+      tester,
+      SingleChildScrollView(
+        child: MapObjectList(
+          items: items,
+          selectedItemId: null,
+          onSelected: (_) {},
+          embedded: true,
+        ),
+      ),
+    );
+    expect(find.text('On the map'), findsOneWidget);
+    // No inner scroll box: every row is laid out in the page.
+    expect(
+      find.byType(ListTile, skipOffstage: false),
+      findsNWidgets(items.length),
+    );
+    final value = aggregate.details.metric.value!;
+    expect(
+      find.textContaining(
+        RegExp(
+          '· ${value.toStringAsFixed(0)} ${aggregate.details.metric.unit}\$',
+        ),
+      ),
+      findsWidgets,
+    );
+    expect(find.text(aggregate.title), findsNothing);
+  });
+
   testWidgets('fake map exposes exact count semantics and original selection', (
     tester,
   ) async {

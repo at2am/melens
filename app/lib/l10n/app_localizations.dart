@@ -547,7 +547,7 @@ abstract class AppLocalizations {
   /// Object list provides exact counts and keyboard selection independently of platform-map interaction.
   ///
   /// In en, this message translates to:
-  /// **'Map objects — keyboard accessible'**
+  /// **'On the map'**
   String get mapSurfaceObjectList;
 
   /// Count of actual records represented by this supplied aggregate, not unique people or the entire source population.
