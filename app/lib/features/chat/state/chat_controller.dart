@@ -60,10 +60,8 @@ class ChatController extends _$ChatController {
     final aboutPlan = state.pendingQuestion?.planCardId;
     final normalised = switch (input) {
       TextTurnInput(:final text) => TurnInput.text(text: text.trim()),
-      RefineTurnInput(:final cardId, :final text) => TurnInput.refine(
-        cardId: cardId,
-        text: text.trim(),
-      ),
+      RefineTurnInput(:final cardId, :final text, :final planId) =>
+        TurnInput.refine(cardId: cardId, text: text.trim(), planId: planId),
       _ => input,
     };
     final sent = normalised is TextTurnInput || normalised is RefineTurnInput
@@ -174,10 +172,11 @@ class ChatController extends _$ChatController {
   }
 
   /// The next message asks the agent to change [card], a plan of this
-  /// session, instead of starting a new request.
-  void startRefine(AgentCard card) {
+  /// session or the card of the saved plan [planId], instead of starting a
+  /// new request.
+  void startRefine(AgentCard card, {String? planId}) {
     if (card.type != CardType.plan) return;
-    state = state.copyWith(refining: card);
+    state = state.copyWith(refining: card, refiningPlanId: planId);
   }
 
   /// The next message is an ordinary one again.
@@ -188,7 +187,7 @@ class ChatController extends _$ChatController {
       send(TurnInput.answer(questionId: question.id, value: option));
 
   /// Answers several questions of the last turn at once, for example the
-  /// questions the agent asked about the plan it showed. A single answer
+  /// questions the agent asked to make or change a plan. A single answer
   /// goes as an ordinary one.
   Future<void> answerAll(List<QuestionAnswer> answers) {
     if (answers.isEmpty) return Future.value();
@@ -266,7 +265,9 @@ class ChatController extends _$ChatController {
       if (!ref.mounted || generation != _generation) return;
       state = state.copyWith(
         isRestoring: false,
-        clearRefining: true,
+        // A saved plan's card is changed in whichever session is open, such
+        // as the one the chat reopens when it first shows.
+        clearRefining: state.refiningPlanId == null,
         sessionId: detail.session.id,
         sessionTitle: detail.session.title,
         turns: [

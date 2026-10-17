@@ -52,7 +52,10 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
     async run(turn: TurnContext): Promise<StoredTurn> {
       const registry = new TurnRegistry({ turnId: turn.turnId, uid: turn.uid, request: turn.request, sink: turn.sink,
         signal: turn.signal, clock, ...(options.log === undefined ? {} : { log: options.log }) });
-      if (turn.planCard !== undefined) registry.rememberCard(turn.planCard);
+      if (turn.planCard !== undefined) {
+        registry.rememberCard(turn.planCard);
+        registry.basePlan = turn.planCard;
+      }
       const tools = toolSpecs(options.tools).map((spec) => buildTool(spec, registry));
       let streamedText = false;
       let answer = '';

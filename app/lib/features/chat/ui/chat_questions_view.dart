@@ -4,11 +4,11 @@ import '../../../l10n/app_localizations.dart';
 import '../../agent/data/agent_models.dart';
 
 /// The questions a turn asked. One question shows a button per option and a
-/// tap answers it. Several questions (a plan turn asks up to three about the
-/// plan it showed: when, how long, how) show their options as choices; the
-/// user picks for any of them and sends the picks together, so the next
-/// turn revises the plan once for all of them. While the questions are not
-/// pending, only their text shows.
+/// tap answers it. Several questions (the agent asks up to three before it
+/// makes or changes a plan: when, how long, how) show their options as
+/// choices; the user picks for any of them and sends the picks together, so
+/// the next turn makes or revises the plan once for all of them. While the
+/// questions are not pending, only their text shows.
 class ChatQuestionsView extends StatefulWidget {
   const ChatQuestionsView({
     required this.questions,
@@ -81,16 +81,21 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
     }
     final canAnswer = widget.active && widget.onAnswers != null;
     final aboutPlan = questions.any((question) => question.planCardId != null);
+    // Asked before there is a plan: the answers make it.
+    final beforePlan =
+        !aboutPlan && questions.any((question) => question.forPlan);
     return Column(
       key: const ValueKey('chat-questions'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 4),
-        if (aboutPlan && canAnswer)
+        if ((aboutPlan || beforePlan) && canAnswer)
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
-              strings.chatQuestionsAboutPlan,
+              beforePlan
+                  ? strings.chatQuestionsBeforePlan
+                  : strings.chatQuestionsAboutPlan,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -129,7 +134,11 @@ class _ChatQuestionsViewState extends State<ChatQuestionsView> {
               key: const ValueKey('chat-questions-send'),
               onPressed: _picked.isEmpty ? null : _send,
               icon: const Icon(Icons.auto_fix_high, size: 18),
-              label: Text(strings.chatQuestionsSend),
+              label: Text(
+                beforePlan
+                    ? strings.chatQuestionsMakePlan
+                    : strings.chatQuestionsSend,
+              ),
             ),
           ),
           if (questions.any((question) => question.allowFreeText))

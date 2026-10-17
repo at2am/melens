@@ -29,20 +29,27 @@ class SavedPlans extends _$SavedPlans {
   @override
   Future<List<SavedPlan>> build() => ref.watch(plansClientProvider).list();
 
-  /// Keeps the plan [card] of [sessionId] and puts it first. Throws the
+  /// Keeps the plan [card] of [sessionId] and puts it first, or in the
+  /// place of the saved plan [replaces], which it removes. Throws the
   /// [AgentClientException] family for the caller to report.
   Future<SavedPlan> save({
     required String sessionId,
     required AgentCard card,
+    String? replaces,
   }) async {
     final plan = await ref
         .read(plansClientProvider)
-        .save(sessionId: sessionId, cardId: card.id);
+        .save(sessionId: sessionId, cardId: card.id, replaces: replaces);
     if (!ref.mounted) return plan;
     final current = state.value;
     if (current == null) {
       // The list never loaded: load it again rather than show one plan.
       ref.invalidateSelf();
+    } else if (current.any((old) => old.id == replaces)) {
+      state = AsyncData([
+        for (final old in current)
+          if (old.id == replaces) plan else if (old.id != plan.id) old,
+      ]);
     } else {
       state = AsyncData([
         plan,
@@ -53,19 +60,35 @@ class SavedPlans extends _$SavedPlans {
     return plan;
   }
 
+  /// Keeps the user's own edits of plan [id]: a new [title], or the [stops]
+  /// to keep in their new order. Throws the [AgentClientException] family
+  /// for the caller to report.
+  Future<SavedPlan> edit(String id, {String? title, List<int>? stops}) async {
+    final plan = await ref
+        .read(plansClientProvider)
+        .edit(id, title: title, stops: stops);
+    _keep(plan);
+    return plan;
+  }
+
   /// Reads the live parking around stop [index] of plan [id] again and
   /// keeps the plan the service returns. Throws the [AgentClientException]
   /// family for the caller to report.
   Future<SavedPlan> refreshStop(String id, int index) async {
     final plan = await ref.read(plansClientProvider).refreshStop(id, index);
-    if (!ref.mounted) return plan;
+    _keep(plan);
+    return plan;
+  }
+
+  /// Puts [plan], as the service returned it, in place of its old copy.
+  void _keep(SavedPlan plan) {
+    if (!ref.mounted) return;
     final current = state.value;
     if (current != null) {
       state = AsyncData([
         for (final old in current) old.id == plan.id ? plan : old,
       ]);
     }
-    return plan;
   }
 
   /// Removes the plan at once and then on the service; a failure puts it

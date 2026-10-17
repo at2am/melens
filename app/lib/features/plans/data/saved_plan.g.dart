@@ -21,6 +21,7 @@ SavedPlan _$SavedPlanFromJson(Map<String, dynamic> json) =>
           'card',
           (v) => AgentCard.fromJson(v as Map<String, dynamic>),
         ),
+        updatedAt: $checkedConvert('updatedAt', (v) => v as String?),
         route: $checkedConvert('route', (v) => v as Map<String, dynamic>?),
       );
       return val;
@@ -31,6 +32,7 @@ Map<String, dynamic> _$SavedPlanToJson(SavedPlan instance) => <String, dynamic>{
   'sessionId': instance.sessionId,
   'turnId': instance.turnId,
   'savedAt': instance.savedAt,
+  'updatedAt': ?instance.updatedAt,
   'card': instance.card.toJson(),
   'route': ?instance.route,
 };

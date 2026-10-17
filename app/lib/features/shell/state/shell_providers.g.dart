@@ -61,6 +61,68 @@ abstract class _$CardItemRequests extends $Notifier<CardItemRequest?> {
   }
 }
 
+/// Asks the shell to open the agent chat, for a page above the tabs such as
+/// a saved plan; each request has a new sequence.
+
+@ProviderFor(ChatOpenRequests)
+final chatOpenRequestsProvider = ChatOpenRequestsProvider._();
+
+/// Asks the shell to open the agent chat, for a page above the tabs such as
+/// a saved plan; each request has a new sequence.
+final class ChatOpenRequestsProvider
+    extends $NotifierProvider<ChatOpenRequests, int> {
+  /// Asks the shell to open the agent chat, for a page above the tabs such as
+  /// a saved plan; each request has a new sequence.
+  ChatOpenRequestsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatOpenRequestsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatOpenRequestsHash();
+
+  @$internal
+  @override
+  ChatOpenRequests create() => ChatOpenRequests();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$chatOpenRequestsHash() => r'e65fcfd95854df4820c3ad701e5fd8f88da66242';
+
+/// Asks the shell to open the agent chat, for a page above the tabs such as
+/// a saved plan; each request has a new sequence.
+
+abstract class _$ChatOpenRequests extends $Notifier<int> {
+  int build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<int, int>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<int, int>,
+              int,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(AppThemeSetting)
 final appThemeSettingProvider = AppThemeSettingProvider._();
 

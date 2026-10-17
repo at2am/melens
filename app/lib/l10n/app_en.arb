@@ -3004,6 +3004,10 @@
   "@planSaveLimit": {
     "description": "Error under a plan card when the user already has the most saved plans."
   },
+  "planUpdateSaved": "Update saved plan",
+  "@planUpdateSaved": {
+    "description": "Button under a revised plan card that replaces the saved plan it revises."
+  },
   "plansSectionTitle": "Saved plans",
   "@plansSectionTitle": {
     "description": "Heading of the saved plans on the Home tab."
@@ -3041,6 +3045,43 @@
         "type": "String"
       }
     }
+  },
+  "planUpdatedOn": "Updated {date}",
+  "@planUpdatedOn": {
+    "description": "When a saved plan was last edited or replaced. {date} is a Melbourne date and time.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "planChangeWithAgent": "Change with Melens",
+  "@planChangeWithAgent": {
+    "description": "Button on a saved plan that opens the chat to have the agent change the plan."
+  },
+  "planEdit": "Edit plan",
+  "@planEdit": {
+    "description": "Tooltip of the button on a saved plan, and title of the page, where the user renames it and removes or reorders its stops."
+  },
+  "planEditName": "Name",
+  "@planEditName": {
+    "description": "Label of the plan name field when editing a saved plan."
+  },
+  "planEditStops": "Drag to reorder the stops, or remove one. The route is drawn again for the new order.",
+  "@planEditStops": {
+    "description": "Hint above the stops when editing a saved plan."
+  },
+  "planEditRemoveStop": "Remove stop",
+  "@planEditRemoveStop": {
+    "description": "Tooltip of the button that removes one stop while editing a saved plan."
+  },
+  "planEditSave": "Save",
+  "@planEditSave": {
+    "description": "Button that keeps the edits of a saved plan."
+  },
+  "planEditFailed": "Your changes could not be saved. Try again.",
+  "@planEditFailed": {
+    "description": "Shown when saving the edits of a saved plan failed."
   },
   "planMissing": "This plan is no longer saved.",
   "@planMissing": {
@@ -3082,6 +3123,14 @@
   "chatQuestionsSend": "Update the plan",
   "@chatQuestionsSend": {
     "description": "Sends the answers chosen under several questions about a plan."
+  },
+  "chatQuestionsBeforePlan": "A few questions before I make your plan. Answer any of them.",
+  "@chatQuestionsBeforePlan": {
+    "description": "Above several questions the agent asked before it makes a plan."
+  },
+  "chatQuestionsMakePlan": "Make the plan",
+  "@chatQuestionsMakePlan": {
+    "description": "Sends the answers chosen under several questions the agent asked before it makes a plan."
   },
   "chatQuestionsFreeText": "Or type what you have in mind below.",
   "@chatQuestionsFreeText": {

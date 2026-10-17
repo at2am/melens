@@ -460,6 +460,7 @@ AgentCard _$AgentCardFromJson(Map<String, dynamic> json) =>
             unknownValue: JsonKey.nullForUndefinedEnumValue,
           ),
         ),
+        revises: $checkedConvert('revises', (v) => v as String?),
         attribution: $checkedConvert(
           'attribution',
           (v) => v as Map<String, dynamic>?,
@@ -474,6 +475,7 @@ Map<String, dynamic> _$AgentCardToJson(AgentCard instance) => <String, dynamic>{
   'title': instance.title,
   'intro': ?instance.intro,
   'travel_mode': ?_$TravelModeEnumMap[instance.travelMode],
+  'revises': ?instance.revises,
   'items': instance.items.map((e) => e.toJson()).toList(),
   'attribution': ?instance.attribution,
 };
@@ -629,6 +631,7 @@ AgentQuestion _$AgentQuestionFromJson(Map<String, dynamic> json) =>
         ),
         allowFreeText: $checkedConvert('allowFreeText', (v) => v as bool),
         planCardId: $checkedConvert('planCardId', (v) => v as String?),
+        forPlan: $checkedConvert('forPlan', (v) => v as bool? ?? false),
       );
       return val;
     });
@@ -640,6 +643,7 @@ Map<String, dynamic> _$AgentQuestionToJson(AgentQuestion instance) =>
       'options': instance.options,
       'allowFreeText': instance.allowFreeText,
       'planCardId': ?instance.planCardId,
+      'forPlan': instance.forPlan,
     };
 
 TraceEntry _$TraceEntryFromJson(Map<String, dynamic> json) =>
@@ -910,6 +914,7 @@ RefineTurnInput _$RefineTurnInputFromJson(Map<String, dynamic> json) =>
       final val = RefineTurnInput(
         cardId: $checkedConvert('cardId', (v) => v as String),
         text: $checkedConvert('text', (v) => v as String),
+        planId: $checkedConvert('planId', (v) => v as String?),
         $type: $checkedConvert('kind', (v) => v as String?),
       );
       return val;
@@ -919,6 +924,7 @@ Map<String, dynamic> _$RefineTurnInputToJson(RefineTurnInput instance) =>
     <String, dynamic>{
       'cardId': instance.cardId,
       'text': instance.text,
+      'planId': ?instance.planId,
       'kind': instance.$type,
     };
 

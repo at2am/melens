@@ -47,6 +47,18 @@ class _AppShellState extends ConsumerState<AppShell> {
           next.highlightedIds != previous?.highlightedIds;
       if (focused || highlighted) _showMap();
     });
+    // A page above the tabs, such as a saved plan, opens the chat once it has
+    // closed and the tabs show again.
+    ref.listenManual(chatOpenRequestsProvider, (previous, next) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (MediaQuery.sizeOf(context).width >= _dockedChatWidth) {
+          setState(() => _dockedChatOpen = true);
+        } else {
+          _showChatSheet();
+        }
+      });
+    });
   }
 
   void _showMap() => widget.navigationShell.goBranch(AppBranch.discover.index);

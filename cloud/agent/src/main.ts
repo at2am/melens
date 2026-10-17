@@ -66,7 +66,7 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
       : createFirestoreFeedStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
   // Saved plans (UC-03) likewise; they copy cards out of the session store.
   const plans = new PlanService({ sessions: store, writeLimiter: createRateLimiter(PLAN_LIMITS.writesPerHour),
-    refreshParking: (request) => refreshStopParking(tools, request),
+    refreshParking: (request) => refreshStopParking(tools, request), routes: tools.routes,
     store: development ? new InMemoryPlanStore()
       : createFirestorePlanStore({ projectId: config.projectId, databaseId: config.firestoreDatabase }) });
   const server = createAgentHttpServer({ store, verifier, runner, events, feeds, plans, rateLimiter: createRateLimiter(config.turnsPerHour),

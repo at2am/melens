@@ -415,9 +415,11 @@ const showCard = (deps: ToolDependencies) => defineTool({
     const placeIds = items.flatMap((item) => item.place_id === undefined ? [] : [item.place_id]);
     const attribution = placeIds.length === 0 ? undefined
       : { google_maps: placeIds.map((placeId) => ({ place_id: placeId, maps_uri: turn.places.get(placeId)?.maps_uri ?? null })) };
+    // A plan shown while the turn changes one is its revision; the app offers to update a saved plan with it.
+    const revises = plan ? turn.basePlan?.id : undefined;
     const card = { id: turn.nextCardId(), type: args.type, title: args.title, ...(args.intro === undefined ? {} : { intro: args.intro }),
       ...(plan && args.travel_mode !== undefined ? { travel_mode: args.travel_mode } : {}),
-      items, ...(attribution === undefined ? {} : { attribution }) };
+      ...(revises === undefined ? {} : { revises }), items, ...(attribution === undefined ? {} : { attribution }) };
     turn.cards.push(card);
     turn.sink.emit({ event: 'card', stepId: step.id, card });
     return { card_id: card.id, ...(parking === undefined ? {} : { parking,
@@ -474,26 +476,30 @@ const askUser = defineTool({
   name: 'ask_user',
   description: 'Ask the user one question, only when the request is ambiguous in a way the request context cannot resolve (for example, '
     + 'which of several gardens or anomaly markers they mean), or when a required input has no sensible default. Do not ask about '
-    + 'preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. After you showed a plan '
-    + 'card in this turn you may ask up to three questions about it (when they leave, how long they have, how they travel), all in the same '
-    + 'response. Calling this ends your turn.',
+    + 'preferences you can assume, and do not ask for confirmation: act, state your assumption, and let the user adjust. A plan is the '
+    + 'exception: before you make or change a plan you may ask up to three questions about what it leaves open (when they leave, how long '
+    + 'they have, how they travel, what they enjoy), with for_plan true, all in the same response; you plan once from the answers. '
+    + 'Calling this ends your turn.',
   status: 'Asking you a question',
   readOnly: false,
   schema: z.strictObject({
     question: z.string().min(1).max(200),
     options: z.array(z.string().min(1).max(40)).min(2).max(4),
     allow_free_text: z.boolean().optional().describe('Default true'),
+    for_plan: z.boolean().optional().describe('True when the question gathers what you need to make or change a plan'),
   }),
   detail(args) { return args.question; },
   async run(args, turn, step) {
-    // Questions after a plan are about that plan: their answers come back with the whole card (agent-protocol.md, Questions about a plan).
-    const plan = turn.cards.findLast((card) => card.type === 'plan');
-    const limit = plan === undefined ? QUESTION_LIMITS.perTurn : QUESTION_LIMITS.perPlanTurn;
+    // Questions to make or change a plan come together, and their answers come back at once (agent-protocol.md, Questions for a plan).
+    // They are about the plan the turn showed or changes, which then comes back with the answers in full.
+    const plan = turn.cards.findLast((card) => card.type === 'plan') ?? turn.basePlan ?? undefined;
+    const forPlan = args.for_plan === true || plan !== undefined;
+    const limit = forPlan ? QUESTION_LIMITS.perPlanTurn : QUESTION_LIMITS.perTurn;
     if (turn.questions.length >= limit) {
-      return toolError('invalid_arguments', plan === undefined ? 'Ask one question per turn.' : `Ask at most ${limit} questions about a plan.`);
+      return toolError('invalid_arguments', forPlan ? `Ask at most ${limit} questions for a plan.` : 'Ask one question per turn.');
     }
     const question = { id: turn.nextQuestionId(), text: args.question, options: args.options, allowFreeText: args.allow_free_text ?? true,
-      ...(plan === undefined ? {} : { planCardId: plan.id }) };
+      ...(plan === undefined ? {} : { planCardId: plan.id }), ...(forPlan ? { forPlan: true as const } : {}) };
     turn.questions.push(question);
     turn.sink.emit({ event: 'question', stepId: step.id, question });
     return { question_id: question.id };

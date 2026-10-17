@@ -158,16 +158,17 @@ sealed class TurnInput with _$TurnInput {
     @JsonKey(required: true) required String value,
   }) = AnswerTurnInput;
 
-  /// Asks the agent to change a plan card of this session; photos may go
-  /// with it as with a text input.
+  /// Asks the agent to change a plan card of this session, or the card of
+  /// the saved plan [planId]; photos may go with it as with a text input.
   @FreezedUnionValue('refine')
   const factory TurnInput.refine({
     @JsonKey(required: true) required String cardId,
     @JsonKey(required: true) required String text,
+    @JsonKey(includeIfNull: false) String? planId,
   }) = RefineTurnInput;
 
   /// Answers several questions of the previous turn at once: the questions
-  /// a plan turn asked about that plan (UC-03).
+  /// the agent asked to make or change a plan (UC-03).
   @FreezedUnionValue('answers')
   const factory TurnInput.answers({
     @JsonKey(required: true) required List<QuestionAnswer> answers,
@@ -588,6 +589,7 @@ final class AgentCard {
     required this.items,
     this.intro,
     this.travelMode,
+    this.revises,
     this.attribution,
   });
 
@@ -611,6 +613,10 @@ final class AgentCard {
     unknownEnumValue: JsonKey.nullForUndefinedEnumValue,
   )
   final TravelMode? travelMode;
+
+  /// The plan card this revised plan replaces, when the turn changed one.
+  @JsonKey(includeIfNull: false)
+  final String? revises;
 
   @JsonKey(required: true)
   final List<CardItem> items;
@@ -769,6 +775,7 @@ final class AgentQuestion {
     required this.options,
     required this.allowFreeText,
     this.planCardId,
+    this.forPlan = false,
   });
 
   @JsonKey(required: true)
@@ -783,9 +790,14 @@ final class AgentQuestion {
   @JsonKey(required: true)
   final bool allowFreeText;
 
-  /// The plan card of the same turn this question refines (UC-03).
+  /// The plan card this question is about (UC-03): its answers change it.
   @JsonKey(includeIfNull: false)
   final String? planCardId;
+
+  /// Asked to make or change a plan (UC-03): the answers go back together
+  /// and the agent plans once. Without [planCardId] they make a new plan.
+  @JsonKey(defaultValue: false)
+  final bool forPlan;
 
   factory AgentQuestion.fromJson(Map<String, dynamic> json) =>
       _$AgentQuestionFromJson(json);

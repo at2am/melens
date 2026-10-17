@@ -11,6 +11,8 @@ import '../../agent/data/agent_models.dart';
 import '../../cards/ui/card_registry.dart';
 import '../../map/data/map_models.dart';
 import '../../map/state/selection_controller.dart';
+import '../../plans/data/saved_plan.dart';
+import '../../plans/state/plans_providers.dart';
 import '../data/chat_photos.dart';
 import '../state/chat_controller.dart';
 import '../state/chat_draft.dart';
@@ -89,7 +91,11 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
           .send(
             refining == null
                 ? TurnInput.text(text: text)
-                : TurnInput.refine(cardId: refining.id, text: text),
+                : TurnInput.refine(
+                    cardId: refining.id,
+                    text: text,
+                    planId: ref.read(chatControllerProvider).refiningPlanId,
+                  ),
             photos: photos,
           ),
     );
@@ -101,16 +107,30 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     unawaited(
       ref
           .read(chatControllerProvider.notifier)
-          .send(TurnInput.refine(cardId: plan.id, text: text)),
+          .send(
+            TurnInput.refine(
+              cardId: plan.id,
+              text: text,
+              planId: ref.read(chatControllerProvider).refiningPlanId,
+            ),
+          ),
     );
   }
 
-  /// The title of a plan card the conversation shows, by id.
-  static String? _planTitle(ChatState chat, String cardId) {
+  /// The title of a plan card the conversation shows, or of a saved plan's
+  /// card, by id.
+  static String? _planTitle(
+    ChatState chat,
+    List<SavedPlan>? saved,
+    String cardId,
+  ) {
     for (final turn in chat.turns) {
       for (final card in turn.cards) {
         if (card.id == cardId) return card.title;
       }
+    }
+    for (final plan in saved ?? const <SavedPlan>[]) {
+      if (plan.card.id == cardId) return plan.card.title;
     }
     return null;
   }
@@ -315,10 +335,14 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                         onCardItemTap: widget.onCardItemTap,
                         onOpenSource: widget.onOpenSource,
                         refinedPlanTitle: switch (turn.input) {
-                          RefineTurnInput(:final cardId) => _planTitle(
-                            chat,
-                            cardId,
-                          ),
+                          RefineTurnInput(:final cardId, :final planId) =>
+                            _planTitle(
+                              chat,
+                              planId == null
+                                  ? null
+                                  : ref.watch(savedPlansProvider).value,
+                              cardId,
+                            ),
                           _ => null,
                         },
                       );

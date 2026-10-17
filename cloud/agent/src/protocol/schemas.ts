@@ -32,8 +32,11 @@ export const turnInputSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('area'), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }),
   z.strictObject({ kind: z.literal('analyse'), featureId: identifierSchema }),
   z.strictObject({ kind: z.literal('answer'), questionId: identifierSchema, value: z.string().trim().min(1).max(200) }),
-  /** The user asks to change a plan card of this session: what to change, and which card. */
-  z.strictObject({ kind: z.literal('refine'), cardId: identifierSchema, text: z.string().trim().min(1).max(2_000) }),
+  /**
+   * The user asks to change a plan card: what to change, and which card. The card is one of this session's, or the card
+   * of the saved plan `planId` when the user changes a plan they kept.
+   */
+  z.strictObject({ kind: z.literal('refine'), cardId: identifierSchema, text: z.string().trim().min(1).max(2_000), planId: identifierSchema.optional() }),
   /** The user answers several questions of the previous turn at once: the questions a plan turn asked about that plan. */
   z.strictObject({ kind: z.literal('answers'), answers: z.array(z.strictObject({ questionId: identifierSchema, value: z.string().trim().min(1).max(200) }))
     .min(1).max(3).refine((answers) => new Set(answers.map((answer) => answer.questionId)).size === answers.length, 'One answer per question') }),
@@ -162,6 +165,8 @@ export const cardSchema = z.strictObject({
   intro: z.string().max(300).optional(),
   /** A plan's travel mode, when the plan states one. */
   travel_mode: travelModeSchema.optional(),
+  /** Written by code, never by the model: the plan card this revised plan replaces, when the turn changed one. */
+  revises: identifierSchema.optional(),
   items: z.array(cardItemSchema).min(1).max(13),
   attribution: z.record(z.string(), z.unknown()).optional(),
 });
@@ -191,12 +196,17 @@ export type StopReason = z.infer<typeof stopReasonSchema>;
 export const questionSchema = z.strictObject({
   id: identifierSchema, text: z.string().min(1).max(200),
   options: z.array(z.string().min(1).max(40)).min(2).max(4), allowFreeText: z.boolean(),
-  /** The plan card of the same turn this question refines (UC-03); its answer changes that plan. */
+  /** The plan card this question is about (UC-03): the plan the turn changes or showed; its answer changes that plan. */
   planCardId: identifierSchema.optional(),
+  /**
+   * Asked to make or change a plan (UC-03): the agent asks first, up to three questions together, and plans once from the
+   * answers. Without `planCardId` the answers make a new plan.
+   */
+  forPlan: z.literal(true).optional(),
 });
 export type Question = z.infer<typeof questionSchema>;
 
-/** A turn asks one question, or up to this many about the plan it just showed. */
+/** A turn asks one question, or up to this many to make or change a plan. */
 export const QUESTION_LIMITS = { perTurn: 1, perPlanTurn: 3 } as const;
 
 /** Where a tool call is: `running` when it starts, then `done` or `failed` (a tool error) when it ends. */

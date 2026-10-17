@@ -14,8 +14,17 @@ abstract interface class PlansClient {
 
   /// `POST /v1/plans`: keeps the plan card [cardId] of [sessionId]. The
   /// service copies the card from the stored turn; saving it again returns
-  /// the same plan.
-  Future<SavedPlan> save({required String sessionId, required String cardId});
+  /// the same plan. With [replaces] the card takes that saved plan's place.
+  Future<SavedPlan> save({
+    required String sessionId,
+    required String cardId,
+    String? replaces,
+  });
+
+  /// `PATCH /v1/plans/{id}`: the user's own edits, a new [title] or the
+  /// [stops] to keep (indices from 0) in their new order. Returns the plan
+  /// as kept, with its route drawn again or dropped.
+  Future<SavedPlan> edit(String id, {String? title, List<int>? stops});
 
   /// `DELETE /v1/plans/{id}`.
   Future<void> remove(String id);
@@ -57,11 +66,24 @@ final class HttpPlansClient implements PlansClient {
   Future<SavedPlan> save({
     required String sessionId,
     required String cardId,
+    String? replaces,
   }) async {
     final json = await _transport.json(
       'POST',
       const ['v1', 'plans'],
-      body: {'sessionId': sessionId, 'cardId': cardId},
+      body: {'sessionId': sessionId, 'cardId': cardId, 'replaces': ?replaces},
+    );
+    return _decode(
+      () => SavedPlan.fromJson(json!['plan'] as Map<String, dynamic>),
+    );
+  }
+
+  @override
+  Future<SavedPlan> edit(String id, {String? title, List<int>? stops}) async {
+    final json = await _transport.json(
+      'PATCH',
+      ['v1', 'plans', id],
+      body: {'title': ?title, 'stops': ?stops},
     );
     return _decode(
       () => SavedPlan.fromJson(json!['plan'] as Map<String, dynamic>),
