@@ -1,21 +1,26 @@
 {
   "source_id": "melbourne.pedestrian.minute",
-  "legacy_ids": ["pedestrian-live", "com.pedestrian.live"],
+  "legacy_ids": [
+    "pedestrian-live",
+    "com.pedestrian.live"
+  ],
   "provider": "City of Melbourne",
   "dataset_title": "Pedestrian Counting System - Past Hour (counts per minute)",
   "landing_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/",
   "api_endpoint": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-past-hour-counts-per-minute/records",
   "topic": "pedestrian",
   "scope": "city",
-  "coverage_area_refs": [],
-  "coverage_from": null,
+  "coverage_area_refs": [
+    "com_municipal:1:2008-07-01"
+  ],
+  "coverage_from": "2026-10-17T02:00:00Z",
   "coverage_to": null,
   "cadence_seconds": 900,
   "check_interval_seconds": 900,
   "requires_monitoring": true,
-  "license_status": "review_required",
+  "license_status": "verified_open",
   "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
-  "access_status": "candidate",
+  "access_status": "active",
   "record_granularity": "sensor_minute",
   "connector_owner": "melens integration",
   "admission_evidence": {
@@ -33,6 +38,10 @@
       "total_of_directions"
     ],
     "staging_retention_days": 1,
-    "license_evidence_url": "https://data.melbourne.vic.gov.au/explore/dataset/pedestrian-counting-system-past-hour-counts-per-minute/"
-  }
+    "license_evidence_url": "https://data.melbourne.vic.gov.au/api/explore/v2.1/catalog/datasets/pedestrian-counting-system-past-hour-counts-per-minute",
+    "quota_requests_per_day": 10000,
+    "raw_retention_days": 0,
+    "reviewed_at": "2026-10-17T02:45:00Z"
+  },
+  "notes": "Admission 2026-10-17: the publisher's dataset metadata states CC BY 4.0 (license_url creativecommons.org/licenses/by/4.0/legalcode), as for the admitted parking sensors on the same City of Melbourne portal. The feed holds minutes since Melbourne midnight and publishes about 35 to 45 minutes after counting, so the schedule reads the 15-minute window that ended 50 minutes ago (lag_seconds); a window the feed has not yet filled fails closed."
 }

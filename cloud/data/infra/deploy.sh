@@ -124,12 +124,16 @@ for source_id in selected:
     cron = entry.get('cron_utc')
     interval = entry.get('interval_seconds')
     overlap = entry.get('overlap_seconds')
+    # A late-publishing source reads the window that ended this long ago (scheduled.ts).
+    lag = entry.get('lag_seconds', 0)
     revision = entry.get('snapshot_revision')
     if mode not in ('time', 'snapshot') or (cron is not None and not re.fullmatch(r'[\d*/ ,\-]+', cron)):
         raise SystemExit(f'Invalid schedule mode or cron: {source_id}')
     if mode == 'time':
         if not isinstance(interval, int) or interval <= 0 or interval != check or not isinstance(overlap, int) or overlap < 0 or revision is not None:
             raise SystemExit(f'Invalid time window: {source_id}')
+        if not isinstance(lag, int) or lag < 0 or lag > 86400:
+            raise SystemExit(f'Invalid time window lag: {source_id}')
     elif interval is not None or overlap is not None or not isinstance(revision, str) or not revision:
         raise SystemExit(f'Invalid snapshot revision: {source_id}')
     if check is not None and cron is None:
@@ -185,7 +189,7 @@ for source_id in selected:
                 or entry.get('dedicated_identity_permissions_verified') is not True):
             raise SystemExit(f'Verified dedicated service identity required: {source_id}')
 
-    safe = [source_id, cron or 'manual', mode, str(interval or 0), str(overlap or 0),
+    safe = [source_id, cron or 'manual', mode, str(interval or 0), str(overlap or 0), str(lag or 0),
             revision or '-', str(entry.get('request_cap_per_day') or 0),
             str(entry.get('maximum_bytes_billed') or 0),
             str(entry.get('max_requests_per_execution') or 0),
@@ -209,7 +213,7 @@ print('Budget alerts verified:', budget['alerts_verified'])
 print('Runtime guards verified:', ', '.join(k for k, v in config['enforcement'].items() if v is True) or 'none')
 PY
 printf 'Source | Schedule (UTC) | Mode | State | Daily request cap | BigQuery max bytes\n'
-while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes max_requests timeout memory secrets service_account state; do
+while IFS=$'\t' read -r source cron mode interval overlap lag revision cap max_bytes max_requests timeout memory secrets service_account state; do
   if [[ "$cap" == 0 ]]; then cap=unset; fi
   if [[ "$max_bytes" == 0 ]]; then max_bytes=unset; fi
   printf '%s | %s | %s | %s | %s | %s\n' "$source" "$cron" "$mode" "$state" "$cap" "$max_bytes"
@@ -272,7 +276,7 @@ readonly INGEST_ACCOUNT="melens-${environment}-ingest@${project}.iam.gserviceacc
 readonly SCHEDULER_ACCOUNT="melens-${environment}-scheduler@${project}.iam.gserviceaccount.com"
 gcloud iam service-accounts describe "$SCHEDULER_ACCOUNT" --project="$project" >/dev/null
 
-while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes max_requests timeout memory secrets service_account state; do
+while IFS=$'\t' read -r source cron mode interval overlap lag revision cap max_bytes max_requests timeout memory secrets service_account state; do
   job="melens-${environment}-${source//[._]/-}"
   scheduler="${job}-schedule"
   [[ ${#job} -le 63 && ${#scheduler} -le 63 ]] || { echo 'Cloud resource name too long' >&2; exit 2; }
@@ -283,7 +287,7 @@ while IFS=$'\t' read -r source cron mode interval overlap revision cap max_bytes
   if [[ "$secrets" != '-' ]]; then secret_names="$secrets"; fi
   env_vars="GOOGLE_CLOUD_PROJECT=${project},GCP_REGION=${RUN_REGION},GCS_BUCKET=${bucket},BQ_INGEST_DATASET=melens_ingest,BQ_QUERY_DATASET=melens_query,MELENS_SOURCE_ID=${source},MELENS_SCHEDULE_MODE=${mode},SECRET_NAMES=${secret_names},MELENS_REQUEST_CAP_PER_DAY=${cap},MELENS_MAX_REQUESTS_PER_EXECUTION=${max_requests},BQ_MAXIMUM_BYTES_BILLED=${max_bytes},MELENS_TASK_TIMEOUT_SECONDS=${timeout}"
   if [[ "$mode" == time ]]; then
-    env_vars+=",MELENS_INTERVAL_SECONDS=${interval},MELENS_OVERLAP_SECONDS=${overlap}"
+    env_vars+=",MELENS_INTERVAL_SECONDS=${interval},MELENS_OVERLAP_SECONDS=${overlap},MELENS_LAG_SECONDS=${lag}"
   else
     env_vars+=",MELENS_SNAPSHOT_REVISION=${revision}"
   fi

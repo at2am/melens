@@ -38,6 +38,13 @@ test('scheduler retries share the same aligned UTC window', () => {
   assert.deepEqual(retry, first);
 });
 
+test('a late-publishing source reads the aligned window that ended its lag ago', () => {
+  const window = scheduledWindow(new Date('2026-10-17T02:15:30Z'), 900, 0, 3_000);
+  assert.deepEqual(window, { from: '2026-10-17T01:00:00.000Z', to: '2026-10-17T01:15:00.000Z' });
+  assert.equal(parseScheduledJobConfig({ MELENS_SCHEDULE_MODE: 'time', MELENS_SOURCE_ID: 'melbourne.pedestrian.minute',
+    MELENS_INTERVAL_SECONDS: '900', MELENS_LAG_SECONDS: '3000', ...caps }).mode === 'time', true);
+});
+
 test('invalid schedule and source identifiers fail before ingestion', () => {
   assert.throws(() => parseScheduledJobConfig({
     MELENS_SCHEDULE_MODE: 'time', MELENS_SOURCE_ID: 'other;echo injected',

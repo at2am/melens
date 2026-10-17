@@ -35,6 +35,7 @@ SOURCES = DEFAULT_SOURCES | frozenset({
     "victoria.csa.recorded_offences", "ticketmaster.events",
     "user.events", "victoria.transport.road_planned", "victoria.transport.road_unplanned",
     "victoria.transport.gtfs_static", "victoria.transport.gtfs_realtime",
+    "melbourne.pedestrian.minute", "melbourne.pedestrian.locations",
 })
 SOURCE_SECRETS = {
     "ticketmaster.events": ["ticketmaster_discovery_api_key"],
