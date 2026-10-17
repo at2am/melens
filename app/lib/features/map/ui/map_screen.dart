@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -93,7 +94,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// Kept for [dispose], where `ref` is no longer safe to use.
   late final NearbyUserEventsController _nearby;
+
+  /// A focus request that waits for the map: before it is created, or while
+  /// it is hidden.
   MapFocusRequest? _pendingFocus;
+
+  /// Whether the map is on screen: another tab and a page pushed above the
+  /// tabs, such as a saved plan, turn its tickers off.
+  ValueListenable<TickerModeData>? _tickerMode;
+
+  /// Fits a deferred route or area once more, for a map that only gets its
+  /// size a moment after it shows again.
+  Timer? _refit;
   CardItem? _awaitingItem;
 
   /// A tapped card item with no map record, shown in the details pane.
@@ -179,6 +191,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
       if (widget.visibleRegionReader != null) unawaited(_readVisibleRegion());
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _watchTickerMode();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _watchTickerMode();
+  }
+
+  void _watchTickerMode() {
+    final tickerMode = TickerMode.getValuesNotifier(context);
+    if (identical(tickerMode, _tickerMode)) return;
+    _tickerMode?.removeListener(_onTickerModeChanged);
+    _tickerMode = tickerMode..addListener(_onTickerModeChanged);
+  }
+
+  bool get _onScreen => _tickerMode?.value.enabled ?? true;
+
+  /// Applies the focus request made while the map was hidden, such as Show
+  /// route on a saved plan, after the frame that shows the map again.
+  void _onTickerModeChanged() {
+    if (!_onScreen || _pendingFocus == null) return;
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        final pending = _pendingFocus;
+        if (!mounted || !_onScreen || pending == null) return;
+        if (_map == null && widget.onFocusRequest == null) return;
+        _pendingFocus = null;
+        _applyFocus(pending, deferred: true);
+      })
+      ..scheduleFrame();
   }
 
   void _reconcileSelection() {
@@ -404,8 +452,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   /// Applies a `focus_map` action from the agent (agent-protocol.md,
   /// Rules): a bounds target fits the box, a point target centres on it.
-  void _applyFocus(MapFocusRequest request) {
-    if (_map == null && widget.onFocusRequest == null) {
+  /// A hidden map has no size to fit a box to, so the request waits until
+  /// the map shows; [deferred] marks one that waited.
+  void _applyFocus(MapFocusRequest request, {bool deferred = false}) {
+    _refit?.cancel();
+    if (!_onScreen || (_map == null && widget.onFocusRequest == null)) {
       _pendingFocus = request;
       return;
     }
@@ -416,14 +467,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final bounds = request.bounds;
     final point = request.point;
     if (bounds != null) {
-      _zoomToBounds(
-        MapBounds(
-          west: bounds.west,
-          south: bounds.south,
-          east: bounds.east,
-          north: bounds.north,
-        ),
+      final target = MapBounds(
+        west: bounds.west,
+        south: bounds.south,
+        east: bounds.east,
+        north: bounds.north,
       );
+      _zoomToBounds(target);
+      // On the web the map's element may get its size a moment after it
+      // shows, and a fit before that lands on the whole world.
+      if (deferred) {
+        _refit = Timer(const Duration(milliseconds: 300), () {
+          if (mounted && _onScreen) _zoomToBounds(target);
+        });
+      }
     } else if (point != null) {
       _focusPoint(point, zoom: request.zoom);
     }
@@ -725,6 +782,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void dispose() {
     if (_holdingNearby) _nearby.setActive(false);
+    _tickerMode?.removeListener(_onTickerModeChanged);
+    _refit?.cancel();
     _regionGeneration++;
     _map = null;
     super.dispose();
