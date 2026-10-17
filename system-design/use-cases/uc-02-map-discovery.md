@@ -46,9 +46,11 @@ The main GenAI feature: the user points at the map and learns what makes that pl
 
 - [ ] Works both for a point selected on the map and for the user's current location.
 - [ ] The first answer is a card with three sections: neighbourhood character, recommended places, upcoming activities.
-- [ ] Every recommended place or activity cites a MapFeature id or a web link.
+- [x] Every recommended place or activity cites a MapFeature id or a web link.
 - [ ] Follow-up questions keep the selected location as context.
 - [ ] Results from Maps grounding show Google Maps attribution.
+
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: a point is only a selected point feature, since a map tap does not pick an arbitrary spot; the brief card puts character in the intro and merges places and activities into one list with no section headings; nothing keeps the briefed point once the selection changes; a text answer from Maps grounding shows no attribution (cards with a `place_id` do). The brief uses Search grounding, not `heritage_lookup` or Maps grounding as Behaviour step 2 says.
 
 ## Notes
 
