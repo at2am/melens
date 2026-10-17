@@ -13,6 +13,31 @@ import { AGENT_NAME, BUDGET_NOTES, INSTRUCTION, historyContents, questionsOf, tu
 import { hasUsage } from './usage.js';
 
 const APP_NAME = 'melens';
+/**
+ * Text that reaches the loop without partial chunks: ADK's streaming aggregator holds back text that arrives in the same
+ * chunk as a function call, and hands it over whole. It goes to the app in pieces of about this many characters, over
+ * at most `FALLBACK_STREAM.totalMs`, so it reads as streamed rather than appearing in one jump. The pieces are awaited
+ * so the step that follows still comes after its text. (ADK's experimental progressive streaming would stream it, but
+ * ADK runs the function calls of partial events too, so each call would run twice.)
+ */
+export const FALLBACK_STREAM = { minChars: 120, pieceChars: 40, totalMs: 300 } as const;
+
+/** Splits `text` at spaces into pieces of about `size` characters; joined, they are `text`. */
+export function textPieces(text: string, size: number): string[] {
+  const pieces: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + size);
+    if (end < text.length) {
+      const space = text.indexOf(' ', end);
+      end = space === -1 ? text.length : space + 1;
+    }
+    pieces.push(text.slice(start, end));
+    start = end;
+  }
+  return pieces;
+}
+
 /** Vertex AI's 400 for an attached file it cannot decode. */
 const UNREADABLE_FILE = /could not be decoded|malformed or corrupted/i;
 
@@ -31,6 +56,8 @@ export interface MapAgentOptions {
   readonly maxModelCalls: number;
   /** Serves the instruction and the tool declarations from a Gemini context cache; without it they go with every call. */
   readonly contextCache?: ContextCache;
+  /** How long held-back text takes to reach the app in pieces; tests pass 0. Defaults to `FALLBACK_STREAM.totalMs`. */
+  readonly fallbackStreamMs?: number;
   readonly clock?: () => Date;
   readonly log?: (line: Record<string, unknown>) => void;
 }
@@ -76,6 +103,14 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
       };
 
       let failure: TurnFailure | undefined;
+      const emitInPieces = async (text: string): Promise<void> => {
+        const pieces = text.length < FALLBACK_STREAM.minChars ? [text] : textPieces(text, FALLBACK_STREAM.pieceChars);
+        const pause = (options.fallbackStreamMs ?? FALLBACK_STREAM.totalMs) / pieces.length;
+        for (const [index, piece] of pieces.entries()) {
+          if (index > 0 && pause > 0 && !turn.signal.aborted) await new Promise((resolve) => setTimeout(resolve, pause));
+          turn.sink.emit({ event: 'text', delta: piece });
+        }
+      };
       // The map's own entry points already say what to do, so code, not the model, picks the workflow (agent-design.md, Entry routing).
       // A workflow that produces no card (nothing found, a model or data failure) falls through to the loop with the explicit prompt.
       let handledByWorkflow = false;
@@ -154,7 +189,7 @@ export function createMapAgentRunner(options: MapAgentOptions): TurnRunner {
               if (text !== '') { streamedText = true; answer += text; turn.sink.emit({ event: 'text', delta: text }); }
             } else if (!streamedText && text.trim() !== '') {
               answer += text;
-              turn.sink.emit({ event: 'text', delta: text });
+              await emitInPieces(text);
             }
           }
           closeCall();

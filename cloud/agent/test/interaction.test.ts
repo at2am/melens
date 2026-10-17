@@ -6,7 +6,7 @@ import type { Content } from '@google/genai';
 
 import { COMPACTION_LIMITS, compactOldToolResults } from '../src/agent/compaction.js';
 import { CONTEXT_CACHE_LIMITS, createContextCache, useContextCache, type CachedPrefix } from '../src/agent/context-cache.js';
-import { createMapAgentRunner } from '../src/agent/map-agent.js';
+import { createMapAgentRunner, textPieces } from '../src/agent/map-agent.js';
 import { contextBlock, historyContents } from '../src/agent/prompts.js';
 import { RetryingLlm, isTransientModelError } from '../src/agent/retrying-llm.js';
 import type { StoredTurn } from '../src/protocol/schemas.js';
@@ -140,4 +140,30 @@ test('the map context tells the model which of its map actions did not apply, an
     text: 'Looking', cards: [], uiActions: [], question: null, questions: [], stop: 'end', failure: { message: 'The agent could not finish this turn', retryable: true },
     trace: [], usage: { calls: 1, input: 1, cachedInput: 0, output: 1, thoughts: 0, toolUseInput: 0, total: 2, complete: false, perCall: [] } };
   assert.match(historyContents([failed])[1]?.parts?.[0]?.text ?? '', /Looking\n\[this answer failed before it finished/);
+});
+
+test('text held back with a function call reaches the app in pieces, before the step it precedes', async () => {
+  const intro = 'Here is what I found around Federation Square tonight, with a few quiet spots further along the river for later on. ';
+  const llm = new ScriptedLlm([
+    () => functionCall('search_features', { layers: ['event'] }, usage(10, 1), intro),
+    () => streamedText('Done.', usage(10, 1)),
+  ]);
+  const runner = createMapAgentRunner({ model: llm, maxModelCalls: 4, fallbackStreamMs: 0, tools: { features: fakeReader([]), grounding: null },
+    clock: () => new Date('2026-10-10T07:40:00Z') });
+  const turn = turnContext('Anything on tonight?');
+  const stored = await runner.run(turn);
+  const kinds = turn.sink.sent.map((event) => event.event);
+  const pieces = turn.sink.sent.flatMap((event) => event.event === 'text' ? [event.delta] : []);
+  assert.ok(pieces.length >= 3, `streamed in ${pieces.length} pieces`);
+  assert.equal(pieces.join(''), `${intro}Done.`);
+  assert.ok(kinds.lastIndexOf('text', kinds.indexOf('status')) === kinds.indexOf('status') - 1, 'the held-back text comes before the step');
+  assert.equal(stored.text, `${intro}Done.`);
+});
+
+test('text pieces split at spaces and join back to the text', () => {
+  const text = 'one two three four five six seven eight nine ten';
+  const pieces = textPieces(text, 10);
+  assert.equal(pieces.join(''), text);
+  assert.ok(pieces.every((piece, index) => index === pieces.length - 1 || piece.endsWith(' ')));
+  assert.deepEqual(textPieces('short', 40), ['short']);
 });
