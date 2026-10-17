@@ -83,6 +83,9 @@ export async function startAgentServer(env: Readonly<Record<string, string | und
     if (address !== null && typeof address !== 'string') {
       log({ severity: 'INFO', event: 'agentServerListening', port: address.port, model: config.model, vertexLocation: config.vertexLocation, development });
     }
+    // Load the shared map layers now; with one warm instance the first turn then reads them from memory.
+    const started = Date.now();
+    void tools.features.warm?.().then(() => log({ severity: 'INFO', event: 'agentLayersWarm', durationMs: Date.now() - started }));
   });
   return server;
 }
