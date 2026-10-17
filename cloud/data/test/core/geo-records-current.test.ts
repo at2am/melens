@@ -160,9 +160,30 @@ test('GDELT without a recorded state rebuilds instead', async () => {
 });
 
 test('any other GDELT failure is reported, not hidden behind a rebuild', async () => {
-  const { calls, bigquery } = fakeBigQuery(() => new Error('Transaction is aborted due to a concurrent update'));
-  await assert.rejects(refreshGeoRecordsCurrent(config, bigquery as never, 'gdelt.news'), /concurrent update/);
+  const { calls, bigquery } = fakeBigQuery(() => new Error('Exceeded rate limits'));
+  await assert.rejects(refreshGeoRecordsCurrent(config, bigquery as never, 'gdelt.news'), /rate limits/);
   assert.equal(calls.length, 1);
+});
+
+test('a refresh aborted by another source\'s concurrent refresh is retried after a wait', async () => {
+  let failures = 1;
+  const { calls, bigquery } = fakeBigQuery(() => failures-- > 0
+    ? new Error('Transaction is aborted due to concurrent update against table geo_records_current') : null);
+  const waits: number[] = [];
+  const sleep = async (ms: number) => { waits.push(ms); };
+  assert.equal(await refreshGeoRecordsCurrent(config, bigquery as never, 'gdelt.news', undefined,
+    { retryDelaysMs: [5, 15], sleep }), 'incremental');
+  assert.deepEqual(waits, [5]);
+  assert.equal(calls.length, 2);
+});
+
+test('a refresh that keeps meeting concurrent refreshes fails after its retries', async () => {
+  const { calls, bigquery } = fakeBigQuery(() => new Error('Transaction is aborted due to a concurrent update'));
+  const waits: number[] = [];
+  await assert.rejects(refreshGeoRecordsCurrent(config, bigquery as never, 'gdelt.news', undefined,
+    { retryDelaysMs: [5, 15], sleep: async (ms) => { waits.push(ms); } }), /concurrent update/);
+  assert.deepEqual(waits, [5, 15]);
+  assert.equal(calls.length, 3);
 });
 
 test('snapshot sources rebuild their own rows', async () => {
