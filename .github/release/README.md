@@ -70,7 +70,7 @@ The mobile jobs and `app-ci.yml` run on a self-hosted runner on the release Mac 
 
 | What | Where |
 | --- | --- |
-| Runner | `~/actions-runners/melens-1`, a LaunchAgent (`actions.runner.at2am-melens.*`). It runs only while the user is logged in, which iOS signing needs for the login keychain |
+| Runner | `~/actions-runners/melens-1`, a LaunchAgent (`actions.runner.at2am-melens.*`). It runs only while the user is logged in, which iOS signing needs for the login keychain. Its plist must not set `SessionCreate`: that key, which `svc.sh install` writes, gives jobs their own security session where the login keychain is locked, and `codesign` fails with `errSecInternalComponent` (v0.1.11, 2026-10-17). After a reinstall, remove it with `PlistBuddy -c "Delete :SessionCreate"` and reload the agent with `launchctl bootout` and `bootstrap` |
 | Toolchain | Xcode, CocoaPods, fvm (installs the SDK in `app/.fvmrc` on first use), JDK 17 and the Android SDK (`JAVA_HOME`, `ANDROID_HOME` in the runner's `.env`), `gcloud`, Python 3 |
 | Android upload key | `~/.melens-release/android/upload-keystore.jks` and `key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), mode 600. Created 2026-10-17, alias `upload`, SHA-256 `84:3D:97:C4:F9:C5:6B:42:99:B0:96:41:1C:95:EC:8B:05:E3:04:85:C7:A6:15:B9:4B:9B:02:23:A4:DD:80:13`. Keep a copy in a password manager: Play App Signing holds the app signing key, but replacing a lost upload key needs a Play support request |
 | App Store Connect API key | `~/.melens-release/ios/AuthKey_<KEY ID>.p8` and `~/.melens-release/ios/app-store-connect.env` with `ASC_KEY_ID=` and `ASC_ISSUER_ID=` lines. Xcode uses it to create the distribution certificate and profiles (cloud-managed, team `ZF5UMMPVX9`) and to upload |
