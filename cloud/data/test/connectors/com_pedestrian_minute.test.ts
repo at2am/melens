@@ -280,7 +280,7 @@ test('connector strictly preserves null counts and gaps for missing minutes with
   assert.equal(obs1402.total_count, null);
 });
 
-test('connector deduplicates identical duplicate readings and fails on conflicting duplicates', async () => {
+test('connector deduplicates identical readings, keeps the fuller of a partial pair, and fails on crossed duplicates', async () => {
   const latestObservedAt = '2026-09-28T14:05:00+00:00';
   const identicalDuplicateRecords = [
     {
@@ -371,10 +371,32 @@ test('connector deduplicates identical duplicate readings and fails on conflicti
     checkpoint: null,
     runId: 'dedup-conflict',
   }));
-  assert.equal(res2.kind, 'failure');
-  if (res2.kind === 'failure') {
-    assert.equal(res2.code, 'validation_failed');
-    assert.match(res2.message, /Conflicting duplicate sensor-minute readings/);
+  // A reading at least as large in both directions is the fuller one and replaces the partial one.
+  assert.equal(res2.kind, 'success');
+  if (res2.kind === 'success') {
+    assert.equal(res2.pedestrianObservations.length, 1);
+    assert.equal(res2.pedestrianObservations[0]?.total_count, 15);
+  }
+
+  // Two readings that each exceed the other in one direction cannot be ordered and still fail closed.
+  const crossedRecords = [
+    { ...conflictingDuplicateRecords[0]!, direction_1: 4, direction_2: 8, total_of_directions: 12 },
+    conflictingDuplicateRecords[1]!,
+  ];
+  const conn3 = createConnector({ http, client: new FakeOdsClient(() => ({
+    records: crossedRecords, totalCount: crossedRecords.length, pageCount: 1,
+    fetchedAt: '2026-09-28T14:06:00.000Z', lastModified: null,
+  })) });
+  const res3 = await conn3.collect(parseConnectorInput({
+    sourceId: SOURCE_ID,
+    window: { kind: 'time', from: '2026-09-28T14:00:00.000Z', to: '2026-09-28T14:05:00.000Z' },
+    checkpoint: null,
+    runId: 'dedup-crossed',
+  }));
+  assert.equal(res3.kind, 'failure');
+  if (res3.kind === 'failure') {
+    assert.equal(res3.code, 'validation_failed');
+    assert.match(res3.message, /Conflicting duplicate sensor-minute readings/);
   }
 });
 
