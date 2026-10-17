@@ -6,17 +6,16 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:melens/features/map/data/map_models.dart';
 import 'package:melens/features/map/ui/renderers/core_renderers.dart';
+import 'package:melens/features/map/ui/renderers/marker_icons.dart';
 
 /// The frozen parking example, with optional detail overrides.
 Map<String, dynamic> _json({Map<String, Object?> details = const {}}) {
-  final items =
-      jsonDecode(
-            File(
-              '../specs/002-map-data-presentation/contracts/examples/'
-              'item-variants.sample.json',
-            ).readAsStringSync(),
-          )
-          as List<dynamic>;
+  final items = jsonDecode(
+    File(
+      '../specs/002-map-data-presentation/contracts/examples/'
+      'item-variants.sample.json',
+    ).readAsStringSync(),
+  ) as List<dynamic>;
   final json = Map<String, dynamic>.from(
     items.cast<Map<String, dynamic>>().singleWhere(
       (item) => item['kind'] == 'parking',
@@ -97,45 +96,42 @@ void main() {
     expect(() => MapItem.fromJson(json), throwsA(anything));
   });
 
-  test(
-    'each bay is a footprint coloured by its own reading, and noData is never the vacant colour',
-    () {
-      const colors = ColorScheme.light();
-      final vacant = _item();
-      final occupied = _item(
-        id: 'parking:kerbside:2',
-        details: {'state': 'occupied'},
-      );
-      final silent = _item(
-        id: 'parking:kerbside:3',
-        details: {
-          'state': 'noData',
-          'noDataReason': 'notReporting',
-          'reading': 'stale',
-        },
-      );
-      final plan = buildCoreRenderPlan(
-        items: [vacant, occupied, silent],
-        colors: colors,
-      );
-      expect(plan.markers, isEmpty, reason: 'Bays are footprints, not pins');
-      expect(plan.circles, isEmpty);
-      Polygon bay(String id) => plan.polygons.singleWhere(
-        (polygon) => polygon.polygonId.value == '$id:bay',
-      );
-      expect(
-        bay('parking:kerbside:1').fillColor,
-        parkingStateColor(ParkingState.vacant, colors),
-      );
-      expect(bay('parking:kerbside:2').fillColor, colors.error);
-      expect(bay('parking:kerbside:3').fillColor, colors.outline);
-      expect(
-        bay('parking:kerbside:3').fillColor,
-        isNot(parkingStateColor(ParkingState.vacant, colors)),
-      );
-      expect(bay('parking:kerbside:1').points, hasLength(4));
-    },
-  );
+  test('each bay is a footprint coloured by its own reading, and noData is never the vacant colour', () {
+    const colors = ColorScheme.light();
+    final vacant = _item();
+    final occupied = _item(
+      id: 'parking:kerbside:2',
+      details: {'state': 'occupied'},
+    );
+    final silent = _item(
+      id: 'parking:kerbside:3',
+      details: {
+        'state': 'noData',
+        'noDataReason': 'notReporting',
+        'reading': 'stale',
+      },
+    );
+    final plan = buildCoreRenderPlan(
+      items: [vacant, occupied, silent],
+      colors: colors,
+    );
+    expect(plan.markers, isEmpty, reason: 'Bays are footprints, not pins');
+    expect(plan.circles, isEmpty);
+    Polygon bay(String id) => plan.polygons.singleWhere(
+      (polygon) => polygon.polygonId.value == '$id:bay',
+    );
+    expect(
+      bay('parking:kerbside:1').fillColor,
+      parkingStateColor(ParkingState.vacant, colors),
+    );
+    expect(bay('parking:kerbside:2').fillColor, colors.error);
+    expect(bay('parking:kerbside:3').fillColor, colors.outline);
+    expect(
+      bay('parking:kerbside:3').fillColor,
+      isNot(parkingStateColor(ParkingState.vacant, colors)),
+    );
+    expect(bay('parking:kerbside:1').points, hasLength(4));
+  });
 
   test('a selected bay keeps its size, is outlined, and a tap selects it', () {
     const colors = ColorScheme.light();
@@ -155,5 +151,25 @@ void main() {
     expect(bay.consumeTapEvents, isTrue);
     bay.onTap!();
     expect(tapped, item);
+  });
+
+  test('only the selected bay carries the selected parking pin, on its '
+      'sensor', () {
+    const colors = ColorScheme.light();
+    final fallback = MapMarkerIcons.fallback;
+    final item = _item();
+    final other = _item(id: 'parking:kerbside:2');
+    final plan = buildCoreRenderPlan(
+      items: [item, other],
+      colors: colors,
+      selectedItemId: item.id,
+      icons: fallback,
+    );
+    final pin = plan.markers.single;
+    expect(pin.markerId.value, '${item.id}:bay-pin');
+    final sensor = (item.geometry! as GeoJsonPoint).coordinates;
+    expect(pin.position, LatLng(sensor[1], sensor[0]));
+    expect(pin.icon, same(fallback.layer(item.layerId, selected: true)));
+    expect(plan.polygons, hasLength(2), reason: 'The pin adds to the bay');
   });
 }
