@@ -347,7 +347,12 @@ const highlightFeatures = (deps: ToolDependencies) => defineTool({
     const resolved = await Promise.all(args.ids.map(async (id) => (await resolveFeature(deps, turn, id)) !== undefined));
     const found = args.ids.filter((_id, index) => resolved[index]);
     const missing = args.ids.filter((_id, index) => !resolved[index]);
-    const action = { action: 'highlight_features' as const, args: { ids: found, clear_previous: args.clear_previous ?? true, missing } };
+    // The app labels a highlight from the items it has loaded; one outside its view (an event later tonight) gets the title from here.
+    const titles = Object.fromEntries(found.flatMap((id) => {
+      const title = turn.features.get(id)?.title;
+      return title === undefined || title === null ? [] : [[id, title]];
+    }));
+    const action = { action: 'highlight_features' as const, args: { ids: found, clear_previous: args.clear_previous ?? true, missing, titles } };
     turn.uiActions.push(action);
     turn.sink.emit({ event: 'ui_action', stepId: step.id, ...action });
     return { ok: true, missing };

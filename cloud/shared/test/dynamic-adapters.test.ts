@@ -225,9 +225,11 @@ test('event venue, local source clock and unknown end are adapted from actual Ti
   const start = '2026-10-10T09:00:00Z';
   const item = adaptEventRow(geo({ source_id: eventSource.sourceId, topic: 'event', geometry_geojson: point,
     assertion_kind: 'plan', record_status: 'planned', valid_from: start, valid_to: start,
-    summary: 'Ticketmaster status: onsale; local start: 2026-10-10 20:00:00 Australia/Melbourne; venue: Forum' }),
+    summary: 'Event information provided by Ticketmaster; Ticketmaster status: onsale; '
+      + 'local start: 2026-10-10 20:00:00 Australia/Melbourne; venue: Forum' }),
   { source: eventSource });
   assert.equal(item.details.venueName, 'Forum');
+  assert.equal(item.details.summary, null, 'The metadata summary is not shown as text');
   assert.equal(item.details.category, null);
   assert.equal(item.details.startAt, start);
   assert.equal(item.details.endAt, null);
@@ -247,6 +249,7 @@ test('unscheduled/unlocated event retains null times and unknown venue without g
   assert.equal(batch.unlocatedItems[0]?.details.startAt, null);
   assert.equal(batch.unlocatedItems[0]?.details.endAt, null);
   assert.equal(batch.unlocatedItems[0]?.details.venueName, null);
+  assert.equal(batch.unlocatedItems[0]?.details.summary, 'Ticketmaster status: postponed');
   assert.equal(batch.unlocatedItems[0]?.time.observedAt, null);
   assert.equal(batch.unresolvedCount, null);
 });

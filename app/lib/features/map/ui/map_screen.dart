@@ -521,6 +521,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _showUnlocated = false;
       _cardItem = null;
     });
+    // A record opened from elsewhere (the Home feed) is brought into view.
+    ref
+        .read(mapActionsControllerProvider.notifier)
+        .focusPoints(_positionsOf(record.item.geometry));
     unawaited(
       ref
           .read(selectionControllerProvider.notifier)
@@ -537,6 +541,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             if (mounted) _reconcileSelection();
           }),
     );
+  }
+
+  static List<AgentLatLng> _positionsOf(GeoJsonGeometry? geometry) {
+    AgentLatLng at(List<double> p) => AgentLatLng(lat: p[1], lng: p[0]);
+    return switch (geometry) {
+      null => const [],
+      GeoJsonPoint(:final coordinates) => [at(coordinates)],
+      GeoJsonMultiPoint(:final coordinates) ||
+      GeoJsonLineString(:final coordinates) => coordinates.map(at).toList(),
+      GeoJsonMultiLineString(:final coordinates) ||
+      GeoJsonPolygon(
+        :final coordinates,
+      ) => [for (final line in coordinates) ...line.map(at)],
+      GeoJsonMultiPolygon(:final coordinates) => [
+        for (final polygon in coordinates)
+          for (final ring in polygon) ...ring.map(at),
+      ],
+    };
   }
 
   /// Why My location did not work; nothing is shown otherwise.
@@ -642,7 +664,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ActionChip(
               key: ValueKey('map-highlight-$id'),
               avatar: const Icon(Icons.place_outlined, size: 16),
-              label: Text(byId[id]?.title ?? id),
+              label: Text(byId[id]?.title ?? actions.highlightTitles[id] ?? id),
               onPressed: byId[id] == null ? null : () => _selectItem(byId[id]!),
             ),
           for (final id in actions.missingIds)
@@ -1135,12 +1157,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final strings = AppLocalizations.of(context);
     final controller = ref.read(layerControllerProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
+    // A layer the catalog lists with no published source can show nothing:
+    // its chip says so and stays off, rather than look on over an empty map.
+    final catalog = ref.watch(mapLayerCatalogProvider).value;
+    final unsourced = {
+      for (final descriptor in catalog?.layers ?? const <LayerDescriptor>[])
+        if (descriptor.sourceIds.isEmpty) descriptor.id,
+    };
     Widget chip({
       required Key key,
       required String label,
       required MapMarkerStyle style,
       required bool on,
-      required ValueChanged<bool> onChanged,
+      required ValueChanged<bool>? onChanged,
     }) => Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
@@ -1169,13 +1198,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         children: [
           for (final layer in layers.availableLayers)
-            chip(
-              key: ValueKey('map-chip-${layer.name}'),
-              label: layerTitle(strings, layer),
-              style: layerStyle(layer),
-              on: layers.isLayerEnabled(layer),
-              onChanged: (on) => controller.setLayerEnabled(layer, on),
-            ),
+            if (unsourced.contains(layer))
+              chip(
+                key: ValueKey('map-chip-${layer.name}'),
+                label: strings.mapLayerNoSource(layerTitle(strings, layer)),
+                style: layerStyle(layer),
+                on: false,
+                onChanged: null,
+              )
+            else
+              chip(
+                key: ValueKey('map-chip-${layer.name}'),
+                label: layerTitle(strings, layer),
+                style: layerStyle(layer),
+                on: layers.isLayerEnabled(layer),
+                onChanged: (on) => controller.setLayerEnabled(layer, on),
+              ),
           chip(
             key: const ValueKey('map-chip-community'),
             label: strings.mapCommunityLayer,
@@ -1246,29 +1284,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           onPressed: () => _showResultsSheet(wide: wide),
           icon: const Icon(Icons.format_list_bulleted),
         ),
-        button(
-          key: const ValueKey('map-chip-my-location'),
-          tooltip: locating
-              ? strings.mapMyLocationLocating
-              : strings.mapMyLocation,
-          active: on,
-          onPressed: locating
-              ? null
-              : () {
-                  final controller = ref.read(userLocationProvider.notifier);
-                  if (on) {
-                    controller.disable();
-                  } else {
-                    unawaited(controller.enable());
-                  }
-                },
-          icon: locating
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(on ? Icons.my_location : Icons.location_searching),
-        ),
+        if (ref.watch(deviceLocationSupportedProvider))
+          button(
+            key: const ValueKey('map-chip-my-location'),
+            tooltip: locating
+                ? strings.mapMyLocationLocating
+                : strings.mapMyLocation,
+            active: on,
+            onPressed: locating
+                ? null
+                : () {
+                    final controller = ref.read(userLocationProvider.notifier);
+                    if (on) {
+                      controller.disable();
+                    } else {
+                      unawaited(controller.enable());
+                    }
+                  },
+            icon: locating
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(on ? Icons.my_location : Icons.location_searching),
+          ),
       ],
     );
   }

@@ -93,7 +93,7 @@ Development mode keeps sessions in memory and accepts `Authorization: Bearer dev
 | `src/features/` | The feature reader over `@melens/shared`, the per-turn search memo, and the compact feature mapping |
 | `src/main.ts` | Production entry point |
 
-The feature reader uses the authoritative current Geo view. It does not have the map service's later record-rights check, so it cannot read the serving copy alone. The server selects this policy; tool input cannot change it. Matching complete searches can still share one read within a turn. A new turn reads current rights again.
+The feature reader answers current planning, disruption, event, news, parking and anomaly searches from the same in-memory layer copy as the map service (`current-layer-cache.ts`, [map-serving-stateless.md](../../system-design/map-serving-stateless.md) phase 2), with the source registry cached for 30 seconds. A copy is served only when its state table reflects every source's latest published batch, and it reloads on a new publication or after two minutes, so a withdrawal reaches the agent as it reaches the map. Until 2026-10-17 it read the authoritative current view per search, which rebuilt "current" from the whole history; that read outgrew the 1 GB scan ceiling, and every such search came back `unavailable`. Pedestrian, boundary and historical searches stay live BigQuery reads. The server selects this policy; tool input cannot change it. Matching complete searches still share one read within a turn.
 
 ## Runtime identity and deployment
 

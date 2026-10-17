@@ -63,15 +63,23 @@ export function adaptEventRow(row: ViewRow, options: {
     const lifecycle = options.mode === 'current' && asOf !== null && sourceLifecycle === 'active'
       && startAt !== null && comparePublishedInstants(startAt, asOf) > 0 ? 'planned' : sourceLifecycle;
     const rawSummary = publishedText(row.summary);
+    // The connector writes "<attribution>; Ticketmaster status: …; local start: …; venue: …"
+    // (cloud/data/src/connectors/ticketmaster/index.ts); older rows have no attribution prefix.
     const ticketSummary = sourceId === 'ticketmaster.events' && rawSummary !== null
-      ? /^Ticketmaster status: [^;]*; local start: ([^;]*); venue: (.*)$/.exec(rawSummary) : null;
-    const sourceClock = ticketSummary?.[1]?.trim() ?? null;
+      ? /^(?:[^;]*Ticketmaster; )?Ticketmaster status: ([^;]*); local start: ([^;]*); venue: (.*)$/.exec(rawSummary) : null;
+    const ticketStatus = ticketSummary?.[1]?.trim() ?? null;
+    const sourceClock = ticketSummary?.[2]?.trim() ?? null;
     const userSummary = sourceId === USER_EVENTS_SOURCE_ID ? userEventSummary(rawSummary) : null;
     const sourceTimezone = userSummary !== null ? USER_EVENTS_TIMEZONE
       : sourceClock === null ? null : /(?:^|\s)([A-Za-z_]+\/[A-Za-z_]+)$/.exec(sourceClock)?.[1] ?? null;
     const venueName = userSummary !== null ? userSummary.placeName
-      : ticketSummary?.[2] === 'unknown' ? null : publishedText(ticketSummary?.[2]);
-    const summary = userSummary !== null ? userSummary.summary : rawSummary;
+      : ticketSummary?.[3] === 'unknown' ? null : publishedText(ticketSummary?.[3]);
+    // A Ticketmaster summary is only metadata the item already carries (venue, start, the
+    // source's attribution); only a status other than on sale is worth reading.
+    const summary = userSummary !== null ? userSummary.summary
+      : ticketSummary === null ? rawSummary
+      : ticketStatus === null || ticketStatus === '' || ticketStatus.toLowerCase() === 'onsale' ? null
+      : `Ticketmaster status: ${ticketStatus}`;
     const parsed = mapItemSchema.parse({ id, versionId, layerId: 'event', kind: 'event',
       title: publishedText(row.title), geometry, location: publishedLocation(row, geometry),
       assertionKind: publishedAssertion(row), lifecycle,

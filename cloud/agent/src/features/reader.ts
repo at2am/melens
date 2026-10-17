@@ -6,8 +6,10 @@ import { createBigQueryViewAdapter, type BigQueryViewAdapter } from '@melens/sha
 import { createAnomalyLayerLoader, failSoftAnomalyLayerLoader } from '@melens/shared/query/anomalies';
 import { createViewAnomalyProducer } from '@melens/shared/query/anomaly-producer';
 import { createViewportLayerLoader } from '@melens/shared/query/layer-loaders';
+import { createCurrentLayerCache } from '@melens/shared/query/current-layer-cache';
 import { createViewQueryRunner } from '@melens/shared/query/query-runner';
-import { createSourceCoverageReader, findPublicSource, type SourceCoverageSnapshot } from '@melens/shared/query/source-coverage';
+import { cacheSourceCoverage, createSourceCoverageReader, findPublicSource, type SourceCoverageSnapshot }
+  from '@melens/shared/query/source-coverage';
 
 export interface FeatureSearch {
   readonly requestId: string;
@@ -32,7 +34,18 @@ export interface FeatureReader {
   search(query: FeatureSearch): Promise<LayerFeatures[]>;
 }
 
-/** The same loaders, coverage and admission the map service uses, without its snapshots and pages. */
+/** How long searches share one source registry read, and how long an expired one still answers while it is replaced (as the map service). */
+const COVERAGE_CACHE_TTL_MS = 30_000;
+const COVERAGE_STALE_MS = 90_000;
+
+/**
+ * The same loaders, coverage, admission and in-memory current layers the map service uses
+ * (system-design/map-serving-stateless.md, phase 2), without its snapshots and pages. Current
+ * planning, disruption, event, news, parking and anomaly searches are answered from a copy that
+ * is reloaded when a source publishes or after two minutes, so a withdrawal reaches the agent
+ * as it reaches the map. Reading the authoritative current view per search instead rebuilt
+ * "current" from the whole history and outgrew the scan ceiling (budgetExceeded, 2026-10-17).
+ */
 export function createSharedFeatureReader(options: {
   readonly config: MapConfig;
   readonly adapter?: BigQueryViewAdapter;
@@ -44,12 +57,13 @@ export function createSharedFeatureReader(options: {
     const reference = sourceReferenceSchema.parse(source);
     return [reference.sourceId, reference] as const;
   }));
-  const runner = createViewQueryRunner({ config: options.config, adapter: options.adapter ?? createBigQueryViewAdapter(options.config),
-    currentGeoRead: 'authoritative' });
-  const readCoverage = createSourceCoverageReader({ runner }).read;
+  const runner = createViewQueryRunner({ config: options.config, adapter: options.adapter ?? createBigQueryViewAdapter(options.config) });
+  const readCoverage = cacheSourceCoverage(createSourceCoverageReader({ runner }).read,
+    { ttlMs: COVERAGE_CACHE_TTL_MS, staleMs: COVERAGE_STALE_MS, clock });
+  const layerCache = createCurrentLayerCache({ config: options.config, runner, readCoverage, clock });
   const resolveSource = (coverage: SourceCoverageSnapshot): PublicSourceResolver => (id) =>
     findPublicSource(coverage, id) === null ? null : references.get(id) ?? null;
-  const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) => runner.run(input, execution);
+  const runQuery = (input: unknown, execution: { readonly signal?: AbortSignal }) => layerCache.runQuery(input, execution);
   // The same published anomaly results as the map's anomaly layer: the detector's, or the labelled replay of a historical day.
   const loadAnomalyLayer = failSoftAnomalyLayerLoader(createAnomalyLayerLoader({ producer: createViewAnomalyProducer({ runQuery, references }) }));
   const loadLayer = createViewportLayerLoader({ runQuery, resolveSource, clock,

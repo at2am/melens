@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../agent/data/agent_models.dart';
@@ -24,6 +25,12 @@ final class UserLocationState {
   /// Counts successful fixes, so the map can move to each new one once.
   final int sequence;
 }
+
+/// Whether this build can ask the device where it is: only the Web build has
+/// a reader ([readDeviceLocation]); the phone builds have no location plugin
+/// or permission strings, so their location controls are hidden.
+@Riverpod(keepAlive: true)
+bool deviceLocationSupported(Ref ref) => kIsWeb;
 
 /// Tests override this with a fake reader.
 @Riverpod(keepAlive: true)

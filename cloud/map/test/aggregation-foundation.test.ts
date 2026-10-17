@@ -249,6 +249,11 @@ test('anomaly grouping requires producer eligibility/classification and keeps ba
   assert.equal(aggregate?.details.metric.unit, 'anomaly results');
   assert.equal(aggregate?.details.metric.value, 2);
   assert.deepEqual(aggregate?.details.memberIds, ['A', 'B']);
+  assert.equal(aggregate?.title, 'Verified anomaly results');
+  // A group of replayed results is labelled as a replay, as each result is.
+  const replayed = [a, b].map((item) => ({ ...item, title: `Replay · ${item.title}` }));
+  const replay = [...aggregateLayer(layer(replayed), { zoom: 12, bounds: BOUNDS }).groups.values()][0]?.aggregate;
+  assert.equal(replay?.title, 'Replay · Verified anomaly results');
 });
 
 test('unknown/open-ended source times remain unknown and planned assertions stay explicit', () => {

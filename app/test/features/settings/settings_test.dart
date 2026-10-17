@@ -66,6 +66,20 @@ void main() {
     expect(find.byType(SwitchListTile), findsNWidgets(2));
   });
 
+  testWidgets('a build that cannot locate the device offers no location '
+      'controls', (tester) async {
+    final container = appContainer(locationSupported: false);
+    addTearDown(container.dispose);
+    await pumpApp(tester, container, size: const Size(390, 1600));
+    await openSettings(tester);
+    expect(key('settings-location'), findsNothing);
+    expect(find.byType(SwitchListTile), findsOneWidget);
+
+    await tester.tap(key('tab-discover'));
+    await tester.pumpAndSettle();
+    expect(key('map-chip-my-location'), findsNothing);
+  });
+
   testWidgets('the map searches as it moves unless auto-search is turned off', (
     tester,
   ) async {

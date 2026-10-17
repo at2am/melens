@@ -87,6 +87,7 @@ final class RouteWaypoint {
 final class MapActionsState {
   const MapActionsState({
     this.highlightedIds = const [],
+    this.highlightTitles = const {},
     this.missingIds = const [],
     this.focus,
     this.route,
@@ -94,6 +95,10 @@ final class MapActionsState {
 
   /// Feature ids the agent asked to highlight, in request order.
   final List<String> highlightedIds;
+
+  /// The agent's title for each highlighted id, for one the map has not
+  /// loaded (an event later tonight while the map shows what is on now).
+  final Map<String, String> highlightTitles;
 
   /// Ids the server could not find in the turn; shown, never drawn.
   final List<String> missingIds;
@@ -105,12 +110,14 @@ final class MapActionsState {
 
   MapActionsState _with({
     List<String>? highlightedIds,
+    Map<String, String>? highlightTitles,
     List<String>? missingIds,
     MapFocusRequest? focus,
     AgentRoute? route,
     bool clearRoute = false,
   }) => MapActionsState(
     highlightedIds: highlightedIds ?? this.highlightedIds,
+    highlightTitles: highlightTitles ?? this.highlightTitles,
     missingIds: missingIds ?? this.missingIds,
     focus: focus ?? this.focus,
     route: clearRoute ? null : route ?? this.route,
@@ -152,13 +159,34 @@ class MapActionsController extends _$MapActionsController {
     );
   }
 
+  /// Moves the camera to a record the app opened, such as a Home feed item:
+  /// one point is centred, a line or area is fitted.
+  void focusPoints(List<AgentLatLng> points) {
+    if (points.isEmpty) return;
+    final first = points.first;
+    if (points.every((p) => p.lat == first.lat && p.lng == first.lng)) {
+      focusPoint(first.lat, first.lng);
+      return;
+    }
+    state = state._with(
+      focus: MapFocusRequest(
+        sequence: ++_focusSequence,
+        bounds: _boundsOf(points),
+      ),
+    );
+  }
+
   /// Removes the drawn route, for the dismiss chip and a new conversation.
   void clearRoute() {
     if (state.route != null) state = state._with(clearRoute: true);
   }
 
   void clearHighlights() {
-    state = state._with(highlightedIds: const [], missingIds: const []);
+    state = state._with(
+      highlightedIds: const [],
+      highlightTitles: const {},
+      missingIds: const [],
+    );
   }
 
   MapActionReport _showLayers(Map<String, dynamic> args) {
@@ -306,6 +334,13 @@ class MapActionsController extends _$MapActionsController {
   MapActionReport _highlight(Map<String, dynamic> args) {
     final ids = _strings(args['ids']);
     final missing = _strings(args['missing']);
+    final titles = switch (args['titles']) {
+      final Map<String, dynamic> map => {
+        for (final MapEntry(:key, :value) in map.entries)
+          if (value is String && value.isNotEmpty) key: value,
+      },
+      _ => const <String, String>{},
+    };
     final clear = args['clear_previous'] != false;
     final highlighted = clear
         ? ids
@@ -315,6 +350,10 @@ class MapActionsController extends _$MapActionsController {
           ];
     state = state._with(
       highlightedIds: List.unmodifiable(highlighted),
+      highlightTitles: Map.unmodifiable({
+        if (!clear) ...state.highlightTitles,
+        ...titles,
+      }),
       missingIds: List.unmodifiable(
         clear ? missing : [...state.missingIds, ...missing],
       ),

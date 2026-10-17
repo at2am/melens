@@ -54,7 +54,8 @@ void main() {
       query.bbox.toJson(),
       melbourneAreaById('docklands')!.bounds.toJson(),
     );
-    expect(query.window.to, harnessNow);
+    // Events reach the feed's default 14 days past what is on now.
+    expect(query.window.to, harnessNow.add(const Duration(days: 14)));
     expect(query.mode, MapQueryMode.current);
   });
 

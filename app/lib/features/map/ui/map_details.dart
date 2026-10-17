@@ -127,7 +127,9 @@ class MapDetails extends ConsumerWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     key: const ValueKey('map-details-scroll'),
-                    padding: const EdgeInsets.all(16),
+                    // The bottom clears the chat button, which floats over
+                    // the panel on a phone.
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
