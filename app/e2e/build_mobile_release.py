@@ -68,8 +68,9 @@ def build_ios(versions):
     signing = ["-allowProvisioningUpdates"]
     key = {name: os.environ.get(name, "") for name in ("ASC_KEY_PATH", "ASC_KEY_ID", "ASC_ISSUER_ID")}
     if all(key.values()):
-        signing += [f"-authenticationKeyPath={key['ASC_KEY_PATH']}", f"-authenticationKeyID={key['ASC_KEY_ID']}",
-                    f"-authenticationKeyIssuerID={key['ASC_ISSUER_ID']}"]
+        # Separate arguments: xcodebuild silently ignores the -option=value form and reports No Accounts.
+        signing += ["-authenticationKeyPath", key["ASC_KEY_PATH"], "-authenticationKeyID", key["ASC_KEY_ID"],
+                    "-authenticationKeyIssuerID", key["ASC_ISSUER_ID"]]
     elif any(key.values()):
         raise ValueError("Set all of ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID, or none.")
     # The Swift packages the workflow resolved into build/ios/SourcePackages; without this the archive

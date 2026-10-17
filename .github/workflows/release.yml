@@ -350,6 +350,12 @@ jobs:
             [[ $key_id =~ ^[A-Z0-9]{10}$ && $issuer_id =~ ^[0-9a-f-]{36}$ ]] \
               || { echo "$settings needs ASC_KEY_ID and ASC_ISSUER_ID" >&2; exit 1; }
             [[ -f $keys/ios/AuthKey_$key_id.p8 ]] || { echo "Missing $keys/ios/AuthKey_$key_id.p8" >&2; exit 1; }
+            # The runner's own security session sees the login keychain locked, so codesign signs from
+            # this keychain (.github/release/ios_signing_keychain.py). It must be on the search list.
+            kc="$HOME/Library/Keychains/melens-signing.keychain-db"
+            security unlock-keychain -p "$(cat "$keys/ios/keychain-password")" "$kc"
+            read -ra others <<< "$(security list-keychains -d user | xargs)"
+            [[ " ${others[*]} " == *" $kc "* ]] || security list-keychains -d user -s "$kc" "${others[@]}"
             {
               echo "ASC_KEY_ID=$key_id"
               echo "ASC_ISSUER_ID=$issuer_id"
