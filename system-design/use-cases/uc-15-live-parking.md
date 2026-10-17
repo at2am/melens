@@ -46,6 +46,8 @@ The map shows, for the area the user searches or looks at, which on-street bays 
 - [x] Each recommended bay on the card shows its reading, distance and walk to the destination, and the area's fee, time limit, hours and payment labelled as the area's rules, or that they are unknown.
 - [ ] The live map in the deployed app shows parking around a searched place (needs the data job image and map/agent deployments from this change).
 
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: the parking code is in released tags (latest change in v0.1.11), but the release workflow does not deploy the data job image, and no check of the deployed app is recorded.
+
 ## Notes
 
 - **Parking at the stops of a plan.** A plan the user drives to (UC-03, `travel_mode` `drive`) carries each located stop's parking in `stop_parking`, read by the same sensor search as `find_parking` (400 m, then 800 m) with the same area rules lookup, in a `plan_parking` step the model cannot call; a saved plan reads one stop's parking again on `POST /v1/plans/{planId}/stops/{index}/refresh`, keeping the area's rules from the earlier reading. The same rules apply: the rules are the area's, and a vacant sensor is not permission.

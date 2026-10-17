@@ -8,7 +8,7 @@ Together the P0 use cases make one demo story: open the map, see an anomaly, ask
 
 | ID | Use case | Priority | Proposed by | Agents | Status |
 | --- | --- | --- | --- | --- | --- |
-| [UC-01](uc-01-layers-and-topics.md) | Views, layers and topics | P0 | Haoyuan Tang | map_agent (UI action) | planned |
+| [UC-01](uc-01-layers-and-topics.md) | Views, layers and topics | P0 | Haoyuan Tang | map_agent (UI action) | in-progress |
 | [UC-02](uc-02-map-discovery.md) | Map discovery | P0 | Wasabii | area_brief, map_agent | in-progress |
 | [UC-03](uc-03-personalized-discovery.md) | Personalized discovery and planning | P0 | Wasabii | map_agent | in-progress |
 | [UC-04](uc-04-pedestrian-anomaly.md) | Pedestrian anomaly detection and analysis | P0 | Alex Gao | analyse_anomaly, map_agent | in-progress |

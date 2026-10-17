@@ -38,9 +38,11 @@ Translated from the original Chinese in the Notion table:
 
 - [ ] The hourly job writes new counts to BigQuery without gaps or duplicates.
 - [ ] Sensors beyond the threshold appear as "?" markers without an app reload.
-- [ ] The pop-up shows the direction (higher or lower) and the size of the difference against the baseline.
+- [x] The pop-up shows the direction (higher or lower) and the size of the difference against the baseline.
 - [ ] The analysis lists possible causes, each with a confidence level and at least one source link.
 - [x] Replay mode: a chosen historical day can run through the same pipeline, so the demo works even with no live anomaly (once `apply-sql.py` has applied 009 and the replay script has published a batch).
+
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: no live detector exists; only `cloud/data/scripts/anomaly_replay.py` writes `anomaly_results`, so there are no live markers, and the app re-reads only on pan, zoom or refresh. The hourly pedestrian job is disabled; the 15-minute minute feed handles duplicates in tests, and a window that is not yet filled fails closed, so gaps are possible. A cause's source may be a map feature rather than a web link, and `analyse_anomaly` has no recorded live run.
 
 ## Notes
 

@@ -51,7 +51,7 @@ Shows the agent calling several tools to build a plan around the user's time, in
 - [ ] Evening results include only events that start after the requested time, each with a source link.
 - [ ] Each evening result says how to get there on foot or by public transport.
 - [ ] A walk plan has free stops only, takes about 45 minutes, uses at most 13 waypoints and is drawn on the map.
-- [ ] Every stop or event cites a MapFeature id or a web link.
+- [x] Every stop or event cites a MapFeature id or a web link.
 - [ ] If the events layer has too few Melbourne events, the agent falls back to Search grounding and links the pages it used.
 - [x] Change plan sends a `refine` turn for that card; the revised plan keeps the unchanged stops and cites their sources without a new search.
 - [x] Save plan keeps the card and its route per uid; it shows on the Home tab until removed and outlives the chat session.
@@ -59,6 +59,8 @@ Shows the agent calling several tools to build a plan around the user's time, in
 - [x] Before a plan the agent asks up to three questions together, without a card, and makes the plan once from the answers; a change that needs answers asks first and revises once.
 - [x] A saved plan can be renamed and have its stops removed or reordered, with its route drawn again; Change with Melens revises it in the chat, and Update saved plan keeps the revision in its place.
 - [x] A driven plan shows the live parking near each located stop, read by code with the area's cited rules; a saved plan's stop reads it again on request and keeps the new reading.
+
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: `search_features` filters events by window overlap, so an event that started before the requested time still passes; `getting_there` is optional in the card schema and not checked; nothing checks that walk stops are free or that the walk takes about 45 minutes (the 13-waypoint limit is enforced); there is no rule or test for falling back to Search grounding when events are scarce. The eval checks tool traces, not card content.
 
 ## Notes
 

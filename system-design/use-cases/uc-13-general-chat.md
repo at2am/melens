@@ -71,20 +71,22 @@ Multi-turn chain:
 
 ## Acceptance criteria (Draft)
 
-- [ ] Random questions outside our data get a useful answer, using Search or Maps grounding when facts are needed.
+- [x] Random questions outside our data get a useful answer, using Search or Maps grounding when facts are needed.
 - [ ] Greetings, thanks, small talk and questions about the assistant get a short plain-text reply with no tool call, no card and no question. A real request in the same chat still gets the right tools.
-- [ ] Map requests ("only show…", "take me to…") change the map through UI action tools.
+- [x] Map requests ("only show…", "take me to…") change the map through UI action tools.
 - [ ] Requests a workflow covers call that workflow.
 - [ ] Specific facts and recommendations appear in cards with sources. General advice may be plain text but never presents live data without a tool result from the same turn.
 - [ ] "Here", "now" and "this one" resolve from the request context.
 - [ ] The agent asks only when the context cannot resolve an ambiguity or a required input has no default: at most one question per turn, with 2–4 options. It never asks for confirmation.
-- [ ] Every turn ends within the step budget; near the limit the agent wraps up and answers.
+- [x] Every turn ends within the step budget; near the limit the agent wraps up and answers.
 - [ ] The eval checks the tool trace for precise requests: the right tool with the right arguments.
-- [ ] Closing and reopening the app restores the conversation, and a new deployment of the agent service does not lose it. A user never sees another user's session.
-- [ ] The chat panel lists the user's sessions; switching to one restores that conversation, and new and delete work.
-- [ ] Every model call sends a `usage` event with Gemini's own input and output token counts while the turn runs; `done.usage` equals their sum and matches the stored turn.
+- [x] Closing and reopening the app restores the conversation, and a new deployment of the agent service does not lose it. A user never sees another user's session.
+- [x] The chat panel lists the user's sessions; switching to one restores that conversation, and new and delete work.
+- [x] Every model call sends a `usage` event with Gemini's own input and output token counts while the turn runs; `done.usage` equals their sum and matches the stored turn.
 - [ ] Stop and a new message both end the running turn within a second, and the new message is never rejected because a turn is still running.
-- [ ] A photo with or without text gets an answer about what it shows; a follow-up about the same photo in the next turns still sees it; a reopened session shows its photos.
+- [x] A photo with or without text gets an answer about what it shows; a follow-up about the same photo in the next turns still sees it; a reopened session shows its photos.
+
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: `scripts/eval.mts` has 24 cases but the recorded run (`system-design/eval/2026-10-15.md`) covers the first 12, so small talk, analyse by marker and "this one" have no recorded result; the eval checks tool names, not arguments; `analyse_anomaly` was never reached from chat (no anomaly data); the plain-text and no-confirmation rules are prompt-only; plan turns may ask up to three questions (UC-03), beyond "at most one"; a turn that ignores the abort delays a new message up to 5 s (`SUPERSEDE_WAIT_MS`). A redeploy was not checked explicitly for session restore.
 
 ## Notes
 

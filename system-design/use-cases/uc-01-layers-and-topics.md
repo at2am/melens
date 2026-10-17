@@ -2,7 +2,7 @@
 id: UC-01
 title: Views, layers and topics
 priority: P0
-status: planned
+status: in-progress
 proposed_by: Haoyuan Tang
 trigger: browse
 agents: [map_agent]
@@ -29,9 +29,11 @@ Every dataset reaches the user as a layer, and every other feature hangs off a l
 ## Acceptance criteria (Draft)
 
 - [ ] Each P0 dataset appears as its own layer: pedestrian counts, anomalies (UC-04), transport disruptions (UC-05) and events.
-- [ ] Toggling a layer updates the map without a reload.
-- [ ] Agent requests include the list of enabled layers.
+- [x] Toggling a layer updates the map without a reload.
+- [x] Agent requests include the list of enabled layers.
 - [ ] Layers from user-added sources (UC-07, P1) appear alongside the built-in ones.
+
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: the anomaly layer has replay data only, no live detector (UC-04); live map acceptance T020 is open (`specs/002-map-data-presentation/validation.md`); UC-07 is not built, so no user-source layers.
 
 ## Notes
 

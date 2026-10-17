@@ -35,6 +35,8 @@ Translated from the original Chinese in the Notion table:
 - [x] Polling stays within 24 calls per 60 seconds per transport mode (the shared key's limit is 20; schedules peak near 16).
 - [ ] Disruptions are available to `map_agent` and `analyse_anomaly` through `nearby_context`.
 
+**Audit, 2026-10-17.** A ticked item is backed by code and a test or recorded check. Still open: the GTFS-R adapter always sends `serviceNames: []` (`cloud/shared/src/query/disruptions.ts`), so a tram or train alert never names its routes, and the details test does not assert the time window or source. `analyse_anomaly` reads disruptions through `searchArea`, not `nearby_context`, and no test shows `nearby_context` returning disruptions.
+
 ## Notes
 
 - Service Alerts cover trams and trains only; buses are not covered.
