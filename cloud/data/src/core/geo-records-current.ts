@@ -72,9 +72,11 @@ export const NO_STATE_MESSAGE = 'geo_records_current has no refreshed state for 
  * rebuild reads most of geo_records, source_records and geo_record_sources whatever its sources:
  * 490 MB on 2026-10-15, against the 500 MB per-query source ceiling. Rebuilds run a few times a day
  * (snapshot publications and the retention cycle). The incremental path reads recent payloads
- * and historical version clocks for the incoming record IDs.
+ * and historical version clocks for the incoming record IDs. Raised from 1.5 GB to 3 GB on
+ * 2026-10-17: the 2026-10-16 partitions grew a Ticketmaster rebuild to 1.50 GB, so its copy kept
+ * the previous day's rows and every event expired from the map.
  */
-export const GEO_CURRENT_REBUILD_MAX_BYTES = '1500000000';
+export const GEO_CURRENT_REBUILD_MAX_BYTES = '3000000000';
 
 function viewBody(sql: string, marker: string): string {
   const start = sql.indexOf(marker);

@@ -412,7 +412,7 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_serial_contiguous_windows",
       "request_cap_per_day": 40,
-      "maximum_bytes_billed": 500000000,
+      "maximum_bytes_billed": 3000000000,
       "secret_names": [
         "ticketmaster_discovery_api_key"
       ],
@@ -458,7 +458,7 @@
       "snapshot_revision": "latest",
       "backfill_strategy": "manual_versioned_snapshot",
       "request_cap_per_day": 10,
-      "maximum_bytes_billed": 1000000000,
+      "maximum_bytes_billed": 2000000000,
       "secret_names": [],
       "task_timeout_seconds": 1800,
       "max_requests_per_execution": 5,
@@ -598,6 +598,7 @@
     }
   ],
   "notes": [
+    "ticketmaster.events (1.16 GB needed against 0.5 GB, failing since 12:40 UTC on 2026-10-16, so every event expired from the map 24 hours after the last publication) and victoria.transport.gtfs_static (1.17 GB against 1 GB) got higher ceilings for the same reason: gtfs_static 2 GB, ticketmaster.events 3 GB, because the map copy's refresh after its publication rebuilds the source from the whole history (about 1.5 GB) on top of the publication's own reads (about 0.54 GB), and a run shares one ceiling.",
     "gdelt.news and victoria.transport.gtfs_realtime have a 2 GB ceiling since 2026-10-17: every run had failed budgetExceeded since about 13:55 UTC on 2026-10-16 (GDELT's publish validation needed 1.10 GB against 0.5 GB; the GTFS-R static join 1.007 GB against about 0.99 GB), because the 2026-10-16 fetched_at partitions hold about 1.1 GB of parking and transport rows. Lower them again once those partitions age out of the reads.",
     "All sources remain disabled until manifest admission and cloud verification are complete.",
     "Time-window backfills are manual, ordered oldest to newest; the scheduler does not replay missed windows automatically.",
