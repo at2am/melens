@@ -12,9 +12,10 @@ All routes are called on the agent service's Cloud Run URL directly (or a custom
 | --- | --- |
 | `POST /v1/sessions` | Create a session for the caller; returns `sessionId` |
 | `GET /v1/sessions` | List the caller's sessions, newest first: `id`, `title`, `createdAt`, `updatedAt`, `turnCount` |
-| `GET /v1/sessions/{sessionId}` | The session's stored turns, for redrawing the chat panel |
+| `GET /v1/sessions/{sessionId}` | The session's stored turns, for redrawing the chat panel, its pending question and `runningTurnId` (the turn still running, or null) |
 | `DELETE /v1/sessions/{sessionId}` | Delete the session and its turns |
 | `POST /v1/sessions/{sessionId}/turns` | Run one turn; the response is a stream of server-sent events. A turn still running in the session is interrupted ([Rules](#rules), 4) |
+| `GET /v1/sessions/{sessionId}/turns/{turnId}/events?after={seq}` | Follow a running or just-finished turn again from the event after `seq`, as server-sent events ([Resuming a turn](#resuming-a-turn)) |
 | `POST /v1/sessions/{sessionId}/cancel` | Stop the session's running turn, wherever it runs; `204` also when none runs |
 | `GET /v1/sessions/{sessionId}/attachments/{attachmentId}` | A stored photo's bytes, with its image type, for redrawing a restored turn |
 
@@ -45,7 +46,8 @@ Flutter                                  Cloud Run: agent service (ADK, TypeScri
     "selected": { "featureId": null, "point": null },
     "layers": ["pedestrian", "events"],
     "openCardId": null,
-    "localTime": "2026-10-10T18:40:00+11:00"
+    "localTime": "2026-10-10T18:40:00+11:00",
+    "actionReports": [{ "action": "highlight_features", "outcome": "partial", "skipped": ["event:9"] }]
   }
 }
 ```
@@ -65,11 +67,11 @@ A `refine` turn is the UC-03 plan refinement. The service reads the card from th
 
 A `text` or `refine` input may carry photos the user attached, in `attachments` next to `input`; a `text` input's `text` may then be empty. Each is `{ "kind": "image", "mimeType": "image/jpeg", "data": "<standard base64>" }`: at most 4 per turn, each at most 1,000,000 bytes, of type `image/jpeg`, `image/png`, `image/webp`, `image/heic` or `image/heif`. The server checks that the bytes start like the declared type and answers `400` otherwise. The app downsizes photos before sending (long edge 1,600 px, JPEG quality 80 where the platform re-encodes) and re-encodes anything still too large, or of another type, as a smaller PNG. Gemini reads the photos with the message; a photo Gemini cannot decode ends the turn with an `error` that says so and is not `retryable`.
 
-`context` is sent on every turn. The app is the source of truth for what is on screen; the server does not guess. `userLocation` is present only when the user granted location access.
+`context` is sent on every turn. The app is the source of truth for what is on screen; the server does not guess. `userLocation` is present only when the user granted location access. `actionReports` (optional, at most 8) names the map actions of the previous turn the app could not fully apply: the action, `outcome` (`partial` or `ignored`) and the layer names or feature ids it `skipped` (at most 20). The model reads them in the map context.
 
 ## Events
 
-Every event carries `turnId` and an increasing `seq`, so the app can de-duplicate and order them.
+Every event carries `turnId` and an increasing `seq`, so the app can de-duplicate and order them. The stream also sends `seq` as the SSE `id:` field.
 
 | Event | Payload | App behaviour |
 | --- | --- | --- |
@@ -85,11 +87,17 @@ Every event carries `turnId` and an increasing `seq`, so the app can de-duplicat
 ## Rules
 
 1. **Recommendations only in cards.** Streamed text carries explanations and transitions. Places, events and routes appear in `card` events, which are sent only after source validation (see [agent-design.md](agent-design.md#source-rules)).
-2. **UI actions are one-way.** The server does not wait for the app to confirm an action. If an action fails in the app, the next request's `context` shows the real state.
+2. **UI actions are one-way.** The server does not wait for the app to confirm an action. If an action fails in the app, the next request's `context` shows the real state, and its `actionReports` say which actions of the previous turn were applied only in part or not at all. The app keeps the map as it was before a turn's first action, so the user can undo the last turn's map changes (layers, highlights, route and camera); reopening a conversation from the session list draws its last route and highlights again.
 3. **Features by id.** Cards and UI actions reference `featureId`s, which are [map contract v1](../specs/002-map-data-presentation/contracts/map-api.md) MapItem ids. The app resolves them against the items it has loaded from the map query service, which keeps events small and consistent with the map. Card items also carry a `location`, so an item the app has not loaded still shows a pin; `highlight_features` reports ids the server could not find as `missing`, and carries `titles` (id to title) for the ids it found, so the app can label a highlight it has not loaded (an event later tonight while the map shows what is on now).
 4. **Server-side sessions, per user.** Conversation history is stored in Firestore under the caller's uid and survives restarts and new revisions. The app keeps the current `sessionId` locally and can list and reopen earlier sessions. A session belongs to one uid; another user's session id returns `not_found`, never `forbidden`. One turn runs at a time per session, and a new turn interrupts the running one, so the user can redirect the agent at any moment: the server asks the running turn to stop, waits up to 5 seconds for it to store what it has (so the new turn's history includes it, marked as stopped), then runs the new turn. A turn that does not stop in time loses its lease; it is stored when it ends, without touching the newer turn's lease or pending question. The store numbers turns in the order they finish.
-5. **Cancellation reaches the server.** When the user taps stop, the app aborts the request and calls `POST /v1/sessions/{sessionId}/cancel`; leaving the screen or the session aborts the request too. The server cancels the run on the disconnect, on the cancel route, on a newer turn and at the turn deadline, so it stops spending tokens and grounding calls: model calls, BigQuery queries and grounding calls in flight are aborted. The stop request travels through the session's lease (`activeTurn.cancelRequested`), which the running turn watches, so it works whichever Cloud Run instance runs the turn. A stopped turn ends with `done` stop `cancelled` and is stored with what it produced so far.
+5. **Cancellation reaches the server.** When the user taps stop, the app aborts the request and calls `POST /v1/sessions/{sessionId}/cancel`; leaving the screen or the session aborts the request too. The server cancels the run on the cancel route, on a newer turn, at the turn deadline, and when no client has followed the turn for 20 seconds after a disconnect (the grace for [resuming](#resuming-a-turn)), so it stops spending tokens and grounding calls: model calls, BigQuery queries and grounding calls in flight are aborted. The stop request travels through the session's lease (`activeTurn.cancelRequested`), which the running turn watches, so it works whichever Cloud Run instance runs the turn. A stopped turn ends with `done` stop `cancelled` and is stored with what it produced so far.
 6. **Questions end the turn.** A turn that asks the user sends `question`, then `done` with stop `asked`. A turn asks one question, or up to three about the plan it showed. Tapping an option sends an `answer` input; picks under several questions go as one `answers` input. Typing something else sends `text` as usual, and the agent decides whether it answers the question or changes the topic.
+
+7. **Failed turns are stored.** A turn that fails (a model or tool failure the turn cannot recover from) ends with `error` and is stored with what it produced and `failure` (`message`, `retryable`), so a reopened conversation shows it as failed and the model's history marks it. A model call that fails with a passing error (429, 5xx, a dropped connection) before it streamed anything is made again, up to twice, before the turn fails.
+
+## Resuming a turn
+
+A phone that loses signal drops the turn's stream, but the turn keeps running for a 20-second grace. The app follows it again with `GET /v1/sessions/{sessionId}/turns/{turnId}/events?after={seq}`, where `seq` is the last event it handled: the response replays the later events and streams the rest. The instance keeps a finished turn's events for 60 seconds, so a late resume still gets the end. Only the instance that runs the turn has its events; another answers `404 notFound`, and the app then reads `GET /v1/sessions/{sessionId}` until `runningTurnId` no longer names the turn and shows the stored turn. The app tries to resume three times (after 1, 2 and 4 seconds) and shows "Reconnecting…" meanwhile.
 
 ## Token usage
 
@@ -294,7 +302,7 @@ Anonymous sign-in is the project's only provider, and Firestore's client rules d
 
 | Part | Responsibility |
 | --- | --- |
-| `AgentClient` | Transport, SSE parsing, cancellation (abort and the cancel route), stored photos |
+| `AgentClient` | Transport, SSE parsing, cancellation (abort and the cancel route), resuming a dropped turn, stored photos |
 | `ChatController` | Conversation state, the turn in progress, any pending question and the turn's running token counter from `usage` events; a message sent while a turn runs interrupts it; restores a session from `GET /v1/sessions/{sessionId}` |
 | `SessionList` | Lists, switches, creates and deletes the user's sessions |
 | `MapActions` | Applies `ui_action` events to the map |

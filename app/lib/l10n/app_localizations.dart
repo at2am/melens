@@ -1642,6 +1642,102 @@ abstract class AppLocalizations {
   /// **'Stop this turn'**
   String get chatStop;
 
+  /// Progress line under a running turn whose stream dropped while the app follows it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection lost. Reconnecting…'**
+  String get chatReconnecting;
+
+  /// Under a step that has run for a while, such as a Google grounding call.
+  ///
+  /// In en, this message translates to:
+  /// **'This source can take up to a minute.'**
+  String get chatStepSlow;
+
+  /// Button under the last answer that puts the layers, highlights, route and camera back as they were before it.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo map changes'**
+  String get chatUndoMap;
+
+  /// Shown under an answer whose map changes the user undid.
+  ///
+  /// In en, this message translates to:
+  /// **'Map changes undone'**
+  String get chatMapUndone;
+
+  /// The answer sent for a question the user skipped when sending answers to several questions.
+  ///
+  /// In en, this message translates to:
+  /// **'No preference'**
+  String get chatQuestionNoPreference;
+
+  /// Under several questions: the user may send without answering all of them.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions you skip use sensible defaults.'**
+  String get chatQuestionsDefaults;
+
+  /// Choice under a question that lets the user type their own answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Other…'**
+  String get chatQuestionOther;
+
+  /// Placeholder of the box for the user's own answer to one question.
+  ///
+  /// In en, this message translates to:
+  /// **'Your answer'**
+  String get chatQuestionOtherHint;
+
+  /// Heading above the suggested first messages of an empty conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Try asking'**
+  String get chatStartersTitle;
+
+  /// Suggested first message: what is around the map's centre or the user.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s interesting around here?'**
+  String get chatStarterAround;
+
+  /// Suggested first message before 11 am.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan my morning'**
+  String get chatStarterMorning;
+
+  /// Suggested first message from 11 am to 4 pm.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan a walk this afternoon'**
+  String get chatStarterAfternoon;
+
+  /// Suggested first message from 4 pm.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan my evening'**
+  String get chatStarterEvening;
+
+  /// Suggested first message: on-street parking near the user or the map centre.
+  ///
+  /// In en, this message translates to:
+  /// **'Find parking nearby'**
+  String get chatStarterParking;
+
+  /// Suggested first message: roadworks, closures and transport disruptions nearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Any disruptions around here?'**
+  String get chatStarterDisruptions;
+
+  /// How long a running step or the model's thinking has taken so far, in whole seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s'**
+  String chatElapsed(int seconds);
+
   /// Button that sends the failed input or request again.
   ///
   /// In en, this message translates to:

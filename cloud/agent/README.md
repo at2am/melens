@@ -68,6 +68,7 @@ Development mode keeps sessions in memory and accepts `Authorization: Bearer dev
 | `AGENT_GROUNDING_TIMEOUT_MS` | `40000`. A `maps_grounding` or `search_grounding` call that takes longer returns `upstream_unavailable` to the model, which answers from the map data and says what is missing. Measured on 2026-10-09: Maps grounding took 48 to 110 s per call, Search grounding about 10 s |
 | `AGENT_ROUTES_QUOTA_PROJECT` | Unset on Cloud Run. Local runs with user credentials need it (`npm run dev` sets it to the project): the Routes API refuses user ADC without a quota project, and a service identity needs none. Not yet verified on the deployed service |
 | `AGENT_TURNS_PER_HOUR` | `120` per uid, in memory per instance |
+| `AGENT_CONTEXT_CACHE` | `true`. Serves the chat instruction and tool declarations from a Gemini explicit context cache, renewed hourly; a creation that fails (quota, too few tokens) falls back to sending them in full for 10 minutes. `false` turns it off |
 | `MAP_*` | The shared query configuration ([cloud/map/README.md](../map/README.md#query-configuration)); `MAP_PROJECT_ID` defaults to the agent project |
 | `PORT` | `8080` |
 

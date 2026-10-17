@@ -83,6 +83,7 @@ final class RequestContext {
     this.userLocation,
     this.selected,
     this.openCardId,
+    this.actionReports,
   });
 
   @JsonKey(required: true)
@@ -109,10 +110,54 @@ final class RequestContext {
   @JsonKey(required: true)
   final String localTime;
 
+  /// The map actions of the previous turn the app could not fully apply.
+  @JsonKey(includeIfNull: false)
+  final List<ActionReport>? actionReports;
+
+  /// This context, reporting [reports]; none leaves the field out.
+  RequestContext withActionReports(List<ActionReport> reports) =>
+      RequestContext(
+        viewport: viewport,
+        zoom: zoom,
+        layers: layers,
+        localTime: localTime,
+        userLocation: userLocation,
+        selected: selected,
+        openCardId: openCardId,
+        actionReports: reports.isEmpty ? null : reports,
+      );
+
   factory RequestContext.fromJson(Map<String, dynamic> json) =>
       _$RequestContextFromJson(json);
 
   Map<String, dynamic> toJson() => _$RequestContextToJson(this);
+}
+
+/// A map action of the previous turn that the app could not fully apply, so
+/// the next request tells the agent (agent-protocol.md, Rules 2).
+@JsonSerializable(checked: true, explicitToJson: true)
+final class ActionReport {
+  const ActionReport({
+    required this.action,
+    required this.outcome,
+    this.skipped = const [],
+  });
+
+  @JsonKey(required: true)
+  final UiActionName action;
+
+  /// `partial` or `ignored`.
+  @JsonKey(required: true)
+  final String outcome;
+
+  /// The layer names or feature ids the app could not use.
+  @JsonKey(defaultValue: <String>[])
+  final List<String> skipped;
+
+  factory ActionReport.fromJson(Map<String, dynamic> json) =>
+      _$ActionReportFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ActionReportToJson(this);
 }
 
 /// One answer of an `answers` input: the question and the option chosen.
@@ -943,6 +988,23 @@ final class TraceEntry {
   Map<String, dynamic> toJson() => _$TraceEntryToJson(this);
 }
 
+/// Why a stored turn failed before it finished: the error the app showed.
+@JsonSerializable(checked: true, explicitToJson: true)
+final class TurnFailure {
+  const TurnFailure({required this.message, required this.retryable});
+
+  @JsonKey(required: true)
+  final String message;
+
+  @JsonKey(required: true)
+  final bool retryable;
+
+  factory TurnFailure.fromJson(Map<String, dynamic> json) =>
+      _$TurnFailureFromJson(json);
+
+  Map<String, dynamic> toJson() => _$TurnFailureToJson(this);
+}
+
 /// A finished turn as the server stores it: what the app needs to redraw.
 @JsonSerializable(checked: true, explicitToJson: true)
 final class StoredTurn {
@@ -960,6 +1022,7 @@ final class StoredTurn {
     required this.usage,
     this.attachments = const [],
     this.questions = const [],
+    this.failure,
   });
 
   @JsonKey(required: true)
@@ -1002,6 +1065,10 @@ final class StoredTurn {
 
   @JsonKey(required: true)
   final StopReason stop;
+
+  /// Set when the turn failed before it finished; what it produced is kept.
+  @JsonKey(includeIfNull: false)
+  final TurnFailure? failure;
 
   @JsonKey(required: true)
   final List<TraceEntry> trace;
@@ -1055,10 +1122,15 @@ final class SessionDetail {
     required this.session,
     required this.pendingQuestion,
     required this.turns,
+    this.runningTurnId,
   });
 
   @JsonKey(required: true)
   final SessionSummary session;
+
+  /// The turn still running in the session, if any: an app that lost the
+  /// turn's stream waits until it is stored.
+  final String? runningTurnId;
 
   @JsonKey(required: true)
   final AgentQuestion? pendingQuestion;

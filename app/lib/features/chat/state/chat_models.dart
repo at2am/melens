@@ -94,6 +94,8 @@ final class ChatStep {
     this.memo = false,
     this.textOffset = 0,
     this.action,
+    this.startedAt,
+    this.finishedAt,
   });
 
   final String id;
@@ -121,6 +123,10 @@ final class ChatStep {
   /// The `ui_action` this step produced, as the app handled it.
   final ChatActionRecord? action;
 
+  /// When the app saw the step start and finish; null for a stored step.
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+
   bool get isRunning => state == AgentStepState.running;
 
   ChatStep copyWith({ChatActionRecord? action}) => ChatStep(
@@ -135,6 +141,8 @@ final class ChatStep {
     memo: memo,
     textOffset: textOffset,
     action: action ?? this.action,
+    startedAt: startedAt,
+    finishedAt: finishedAt,
   );
 }
 
@@ -155,6 +163,10 @@ final class ChatTurn {
     this.stop,
     this.error,
     this.lastSeq = -1,
+    this.startedAt,
+    this.reconnecting = false,
+    this.mapBefore,
+    this.mapUndone = false,
   });
 
   final int localId;
@@ -188,7 +200,25 @@ final class ChatTurn {
   final ChatError? error;
   final int lastSeq;
 
+  /// When the user sent it; null for a stored turn.
+  final DateTime? startedAt;
+
+  /// The stream dropped and the app is following the turn again.
+  final bool reconnecting;
+
+  /// The map before the turn's first UI action, so the user can undo what
+  /// the turn changed on it; null when the turn changed nothing.
+  final MapSnapshot? mapBefore;
+
+  /// The user undid the turn's map changes.
+  final bool mapUndone;
+
   bool get isRunning => phase == ChatTurnPhase.running;
+
+  /// When the model last started working with nothing to show: the end of
+  /// the last step, or the start of the turn.
+  DateTime? get thinkingSince =>
+      steps.isEmpty ? startedAt : steps.last.finishedAt ?? startedAt;
 
   /// The model is working between tool calls: nothing shows progress but
   /// the turn is still running.
@@ -218,6 +248,9 @@ final class ChatTurn {
     StopReason? stop,
     ChatError? error,
     int? lastSeq,
+    bool? reconnecting,
+    MapSnapshot? mapBefore,
+    bool? mapUndone,
   }) => ChatTurn(
     localId: localId,
     input: input,
@@ -233,6 +266,10 @@ final class ChatTurn {
     stop: stop ?? this.stop,
     error: error ?? this.error,
     lastSeq: lastSeq ?? this.lastSeq,
+    startedAt: startedAt,
+    reconnecting: reconnecting ?? this.reconnecting,
+    mapBefore: mapBefore ?? this.mapBefore,
+    mapUndone: mapUndone ?? this.mapUndone,
   );
 }
 

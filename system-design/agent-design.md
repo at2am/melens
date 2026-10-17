@@ -210,5 +210,6 @@ There is no stable Pro model yet (only `gemini-3.1-pro-preview`), and the produc
 
 ## Open questions
 
-- Result compaction for long tool results (rows shortened, first N kept) is still to be implemented; the first version caps list sizes instead.
+- Result compaction is implemented (2026-10-17): a tool result over 6,000 characters that the model already read is sent to the later calls of the turn with its lists cut to the first 5 rows and long strings clipped; the newest results stay whole.
+- Prompt caching (2026-10-17): the instruction and tool declarations (about 4,300 tokens) are served from a Gemini explicit context cache, renewed hourly (`AGENT_CONTEXT_CACHE`). The pending question moved from the instruction into the message so the cached prefix is the same for every turn. Eval case 10 on 2026-10-17: 8,714 of 14,997 tokens came from the cache. The last call of a turn, which has no tools, sends the prefix in full.
 - Rate-limit counters are still in memory per instance; the grounding cache and the workflow cards moved to Firestore (`agentCache`) on 2026-10-15.

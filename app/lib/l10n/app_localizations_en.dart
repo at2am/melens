@@ -901,6 +901,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatStop => 'Stop this turn';
 
   @override
+  String get chatReconnecting => 'Connection lost. Reconnecting…';
+
+  @override
+  String get chatStepSlow => 'This source can take up to a minute.';
+
+  @override
+  String get chatUndoMap => 'Undo map changes';
+
+  @override
+  String get chatMapUndone => 'Map changes undone';
+
+  @override
+  String get chatQuestionNoPreference => 'No preference';
+
+  @override
+  String get chatQuestionsDefaults =>
+      'Questions you skip use sensible defaults.';
+
+  @override
+  String get chatQuestionOther => 'Other…';
+
+  @override
+  String get chatQuestionOtherHint => 'Your answer';
+
+  @override
+  String get chatStartersTitle => 'Try asking';
+
+  @override
+  String get chatStarterAround => 'What\'s interesting around here?';
+
+  @override
+  String get chatStarterMorning => 'Plan my morning';
+
+  @override
+  String get chatStarterAfternoon => 'Plan a walk this afternoon';
+
+  @override
+  String get chatStarterEvening => 'Plan my evening';
+
+  @override
+  String get chatStarterParking => 'Find parking nearby';
+
+  @override
+  String get chatStarterDisruptions => 'Any disruptions around here?';
+
+  @override
+  String chatElapsed(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
   String get chatRetry => 'Retry';
 
   @override

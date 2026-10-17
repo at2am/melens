@@ -90,7 +90,12 @@ class SessionList extends ConsumerWidget {
                       selected: session.id == chat.sessionId,
                       onTap: () {
                         if (session.id != chat.sessionId) {
-                          unawaited(controller.openSession(session.id));
+                          unawaited(
+                            controller.openSession(
+                              session.id,
+                              restoreMap: true,
+                            ),
+                          );
                         }
                         onSelected?.call();
                       },
