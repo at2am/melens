@@ -675,6 +675,57 @@ void main() {
     );
   });
 
+  testWidgets('the user ticks off the stops they reached; the next one '
+      'stands out, the progress is kept and shows on Home', (tester) async {
+    final plans = FakePlansClient(stored: [_saved(_plan)]);
+    final container = appContainer(plans: plans);
+    await pumpApp(tester, container);
+    await tester.tap(find.byKey(ValueKey('saved-plan-${_plan.id}')));
+    await tester.pumpAndSettle();
+
+    // Nothing visited: the first stop is next.
+    expect(find.byKey(const ValueKey('plan-progress')), findsNothing);
+    expect(find.byKey(const ValueKey('plan-stop-arrived-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan-stop-arrived-1')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('plan-stop-arrived-0')));
+    await tester.pumpAndSettle();
+    expect(plans.calls, contains('edit:${_plan.id} - - done 1'));
+    expect(find.text('1 of 2 visited'), findsOneWidget);
+    expect(find.text('Next: Treasury Gardens'), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan-stop-arrived-1')), findsOneWidget);
+
+    // Ticking the last stop's circle marks every stop.
+    await tester.tap(find.byKey(const ValueKey('plan-stop-mark-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('All stops visited'), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan-progress-next')), findsNothing);
+
+    // Taking the first tick off takes off the ones after it.
+    await tester.tap(find.byKey(const ValueKey('plan-stop-mark-0')));
+    await tester.pumpAndSettle();
+    expect(plans.calls.last, 'edit:${_plan.id} - - done 0');
+    expect(find.byKey(const ValueKey('plan-progress')), findsNothing);
+
+    // A failure puts the old progress back and says so.
+    plans.failure = const AgentProtocolException('down');
+    await tester.tap(find.byKey(const ValueKey('plan-stop-arrived-0')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Your progress could not be saved. Try again.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('plan-progress')), findsNothing);
+    plans.failure = null;
+
+    await tester.tap(find.byKey(const ValueKey('plan-stop-arrived-0')));
+    await tester.pumpAndSettle();
+    expect(container.read(savedPlansProvider).value?.single.done, 1);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 2 visited · Mon 19 Oct, 6:00 pm'), findsOneWidget);
+  });
+
   testWidgets('Change with Melens opens the chat on the saved plan; its '
       'revision updates the saved plan in its place', (tester) async {
     const revised = AgentCard(

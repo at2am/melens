@@ -397,6 +397,35 @@ test('the user edits a saved plan: a new title, stops dropped and reordered, and
   } finally { await close(); }
 });
 
+test('the user marks how far they have got through a saved plan', async () => {
+  const { call, newSession, turn, lastTurnId, save, close } = await start(cardRunner([], [{ cards: (id) => [located(id)] }]));
+  try {
+    const sessionId = await newSession();
+    await turn(sessionId, { kind: 'text', text: 'Plan my evening' });
+    const planId = `c_${await lastTurnId(sessionId)}_1`;
+    await save(sessionId, planId);
+    const edit = async (body: unknown) => {
+      const response = await call(`/v1/plans/${planId}`, { method: 'PATCH', body: JSON.stringify(body) });
+      return { status: response.status, plan: response.status === 200 ? ((await response.json()) as { plan: SavedPlan }).plan : null };
+    };
+
+    const first = await edit({ done: 1 });
+    assert.equal(first.status, 200);
+    assert.equal(first.plan?.done, 1);
+    assert.deepEqual(first.plan?.card.items, located(first.plan!.turnId).items, 'marking a stop changes no stop');
+    assert.equal((await edit({ title: 'Our evening' })).plan?.done, 1, 'a new title keeps the progress');
+    assert.equal((await edit({ done: 3 })).plan?.done, 3, 'every stop visited');
+    assert.equal((await edit({ stops: [0, 1, 2] })).plan?.done, 3, 'stops in the same order keep it');
+    assert.equal((await edit({ stops: [1, 0] })).plan?.done, undefined, 'moved stops start it again');
+    assert.equal((await edit({ stops: [1, 0], done: 1 })).plan?.done, 1, 'unless the edit gives it');
+    assert.equal((await edit({ done: 0 })).plan?.done, undefined, 'none visited');
+    assert.equal((await edit({ done: 3 })).status, 400, 'more stops than the plan has');
+    assert.equal((await edit({ done: -1 })).status, 400);
+    const listed = ((await (await call('/v1/plans')).json()) as { plans: SavedPlan[] }).plans;
+    assert.equal(listed[0]?.done, undefined);
+  } finally { await close(); }
+});
+
 test('a saved plan is changed from any session: the refine turn and the answers to its questions get the saved card', async () => {
   const seen: TurnContext[] = [];
   // The jazz alone: first now, so it no longer says how to get there from the stop before.

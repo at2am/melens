@@ -57,6 +57,11 @@ const routeStartStyle = MapMarkerStyle(Icons.trip_origin, Color(0xFF2E7D32));
 const routeEndStyle = MapMarkerStyle(Icons.sports_score, Color(0xFFC62828));
 const routeStopStyle = MapMarkerStyle(Icons.place, Color(0xFF1E88E5));
 
+/// The place the user opened from a card or a plan: a dark pin in an amber
+/// halo, unlike any layer, so it stands out among them.
+const focusStyle = MapMarkerStyle(Icons.place, Color(0xFF263238));
+const focusHaloColor = Color(0xFFFFB300);
+
 /// The user's own position: a blue dot, not a pin.
 const userLocationColor = Color(0xFF1A73E8);
 

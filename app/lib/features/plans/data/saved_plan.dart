@@ -8,6 +8,7 @@ part 'saved_plan.g.dart';
 /// card as the agent service stored it, so it outlives the chat session.
 /// Its id is the card's id. [route] is the `draw_route` action of the same
 /// turn, when the agent drew one; an edit draws it again or drops it.
+/// [done] is how many stops, from the first, the user marked as visited.
 @JsonSerializable(checked: true, explicitToJson: true)
 final class SavedPlan {
   const SavedPlan({
@@ -18,6 +19,7 @@ final class SavedPlan {
     required this.card,
     this.updatedAt,
     this.route,
+    this.done,
   });
 
   @JsonKey(required: true)
@@ -42,6 +44,27 @@ final class SavedPlan {
 
   @JsonKey(includeIfNull: false)
   final Map<String, dynamic>? route;
+
+  @JsonKey(includeIfNull: false)
+  final int? done;
+
+  /// How many stops are visited, within the stops the plan has.
+  int get visited => (done ?? 0).clamp(0, card.items.length);
+
+  /// The index of the stop to visit next, or null once all are visited.
+  int? get nextStop => visited < card.items.length ? visited : null;
+
+  /// This plan with [count] stops visited, as the service will keep it.
+  SavedPlan withVisited(int count) => SavedPlan(
+    id: id,
+    sessionId: sessionId,
+    turnId: turnId,
+    savedAt: savedAt,
+    updatedAt: updatedAt,
+    card: card,
+    route: route,
+    done: count == 0 ? null : count,
+  );
 
   /// The earliest and latest times its stops give, or null without any.
   (DateTime, DateTime)? get span {

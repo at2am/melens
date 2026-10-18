@@ -260,7 +260,7 @@ A plan card the user saves from the chat (UC-03) is kept per uid on `/v1/plans` 
 | --- | --- |
 | `GET /v1/plans` | The caller's saved plans, newest first: `{ "plans": […] }` |
 | `POST /v1/plans` | Save the plan card named by the body `{ "sessionId": …, "cardId": …, "replaces": … }` (`replaces` optional); `201` with `{ "plan": … }`. Saving a card already saved returns that plan |
-| `PATCH /v1/plans/{planId}` | The user's own edits, body `{ "title": …, "stops": [2, 0] }` (at least one): a new name, or the indices (from 0) of the stops to keep in their new order; `200` with `{ "plan": … }` as kept |
+| `PATCH /v1/plans/{planId}` | The user's own edits, body `{ "title": …, "stops": [2, 0], "done": 1 }` (at least one): a new name, the indices (from 0) of the stops to keep in their new order, or how many stops from the first the user has visited; `200` with `{ "plan": … }` as kept |
 | `DELETE /v1/plans/{planId}` | Remove one; `204`, or `404 notFound` |
 | `POST /v1/plans/{planId}/stops/{index}/refresh` | Read one live part of stop `index` (from 0) again, body `{ "part": "parking" }`; `200` with `{ "plan": … }` as kept |
 
@@ -274,7 +274,8 @@ A saved plan:
   "savedAt": "2026-10-16T08:12:00.000Z",
   "updatedAt": "2026-10-17T02:30:00.000Z",
   "card": { "id": "c_t_Xk2…_1", "type": "plan", "title": "A quiet evening walk", "items": […] },
-  "route": { "polyline": "…", "mode": "walk", "distance_m": 3400, "duration_min": 46, "waypoints": […] }
+  "route": { "polyline": "…", "mode": "walk", "distance_m": 3400, "duration_min": 46, "waypoints": […] },
+  "done": 1
 }
 ```
 
@@ -287,6 +288,7 @@ Rules:
 5. **Refreshing a stop.** The service reads the parking sensors around the stop's `location` again, as `find_parking` does, and replaces the stop's `stop_parking`; no model runs. The area's rules are kept from the earlier reading when it had them, and looked up once (cached by place and day) when it did not. Any located stop can be refreshed, also in a plan that was not driven. An unknown plan or stop answers `404 notFound`, a stop without a location `400 invalidRequest` (`.no_location`), another `part` `400`, and a service without the parking reader `503`. A plan removed while the sensors were read stays removed (`404`).
 6. **Replacing.** A save with `replaces` naming one of the caller's saved plans (the app sends the plan the card `revises`) keeps the card in that plan's place: the new plan takes its `savedAt`, gets `updatedAt`, and the replaced plan is removed in the same write. A `replaces` that names no saved plan saves the card as a new plan.
 7. **Editing.** An edit changes only the copy: no model runs, and every kept stop keeps its source. A stop whose stop before it changed loses its `getting_there`, which described the old leg. When the plan has a `route`, the service computes it again (Routes API, in the route's mode) through the kept stops that have a `location`, in their new order, and each leg gives the stop it reaches its time as `getting_there` ("12 min walk"); a route it cannot compute (fewer than two located stops, transit through other than two, no route found) is dropped rather than left through the old stops. An unknown plan answers `404`, a stop index the plan does not have `400 invalidRequest` (`.no_stop`), an empty or unknown body `400`. A plan removed while the route was computed stays removed (`404`).
+8. **Progress.** `done` is how many stops, from the first, the user has marked as visited while following the plan; the next stop is the one at index `done`. It is absent until they mark one, and `done: 0` removes it. An edit whose `stops` drop or move a stop starts it again unless the same edit gives `done`; a title, a stop refresh or `stops` in the same order keep it, and a replacing save starts the new plan without it. A `done` above the number of stops (after `stops`, when given) answers `400 invalidRequest` (`.no_stop`). Marking counts as an edit.
 
 | Document | Fields |
 | --- | --- |

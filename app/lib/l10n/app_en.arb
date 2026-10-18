@@ -3146,6 +3146,51 @@
       }
     }
   },
+  "planProgress": "{done} of {total} visited",
+  "@planProgress": {
+    "description": "How far the user has got through a saved plan.",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "planProgressAllDone": "All stops visited",
+  "@planProgressAllDone": {
+    "description": "A saved plan whose every stop the user marked as visited."
+  },
+  "planProgressNext": "Next: {stop}",
+  "@planProgressNext": {
+    "description": "The stop the user visits next in a saved plan.",
+    "placeholders": {
+      "stop": {
+        "type": "String"
+      }
+    }
+  },
+  "planProgressReset": "Start over",
+  "@planProgressReset": {
+    "description": "Button that clears which stops of a saved plan are visited."
+  },
+  "planStopMarkVisited": "Mark as visited",
+  "@planStopMarkVisited": {
+    "description": "Tooltip of a saved plan stop's circle that marks it, and every stop before it, as visited."
+  },
+  "planStopUnmark": "Mark as not visited",
+  "@planStopUnmark": {
+    "description": "Tooltip of a visited stop's tick that marks it, and every stop after it, as not visited."
+  },
+  "planStopArrived": "I'm here",
+  "@planStopArrived": {
+    "description": "Button on the next stop of a saved plan that marks it as visited."
+  },
+  "planProgressFailed": "Your progress could not be saved. Try again.",
+  "@planProgressFailed": {
+    "description": "Shown when marking a stop as visited failed."
+  },
   "planPast": "Past",
   "@planPast": {
     "description": "Label on a saved plan whose stops are all over."

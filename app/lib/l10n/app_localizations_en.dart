@@ -2325,6 +2325,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String planProgress(int done, int total) {
+    return '$done of $total visited';
+  }
+
+  @override
+  String get planProgressAllDone => 'All stops visited';
+
+  @override
+  String planProgressNext(String stop) {
+    return 'Next: $stop';
+  }
+
+  @override
+  String get planProgressReset => 'Start over';
+
+  @override
+  String get planStopMarkVisited => 'Mark as visited';
+
+  @override
+  String get planStopUnmark => 'Mark as not visited';
+
+  @override
+  String get planStopArrived => 'I\'m here';
+
+  @override
+  String get planProgressFailed =>
+      'Your progress could not be saved. Try again.';
+
+  @override
   String get planPast => 'Past';
 
   @override

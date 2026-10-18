@@ -45,6 +45,9 @@ import 'unlocated_list.dart';
 /// The marker id of the user's own position.
 const userLocationMarkerId = 'user-location';
 
+/// The pin on the place a card item or plan stop opened.
+const cardItemMarkerId = 'card-item-focus';
+
 typedef MapVisibleRegionReader = Future<MapBounds> Function();
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -107,6 +110,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Fits a deferred route or area once more, for a map that only gets its
   /// size a moment after it shows again.
   Timer? _refit;
+  Timer? _labelTimer;
+
+  /// The located card item last opened on the map. Its pin stands while its
+  /// details or its record are open, also when the record's layer is not
+  /// drawn.
+  CardItem? _focusItem;
   CardItem? _awaitingItem;
 
   /// A tapped card item with no map record, shown in the details pane.
@@ -509,16 +518,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// A tapped card item opens its details beside the map. A map record is
   /// selected as if tapped on the map, fetched by id when the map has not
   /// loaded it; any other item shows what the card knows about it. The
-  /// camera moves to the item's location when the map does not show it.
+  /// camera moves to the item's location, where a pin with its name marks
+  /// it.
   void _onCardItemTap(CardItem item) {
     final source = item.source;
+    final location = item.location;
+    _focusItem = location == null ? null : item;
+    if (location != null) {
+      _focusPoint(location);
+      _showLabel(const MarkerId(cardItemMarkerId));
+    }
     if (source is FeatureCardSource) {
       final loaded = _loadedItem(source.featureId);
       if (loaded != null) {
         _selectItem(loaded);
         return;
       }
-      if (item.location case final location?) _focusPoint(location);
       unawaited(
         _selectFeatureById(source.featureId).then((selected) {
           if (!selected && mounted) _showCardItem(item);
@@ -526,15 +541,38 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
       return;
     }
-    if (item.location case final location?) _focusPoint(location);
     _showCardItem(item);
   }
+
+  /// Whether [_focusItem]'s pin stands: while its details, or the record it
+  /// cites, are open.
+  bool _focusShown(MapSelectionState selection) => switch (_focusItem) {
+    null => false,
+    final item when identical(item, _cardItem) => true,
+    CardItem(source: FeatureCardSource(:final featureId)) =>
+      selection.selectedItemId == featureId,
+    _ => false,
+  };
 
   void _showCardItem(CardItem item) {
     ref.read(selectionControllerProvider.notifier).clear();
     setState(() {
       _showUnlocated = false;
       _cardItem = item;
+    });
+  }
+
+  /// Opens the name above [marker] once the camera has reached it, so the
+  /// place the user opened reads at a glance. The marker may not be on the
+  /// map yet, or gone again; then nothing shows.
+  void _showLabel(MarkerId marker) {
+    _labelTimer?.cancel();
+    _labelTimer = Timer(const Duration(milliseconds: 700), () {
+      final controller = _map;
+      if (!mounted || controller == null) return;
+      unawaited(
+        controller.showMarkerInfoWindow(marker).catchError((Object _) {}),
+      );
     });
   }
 
@@ -788,6 +826,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_holdingNearby) _nearby.setActive(false);
     _tickerMode?.removeListener(_onTickerModeChanged);
     _refit?.cancel();
+    _labelTimer?.cancel();
     _regionGeneration++;
     _map = null;
     super.dispose();
@@ -853,6 +892,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           color: scheme.primary,
           stopLabel: (number) => strings.mapRouteStop(number.toString()),
           icons: pins,
+        ),
+      );
+    }
+    if (_focusItem
+        case CardItem(:final title, location: final AgentLatLng location)
+        when _focusShown(selection)) {
+      overlayPlan = overlayPlan.merge(
+        CoreRenderPlan(
+          markers: {
+            Marker(
+              markerId: const MarkerId(cardItemMarkerId),
+              position: LatLng(location.lat, location.lng),
+              icon: pins.focus,
+              infoWindow: InfoWindow(title: title),
+              zIndexInt: 6,
+            ),
+          },
         ),
       );
     }

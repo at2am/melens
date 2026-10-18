@@ -19,9 +19,10 @@ import '../data/saved_plan.dart';
 import '../state/plans_providers.dart';
 
 /// One saved plan, opened from the Home tab: the card as the agent made it,
-/// its route on the map, and a remove button. A stop opens on the map. The
-/// user edits the plan themselves (name, which stops, their order) or has the
-/// agent change it in the chat.
+/// its route on the map, and a remove button. A stop opens on the map. While
+/// following the plan the user ticks off the stops they reached, and the next
+/// one stands out. The user edits the plan themselves (name, which stops,
+/// their order) or has the agent change it in the chat.
 class PlanScreen extends ConsumerWidget {
   const PlanScreen({required this.planId, super.key});
 
@@ -44,6 +45,28 @@ class PlanScreen extends ConsumerWidget {
         .startRefine(plan.card, planId: plan.id);
     context.go(AppRoutes.discover);
     ref.read(chatOpenRequestsProvider.notifier).request();
+  }
+
+  void _openStop(BuildContext context, WidgetRef ref, CardItem item) {
+    ref.read(cardItemRequestsProvider.notifier).request(item);
+    context.go(AppRoutes.discover);
+  }
+
+  /// Keeps the first [count] stops as visited; says so when that failed.
+  Future<void> _setVisited(
+    BuildContext context,
+    WidgetRef ref,
+    int count,
+  ) async {
+    final strings = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(savedPlansProvider.notifier).setVisited(planId, count);
+    } on AgentClientException {
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.planProgressFailed)),
+      );
+    }
   }
 
   Future<void> _remove(BuildContext context, WidgetRef ref) async {
@@ -124,27 +147,64 @@ class PlanScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
+                PlanProgressHeader(
+                  plan: plan,
+                  onOpenNext: (item) => _openStop(context, ref, item),
+                  onReset: () => unawaited(_setVisited(context, ref, 0)),
+                ),
                 AgentCardView(
                   card: plan.card,
                   icon: Icons.route_outlined,
                   numbered: true,
-                  // A stop the user drives to can read its parking again,
-                  // for example on reaching the stop before it.
-                  itemFooter: (index, item) =>
-                      item.location != null &&
-                          (plan.card.travelMode == TravelMode.drive ||
-                              item.stopParking != null)
-                      ? StopParkingRefresh(
-                          key: ValueKey('plan-stop-refresh-$index'),
-                          planId: plan.id,
-                          index: index,
-                          hasParking: item.stopParking != null,
-                        )
-                      : null,
-                  onItemTap: (item) {
-                    ref.read(cardItemRequestsProvider.notifier).request(item);
-                    context.go(AppRoutes.discover);
+                  currentItem: plan.nextStop,
+                  itemLeading: (index, item) => StopVisitedMark(
+                    key: ValueKey('plan-stop-mark-$index'),
+                    number: index + 1,
+                    visited: index < plan.visited,
+                    next: index == plan.nextStop,
+                    // A tick marks the stops before too; taking one off
+                    // takes off the stops after.
+                    onPressed: () => unawaited(
+                      _setVisited(
+                        context,
+                        ref,
+                        index < plan.visited ? index : index + 1,
+                      ),
+                    ),
+                  ),
+                  itemFooter: (index, item) {
+                    // A stop the user drives to can read its parking again,
+                    // for example on reaching the stop before it.
+                    final parking =
+                        item.location != null &&
+                            (plan.card.travelMode == TravelMode.drive ||
+                                item.stopParking != null)
+                        ? StopParkingRefresh(
+                            key: ValueKey('plan-stop-refresh-$index'),
+                            planId: plan.id,
+                            index: index,
+                            hasParking: item.stopParking != null,
+                          )
+                        : null;
+                    if (index != plan.nextStop) return parking;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ?parking,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: FilledButton.tonalIcon(
+                            key: ValueKey('plan-stop-arrived-$index'),
+                            onPressed: () =>
+                                unawaited(_setVisited(context, ref, index + 1)),
+                            icon: const Icon(Icons.check, size: 18),
+                            label: Text(strings.planStopArrived),
+                          ),
+                        ),
+                      ],
+                    );
                   },
+                  onItemTap: (item) => _openStop(context, ref, item),
                   onOpenSource: supportsPublicSourceOpening
                       ? openPublicSource
                       : null,
@@ -259,6 +319,146 @@ class _StopParkingRefreshState extends ConsumerState<StopParkingRefresh> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// How far the user has got through a saved plan: a bar, the count, and the
+/// stop to visit next, which opens on the map. Starting over clears the
+/// ticks. Nothing shows until a stop is ticked.
+class PlanProgressHeader extends StatelessWidget {
+  const PlanProgressHeader({
+    required this.plan,
+    required this.onOpenNext,
+    required this.onReset,
+    super.key,
+  });
+
+  final SavedPlan plan;
+  final ValueChanged<CardItem> onOpenNext;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final visited = plan.visited;
+    if (visited == 0) return const SizedBox.shrink();
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final total = plan.card.items.length;
+    final next = switch (plan.nextStop) {
+      final index? => plan.card.items[index],
+      null => null,
+    };
+    return Padding(
+      key: const ValueKey('plan-progress'),
+      padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  next == null
+                      ? strings.planProgressAllDone
+                      : strings.planProgress(visited, total),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('plan-progress-reset'),
+                onPressed: onReset,
+                child: Text(strings.planProgressReset),
+              ),
+            ],
+          ),
+          LinearProgressIndicator(
+            value: visited / total,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          if (next != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TextButton.icon(
+                key: const ValueKey('plan-progress-next'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                ),
+                onPressed: () => onOpenNext(next),
+                icon: const Icon(Icons.place, size: 18),
+                label: Text(
+                  strings.planProgressNext(next.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A saved plan stop's mark: its number until it is visited, then a tick.
+/// The next stop's number is in the accent colour.
+class StopVisitedMark extends StatelessWidget {
+  const StopVisitedMark({
+    required this.number,
+    required this.visited,
+    required this.next,
+    required this.onPressed,
+    super.key,
+  });
+
+  final int number;
+  final bool visited;
+  final bool next;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Tooltip(
+      message: visited ? strings.planStopUnmark : strings.planStopMarkVisited,
+      child: Semantics(
+        button: true,
+        checked: visited,
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 22,
+          child: Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: visited
+                  ? colors.primary
+                  : next
+                  ? colors.primaryContainer
+                  : colors.surfaceContainerHighest,
+              border: Border.all(
+                color: visited || next ? colors.primary : colors.outline,
+                width: next ? 2 : 1,
+              ),
+            ),
+            child: visited
+                ? Icon(Icons.check, size: 18, color: colors.onPrimary)
+                : Text(
+                    '$number',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: next ? FontWeight.w700 : null,
+                      color: next
+                          ? colors.onPrimaryContainer
+                          : colors.onSurfaceVariant,
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }

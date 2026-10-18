@@ -75,6 +75,8 @@ class AgentCardView extends ConsumerWidget {
     this.onOpenSource,
     this.footer,
     this.itemFooter,
+    this.itemLeading,
+    this.currentItem,
     super.key,
   });
 
@@ -87,6 +89,14 @@ class AgentCardView extends ConsumerWidget {
   /// Actions inside one item's tile, for example refreshing a saved plan
   /// stop's parking; null for none.
   final Widget? Function(int index, CardItem item)? itemFooter;
+
+  /// What stands before one item in place of its number, for example a
+  /// saved plan stop's visited tick; null keeps the number.
+  final Widget? Function(int index, CardItem item)? itemLeading;
+
+  /// The item drawn outlined in the accent colour, for example the stop the
+  /// user visits next; null for none.
+  final int? currentItem;
 
   /// Plans list stops in visiting order.
   final bool numbered;
@@ -147,6 +157,8 @@ class AgentCardView extends ConsumerWidget {
                 key: ValueKey('agent-card-item-${card.id}-$index'),
                 item: item,
                 index: numbered ? index + 1 : null,
+                leading: itemLeading?.call(index, item),
+                current: index == currentItem,
                 clock: clock,
                 onTap: onItemTap == null ? null : () => onItemTap!(item),
                 onOpenSource: onOpenSource,
@@ -196,6 +208,8 @@ class _CardItemView extends StatelessWidget {
     required this.item,
     required this.index,
     required this.clock,
+    this.leading,
+    this.current = false,
     this.onTap,
     this.onOpenSource,
     this.onBayTap,
@@ -205,6 +219,8 @@ class _CardItemView extends StatelessWidget {
 
   final CardItem item;
   final int? index;
+  final Widget? leading;
+  final bool current;
   final MelbourneClock clock;
   final VoidCallback? onTap;
   final ValueChanged<Uri>? onOpenSource;
@@ -225,7 +241,9 @@ class _CardItemView extends StatelessWidget {
     final recommended = parking?.recommended ?? false;
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(10),
-      side: recommended
+      side: current
+          ? BorderSide(color: colors.primary, width: 2.5)
+          : recommended
           ? BorderSide(color: colors.primary, width: 1.5)
           : BorderSide(color: colors.outlineVariant),
     );
@@ -243,7 +261,12 @@ class _CardItemView extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (index case final number?)
+                if (leading != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: leading,
+                  )
+                else if (index case final number?)
                   Padding(
                     padding: const EdgeInsets.only(right: 8, top: 2),
                     child: CircleAvatar(

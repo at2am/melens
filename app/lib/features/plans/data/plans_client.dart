@@ -21,10 +21,16 @@ abstract interface class PlansClient {
     String? replaces,
   });
 
-  /// `PATCH /v1/plans/{id}`: the user's own edits, a new [title] or the
-  /// [stops] to keep (indices from 0) in their new order. Returns the plan
-  /// as kept, with its route drawn again or dropped.
-  Future<SavedPlan> edit(String id, {String? title, List<int>? stops});
+  /// `PATCH /v1/plans/{id}`: the user's own edits, a new [title], the
+  /// [stops] to keep (indices from 0) in their new order, or how many stops
+  /// are [done]. Returns the plan as kept, with its route drawn again or
+  /// dropped.
+  Future<SavedPlan> edit(
+    String id, {
+    String? title,
+    List<int>? stops,
+    int? done,
+  });
 
   /// `DELETE /v1/plans/{id}`.
   Future<void> remove(String id);
@@ -79,11 +85,16 @@ final class HttpPlansClient implements PlansClient {
   }
 
   @override
-  Future<SavedPlan> edit(String id, {String? title, List<int>? stops}) async {
+  Future<SavedPlan> edit(
+    String id, {
+    String? title,
+    List<int>? stops,
+    int? done,
+  }) async {
     final json = await _transport.json(
       'PATCH',
       ['v1', 'plans', id],
-      body: {'title': ?title, 'stops': ?stops},
+      body: {'title': ?title, 'stops': ?stops, 'done': ?done},
     );
     return _decode(
       () => SavedPlan.fromJson(json!['plan'] as Map<String, dynamic>),

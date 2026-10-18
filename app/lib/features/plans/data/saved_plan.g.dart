@@ -23,6 +23,7 @@ SavedPlan _$SavedPlanFromJson(Map<String, dynamic> json) =>
         ),
         updatedAt: $checkedConvert('updatedAt', (v) => v as String?),
         route: $checkedConvert('route', (v) => v as Map<String, dynamic>?),
+        done: $checkedConvert('done', (v) => (v as num?)?.toInt()),
       );
       return val;
     });
@@ -35,4 +36,5 @@ Map<String, dynamic> _$SavedPlanToJson(SavedPlan instance) => <String, dynamic>{
   'updatedAt': ?instance.updatedAt,
   'card': instance.card.toJson(),
   'route': ?instance.route,
+  'done': ?instance.done,
 };
